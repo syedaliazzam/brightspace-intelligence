@@ -1,0 +1,43 @@
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Role {
+  id          String  @id @default(uuid()) @db.Uuid
+  name        String  @unique @db.VarChar(50)
+  description String?
+  created_at  DateTime? @default(now())
+
+  users       User[]
+
+  @@map("roles")
+}
+enum user_status {
+  pending
+  active
+  suspended
+  archived
+}
+model User {
+  id                 String      @id @default(uuid()) @db.Uuid
+  role_id            String      @db.Uuid
+  full_name          String      @db.VarChar(150)
+  email              String?     @unique @db.VarChar(150)
+  phone              String?     @unique @db.VarChar(30)
+  password_hash      String?
+  status             user_status @default(pending)
+  must_change_password Boolean?  @default(true)
+  last_login_at      DateTime?
+  created_at         DateTime?   @default(now())
+  updated_at         DateTime?   @default(now())
+
+  role               Role        @relation(fields: [role_id], references: [id])
+
+  @@map("users")
+}
