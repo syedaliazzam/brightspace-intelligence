@@ -1,7 +1,6 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 import PaymentProofPreview from "@/components/coordinator/PaymentProofPreview";
 
@@ -36,8 +35,7 @@ function formatDate(value) {
   }).format(date);
 }
 
-export default function PaymentVerificationTable({ items }) {
-  const router = useRouter();
+export default function PaymentVerificationTable({ items, onRefresh }) {
   const [pendingId, setPendingId] = useState("");
   const [selectedItem, setSelectedItem] = useState(null);
 
@@ -81,7 +79,7 @@ export default function PaymentVerificationTable({ items }) {
         return;
       }
 
-      router.refresh();
+      onRefresh?.();
     } catch (error) {
       window.alert(error instanceof Error ? error.message : "Payment verification failed.");
     } finally {

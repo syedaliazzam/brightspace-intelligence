@@ -18,29 +18,65 @@ export async function GET(request) {
 
     const { searchParams } = new URL(request.url);
     const filter = normalizeText(searchParams.get("status")).toLowerCase();
-    const pendingCondition = "(LOWER(ls.status::text) IN ('completed_by_teacher', 'live') OR (LOWER(ls.status::text) = 'scheduled' AND ls.scheduled_end < NOW()))";
-    const historyCondition = `${pendingCondition} OR LOWER(ls.status::text) = 'verified_by_coordinator' OR LOWER(ls.status::text) IN ('disputed', 'missed')`;
-    let whereClause = `WHERE ${pendingCondition}`;
+    const needsReviewCondition = `
+      ls.status::text = 'completed_by_teacher'
+      AND NOT EXISTS (
+        SELECT 1
+        FROM lecture_verifications lv2
+        WHERE lv2.lecture_id = ls.id
+          AND LOWER(lv2.decision::text) = 'approved'
+      )
+    `;
+    const approvedCondition = `
+      (
+        ls.status::text = 'verified_by_coordinator'
+        OR EXISTS (
+          SELECT 1
+          FROM lecture_verifications lv2
+          WHERE lv2.lecture_id = ls.id
+            AND LOWER(lv2.decision::text) = 'approved'
+        )
+      )
+    `;
+    const rejectedCondition = `
+      EXISTS (
+        SELECT 1
+        FROM lecture_verifications lv2
+        WHERE lv2.lecture_id = ls.id
+          AND LOWER(lv2.decision::text) = 'rejected'
+      )
+    `;
+    const missedCondition = `ls.status::text = 'missed'`;
+    let whereClause = `WHERE ${needsReviewCondition}`;
     let orderClause = "ORDER BY ls.scheduled_start ASC";
 
     if (filter === "pending") {
-      whereClause = `WHERE ${pendingCondition}`;
+      whereClause = `WHERE ${needsReviewCondition}`;
       orderClause = "ORDER BY ls.scheduled_start ASC";
     } else if (filter === "verified") {
-      whereClause = "WHERE LOWER(ls.status::text) = 'verified_by_coordinator'";
+      whereClause = `WHERE ${approvedCondition}`;
       orderClause = "ORDER BY ls.scheduled_start DESC";
     } else if (filter === "rejected") {
-      whereClause = "WHERE LOWER(ls.status::text) IN ('disputed', 'missed')";
+      whereClause = `WHERE ${rejectedCondition}`;
+      orderClause = "ORDER BY ls.scheduled_start DESC";
+    } else if (filter === "missed") {
+      whereClause = `WHERE ${missedCondition}`;
       orderClause = "ORDER BY ls.scheduled_start DESC";
     } else if (filter === "all" || filter === "history") {
-      whereClause = `WHERE ${historyCondition}`;
+      whereClause = `WHERE ${needsReviewCondition} OR ${approvedCondition} OR ${rejectedCondition} OR ${missedCondition}`;
       orderClause = "ORDER BY ls.scheduled_start DESC";
     }
 
     const [pendingRows, verifiedRows, rejectedRows, items] = await Promise.all([
-      prisma.$queryRaw`SELECT COUNT(*)::int AS total FROM lecture_schedules WHERE status IN ('completed_by_teacher','live') OR (status = 'scheduled' AND scheduled_end < NOW())`,
-      prisma.$queryRaw`SELECT COUNT(*)::int AS total FROM lecture_schedules WHERE status = 'verified_by_coordinator'`,
-      prisma.$queryRaw`SELECT COUNT(*)::int AS total FROM lecture_schedules WHERE status IN ('disputed', 'missed')`,
+      prisma.$queryRawUnsafe(
+        `SELECT COUNT(DISTINCT ls.id)::int AS total FROM lecture_schedules ls WHERE ${needsReviewCondition}`
+      ),
+      prisma.$queryRawUnsafe(
+        `SELECT COUNT(DISTINCT ls.id)::int AS total FROM lecture_schedules ls WHERE ${approvedCondition}`
+      ),
+      prisma.$queryRawUnsafe(
+        `SELECT COUNT(DISTINCT ls.id)::int AS total FROM lecture_schedules ls WHERE ${rejectedCondition} OR ${missedCondition}`
+      ),
       prisma.$queryRawUnsafe(
         `
         SELECT

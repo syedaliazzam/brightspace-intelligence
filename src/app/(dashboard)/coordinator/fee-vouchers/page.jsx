@@ -30,9 +30,24 @@ async function getEligibleLeads() {
       parent_name,
       email,
       phone,
-      LOWER(status::text) AS status
+      LOWER(status::text) AS status,
+      CASE
+        WHEN status::text = 'new_lead'
+         AND NOT EXISTS (
+           SELECT 1
+           FROM fee_vouchers fv
+           WHERE fv.registration_id = registration_leads.id
+         )
+        THEN true
+        ELSE false
+      END AS can_create_voucher
     FROM registration_leads
-    WHERE LOWER(status::text) IN ('new_lead', 'pending_clarification')
+    WHERE LOWER(status::text) = 'new_lead'
+      AND NOT EXISTS (
+        SELECT 1
+        FROM fee_vouchers fv
+        WHERE fv.registration_id = registration_leads.id
+      )
     ORDER BY created_at DESC NULLS LAST, id DESC
   `;
 }

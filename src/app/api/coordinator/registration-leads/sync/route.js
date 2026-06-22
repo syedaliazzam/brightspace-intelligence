@@ -152,7 +152,7 @@ function validateLead(lead) {
   }
 
   if (!lead.email && !lead.phone) {
-    return "Missing email or phone.";
+    return "Missing emai.";
   }
 
   if (!lead.classLevel) {

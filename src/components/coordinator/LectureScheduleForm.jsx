@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 export default function LectureScheduleForm({ options, onSuccess }) {
   const [form, setForm] = useState({
@@ -18,9 +18,11 @@ export default function LectureScheduleForm({ options, onSuccess }) {
   const [students, setStudents] = useState([]);
   const [subjects, setSubjects] = useState([]);
   const [teachers, setTeachers] = useState([]);
+  const [teacherNotice, setTeacherNotice] = useState("");
   const [loadingOptions, setLoadingOptions] = useState(false);
   const [teachersLoading, setTeachersLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const assignmentLookupRef = useRef(0);
 
   useEffect(() => {
     let active = true;
@@ -49,6 +51,7 @@ export default function LectureScheduleForm({ options, onSuccess }) {
         setStudents([]);
         setSubjects([]);
         setTeachers([]);
+        setTeacherNotice("");
         return;
       }
 
@@ -103,14 +106,18 @@ export default function LectureScheduleForm({ options, onSuccess }) {
     async function loadAssignedTeachers() {
       if (!form.courseId || !form.subjectId) {
         setTeachers([]);
+        setTeacherNotice("");
+        setForm((current) => ({ ...current, teacherId: "" }));
         return;
       }
 
       setTeachersLoading(true);
+      setTeacherNotice("");
 
       try {
+        const lookupId = ++assignmentLookupRef.current;
         const response = await fetch(
-          `/api/coordinator/classes/${form.courseId}/subjects/${form.subjectId}/teachers`,
+          `/api/coordinator/teacher-assignments/lookup?course_id=${encodeURIComponent(form.courseId)}&subject_id=${encodeURIComponent(form.subjectId)}`,
           { cache: "no-store" }
         );
         const data = await response.json();
@@ -120,11 +127,26 @@ export default function LectureScheduleForm({ options, onSuccess }) {
         }
 
         if (active) {
-          setTeachers(data.items || []);
+          const assignedTeachers = data.items || [];
+          setTeachers(assignedTeachers);
+
+          if (lookupId === assignmentLookupRef.current) {
+            if (assignedTeachers.length === 1) {
+              setForm((current) => ({ ...current, teacherId: assignedTeachers[0].teacher_id }));
+            } else {
+              setForm((current) => ({ ...current, teacherId: "" }));
+            }
+          }
+
+          if (!assignedTeachers.length) {
+            setTeacherNotice("No teacher assigned for this class and subject.");
+          }
         }
       } catch {
         if (active) {
           setTeachers([]);
+          setTeacherNotice("No teacher assigned for this class and subject.");
+          setForm((current) => ({ ...current, teacherId: "" }));
         }
       } finally {
         if (active) {
@@ -243,6 +265,8 @@ export default function LectureScheduleForm({ options, onSuccess }) {
       });
       setStudents([]);
       setSubjects([]);
+      setTeachers([]);
+      setTeacherNotice("");
       onSuccess?.();
     } catch (error) {
       window.alert(error instanceof Error ? error.message : "Unable to schedule lecture.");
@@ -265,22 +289,22 @@ export default function LectureScheduleForm({ options, onSuccess }) {
         {subjects.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
       </select>
 
-      <select value={form.teacherId} onChange={(event) => setForm((current) => ({ ...current, teacherId: event.target.value }))} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm">
+      <select
+        value={form.teacherId}
+        onChange={(event) => setForm((current) => ({ ...current, teacherId: event.target.value }))}
+        className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm"
+      >
         <option value="">
-          {teachersLoading
-            ? "Loading assigned teacher..."
-            : form.subjectId
-              ? "Select assigned teacher"
-              : "Select subject first"}
+          {teachersLoading ? "Loading assigned teacher..." : form.subjectId ? "Select assigned teacher" : "Select subject first"}
         </option>
-        {teachers.map((item) => <option key={item.id} value={item.id}>{item.full_name}</option>)}
+        {teachers.map((item) => (
+          <option key={item.teacher_id} value={item.teacher_id}>
+            {item.teacher_name}
+          </option>
+        ))}
       </select>
 
-      {form.courseId && form.subjectId && !teachersLoading && !teachers.length ? (
-        <p className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-          No teacher is assigned to this class subject yet. Assign a teacher first.
-        </p>
-      ) : null}
+      {teacherNotice ? <p className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">{teacherNotice}</p> : null}
 
       <input value={form.title} onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))} placeholder="Lecture title" className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm" />
       <input

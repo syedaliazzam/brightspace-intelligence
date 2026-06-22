@@ -74,7 +74,8 @@ async function generateNextRollNo(classLevel, tx) {
 }
 
 function buildStudentEmailFromRollNo(rollNo) {
-  return `${String(rollNo || "").trim().toLowerCase()}@students.local`;
+  const value = String(rollNo || "").trim().toLowerCase();
+  return value ? `${value}@students.lms` : "";
 }
 
 async function insertAuditLog(

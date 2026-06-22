@@ -95,7 +95,7 @@ export async function PUT(request) {
 
     if (!id) return json("Parent id is required.", 400);
     if (!fullName) return json("Parent name is required.", 400);
-    if (!email && !phone) return json("Parent email or phone is required.", 400);
+    if (!email && !phone) return json("Parent email is required.", 400);
     if (status && !["active", "suspended", "archived"].includes(status)) {
       return json("Invalid parent status.", 400);
     }

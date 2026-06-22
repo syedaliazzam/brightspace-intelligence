@@ -41,17 +41,17 @@ export async function GET(request) {
 
   if (status && VALID_STATUSES.has(status)) {
     values.push(status);
-    conditions.push(`effective_status = $${values.length}`);
+    conditions.push(`LOWER(rl.status::text) = $${values.length}`);
   }
 
   if (search) {
     const term = `%${search}%`;
     values.push(term);
     conditions.push(`(
-        student_name ILIKE $${values.length}
-        OR parent_name ILIKE $${values.length}
-        OR email ILIKE $${values.length}
-        OR phone ILIKE $${values.length}
+        rl.student_name ILIKE $${values.length}
+        OR rl.parent_name ILIKE $${values.length}
+        OR rl.email ILIKE $${values.length}
+        OR rl.phone ILIKE $${values.length}
       )`);
   }
 
@@ -62,48 +62,27 @@ export async function GET(request) {
   try {
     const leads = await prisma.$queryRawUnsafe(
       `
-      WITH lead_rows AS (
-        SELECT
-          rl.*,
-          EXISTS (
-            SELECT 1
-            FROM fee_vouchers fv
-            WHERE fv.registration_id = rl.id
-          ) AS has_voucher,
-          CASE
-            WHEN rl.status::text = 'voucher_created'
-              AND NOT EXISTS (
-                SELECT 1
-                FROM fee_vouchers fv
-                WHERE fv.registration_id = rl.id
-              )
-            THEN 'new_lead'
-            ELSE LOWER(rl.status::text)
-          END AS effective_status
-        FROM registration_leads rl
-      )
-      SELECT
-        id::text AS id,
-        google_sheet_row_id,
-        created_at AS submitted_at,
-        student_name,
-        parent_name,
-        NULL::text AS parent_relation,
-        email,
-        phone,
-        age AS student_age,
-        class_level,
-        subject_interest,
-        preferred_schedule,
-        address,
-        NULL::text AS city,
-        notes,
-        source,
-        has_voucher,
-        effective_status AS status
-      FROM lead_rows
-      ${whereClause}
-      ORDER BY updated_at DESC NULLS LAST, created_at DESC NULLS LAST, id DESC
+    SELECT
+      rl.id::text AS id,
+      rl.student_name,
+      rl.parent_name,
+      rl.class_level,
+      rl.parent_relation,
+      rl.preferred_schedule,
+      rl.created_at AS submitted_at,
+      rl.email,
+      rl.phone,
+      LOWER(rl.status::text) AS status,
+      fv.id::text AS voucher_id,
+      LOWER(fv.status::text) AS voucher_status,
+      CASE
+        WHEN rl.status::text = 'new_lead' AND fv.id IS NULL THEN true
+        ELSE false
+      END AS can_create_voucher
+    FROM registration_leads rl
+    LEFT JOIN fee_vouchers fv ON fv.registration_id = rl.id
+    ${whereClause}
+    ORDER BY rl.created_at DESC NULLS LAST, rl.id DESC
       `,
       ...values
     );

@@ -19,6 +19,7 @@ import LectureScheduleForm from "@/components/coordinator/LectureScheduleForm";
 import LectureScheduleTable from "@/components/coordinator/LectureScheduleTable";
 import LectureVerificationTable from "@/components/coordinator/LectureVerificationTable";
 import CoordinatorReportsPanel from "@/components/coordinator/CoordinatorReportsPanel";
+import CoordinatorGoTopButton from "@/components/coordinator/CoordinatorGoTopButton";
 
 const CACHE_KEY = "coordinator-dashboard";
 const CACHE_TTL = 60 * 1000;
@@ -245,6 +246,32 @@ export default function CoordinatorDashboardPage() {
 
   const stats = state.stats || {};
   const reportData = state.reports || null;
+  async function refreshTeacherAssignments() {
+    const response = await fetch("/api/coordinator/teacher-assignments", { cache: "no-store" });
+    const payload = await response.json();
+    if (!response.ok) {
+      throw new Error(payload?.message || "Unable to refresh teacher assignments.");
+    }
+    setState((current) => ({ ...current, assignments: payload.items || [], assignmentOptions: payload }));
+  }
+
+  async function refreshLectureSchedules() {
+    const response = await fetch("/api/coordinator/lecture-schedules", { cache: "no-store" });
+    const payload = await response.json();
+    if (!response.ok) {
+      throw new Error(payload?.message || "Unable to refresh lecture schedules.");
+    }
+    setState((current) => ({ ...current, schedules: payload.items || [], scheduleOptions: payload }));
+  }
+
+  async function refreshPayments() {
+    const response = await fetch("/api/coordinator/payments", { cache: "no-store" });
+    const payload = await response.json();
+    if (!response.ok) {
+      throw new Error(payload?.message || "Unable to refresh payments.");
+    }
+    setState((current) => ({ ...current, payments: payload.items || [] }));
+  }
   const filteredLeads = state.leads
     .filter((lead) => {
       const search = leadFilter.search.trim().toLowerCase();
@@ -310,10 +337,7 @@ export default function CoordinatorDashboardPage() {
             { key: "pendingVouchers", label: "Pending vouchers", value: state.loading ? "..." : stats.pendingVouchers || 0 },
             { key: "pendingPaymentVerifications", label: "Pending payment verifications", value: state.loading ? "..." : stats.pendingPaymentVerifications || 0 },
             { key: "activeStudents", label: "Active students", value: state.loading ? "..." : stats.activeStudents || 0 },
-            { key: "todayClasses", label: "Today lectures", value: state.loading ? "..." : stats.todayClasses || 0 },
-            { key: "classesNeedingVerification", label: "Lectures needing verification", value: state.loading ? "..." : stats.classesNeedingVerification || 0 },
-            { key: "missedClasses", label: "Missed lectures", value: state.loading ? "..." : stats.missedClasses || 0 },
-            { key: "rescheduledClasses", label: "Rescheduled lectures", value: state.loading ? "..." : stats.rescheduledClasses || 0 },
+            { key: "lectureNeedsApproval", label: "Lecture needs approval", value: state.loading ? "..." : stats.lectureNeedsApproval || 0 },
           ]}
         />
       </CoordinatorPortalSection>
@@ -346,7 +370,7 @@ export default function CoordinatorDashboardPage() {
             initialStatus={voucherFilter.status}
             onFilterChange={(next) => setVoucherFilter(next)}
           />
-          <FeeVoucherForm leads={state.voucherLeads} />
+          <FeeVoucherForm leads={state.leads} />
           <ShowMoreSection
             items={filteredVouchers}
             renderItems={(visibleItems) => <FeeVoucherTable vouchers={visibleItems} />}
@@ -358,7 +382,9 @@ export default function CoordinatorDashboardPage() {
       <CoordinatorPortalSection id="payments" title="Payments" description="Verification queue." showBrand={false}>
         <ShowMoreSection
           items={state.payments}
-          renderItems={(visibleItems) => <PaymentVerificationTable items={visibleItems} />}
+          renderItems={(visibleItems) => (
+            <PaymentVerificationTable items={visibleItems} onRefresh={() => void refreshPayments()} />
+          )}
           emptyMessage="No payment submissions match the current filter."
         />
       </CoordinatorPortalSection>
@@ -381,10 +407,15 @@ export default function CoordinatorDashboardPage() {
 
       <CoordinatorPortalSection id="teacher-assignments" title="Teacher Assignments" description="Assignment workspace." showBrand={false}>
         <div className="space-y-4">
-          <TeacherAssignmentForm options={state.assignmentOptions} onSuccess={() => window.location.reload()} />
+          <TeacherAssignmentForm
+            options={state.assignmentOptions}
+            onSuccess={() => {
+              void refreshTeacherAssignments();
+            }}
+          />
           <ShowMoreSection
             items={state.assignments}
-            renderItems={(visibleItems) => <TeacherAssignmentTable items={visibleItems} />}
+            renderItems={(visibleItems) => <TeacherAssignmentTable items={visibleItems} onRefresh={() => void refreshTeacherAssignments()} />}
             emptyMessage="No teacher assignments available."
           />
         </div>
@@ -392,10 +423,15 @@ export default function CoordinatorDashboardPage() {
 
       <CoordinatorPortalSection id="lecture-scheduler" title="Lecture Scheduler" description="Scheduling workspace." showBrand={false}>
         <div className="space-y-4">
-          <LectureScheduleForm options={state.scheduleOptions} onSuccess={() => window.location.reload()} />
+          <LectureScheduleForm
+            options={state.scheduleOptions}
+            onSuccess={() => {
+              void refreshLectureSchedules();
+            }}
+          />
           <ShowMoreSection
             items={state.schedules}
-            renderItems={(visibleItems) => <LectureScheduleTable items={visibleItems} />}
+            renderItems={(visibleItems) => <LectureScheduleTable items={visibleItems} onRefresh={() => void refreshLectureSchedules()} />}
             emptyMessage="No lecture schedules available."
           />
         </div>
@@ -412,6 +448,7 @@ export default function CoordinatorDashboardPage() {
       <CoordinatorPortalSection id="reports" title="Reports" description="Operational reports." showBrand={false}>
         <CoordinatorReportsPanel data={reportData || state.recentReportData || {}} />
       </CoordinatorPortalSection>
+      <CoordinatorGoTopButton />
     </div>
   );
 }

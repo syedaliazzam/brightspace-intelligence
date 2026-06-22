@@ -41,13 +41,6 @@ const REPORTS = [
     valueLabel: "Payments",
   },
   {
-    key: "lectureCompletion",
-    title: "Class Delivery",
-    description: "Lecture schedules grouped by delivery outcome.",
-    itemLabel: "Class status",
-    valueLabel: "Classes",
-  },
-  {
     key: "teacherClassReport",
     title: "Teacher Workload",
     description: "Teachers with the highest number of assigned classes.",
@@ -145,50 +138,31 @@ export default function CoordinatorReportsPanel({ data }) {
         ))}
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-2">
-        <section className="rounded-[1.75rem] border border-white/70 bg-white/90 p-5 shadow-[0_20px_70px_-36px_rgba(15,23,42,0.25)]">
-          <p className="text-sm font-semibold uppercase tracking-[0.22em] text-sky-700">Recent Leads</p>
-          <p className="mt-2 text-sm leading-6 text-slate-500">Latest registration leads shown in a compact portal table.</p>
-          <div className="mt-5 overflow-hidden rounded-2xl border border-slate-200">
-            <div className="grid grid-cols-[1.1fr_1fr_.8fr_.8fr_120px] bg-slate-50 px-4 py-3 text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
-              <span>Student</span>
-              <span>Parent</span>
-              <span>Class</span>
-              <span>Status</span>
-              <span className="text-right">Created</span>
-            </div>
-            {(data?.recentLeads || []).length ? data.recentLeads.map((row) => (
-              <div key={row.id} className="grid grid-cols-[1.1fr_1fr_.8fr_.8fr_120px] border-t border-slate-100 px-4 py-3 text-sm">
-                <span className="text-slate-600">{row.student_name}</span>
-                <span className="text-slate-600">{row.parent_name || "-"}</span>
-                <span className="text-slate-600">{row.class_level || "-"}</span>
-                <span className="text-slate-600">{row.status || "-"}</span>
-                <span className="text-right text-slate-500">{formatDate(row.created_at)}</span>
-              </div>
-            )) : <p className="border-t border-slate-100 px-4 py-4 text-sm text-slate-500">No recent leads found.</p>}
-          </div>
-        </section>
-
+      <div className="grid gap-6">
         <section className="rounded-[1.75rem] border border-white/70 bg-white/90 p-5 shadow-[0_20px_70px_-36px_rgba(15,23,42,0.25)]">
           <p className="text-sm font-semibold uppercase tracking-[0.22em] text-sky-700">Recent Lectures</p>
           <p className="mt-2 text-sm leading-6 text-slate-500">Latest scheduled lectures shown in a compact portal table.</p>
-          <div className="mt-5 overflow-hidden rounded-2xl border border-slate-200">
-            <div className="grid grid-cols-[1fr_1fr_1fr_1fr_120px] bg-slate-50 px-4 py-3 text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+          <div className="mt-5 overflow-x-auto rounded-2xl border border-slate-200">
+            <div className="min-w-[860px]">
+            <div className="grid grid-cols-[1fr_1fr_1fr_1fr_120px_110px] bg-slate-50 px-6 py-3 text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
               <span>Title</span>
               <span>Subject</span>
               <span>Teacher</span>
-              <span>Student / Class</span>
-              <span className="text-right">Scheduled</span>
+              <span>Class</span>
+              <span className="text-right">Scheduled Time</span>
+              <span className="text-right">Status</span>
             </div>
             {(data?.recentLectures || []).length ? data.recentLectures.map((row) => (
-              <div key={row.id} className="grid grid-cols-[1fr_1fr_1fr_1fr_120px] border-t border-slate-100 px-4 py-3 text-sm">
+              <div key={row.id} className="grid grid-cols-[1fr_1fr_1fr_1fr_120px_110px] border-t border-slate-100 px-6 py-3 text-sm">
                 <span className="text-slate-600">{row.title}</span>
                 <span className="text-slate-600">{row.subject_name || "-"}</span>
                 <span className="text-slate-600">{row.teacher_name || "-"}</span>
-                <span className="text-slate-600">{row.student_name || "-"}</span>
+                <span className="text-slate-600">{row.class_name || "-"}</span>
                 <span className="text-right text-slate-500">{formatDate(row.scheduled_start)}</span>
+                <span className="text-right text-slate-600">{row.status || "-"}</span>
               </div>
             )) : <p className="border-t border-slate-100 px-4 py-4 text-sm text-slate-500">No recent lectures found.</p>}
+            </div>
           </div>
         </section>
       </div>

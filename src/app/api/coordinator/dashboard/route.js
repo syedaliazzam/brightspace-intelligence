@@ -20,10 +20,7 @@ export async function GET() {
       pendingVoucherRows,
       pendingPaymentRows,
       activeStudentRows,
-      todayClassesRows,
-      needsVerificationRows,
-      missedClassesRows,
-      rescheduledRows,
+      lectureApprovalRows,
       recentLectures,
       recentLeads,
     ] = await Promise.all([
@@ -32,32 +29,30 @@ export async function GET() {
       prisma.$queryRaw`SELECT COUNT(*)::int AS total FROM fee_submissions WHERE status = 'pending'`,
       prisma.$queryRaw`SELECT COUNT(*)::int AS total FROM student_profiles WHERE status = 'active'`,
       prisma.$queryRaw`
-        SELECT COUNT(*)::int AS total
-        FROM lecture_schedules
-        WHERE scheduled_start >= ${todayRange.start}::timestamp
-          AND scheduled_start <= ${todayRange.end}::timestamp
-          AND status IN ('scheduled', 'upcoming', 'live', 'completed_by_teacher')
+        SELECT COUNT(DISTINCT ls.id)::int AS lectures_needing_approval
+        FROM lecture_schedules ls
+        LEFT JOIN lecture_verifications lv ON lv.lecture_id = ls.id
+        WHERE ls.status::text = 'completed_by_teacher'
+          AND (
+            lv.id IS NULL
+            OR LOWER(lv.decision::text) IN ('needs_review', 'reschedule')
+          )
       `,
-      prisma.$queryRaw`
-        SELECT COUNT(*)::int AS total
-        FROM lecture_schedules
-        WHERE status = 'completed_by_teacher'
-      `,
-      prisma.$queryRaw`SELECT COUNT(*)::int AS total FROM lecture_schedules WHERE status = 'missed'`,
-      prisma.$queryRaw`SELECT COUNT(*)::int AS total FROM lecture_schedules WHERE status = 'rescheduled'`,
       prisma.$queryRaw`
         SELECT
           ls.id::text AS id,
           ls.title,
           ls.status,
           ls.scheduled_start,
-          s.full_name AS student_name,
-          t.full_name AS teacher_name
+          sub.name AS subject_name,
+          t.full_name AS teacher_name,
+          c.title AS class_name
         FROM lecture_schedules ls
-        INNER JOIN student_profiles sp ON sp.id = ls.student_id
-        INNER JOIN users s ON s.id = sp.user_id
-        INNER JOIN teacher_profiles tp ON tp.id = ls.teacher_id
-        INNER JOIN users t ON t.id = tp.user_id
+        LEFT JOIN subjects sub ON sub.id = ls.subject_id
+        LEFT JOIN teacher_profiles tp ON tp.id = ls.teacher_id
+        LEFT JOIN users t ON t.id = tp.user_id
+        LEFT JOIN enrollments e ON e.id = ls.enrollment_id
+        LEFT JOIN courses c ON c.id = e.course_id
         ORDER BY ls.scheduled_start DESC
         LIMIT 6
       `,
@@ -80,10 +75,7 @@ export async function GET() {
         pendingVouchers: Number(pendingVoucherRows?.[0]?.total || 0),
         pendingPaymentVerifications: Number(pendingPaymentRows?.[0]?.total || 0),
         activeStudents: Number(activeStudentRows?.[0]?.total || 0),
-        todayClasses: Number(todayClassesRows?.[0]?.total || 0),
-        classesNeedingVerification: Number(needsVerificationRows?.[0]?.total || 0),
-        missedClasses: Number(missedClassesRows?.[0]?.total || 0),
-        rescheduledClasses: Number(rescheduledRows?.[0]?.total || 0),
+        lectureNeedsApproval: Number(lectureApprovalRows?.[0]?.lectures_needing_approval || 0),
       },
       recentLectures,
       recentLeads,

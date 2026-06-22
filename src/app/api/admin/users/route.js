@@ -278,7 +278,7 @@ export async function POST(request) {
     }
 
     if (!email && !phone) {
-      return json("Email or phone is required.", 400);
+      return json("Email is required.", 400);
     }
 
     if (!password.trim() || password.trim().length < 8) {

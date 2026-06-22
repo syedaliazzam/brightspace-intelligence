@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { signIn } from "next-auth/react";
 
@@ -25,6 +26,7 @@ const item = {
 };
 
 export default function LoginPage() {
+  const router = useRouter();
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [errors, setErrors] = useState(initialErrors);
@@ -35,7 +37,7 @@ export default function LoginPage() {
 
     const nextErrors = { ...initialErrors };
     if (!identifier.trim()) {
-      nextErrors.identifier = "Email or phone is required.";
+      nextErrors.identifier = "Email is required.";
     }
     if (!password.trim()) {
       nextErrors.password = "Password is required.";
@@ -50,11 +52,31 @@ export default function LoginPage() {
     setErrors(initialErrors);
 
     try {
-      await signIn("credentials", {
+      const result = await signIn("credentials", {
         identifier,
         password,
-        redirectTo: "/parent/dashboard",
+        redirect: false,
       });
+
+      if (!result || result.error) {
+        throw new Error("Invalid credentials.");
+      }
+
+      const sessionResponse = await fetch("/api/auth/session", { cache: "no-store" });
+      const session = await sessionResponse.json();
+      const role = String(session?.user?.role || "").toLowerCase();
+      const target =
+        role === "admin"
+          ? "/admin/dashboard"
+          : role === "coordinator"
+            ? "/coordinator/dashboard"
+            : role === "teacher"
+              ? "/teacher/dashboard"
+              : role === "parent"
+                ? "/parent/dashboard"
+                : "/student/dashboard";
+
+      router.replace(target);
     } catch {
       setErrors((current) => ({
         ...current,
@@ -129,7 +151,7 @@ export default function LoginPage() {
                 Sign in to your account
               </h2>
               <p className="mt-2 text-sm leading-6 text-slate-600">
-                Use your email or phone number with your password.
+                Use your email number with your password.
               </p>
             </div>
 
@@ -148,7 +170,7 @@ export default function LoginPage() {
                   htmlFor="identifier"
                   className="mb-2 block text-sm font-medium text-slate-700"
                 >
-                  Email or phone
+                  Email
                 </label>
                 <input
                   id="identifier"

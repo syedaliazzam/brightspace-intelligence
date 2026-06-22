@@ -147,7 +147,7 @@ async function ensureUniqueUser(email, phone) {
   }
 
   if (row?.id) {
-    throw new Error("A user with this email or phone already exists.");
+    throw new Error("A user with this email or phone number already exists.");
   }
 }
 
@@ -324,7 +324,7 @@ export async function POST(request) {
     }
 
     if (!email && !phone) {
-      return json("Email or phone is required.", 400);
+      return json("Email is required.", 400);
     }
 
     if (password.length < 8) {

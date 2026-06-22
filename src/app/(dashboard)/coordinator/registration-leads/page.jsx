@@ -57,15 +57,16 @@ async function getLeads(status, search) {
           WHERE fv.registration_id = rl.id
         ) AS has_voucher,
         CASE
-          WHEN rl.status::text = 'voucher_created'
-            AND NOT EXISTS (
-              SELECT 1
-              FROM fee_vouchers fv
-              WHERE fv.registration_id = rl.id
-            )
-          THEN 'new_lead'
-          ELSE LOWER(rl.status::text)
-        END AS effective_status
+          WHEN rl.status::text = 'new_lead'
+           AND NOT EXISTS (
+             SELECT 1
+             FROM fee_vouchers fv
+             WHERE fv.registration_id = rl.id
+           )
+          THEN true
+          ELSE false
+        END AS can_create_voucher,
+        LOWER(rl.status::text) AS effective_status
       FROM registration_leads rl
     )
     SELECT
@@ -86,6 +87,7 @@ async function getLeads(status, search) {
       notes,
       source,
       has_voucher,
+      can_create_voucher,
       effective_status AS status
     FROM lead_rows
     ${whereClause}

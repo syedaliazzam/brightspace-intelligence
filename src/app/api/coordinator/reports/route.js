@@ -15,7 +15,6 @@ export async function GET() {
     const [
       registrationPipeline,
       feeVerification,
-      lectureCompletion,
       teacherClassReport,
       studentActivity,
       recentLeads,
@@ -30,12 +29,6 @@ export async function GET() {
       prisma.$queryRaw`
         SELECT status::text AS label, COUNT(*)::int AS total
         FROM fee_submissions
-        GROUP BY status
-        ORDER BY status::text
-      `,
-      prisma.$queryRaw`
-        SELECT status::text AS label, COUNT(*)::int AS total
-        FROM lecture_schedules
         GROUP BY status
         ORDER BY status::text
       `,
@@ -79,7 +72,7 @@ export async function GET() {
           ls.title,
           sub.name AS subject_name,
           COALESCE(tu.full_name, 'Unknown teacher') AS teacher_name,
-          COALESCE(su.full_name, c.title, 'Unassigned') AS student_name,
+          COALESCE(c.title, c.class_level, 'Unassigned') AS class_name,
           ls.scheduled_start,
           ls.scheduled_end,
           ls.status::text AS status
@@ -87,8 +80,6 @@ export async function GET() {
         LEFT JOIN subjects sub ON sub.id = ls.subject_id
         LEFT JOIN teacher_profiles tp ON tp.id = ls.teacher_id
         LEFT JOIN users tu ON tu.id = tp.user_id
-        LEFT JOIN student_profiles sp ON sp.id = ls.student_id
-        LEFT JOIN users su ON su.id = sp.user_id
         LEFT JOIN enrollments e ON e.id = ls.enrollment_id
         LEFT JOIN courses c ON c.id = e.course_id
         ORDER BY ls.created_at DESC NULLS LAST, ls.id DESC
@@ -100,7 +91,6 @@ export async function GET() {
       summary: {
         registrationPipeline,
         feeVerification,
-        lectureCompletion,
         teacherClassReport,
         studentActivity,
       },

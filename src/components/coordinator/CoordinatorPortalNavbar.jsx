@@ -151,7 +151,7 @@ export default function CoordinatorPortalNavbar({ profile = {} }) {
             <button
               type="button"
               onClick={() => signOut({ callbackUrl: "/login" })}
-              className="rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-100"
+              className="rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white shadow transition hover:bg-slate-800"
             >
               Logout
             </button>
@@ -197,7 +197,7 @@ export default function CoordinatorPortalNavbar({ profile = {} }) {
             <button
               type="button"
               onClick={() => signOut({ callbackUrl: "/login" })}
-              className="rounded-2xl border border-slate-200 px-4 py-3 text-left text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-100 sm:hidden"
+              className="rounded-2xl bg-slate-950 px-4 py-3 text-left text-sm font-semibold text-white shadow transition hover:bg-slate-800 sm:hidden"
             >
               Logout
             </button>

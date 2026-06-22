@@ -28,6 +28,25 @@ export default function FeeVoucherForm({ leads }) {
     () => leads.find((lead) => lead.id === form.registrationLeadId),
     [form.registrationLeadId, leads]
   );
+  const eligibleLeads = useMemo(
+    () =>
+      leads.filter(
+        (lead) =>
+          lead.can_create_voucher === true ||
+          lead.canCreateVoucher === true ||
+          (lead.status === "new_lead" && !lead.voucher_id && !lead.voucherId)
+      ),
+    [leads]
+  );
+  const hasEligibleLead = eligibleLeads.length > 0;
+
+  console.log("voucher leads state", {
+    leads,
+    eligibleLeads,
+    hasEligibleLead,
+    isCreatingVoucher: pending,
+    isLoading: false,
+  });
 
   function updateField(name, value) {
     setForm((current) => ({
@@ -78,7 +97,7 @@ export default function FeeVoucherForm({ leads }) {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        disabled={!leads.length}
+        disabled={pending || !hasEligibleLead}
         className="inline-flex items-center justify-center rounded-2xl bg-slate-950 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
       >
         Create fee voucher
@@ -121,7 +140,7 @@ export default function FeeVoucherForm({ leads }) {
                   onChange={(event) => updateField("registrationLeadId", event.target.value)}
                   className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-950 outline-none transition focus:border-sky-400 focus:bg-white focus:ring-4 focus:ring-sky-100"
                 >
-                  {leads.map((lead) => (
+                  {eligibleLeads.map((lead) => (
                     <option key={lead.id} value={lead.id}>
                       {lead.student_name} | {lead.parent_name || "Parent pending"} | {lead.phone || lead.email || "No contact"}
                     </option>

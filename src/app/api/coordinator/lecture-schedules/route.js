@@ -512,7 +512,7 @@ export async function POST(request) {
     const resolvedMeetLink = manualMeetLink;
     const resolvedMeetSource = "manual";
 
-    const created = await prisma.$transaction(async (tx) => {
+    const createdMeta = await prisma.$transaction(async (tx) => {
       const createdRows = [];
 
       for (const enrollment of enrollmentRows) {
@@ -558,66 +558,9 @@ export async function POST(request) {
         RETURNING id::text AS id
       `;
         createdRows.push(rows[0]);
-
-        await createNotifications(
-          tx,
-          [teacher.user_id, enrollment.student_user_id, enrollment.parent_user_id],
-          "New lecture scheduled",
-          `${title} is scheduled for ${enrollment.student_name}.${resolvedMeetLink ? ` Join: ${resolvedMeetLink}` : ""}`,
-          "class"
-        );
       }
 
-      await createAuditLog(
-        {
-          actorUserId: session.user.id,
-          action: "lecture_scheduled",
-          entityType: "lecture_schedules",
-          entityId: createdRows[0].id,
-          newData: {
-            teacherId,
-            subjectId,
-            courseId,
-            studentIds,
-            scheduledStart,
-            scheduledEnd,
-          },
-        },
-        tx
-      );
-
-      return tx.$queryRaw`
-        SELECT
-          ls.id::text AS id,
-          ls.enrollment_id::text AS enrollment_id,
-          ls.student_id::text AS student_id,
-          ls.teacher_id::text AS teacher_id,
-          ls.subject_id::text AS subject_id,
-          ls.title,
-          ls.description,
-          ls.scheduled_start::text AS scheduled_start,
-          ls.scheduled_end::text AS scheduled_end,
-          ls.status::text AS status,
-          ls.google_calendar_event_id,
-          ls.google_meet_link,
-          ls.meet_link_source,
-          ls.google_meet_space_id,
-          ls.rescheduled_from_id::text AS rescheduled_from_id,
-          su.full_name AS student_name,
-          tu.full_name AS teacher_name,
-          sub.name AS subject_name,
-          c.title AS course_title
-        FROM lecture_schedules ls
-        INNER JOIN enrollments e ON e.id = ls.enrollment_id
-        INNER JOIN courses c ON c.id = e.course_id
-        INNER JOIN student_profiles sp ON sp.id = ls.student_id
-        INNER JOIN users su ON su.id = sp.user_id
-        INNER JOIN teacher_profiles tp ON tp.id = ls.teacher_id
-        INNER JOIN users tu ON tu.id = tp.user_id
-        INNER JOIN subjects sub ON sub.id = ls.subject_id
-        WHERE ls.id IN (${Prisma.join(createdRows.map((row) => Prisma.sql`${row.id}::uuid`))})
-        ORDER BY ls.scheduled_start ASC, su.full_name ASC
-      `;
+      return { ids: createdRows.map((row) => row.id) };
     });
 
     await sendLectureLinkEmails({
@@ -627,6 +570,54 @@ export async function POST(request) {
       scheduledStart,
       meetLink: resolvedMeetLink,
     });
+
+    await createAuditLog({
+      actorUserId: session.user.id,
+      action: "lecture_scheduled",
+      entityType: "lecture_schedules",
+      entityId: createdMeta.ids[0],
+      newData: {
+        teacherId,
+        subjectId,
+        courseId,
+        studentIds,
+        scheduledStart,
+        scheduledEnd,
+      },
+    });
+
+    const created = await prisma.$queryRaw`
+      SELECT
+        ls.id::text AS id,
+        ls.enrollment_id::text AS enrollment_id,
+        ls.student_id::text AS student_id,
+        ls.teacher_id::text AS teacher_id,
+        ls.subject_id::text AS subject_id,
+        ls.title,
+        ls.description,
+        ls.scheduled_start::text AS scheduled_start,
+        ls.scheduled_end::text AS scheduled_end,
+        ls.status::text AS status,
+        ls.google_calendar_event_id,
+        ls.google_meet_link,
+        ls.meet_link_source,
+        ls.google_meet_space_id,
+        ls.rescheduled_from_id::text AS rescheduled_from_id,
+        su.full_name AS student_name,
+        tu.full_name AS teacher_name,
+        sub.name AS subject_name,
+        c.title AS course_title
+      FROM lecture_schedules ls
+      INNER JOIN enrollments e ON e.id = ls.enrollment_id
+      INNER JOIN courses c ON c.id = e.course_id
+      INNER JOIN student_profiles sp ON sp.id = ls.student_id
+      INNER JOIN users su ON su.id = sp.user_id
+      INNER JOIN teacher_profiles tp ON tp.id = ls.teacher_id
+      INNER JOIN users tu ON tu.id = tp.user_id
+      INNER JOIN subjects sub ON sub.id = ls.subject_id
+      WHERE ls.id IN (${Prisma.join(createdMeta.ids.map((id) => Prisma.sql`${id}::uuid`))})
+      ORDER BY ls.scheduled_start ASC, su.full_name ASC
+    `;
 
     return json("Lectures scheduled.", 201, {
       item: created[0] || null,

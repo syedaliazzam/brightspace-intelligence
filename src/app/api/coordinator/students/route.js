@@ -112,7 +112,7 @@ export async function PUT(request) {
 
     if (!id) return json("Student id is required.", 400);
     if (!fullName) return json("Student name is required.", 400);
-    if (!email && !phone) return json("Student email or phone is required.", 400);
+    if (!email && !phone) return json("Student email is required.", 400);
     if (age !== null && (!Number.isInteger(age) || age < 1 || age > 100)) {
       return json("Student age must be a valid number.", 400);
     }
