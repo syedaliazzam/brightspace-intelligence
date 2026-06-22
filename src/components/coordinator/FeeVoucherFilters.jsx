@@ -12,7 +12,7 @@ const STATUS_OPTIONS = [
   { label: "Expired", value: "expired" },
 ];
 
-export default function FeeVoucherFilters({ initialSearch, initialStatus }) {
+export default function FeeVoucherFilters({ initialSearch, initialStatus, onFilterChange }) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -49,10 +49,12 @@ export default function FeeVoucherFilters({ initialSearch, initialStatus }) {
     }
     startTransition(() => {
       replaceWithHash(params);
+      onFilterChange?.({ search: nextSearch, status: nextStatus });
       if (typeof window !== "undefined") {
-        window.requestAnimationFrame(() => {
-          window.scrollTo({ top: window.scrollY, behavior: "smooth" });
-        });
+        const hash = window.location.hash;
+        if (hash) {
+          document.querySelector(hash)?.scrollIntoView({ behavior: "smooth", block: "start" });
+        }
       }
     });
   }

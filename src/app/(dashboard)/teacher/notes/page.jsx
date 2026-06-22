@@ -5,18 +5,10 @@ import TeacherNotesPanel from "@/components/teacher/TeacherNotesPanel";
 
 export default function TeacherNotesPage() {
   const [state, setState] = useState({ classes: [], notes: [], error: "" });
-  async function readJson(response) {
-    const contentType = response.headers.get("content-type") || "";
-    if (!contentType.includes("application/json")) {
-      throw new Error(await response.text());
-    }
-    return response.json();
-  }
-
   async function load() {
     const [classesResponse, notesResponse] = await Promise.all([fetch("/api/teacher/lectures", { cache: "no-store" }), fetch("/api/teacher/notes", { cache: "no-store" })]);
-    const classesData = await readJson(classesResponse);
-    const notesData = await readJson(notesResponse);
+    const classesData = await classesResponse.json();
+    const notesData = await notesResponse.json();
     if (!classesResponse.ok || !notesResponse.ok) throw new Error(classesData?.message || notesData?.message || "Unable to load notes.");
     setState({ classes: classesData.items || [], notes: notesData.items || [], error: "" });
   }

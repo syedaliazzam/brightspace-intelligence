@@ -77,32 +77,38 @@ export async function GET() {
         SELECT
           ls.id::text AS id,
           ls.title,
-          ls.subject_name AS subject,
-          u.full_name AS teacher,
-          COALESCE(su.full_name, c.title) AS student_or_class,
+          sub.name AS subject_name,
+          COALESCE(tu.full_name, 'Unknown teacher') AS teacher_name,
+          COALESCE(su.full_name, c.title, 'Unassigned') AS student_name,
           ls.scheduled_start,
+          ls.scheduled_end,
           ls.status::text AS status
         FROM lecture_schedules ls
+        LEFT JOIN subjects sub ON sub.id = ls.subject_id
         LEFT JOIN teacher_profiles tp ON tp.id = ls.teacher_id
-        LEFT JOIN users u ON u.id = tp.user_id
+        LEFT JOIN users tu ON tu.id = tp.user_id
         LEFT JOIN student_profiles sp ON sp.id = ls.student_id
         LEFT JOIN users su ON su.id = sp.user_id
-        LEFT JOIN courses c ON c.id = ls.course_id
+        LEFT JOIN enrollments e ON e.id = ls.enrollment_id
+        LEFT JOIN courses c ON c.id = e.course_id
         ORDER BY ls.created_at DESC NULLS LAST, ls.id DESC
         LIMIT 5
       `,
     ]);
 
     return json("Coordinator reports fetched.", 200, {
-      registrationPipeline,
-      feeVerification,
-      lectureCompletion,
-      teacherClassReport,
-      studentActivity,
+      summary: {
+        registrationPipeline,
+        feeVerification,
+        lectureCompletion,
+        teacherClassReport,
+        studentActivity,
+      },
       recentLeads,
       recentLectures,
     });
   } catch (error) {
+    console.error("COORDINATOR_REPORTS_ERROR:", error);
     const guard = roleGuardResponse(error);
     if (guard) {
       return guard;

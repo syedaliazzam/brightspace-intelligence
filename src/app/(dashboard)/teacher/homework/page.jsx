@@ -6,18 +6,10 @@ import HomeworkTable from "@/components/teacher/HomeworkTable";
 
 export default function TeacherHomeworkPage() {
   const [state, setState] = useState({ classes: [], items: [], error: "" });
-  async function readJson(response) {
-    const contentType = response.headers.get("content-type") || "";
-    if (!contentType.includes("application/json")) {
-      throw new Error(await response.text());
-    }
-    return response.json();
-  }
-
   async function load() {
     const [classesResponse, homeworkResponse] = await Promise.all([fetch("/api/teacher/lectures", { cache: "no-store" }), fetch("/api/teacher/homework", { cache: "no-store" })]);
-    const classesData = await readJson(classesResponse);
-    const homeworkData = await readJson(homeworkResponse);
+    const classesData = await classesResponse.json();
+    const homeworkData = await homeworkResponse.json();
     if (!classesResponse.ok || !homeworkResponse.ok) throw new Error(classesData?.message || homeworkData?.message || "Unable to load homework.");
     setState({ classes: classesData.items || [], items: homeworkData.items || [], error: "" });
   }

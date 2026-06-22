@@ -129,6 +129,7 @@ function ReportCard({ title, description, rows, itemLabel, valueLabel }) {
 }
 
 export default function CoordinatorReportsPanel({ data }) {
+  const summary = data?.summary || data || {};
   return (
     <div className="grid gap-6">
       <div className="grid gap-6 xl:grid-cols-2">
@@ -137,7 +138,7 @@ export default function CoordinatorReportsPanel({ data }) {
             key={report.key}
             title={report.title}
             description={report.description}
-            rows={data?.[report.key] || []}
+            rows={summary?.[report.key] || []}
             itemLabel={report.itemLabel}
             valueLabel={report.valueLabel}
           />
@@ -164,7 +165,7 @@ export default function CoordinatorReportsPanel({ data }) {
                 <span className="text-slate-600">{row.status || "-"}</span>
                 <span className="text-right text-slate-500">{formatDate(row.created_at)}</span>
               </div>
-            )) : <p className="border-t border-slate-100 px-4 py-4 text-sm text-slate-500">No recent leads available.</p>}
+            )) : <p className="border-t border-slate-100 px-4 py-4 text-sm text-slate-500">No recent leads found.</p>}
           </div>
         </section>
 
@@ -182,12 +183,12 @@ export default function CoordinatorReportsPanel({ data }) {
             {(data?.recentLectures || []).length ? data.recentLectures.map((row) => (
               <div key={row.id} className="grid grid-cols-[1fr_1fr_1fr_1fr_120px] border-t border-slate-100 px-4 py-3 text-sm">
                 <span className="text-slate-600">{row.title}</span>
-                <span className="text-slate-600">{row.subject || "-"}</span>
-                <span className="text-slate-600">{row.teacher || "-"}</span>
-                <span className="text-slate-600">{row.student_or_class || "-"}</span>
+                <span className="text-slate-600">{row.subject_name || "-"}</span>
+                <span className="text-slate-600">{row.teacher_name || "-"}</span>
+                <span className="text-slate-600">{row.student_name || "-"}</span>
                 <span className="text-right text-slate-500">{formatDate(row.scheduled_start)}</span>
               </div>
-            )) : <p className="border-t border-slate-100 px-4 py-4 text-sm text-slate-500">No recent lectures available.</p>}
+            )) : <p className="border-t border-slate-100 px-4 py-4 text-sm text-slate-500">No recent lectures found.</p>}
           </div>
         </section>
       </div>

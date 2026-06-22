@@ -70,6 +70,8 @@ function writeNamedCache(key, payload) {
 }
 
 export default function CoordinatorDashboardPage() {
+  const [leadFilter, setLeadFilter] = useState({ search: "", status: "" });
+  const [voucherFilter, setVoucherFilter] = useState({ search: "", status: "" });
   const [state, setState] = useState({
     loading: true,
     error: "",
@@ -243,6 +245,41 @@ export default function CoordinatorDashboardPage() {
 
   const stats = state.stats || {};
   const reportData = state.reports || null;
+  const filteredLeads = state.leads
+    .filter((lead) => {
+      const search = leadFilter.search.trim().toLowerCase();
+      const status = leadFilter.status.trim().toLowerCase();
+      const leadStatus = String(lead.status || "").toLowerCase();
+      const haystack = [
+        lead.student_name,
+        lead.parent_name,
+        lead.class_level,
+        lead.email,
+        lead.phone,
+      ].join(" ").toLowerCase();
+      const matchesSearch = !search || haystack.includes(search);
+      const matchesStatus = !status || leadStatus === status;
+      return matchesSearch && matchesStatus;
+    })
+    .sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
+
+  const filteredVouchers = state.vouchers
+    .filter((voucher) => {
+      const search = voucherFilter.search.trim().toLowerCase();
+      const status = voucherFilter.status.trim().toLowerCase();
+      const haystack = [
+        voucher.voucher_no,
+        voucher.student_name,
+        voucher.parent_name,
+        voucher.phone,
+        voucher.email,
+        voucher.amount,
+      ].join(" ").toLowerCase();
+      const matchesSearch = !search || haystack.includes(search);
+      const matchesStatus = !status || String(voucher.status || "").toLowerCase() === status;
+      return matchesSearch && matchesStatus;
+    })
+    .sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
 
   return (
     <div className="space-y-6">
@@ -251,6 +288,7 @@ export default function CoordinatorDashboardPage() {
         id="dashboard"
         title="Dashboard"
         description="Monitor intake, payments, access approvals, teacher activity, and lecture scheduling from one coordinated portal."
+        showBrand={true}
       >
       </CoordinatorPortalSection>
 
@@ -264,6 +302,7 @@ export default function CoordinatorDashboardPage() {
         id="summary"
         title="Coordinator Summary"
         description="Key operational counts in the same compact card style used across the portal."
+        showBrand={false}
       >
         <CoordinatorStatsCards
           items={[
@@ -271,10 +310,10 @@ export default function CoordinatorDashboardPage() {
             { key: "pendingVouchers", label: "Pending vouchers", value: state.loading ? "..." : stats.pendingVouchers || 0 },
             { key: "pendingPaymentVerifications", label: "Pending payment verifications", value: state.loading ? "..." : stats.pendingPaymentVerifications || 0 },
             { key: "activeStudents", label: "Active students", value: state.loading ? "..." : stats.activeStudents || 0 },
-            { key: "todayClasses", label: "Today classes", value: state.loading ? "..." : stats.todayClasses || 0 },
-            { key: "classesNeedingVerification", label: "Classes needing verification", value: state.loading ? "..." : stats.classesNeedingVerification || 0 },
-            { key: "missedClasses", label: "Missed classes", value: state.loading ? "..." : stats.missedClasses || 0 },
-            { key: "rescheduledClasses", label: "Rescheduled classes", value: state.loading ? "..." : stats.rescheduledClasses || 0 },
+            { key: "todayClasses", label: "Today lectures", value: state.loading ? "..." : stats.todayClasses || 0 },
+            { key: "classesNeedingVerification", label: "Lectures needing verification", value: state.loading ? "..." : stats.classesNeedingVerification || 0 },
+            { key: "missedClasses", label: "Missed lectures", value: state.loading ? "..." : stats.missedClasses || 0 },
+            { key: "rescheduledClasses", label: "Rescheduled lectures", value: state.loading ? "..." : stats.rescheduledClasses || 0 },
           ]}
         />
       </CoordinatorPortalSection>
@@ -283,30 +322,40 @@ export default function CoordinatorDashboardPage() {
         id="registration-leads"
         title="Registration Leads"
         description="Latest intake and pipeline summary."
+        showBrand={false}
       >
         <div className="space-y-4">
-          <RegistrationLeadFilters initialSearch="" initialStatus="" canSync={true} />
+          <RegistrationLeadFilters
+            initialSearch={leadFilter.search}
+            initialStatus={leadFilter.status}
+            canSync={true}
+            onFilterChange={(next) => setLeadFilter(next)}
+          />
           <ShowMoreSection
-            items={state.leads}
+            items={filteredLeads}
             renderItems={(visibleItems) => <RegistrationLeadTable leads={visibleItems} />}
             emptyMessage="No registration leads match the current filters."
           />
         </div>
       </CoordinatorPortalSection>
 
-      <CoordinatorPortalSection id="fee-vouchers" title="Fee Vouchers" description="Billing and voucher issuance.">
+      <CoordinatorPortalSection id="fee-vouchers" title="Fee Vouchers" description="Billing and voucher issuance." showBrand={false}>
         <div className="space-y-4">
-          <FeeVoucherFilters initialSearch="" initialStatus="" />
+          <FeeVoucherFilters
+            initialSearch={voucherFilter.search}
+            initialStatus={voucherFilter.status}
+            onFilterChange={(next) => setVoucherFilter(next)}
+          />
           <FeeVoucherForm leads={state.voucherLeads} />
           <ShowMoreSection
-            items={state.vouchers}
+            items={filteredVouchers}
             renderItems={(visibleItems) => <FeeVoucherTable vouchers={visibleItems} />}
             emptyMessage="No fee vouchers match the current filters."
           />
         </div>
       </CoordinatorPortalSection>
 
-      <CoordinatorPortalSection id="payments" title="Payments" description="Verification queue.">
+      <CoordinatorPortalSection id="payments" title="Payments" description="Verification queue." showBrand={false}>
         <ShowMoreSection
           items={state.payments}
           renderItems={(visibleItems) => <PaymentVerificationTable items={visibleItems} />}
@@ -314,7 +363,7 @@ export default function CoordinatorDashboardPage() {
         />
       </CoordinatorPortalSection>
 
-      <CoordinatorPortalSection id="students" title="Students" description="Learner registry.">
+      <CoordinatorPortalSection id="students" title="Students" description="Learner registry." showBrand={false}>
         <ShowMoreSection
           items={state.students}
           renderItems={(visibleItems) => <StudentTable items={visibleItems} />}
@@ -322,7 +371,7 @@ export default function CoordinatorDashboardPage() {
         />
       </CoordinatorPortalSection>
 
-      <CoordinatorPortalSection id="parents" title="Parents" description="Family registry.">
+      <CoordinatorPortalSection id="parents" title="Parents" description="Family registry." showBrand={false}>
         <ShowMoreSection
           items={state.parents}
           renderItems={(visibleItems) => <ParentTable items={visibleItems} />}
@@ -330,7 +379,7 @@ export default function CoordinatorDashboardPage() {
         />
       </CoordinatorPortalSection>
 
-      <CoordinatorPortalSection id="teacher-assignments" title="Teacher Assignments" description="Assignment workspace.">
+      <CoordinatorPortalSection id="teacher-assignments" title="Teacher Assignments" description="Assignment workspace." showBrand={false}>
         <div className="space-y-4">
           <TeacherAssignmentForm options={state.assignmentOptions} onSuccess={() => window.location.reload()} />
           <ShowMoreSection
@@ -341,7 +390,7 @@ export default function CoordinatorDashboardPage() {
         </div>
       </CoordinatorPortalSection>
 
-      <CoordinatorPortalSection id="lecture-scheduler" title="Lecture Scheduler" description="Scheduling workspace.">
+      <CoordinatorPortalSection id="lecture-scheduler" title="Lecture Scheduler" description="Scheduling workspace." showBrand={false}>
         <div className="space-y-4">
           <LectureScheduleForm options={state.scheduleOptions} onSuccess={() => window.location.reload()} />
           <ShowMoreSection
@@ -352,7 +401,7 @@ export default function CoordinatorDashboardPage() {
         </div>
       </CoordinatorPortalSection>
 
-      <CoordinatorPortalSection id="lecture-verification" title="Lecture Verification" description="Verification queue.">
+      <CoordinatorPortalSection id="lecture-verification" title="Lecture Verification" description="Verification queue." showBrand={false}>
         <ShowMoreSection
           items={state.verifications}
           renderItems={(visibleItems) => <LectureVerificationTable items={visibleItems} />}
@@ -360,37 +409,9 @@ export default function CoordinatorDashboardPage() {
         />
       </CoordinatorPortalSection>
 
-      <CoordinatorPortalSection id="reports" title="Reports" description="Operational reports.">
+      <CoordinatorPortalSection id="reports" title="Reports" description="Operational reports." showBrand={false}>
         <CoordinatorReportsPanel data={reportData || state.recentReportData || {}} />
       </CoordinatorPortalSection>
-
-      <section className="grid gap-6 xl:grid-cols-2">
-        <div className="rounded-[1.75rem] border border-white/70 bg-white/90 p-5 shadow-[0_20px_70px_-36px_rgba(15,23,42,0.25)]">
-          <p className="text-sm font-semibold uppercase tracking-[0.22em] text-sky-700">Recent lectures</p>
-          <div className="mt-4 space-y-3">
-            {state.recentLectures.length ? state.recentLectures.map((item) => (
-              <div key={item.id} className="rounded-2xl bg-slate-50 px-4 py-3">
-                <p className="font-semibold text-slate-950">{item.title}</p>
-                <p className="mt-1 text-sm text-slate-600">{item.student_name} with {item.teacher_name}</p>
-                <p className="mt-1 text-xs text-slate-500">{item.status}</p>
-              </div>
-            )) : <p className="text-sm text-slate-500">No lecture activity available.</p>}
-          </div>
-        </div>
-
-        <div className="rounded-[1.75rem] border border-white/70 bg-white/90 p-5 shadow-[0_20px_70px_-36px_rgba(15,23,42,0.25)]">
-          <p className="text-sm font-semibold uppercase tracking-[0.22em] text-sky-700">Recent leads</p>
-          <div className="mt-4 space-y-3">
-            {state.recentLeads.length ? state.recentLeads.map((item) => (
-              <div key={item.id} className="rounded-2xl bg-slate-50 px-4 py-3">
-                <p className="font-semibold text-slate-950">{item.student_name}</p>
-                <p className="mt-1 text-sm text-slate-600">{item.parent_name || "Parent pending"}</p>
-                <p className="mt-1 text-xs text-slate-500">{item.status}</p>
-              </div>
-            )) : <p className="text-sm text-slate-500">No lead activity available.</p>}
-          </div>
-        </div>
-      </section>
     </div>
   );
 }

@@ -6,6 +6,7 @@ export default function CoordinatorPortalSection({
   description,
   children,
   className = "",
+  showBrand = true,
 }) {
   return (
     <section
@@ -15,9 +16,11 @@ export default function CoordinatorPortalSection({
       <div className="mx-auto max-w-6xl space-y-5">
         <header className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
           <div className="max-w-3xl">
-            <p className="text-sm font-semibold uppercase tracking-[0.22em] text-sky-700">
-              Coordinator Portal
-            </p>
+            {showBrand ? (
+              <p className="text-sm font-semibold uppercase tracking-[0.22em] text-sky-700">
+                Coordinator Portal
+              </p>
+            ) : null}
             <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">
               {title}
             </h2>

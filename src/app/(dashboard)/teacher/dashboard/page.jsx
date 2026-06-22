@@ -6,7 +6,6 @@ import TodayClassesCard from "@/components/teacher/TodayClassesCard";
 import ClassActionModal from "@/components/teacher/ClassActionModal";
 import TeacherLectureCalendar from "@/components/teacher/TeacherLectureCalendar";
 import TeacherSelectedDateLectures from "@/components/teacher/TeacherSelectedDateLectures";
-import LMSCalendar from "@/components/calendar/LMSCalendar";
 
 function todayDate() {
   const date = new Date();
@@ -32,17 +31,9 @@ export default function TeacherDashboardPage() {
     error: "",
   });
 
-  async function readJson(response) {
-    const contentType = response.headers.get("content-type") || "";
-    if (!contentType.includes("application/json")) {
-      throw new Error(await response.text());
-    }
-    return response.json();
-  }
-
   async function load() {
     const response = await fetch("/api/teacher/dashboard", { cache: "no-store" });
-    const data = await readJson(response);
+    const data = await response.json();
     if (!response.ok) throw new Error(data?.message || "Unable to load dashboard.");
     setState((current) => ({ ...current, stats: data.stats || {}, today: data.today || [], error: "" }));
   }
@@ -57,14 +48,14 @@ export default function TeacherDashboardPage() {
       status: safeFilters.status,
     });
     const response = await fetch(`/api/teacher/calendar-lectures?${params.toString()}`, { cache: "no-store" });
-    const data = await readJson(response);
+    const data = await response.json();
     if (!response.ok) throw new Error(data?.message || "Unable to load calendar lectures.");
     setState((current) => ({
       ...current,
       calendarLectures: data.items || [],
       subjects: data.subjects || current.subjects,
       markedDates: data.markedDates || current.markedDates,
-      filters: { ...safeFilters },
+      filters: { ...current.filters, date: safeFilters.date },
       calendarLoading: false,
       error: "",
     }));
@@ -79,7 +70,7 @@ export default function TeacherDashboardPage() {
 
   async function markConducted(item) {
     const response = await fetch(`/api/teacher/lectures/${item.id}`, { method: "PATCH" });
-    const data = await readJson(response);
+    const data = await response.json();
     if (!response.ok) {
       window.alert(data?.message || "Unable to mark conducted.");
       return;
@@ -111,11 +102,6 @@ export default function TeacherDashboardPage() {
       ]} />
       <TodayClassesCard items={state.today} onOpen={(item) => setState((current) => ({ ...current, selected: item }))} />
       <TeacherLectureCalendar filters={state.filters} subjects={state.subjects} markedDates={state.markedDates} onChange={updateFilters} />
-      <LMSCalendar
-        apiUrl="/api/teacher/calendar-lectures"
-        filters={state.filters}
-        onDateSelect={(date) => updateFilters({ ...state.filters, date, range: "selected_date" })}
-      />
       <TeacherSelectedDateLectures items={state.calendarLectures} loading={state.calendarLoading} onMarkConducted={markConducted} />
       <ClassActionModal lecture={state.selected} open={Boolean(state.selected)} onClose={() => setState((current) => ({ ...current, selected: null }))} onChanged={() => load()} />
     </div>
