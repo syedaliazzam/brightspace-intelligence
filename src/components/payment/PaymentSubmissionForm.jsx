@@ -26,11 +26,12 @@ export default function PaymentSubmissionForm({ voucher }) {
 
   async function handleSubmit(event) {
     event.preventDefault();
+    const formElement = event.currentTarget;
     setPending(true);
     setMessage("");
 
     try {
-      const formData = new FormData(event.currentTarget);
+      const formData = new FormData(formElement);
       formData.set("voucherNo", voucher.voucher_no);
 
       const response = await fetch("/api/payment/submit", {
@@ -45,7 +46,7 @@ export default function PaymentSubmissionForm({ voucher }) {
 
       setTone("success");
       setMessage("Payment proof submitted successfully. The coordinator will review it shortly.");
-      event.currentTarget.reset();
+      formElement.reset();
     } catch (error) {
       setTone("error");
       setMessage(error instanceof Error ? error.message : "Payment submission failed.");

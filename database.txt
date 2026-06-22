@@ -707,3 +707,160 @@ CREATE INDEX idx_audit_logs_actor ON audit_logs(actor_user_id);
 INSERT INTO storage.buckets (id, name, public)
 VALUES ('payment_proofs', 'payment_proofs', false)
 ON CONFLICT (id) DO NOTHING;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+updated queries jo myn bad myn run ki corrections ky liye: 
+
+-- Agar pehle se enum bana hua hai, toh usme missing values add karne ka tareeqa:
+ALTER TYPE payment_method ADD VALUE IF NOT EXISTS 'Bank transfer';
+ALTER TYPE payment_method ADD VALUE IF NOT EXISTS 'JazzCash';
+ALTER TYPE payment_method ADD VALUE IF NOT EXISTS 'EasyPaisa';
+ALTER TYPE payment_method ADD VALUE IF NOT EXISTS 'Cash deposit';
+ALTER TYPE payment_method ADD VALUE IF NOT EXISTS 'Other';
+
+
+
+DROP TYPE IF EXISTS fee_submission_status CASCADE;
+
+CREATE TYPE fee_submission_status AS ENUM ('pending', 'verified', 'rejected');
+
+
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_type WHERE typname = 'fee_submission_status'
+  ) THEN
+    CREATE TYPE fee_submission_status AS ENUM ('pending', 'verified', 'rejected');
+  END IF;
+END $$;
+
+ALTER TABLE fee_submissions
+ADD COLUMN IF NOT EXISTS status fee_submission_status NOT NULL DEFAULT 'pending';
+
+
+ALTER TABLE registration_leads
+ADD COLUMN IF NOT EXISTS city VARCHAR(150);
+
+
+ALTER TABLE fee_submissions
+ALTER COLUMN submitted_by DROP NOT NULL;
+
+
+ALTER TABLE credential_dispatch_logs
+ALTER COLUMN channel TYPE VARCHAR(100);
+
+ALTER TABLE credential_dispatch_logs
+ALTER COLUMN status TYPE VARCHAR(100);
+
+ALTER TABLE credential_dispatch_logs
+ALTER COLUMN sent_to_phone TYPE VARCHAR(50);
+
+
+ALTER TABLE users
+ALTER COLUMN phone TYPE VARCHAR(50);
+
+ALTER TABLE registration_leads
+ALTER COLUMN phone TYPE VARCHAR(50);
+
+ALTER TABLE fee_submissions
+ALTER COLUMN transaction_id TYPE VARCHAR(150);
+
+
+-- Ensure required classes/courses existy
+INSERT INTO courses (title, class_level, description, status)
+VALUES
+('Pre-Nursery', 'Pre-Nursery', 'Pre-Nursery class package', 'active'),
+('Nursery', 'Nursery', 'Nursery class package', 'active'),
+('KG-1', 'KG-1', 'KG-1 class package', 'active'),
+('KG-2', 'KG-2', 'KG-2 class package', 'active')
+ON CONFLICT DO NOTHING;
+
+-- Ensure required subjects exist
+INSERT INTO subjects (name, description, status)
+VALUES
+('English', 'English subject', 'active'),
+('Mathematics', 'Mathematics subject', 'active'),
+('Urdu', 'Urdu subject', 'active'),
+('General Knowledge', 'General Knowledge subject', 'active'),
+('Islamiat', 'Islamiat subject', 'active'),
+('Environmental Studies', 'Environmental Studies subject', 'active'),
+('General Science', 'General Science subject', 'active')
+ON CONFLICT (name) DO NOTHING;
+
+-- Link subjects to classes
+INSERT INTO course_subjects (course_id, subject_id)
+SELECT c.id, s.id
+FROM courses c
+JOIN subjects s ON s.name IN (
+  'English',
+  'Mathematics',
+  'Urdu',
+  'General Knowledge',
+  'Islamiat'
+)
+WHERE c.class_level IN ('Pre-Nursery', 'Nursery')
+ON CONFLICT DO NOTHING;
+
+INSERT INTO course_subjects (course_id, subject_id)
+SELECT c.id, s.id
+FROM courses c
+JOIN subjects s ON s.name IN (
+  'English',
+  'Mathematics',
+  'Urdu',
+  'Environmental Studies',
+  'Islamiat'
+)
+WHERE c.class_level = 'KG-1'
+ON CONFLICT DO NOTHING;
+
+INSERT INTO course_subjects (course_id, subject_id)
+SELECT c.id, s.id
+FROM courses c
+JOIN subjects s ON s.name IN (
+  'English',
+  'Mathematics',
+  'Urdu',
+  'General Science',
+  'Islamiat'
+)
+WHERE c.class_level = 'KG-2'
+ON CONFLICT DO NOTHING;
+
+
+SELECT
+  c.class_level,
+  s.name AS subject_name
+FROM course_subjects cs
+JOIN courses c ON c.id = cs.course_id
+JOIN subjects s ON s.id = cs.subject_id
+ORDER BY c.class_level, s.name;
+
+
+SELECT
+  c.class_level,
+  s.name AS subject_name
+FROM course_subjects cs
+JOIN courses c ON c.id = cs.course_id
+JOIN subjects s ON s.id = cs.subject_id
+ORDER BY c.class_level, s.name;

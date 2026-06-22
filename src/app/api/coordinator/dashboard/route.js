@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { requireRole, roleGuardResponse } from "@/lib/roleGuard";
+import { getDayRange } from "@/lib/dateTime";
 
 const ALLOWED_ROLES = ["admin", "coordinator"];
 
@@ -12,10 +13,7 @@ export async function GET() {
   try {
     await requireRole(ALLOWED_ROLES);
 
-    const todayStart = new Date();
-    todayStart.setHours(0, 0, 0, 0);
-    const todayEnd = new Date(todayStart);
-    todayEnd.setDate(todayEnd.getDate() + 1);
+    const todayRange = getDayRange(new Date());
 
     const [
       newLeadsRows,
@@ -36,8 +34,8 @@ export async function GET() {
       prisma.$queryRaw`
         SELECT COUNT(*)::int AS total
         FROM lecture_schedules
-        WHERE scheduled_start >= ${todayStart}
-          AND scheduled_start < ${todayEnd}
+        WHERE scheduled_start >= ${todayRange.start}::timestamp
+          AND scheduled_start <= ${todayRange.end}::timestamp
           AND status IN ('scheduled', 'upcoming', 'live', 'completed_by_teacher')
       `,
       prisma.$queryRaw`
@@ -102,4 +100,3 @@ export async function GET() {
     );
   }
 }
-

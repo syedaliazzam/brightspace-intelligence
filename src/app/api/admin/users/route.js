@@ -219,64 +219,16 @@ async function ensureUniqueUser(email, phone) {
 }
 
 async function insertAuditLog(actorUserId, targetUserId, action, description, metadata = {}) {
-  const columns = await getTableColumns("audit_logs");
-
-  if (!Object.keys(columns).length) {
-    return;
-  }
-
-  const insertColumns = [];
-  const insertValues = [];
-  const supportedColumns = new Set();
-
-  if (columns.id) {
-    addColumn(insertColumns, insertValues, "id", crypto.randomUUID());
-    supportedColumns.add("id");
-  }
-  if (columns.actor_user_id) {
-    addColumn(insertColumns, insertValues, "actor_user_id", actorUserId);
-    supportedColumns.add("actor_user_id");
-  }
-  
-  // FIXED: entity_type aur entity_id ko support mein add kiya taake framework validation fail na ho
-  if (columns.entity_type) {
-    addColumn(insertColumns, insertValues, "entity_type", "users"); // Chunki hum users page par hain
-    supportedColumns.add("entity_type");
-  }
-  if (columns.entity_id) {
-    addColumn(insertColumns, insertValues, "entity_id", targetUserId); // Jis user par action hua uski ID
-    supportedColumns.add("entity_id");
-  }
-
-  if (columns.action) {
-    addColumn(insertColumns, insertValues, "action", action);
-    supportedColumns.add("action");
-  }
-  if (columns.description) {
-    addColumn(insertColumns, insertValues, "description", description);
-    supportedColumns.add("description");
-  }
-  if (columns.metadata) {
-    addColumn(insertColumns, insertValues, "metadata", JSON.stringify(metadata));
-    supportedColumns.add("metadata");
-  }
-  if (columns.meta) {
-    addColumn(insertColumns, insertValues, "meta", JSON.stringify(metadata));
-    supportedColumns.add("meta");
-  }
-
-  ensureSupportedRequiredColumns("audit_logs", columns, supportedColumns);
-
-  if (!insertColumns.length) {
-    return;
-  }
-
-  await prisma.$executeRaw(
-    Prisma.sql`
-      INSERT INTO audit_logs (${Prisma.join(insertColumns, Prisma.sql`, `)})
-      VALUES (${Prisma.join(insertValues, Prisma.sql`, `)})
-    `
-  );
+  await prisma.$executeRaw`
+    INSERT INTO audit_logs (id, actor_user_id, entity_type, entity_id, action)
+    VALUES (
+      ${crypto.randomUUID()}::uuid,
+      ${actorUserId}::uuid,
+      ${"users"},
+      ${targetUserId}::uuid,
+      ${action}
+    )
+  `;
 }
 
 export async function GET(request) {
@@ -341,144 +293,43 @@ export async function POST(request) {
 
     await ensureUniqueUser(email, phone);
 
-    const userColumns = await getTableColumns("users");
-    const { firstName, lastName } = splitName(fullName);
-    const insertColumns = [];
-    const insertValues = [];
-    const supportedColumns = new Set();
     const userId = crypto.randomUUID();
     const hashedPassword = await bcrypt.hash(password, 12);
 
-    addColumn(insertColumns, insertValues, "id", userId);
-    supportedColumns.add("id");
-    addColumn(insertColumns, insertValues, "role_id", roleId);
-    supportedColumns.add("role_id");
-    addColumn(insertColumns, insertValues, "password_hash", hashedPassword);
-    supportedColumns.add("password_hash");
-    addColumn(insertColumns, insertValues, "status", "active");
-    supportedColumns.add("status");
-
-    if (userColumns.email) {
-      addColumn(insertColumns, insertValues, "email", email || null);
-      supportedColumns.add("email");
-    }
-    if (userColumns.phone) {
-      addColumn(insertColumns, insertValues, "phone", phone || null);
-      supportedColumns.add("phone");
-    }
-    if (userColumns.full_name) {
-      addColumn(insertColumns, insertValues, "full_name", fullName);
-      supportedColumns.add("full_name");
-    }
-    if (userColumns.name) {
-      addColumn(insertColumns, insertValues, "name", fullName);
-      supportedColumns.add("name");
-    }
-    if (userColumns.first_name) {
-      addColumn(insertColumns, insertValues, "first_name", firstName);
-      supportedColumns.add("first_name");
-    }
-    if (userColumns.last_name) {
-      addColumn(insertColumns, insertValues, "last_name", lastName);
-      supportedColumns.add("last_name");
-    }
-
-    ensureSupportedRequiredColumns("users", userColumns, supportedColumns);
-
     await prisma.$transaction(async (tx) => {
-      await tx.$executeRaw(
-        Prisma.sql`
-          INSERT INTO users (${Prisma.join(insertColumns, ', ')})
-          VALUES (${Prisma.join(insertValues, ', ')})
-        `
-      );
-
-      const profileTable =
-        role === "coordinator" ? "coordinator_profiles" : "teacher_profiles";
-      const profileColumns = await tx.$queryRaw`
-        SELECT
-          column_name,
-          is_nullable,
-          column_default
-        FROM information_schema.columns
-        WHERE table_schema = 'public'
-          AND table_name = ${profileTable}
+      await tx.$executeRaw`
+        INSERT INTO users (
+          id,
+          role_id,
+          full_name,
+          email,
+          phone,
+          password_hash,
+          status,
+          must_change_password
+        )
+        VALUES (
+          ${userId}::uuid,
+          ${roleId}::uuid,
+          ${fullName},
+          ${email || null},
+          ${phone || null},
+          ${hashedPassword},
+          ${"active"}::user_status,
+          ${true}
+        )
       `;
 
-      const profileMap = profileColumns.reduce((accumulator, row) => {
-        accumulator[row.column_name] = {
-          nullable: row.is_nullable === "YES",
-          defaultValue: row.column_default,
-        };
-        return accumulator;
-      }, {});
-
-      if (Object.keys(profileMap).length) {
-        const profileInsertColumns = [];
-        const profileInsertValues = [];
-        const profileSupported = new Set();
-
-        if (profileMap.id) {
-          addColumn(profileInsertColumns, profileInsertValues, "id", crypto.randomUUID());
-          profileSupported.add("id");
-        }
-        if (profileMap.user_id) {
-          addColumn(profileInsertColumns, profileInsertValues, "user_id", userId);
-          profileSupported.add("user_id");
-        }
-        if (profileMap.full_name) {
-          addColumn(profileInsertColumns, profileInsertValues, "full_name", fullName);
-          profileSupported.add("full_name");
-        }
-        if (profileMap.name) {
-          addColumn(profileInsertColumns, profileInsertValues, "name", fullName);
-          profileSupported.add("name");
-        }
-        if (profileMap.first_name) {
-          addColumn(profileInsertColumns, profileInsertValues, "first_name", firstName);
-          profileSupported.add("first_name");
-        }
-        if (profileMap.last_name) {
-          addColumn(profileInsertColumns, profileInsertValues, "last_name", lastName);
-          profileSupported.add("last_name");
-        }
-        if (profileMap.email) {
-          addColumn(profileInsertColumns, profileInsertValues, "email", email || null);
-          profileSupported.add("email");
-        }
-        if (profileMap.phone) {
-          addColumn(profileInsertColumns, profileInsertValues, "phone", phone || null);
-          profileSupported.add("phone");
-        }
-        if (profileMap.status) {
-          addColumn(profileInsertColumns, profileInsertValues, "status", "active");
-          profileSupported.add("status");
-        }
-
-        const requiredUnsupported = Object.entries(profileMap)
-          .filter(
-            ([columnName, meta]) =>
-              !meta.nullable &&
-              !meta.defaultValue &&
-              !profileSupported.has(columnName)
-          )
-          .map(([columnName]) => columnName);
-
-        if (requiredUnsupported.length) {
-          throw new Error(
-            `${profileTable} requires unsupported columns: ${requiredUnsupported.join(", ")}.`
-          );
-        }
-
-        if (profileInsertColumns.length) {
-          // FIXED: Separators sorted out to prevent the 42601 Object interpretation error.
-          await tx.$executeRaw(
-            Prisma.sql`
-              INSERT INTO ${Prisma.raw(`"${profileTable}"`)} (${Prisma.join(profileInsertColumns, ', ')})
-              VALUES (${Prisma.join(profileInsertValues, ', ')})
-            `
-          );
-        }
+      if (role === "coordinator") {
+        await tx.$executeRaw`
+          INSERT INTO coordinator_profiles (id, user_id, status)
+          VALUES (${crypto.randomUUID()}::uuid, ${userId}::uuid, ${"active"}::user_status)
+        `;
+      } else {
+        await tx.$executeRaw`
+          INSERT INTO teacher_profiles (id, user_id, status)
+          VALUES (${crypto.randomUUID()}::uuid, ${userId}::uuid, ${"active"}::user_status)
+        `;
       }
     });
 

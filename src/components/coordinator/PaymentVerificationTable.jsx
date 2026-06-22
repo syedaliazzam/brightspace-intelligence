@@ -70,15 +70,15 @@ export default function PaymentVerificationTable({ items }) {
       const response = await fetch(`/api/coordinator/payments/${id}/verify`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action,
-          rejectionReason,
-        }),
+        body: JSON.stringify({ action, rejectionReason }),
       });
+
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data?.message || "Payment verification failed.");
+        console.error("Verify API error:", data);
+        alert(data.message || "Payment verification failed");
+        return;
       }
 
       router.refresh();
@@ -145,9 +145,8 @@ export default function PaymentVerificationTable({ items }) {
                     </td>
                     <td className="px-6 py-5">
                       <span
-                        className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${
-                          STATUS_STYLES[normalizeStatus(item.status)] || "bg-slate-100 text-slate-700"
-                        }`}
+                        className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${STATUS_STYLES[normalizeStatus(item.status)] || "bg-slate-100 text-slate-700"
+                          }`}
                       >
                         {formatStatus(normalizeStatus(item.status))}
                       </span>
@@ -208,9 +207,8 @@ export default function PaymentVerificationTable({ items }) {
                   </p>
                 </div>
                 <span
-                  className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${
-                    STATUS_STYLES[normalizeStatus(item.status)] || "bg-slate-100 text-slate-700"
-                  }`}
+                  className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${STATUS_STYLES[normalizeStatus(item.status)] || "bg-slate-100 text-slate-700"
+                    }`}
                 >
                   {formatStatus(normalizeStatus(item.status))}
                 </span>

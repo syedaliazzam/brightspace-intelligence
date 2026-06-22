@@ -3,6 +3,7 @@ import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import prisma from "@/lib/prisma";
+import { CLASS_SUBJECTS, normalizeClassLevel } from "@/lib/academicCatalog";
 
 function json(message, status = 200, extra = {}) {
   return NextResponse.json({ message, ...extra }, { status });
@@ -10,6 +11,13 @@ function json(message, status = 200, extra = {}) {
 
 function normalizeText(value) {
   return typeof value === "string" ? value.trim() : "";
+}
+
+function normalizeCourseStatus(value) {
+  const status = normalizeText(value).toLowerCase();
+  return ["active", "pending", "suspended", "archived"].includes(status)
+    ? status
+    : "active";
 }
 
 async function requireAdminSession() {
@@ -76,40 +84,40 @@ function getValueSql(columnMeta, value) {
   return Prisma.sql`${value}`;
 }
 
-async function insertAuditLog(actorUserId, targetId, action, description, metadata = {}, tx = prisma) {
-  const columns = await getTableColumns("audit_logs", tx);
+async function syncCourseSubjects(tx, courseId, classLevel) {
+  const subjects = CLASS_SUBJECTS[classLevel] || [];
 
-  if (!Object.keys(columns).length) {
+  if (!subjects.length) {
     return;
   }
 
-  const insertColumns = [];
-  const insertValues = [];
+  await tx.$executeRaw`
+    DELETE FROM course_subjects
+    WHERE course_id = ${courseId}::uuid
+  `;
 
-  const pushColumn = (name, value) => {
-    if (columns[name]) {
-      insertColumns.push(Prisma.raw(`"${name}"`));
-      insertValues.push(getValueSql(columns[name], value));
-    }
-  };
+  await tx.$executeRaw(
+    Prisma.sql`
+      INSERT INTO course_subjects (course_id, subject_id)
+      SELECT ${courseId}::uuid, s.id
+      FROM subjects s
+      WHERE s.name IN (${Prisma.join(subjects)})
+      ON CONFLICT (course_id, subject_id) DO NOTHING
+    `
+  );
+}
 
-  pushColumn("id", crypto.randomUUID());
-  pushColumn("actor_user_id", actorUserId);
-  pushColumn("entity_type", "courses");
-  pushColumn("entity_id", targetId);
-  pushColumn("action", action);
-  pushColumn("description", description);
-  pushColumn("metadata", JSON.stringify(metadata));
-  pushColumn("meta", JSON.stringify(metadata));
-
-  if (insertColumns.length) {
-    await tx.$executeRaw(
-      Prisma.sql`
-        INSERT INTO audit_logs (${Prisma.join(insertColumns, ", ")})
-        VALUES (${Prisma.join(insertValues, ", ")})
-      `
-    );
-  }
+async function insertAuditLog(actorUserId, targetId, action, description, metadata = {}, tx = prisma) {
+  await tx.$executeRaw`
+    INSERT INTO audit_logs (id, actor_user_id, entity_type, entity_id, action)
+    VALUES (
+      ${crypto.randomUUID()}::uuid,
+      ${actorUserId}::uuid,
+      ${"courses"},
+      ${targetId}::uuid,
+      ${action}
+    )
+  `;
 }
 
 export async function PATCH(request, { params }) {
@@ -126,38 +134,35 @@ export async function PATCH(request, { params }) {
 
     const { id } = await params;
     const body = await request.json();
-    const name = normalizeText(body?.name);
-    const code = normalizeText(body?.code);
-    const subjectId = normalizeText(body?.subjectId);
+    const classLevel = normalizeClassLevel(body?.classMode || body?.name);
     const description = normalizeText(body?.description);
-    const classMode = normalizeText(body?.classMode);
-    const capacity = body?.capacity === "" ? null : Number(body?.capacity);
-    const status = normalizeText(body?.status).toLowerCase();
-    const columns = await getTableColumns("courses");
+    const status = normalizeCourseStatus(body?.status);
     const updates = [];
 
-    if (columns.name) {
-      updates.push(Prisma.sql`name = ${name}`);
+    if (!classLevel) {
+      return json("Please select a valid class level.", 400);
     }
-    if (columns.code) {
-      updates.push(Prisma.sql`code = ${code || null}`);
+
+    const [existing] = await prisma.$queryRaw`
+      SELECT id::text
+      FROM courses
+      WHERE (class_level = ${classLevel} OR title = ${classLevel})
+        AND id <> ${id}::uuid
+      LIMIT 1
+    `;
+
+    if (existing?.id) {
+      return json("This class already exists.", 409);
     }
-    if (columns.subject_id) {
-      updates.push(Prisma.sql`subject_id = ${subjectId || null}::uuid`);
-    }
-    if (columns.description) {
+
+    updates.push(Prisma.sql`title = ${classLevel}`);
+    updates.push(Prisma.sql`class_level = ${classLevel}`);
+
+    if (description || body?.description === "") {
       updates.push(Prisma.sql`description = ${description || null}`);
     }
-    if (columns.class_mode) {
-      updates.push(Prisma.sql`class_mode = ${classMode || null}`);
-    }
-    if (columns.capacity) {
-      updates.push(
-        Prisma.sql`capacity = ${Number.isFinite(capacity) ? capacity : null}`
-      );
-    }
-    if (columns.status && status) {
-      updates.push(Prisma.sql`status = ${status}`);
+    if (status) {
+      updates.push(Prisma.sql`status = ${status}::user_status`);
     }
 
     await prisma.$transaction(async (tx) => {
@@ -165,37 +170,40 @@ export async function PATCH(request, { params }) {
         await tx.$executeRaw(
           Prisma.sql`
             UPDATE courses
-            SET ${Prisma.join(updates, ", ")}
+            SET ${Prisma.join(updates, Prisma.sql`, `)}
             WHERE id = ${id}::uuid
           `
         );
       }
 
+      await syncCourseSubjects(tx, id, classLevel);
+
       await insertAuditLog(
         authState.session.user.id,
         id,
         "course_updated",
-        `Course ${name || id} updated by admin.`,
+        `Class ${classLevel} updated by admin.`,
         { status },
         tx
       );
     });
 
-    return json("Course updated.", 200, {
+    return json("Class updated.", 200, {
       item: {
         id,
-        name,
-        code,
-        subject_id: subjectId || null,
+        name: classLevel,
+        code: null,
+        subject_id: null,
         description,
-        class_mode: classMode,
-        capacity,
+        class_mode: classLevel,
+        capacity: null,
+        assigned_subjects: (CLASS_SUBJECTS[classLevel] || []).join(", "),
         status,
       },
     });
   } catch (error) {
     return json(
-      error instanceof Error ? error.message : "Unable to update course.",
+      error instanceof Error ? error.message : "Unable to update class.",
       500
     );
   }

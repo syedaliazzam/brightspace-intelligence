@@ -1,8 +1,10 @@
 import { Prisma } from "@prisma/client";
 import { redirect } from "next/navigation";
+import CoordinatorPortalNavbar from "@/components/coordinator/CoordinatorPortalNavbar";
 import FeeVoucherFilters from "@/components/coordinator/FeeVoucherFilters";
 import FeeVoucherForm from "@/components/coordinator/FeeVoucherForm";
 import FeeVoucherTable from "@/components/coordinator/FeeVoucherTable";
+import ShowMoreSection from "@/components/coordinator/ShowMoreSection";
 import { auth, roleToDashboard } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 
@@ -30,36 +32,39 @@ async function getEligibleLeads() {
       phone,
       LOWER(status::text) AS status
     FROM registration_leads
-    WHERE LOWER(status::text) IN (${Prisma.join([...ELIGIBLE_LEAD_STATUSES])})
+    WHERE LOWER(status::text) IN ('new_lead', 'pending_clarification')
     ORDER BY created_at DESC NULLS LAST, id DESC
   `;
 }
 
 async function getVouchers(status, search) {
   const conditions = [];
+  const values = [];
 
   if (status && VALID_VOUCHER_STATUSES.has(status)) {
-    conditions.push(Prisma.sql`LOWER(fv.status::text) = ${status}`);
+    values.push(status);
+    conditions.push(`LOWER(fv.status::text) = $${values.length}`);
   }
 
   if (search) {
     const term = `%${search}%`;
-    conditions.push(
-      Prisma.sql`(
-        fv.voucher_no ILIKE ${term}
-        OR rl.student_name ILIKE ${term}
-        OR rl.parent_name ILIKE ${term}
-        OR rl.phone ILIKE ${term}
-        OR rl.email ILIKE ${term}
-      )`
-    );
+    values.push(term);
+    conditions.push(`(
+        COALESCE(fv.voucher_no, '') ILIKE $${values.length}
+        OR COALESCE(rl.student_name, '') ILIKE $${values.length}
+        OR COALESCE(rl.parent_name, '') ILIKE $${values.length}
+        OR COALESCE(rl.phone, '') ILIKE $${values.length}
+        OR COALESCE(rl.email, '') ILIKE $${values.length}
+        OR fv.amount::text ILIKE $${values.length}
+      )`);
   }
 
   const whereClause = conditions.length
-    ? Prisma.sql`WHERE ${Prisma.join(conditions, Prisma.sql` AND `)}`
-    : Prisma.empty;
+    ? `WHERE ${conditions.join(" AND ")}`
+    : "";
 
-  return prisma.$queryRaw`
+  return prisma.$queryRawUnsafe(
+    `
     SELECT
       fv.id::text AS id,
       fv.voucher_no,
@@ -76,8 +81,10 @@ async function getVouchers(status, search) {
     FROM fee_vouchers fv
     INNER JOIN registration_leads rl ON rl.id = fv.registration_id
     ${whereClause}
-    ORDER BY fv.due_date ASC NULLS LAST, fv.id DESC
-  `;
+    ORDER BY fv.created_at DESC NULLS LAST, fv.id DESC
+    `,
+    ...values
+  );
 }
 
 export const dynamic = "force-dynamic";
@@ -86,71 +93,42 @@ export default async function CoordinatorFeeVouchersPage({ searchParams }) {
   const session = await auth();
   const role = String(session?.user?.role || "").toLowerCase();
 
-  if (!session?.user) {
-    redirect("/login");
-  }
-
-  if (!ALLOWED_ROLES.has(role)) {
-    redirect(roleToDashboard[role] || "/");
+  if (!session?.user || !ALLOWED_ROLES.has(role)) {
+    redirect(session?.user ? roleToDashboard[role] || "/login" : "/login");
   }
 
   const resolvedParams = await searchParams;
   const search = normalizeText(resolvedParams?.search);
   const status = normalizeText(resolvedParams?.status).toLowerCase();
-
-  let eligibleLeads = [];
-  let vouchers = [];
-  let loadError = null;
-
-  try {
-    [eligibleLeads, vouchers] = await Promise.all([
-      getEligibleLeads(),
-      getVouchers(status, search),
-    ]);
-  } catch (error) {
-    loadError = error instanceof Error ? error.message : "Unable to load fee vouchers.";
-  }
+  const [eligibleLeads, vouchers] = await Promise.all([
+    getEligibleLeads(),
+    getVouchers(status, search),
+  ]);
 
   return (
     <div className="space-y-6">
+      <CoordinatorPortalNavbar profile={session.user} />
       <section className="rounded-[2rem] border border-white/70 bg-[linear-gradient(135deg,rgba(255,255,255,0.92),rgba(241,248,255,0.92))] p-6 shadow-[0_24px_80px_-36px_rgba(15,23,42,0.25)] sm:p-8">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-          <div className="max-w-3xl">
-            <p className="text-sm font-semibold uppercase tracking-[0.24em] text-sky-700">
-              Coordinator billing
-            </p>
-            <h1 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">
-              Fee vouchers
-            </h1>
+          <div>
+            <p className="text-sm font-semibold uppercase tracking-[0.24em] text-sky-700">Fee vouchers</p>
+            <h1 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">Voucher creation and tracking</h1>
             <p className="mt-3 text-sm leading-7 text-slate-600 sm:text-base">
-              Create payable fee vouchers from eligible registration leads and track issued vouchers before payment proof and verification workflows begin.
+              Create fee vouchers for eligible leads and monitor their payment status.
             </p>
           </div>
-
-          <div className="rounded-2xl border border-slate-200 bg-white/80 px-4 py-3 text-sm text-slate-600">
-            {vouchers.length} vouchers loaded
-          </div>
+          <FeeVoucherForm leads={eligibleLeads} />
         </div>
       </section>
 
-      {loadError ? (
-        <div className="rounded-2xl border border-rose-200 bg-rose-50 px-6 py-5 text-sm text-rose-700">
-          {loadError}
-        </div>
-      ) : null}
-
-      <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-        <div className="flex-1">
-          <FeeVoucherFilters
-            initialSearch={search}
-            initialStatus={VALID_VOUCHER_STATUSES.has(status) ? status : ""}
-          />
-        </div>
-
-        <FeeVoucherForm leads={eligibleLeads} />
-      </div>
-
-      <FeeVoucherTable vouchers={vouchers} />
+      <FeeVoucherFilters initialSearch={search} initialStatus={status} />
+      <ShowMoreSection
+        items={vouchers}
+        initialCount={10}
+        step={10}
+        renderItems={(visibleItems) => <FeeVoucherTable vouchers={visibleItems} />}
+        emptyMessage="No fee vouchers match the current filters."
+      />
     </div>
   );
 }

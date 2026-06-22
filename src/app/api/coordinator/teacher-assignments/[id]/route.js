@@ -20,7 +20,7 @@ export async function PATCH(request, context) {
     const body = await request.json();
     const status = normalizeText(body?.status).toLowerCase();
 
-    if (!["active", "inactive", "suspended", "archived"].includes(status)) {
+    if (!["active", "suspended", "archived"].includes(status)) {
       return json("Valid assignment status is required.", 400);
     }
 

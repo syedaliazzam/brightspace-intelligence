@@ -50,31 +50,11 @@ export default function LoginPage() {
     setErrors(initialErrors);
 
     try {
-      const result = await signIn("credentials", {
-        redirect: false,
+      await signIn("credentials", {
         identifier,
         password,
-        redirectTo: "/",
+        redirectTo: "/parent/dashboard",
       });
-
-      if (!result?.ok) {
-        const code = String(result?.error || result?.code || "").toLowerCase();
-        const message = code.includes("inactive")
-          ? "This account is inactive. Contact your administrator."
-          : code.includes("missing_identifier")
-            ? "Email or phone is required."
-            : code.includes("missing_password")
-              ? "Password is required."
-              : "Invalid credentials. Please check your email/phone and password.";
-
-        setErrors((current) => ({
-          ...current,
-          form: message,
-        }));
-        return;
-      }
-
-      window.location.assign(result?.url || "/");
     } catch {
       setErrors((current) => ({
         ...current,

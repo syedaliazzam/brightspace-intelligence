@@ -1,0 +1,47 @@
+"use client";
+
+import { motion } from "framer-motion";
+import { formatDateTimeRange } from "@/lib/dateTime";
+import { canShowJoinMeet, getLectureDisplayStatus } from "@/lib/lectureStatus";
+
+export default function StudentSelectedDateLectures({ items = [], loading }) {
+  return (
+    <section className="rounded-[1.75rem] border border-white/70 bg-white/90 p-5 shadow-[0_20px_70px_-36px_rgba(15,23,42,0.25)]">
+      <div className="flex items-end justify-between gap-3">
+        <div>
+          <p className="text-sm font-semibold uppercase tracking-[0.22em] text-sky-700">Selected date</p>
+          <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">Lectures</h2>
+        </div>
+        <p className="text-sm text-slate-500">{loading ? "Loading..." : `${items.length} found`}</p>
+      </div>
+      <div className="mt-5 grid gap-3">
+        {items.length ? items.map((item, index) => {
+          const canJoin = canShowJoinMeet(item);
+          const displayStatus = item.display_status || getLectureDisplayStatus(item);
+
+          return (
+          <motion.article key={`${item.id}-${index}`} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.16, delay: index * 0.02 }} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+              <div>
+                <p className="font-semibold text-slate-950">{item.title}</p>
+                <p className="mt-1 text-sm text-slate-600">{item.subject_name} with {item.teacher_name}</p>
+                <p className="mt-1 text-sm text-slate-500">{formatDateTimeRange(item.scheduled_start, item.scheduled_end)}</p>
+                {item.completion_summary ? <p className="mt-2 text-sm text-slate-600">{item.completion_summary}</p> : null}
+              </div>
+                <div className="flex flex-wrap gap-2">
+                <span className="rounded-full bg-white px-3 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-slate-600">{displayStatus}</span>
+                {item.google_meet_link && canJoin ? (
+                  <>
+                    <a href={item.google_meet_link} target="_blank" rel="noreferrer" className="rounded-xl bg-slate-950 px-4 py-2 text-sm font-semibold text-white">Join Meet</a>
+                  </>
+                ) : null}
+                {displayStatus === "verified" && item.recording_drive_url ? <a href={item.recording_drive_url} target="_blank" rel="noreferrer" className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700">Recording</a> : null}
+              </div>
+            </div>
+          </motion.article>
+        );
+        }) : <p className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-6 text-sm text-slate-600">No lectures for the selected filters.</p>}
+      </div>
+    </section>
+  );
+}

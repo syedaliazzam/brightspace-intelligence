@@ -6,9 +6,15 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "seed:academic": "node prisma/seed-academic.js"
   },
   "dependencies": {
+    "@fullcalendar/core": "^6.1.21",
+    "@fullcalendar/daygrid": "^6.1.21",
+    "@fullcalendar/interaction": "^6.1.21",
+    "@fullcalendar/react": "^6.1.21",
+    "@fullcalendar/timegrid": "^6.1.21",
     "bcrypt": "^6.0.0",
     "framer-motion": "^12.40.0",
     "next": "16.2.9",
@@ -22,7 +28,6 @@
     "babel-plugin-react-compiler": "1.0.0",
     "eslint": "^9",
     "eslint-config-next": "16.2.9",
-    "nodemailer": "^6.10.1",
     "prisma": "^6.19.3",
     "tailwindcss": "^4"
   }

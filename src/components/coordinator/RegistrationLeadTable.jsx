@@ -36,6 +36,14 @@ function formatDate(value) {
   }).format(date);
 }
 
+function getDisplayStatus(lead) {
+  if (lead?.status === "voucher_created" && !lead?.has_voucher) {
+    return "new_lead";
+  }
+
+  return lead?.status || "";
+}
+
 export default function RegistrationLeadTable({ leads }) {
   if (!leads.length) {
     return (
@@ -61,7 +69,10 @@ export default function RegistrationLeadTable({ leads }) {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {leads.map((lead, index) => (
+              {leads.map((lead, index) => {
+                const displayStatus = getDisplayStatus(lead);
+
+                return (
                 <motion.tr
                   key={lead.id}
                   initial={{ opacity: 0, y: 10 }}
@@ -71,7 +82,7 @@ export default function RegistrationLeadTable({ leads }) {
                 >
                   <td className="px-6 py-5">
                     <p className="font-semibold text-slate-950">{lead.student_name}</p>
-                    <p className="mt-1 text-sm text-slate-500">{lead.subject_interest || "No subject selected"}</p>
+                    <p className="mt-1 text-sm text-slate-500">{lead.class_level || "Class not selected"}</p>
                   </td>
                   <td className="px-6 py-5">
                     <p className="font-medium text-slate-800">{lead.parent_name || "Not provided"}</p>
@@ -89,21 +100,25 @@ export default function RegistrationLeadTable({ leads }) {
                   <td className="px-6 py-5">
                     <span
                       className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${
-                        STATUS_STYLES[lead.status] || "bg-slate-100 text-slate-700"
+                        STATUS_STYLES[displayStatus] || "bg-slate-100 text-slate-700"
                       }`}
                     >
-                      {formatStatus(lead.status)}
+                      {formatStatus(displayStatus)}
                     </span>
                   </td>
                 </motion.tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
         </div>
       </div>
 
       <div className="grid gap-4 lg:hidden">
-        {leads.map((lead, index) => (
+        {leads.map((lead, index) => {
+          const displayStatus = getDisplayStatus(lead);
+
+          return (
           <motion.article
             key={lead.id}
             initial={{ opacity: 0, y: 10 }}
@@ -118,10 +133,10 @@ export default function RegistrationLeadTable({ leads }) {
               </div>
               <span
                 className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${
-                  STATUS_STYLES[lead.status] || "bg-slate-100 text-slate-700"
+                  STATUS_STYLES[displayStatus] || "bg-slate-100 text-slate-700"
                 }`}
               >
-                {formatStatus(lead.status)}
+                {formatStatus(displayStatus)}
               </span>
             </div>
 
@@ -135,8 +150,8 @@ export default function RegistrationLeadTable({ leads }) {
                 <dd className="mt-1 text-slate-800">{lead.email || lead.phone || "Not provided"}</dd>
               </div>
               <div>
-                <dt className="font-medium text-slate-500">Subject</dt>
-                <dd className="mt-1 text-slate-800">{lead.subject_interest || "Not selected"}</dd>
+                <dt className="font-medium text-slate-500">Schedule</dt>
+                <dd className="mt-1 text-slate-800">{lead.preferred_schedule || "Pending"}</dd>
               </div>
               <div>
                 <dt className="font-medium text-slate-500">Submitted</dt>
@@ -144,7 +159,8 @@ export default function RegistrationLeadTable({ leads }) {
               </div>
             </dl>
           </motion.article>
-        ))}
+          );
+        })}
       </div>
     </section>
   );

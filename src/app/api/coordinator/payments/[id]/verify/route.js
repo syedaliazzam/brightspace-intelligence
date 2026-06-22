@@ -3,10 +3,13 @@ import bcrypt from "bcrypt";
 import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
+import { buildCredentialsEmailHtml, getAppUrl, sendEmail } from "@/lib/email";
+import { normalizeClassLevel } from "@/lib/academicCatalog";
 import prisma from "@/lib/prisma";
 import { generatePassword } from "@/lib/generatePassword";
 
 const ALLOWED_ROLES = new Set(["admin", "coordinator"]);
+const TRANSACTION_OPTIONS = { maxWait: 10000, timeout: 30000 };
 
 function json(message, status = 200, extra = {}) {
   return NextResponse.json({ message, ...extra }, { status });
@@ -14,66 +17,6 @@ function json(message, status = 200, extra = {}) {
 
 function normalizeText(value) {
   return typeof value === "string" ? value.trim() : "";
-}
-
-async function getTableColumns(tableName, tx = prisma) {
-  const rows = await tx.$queryRaw`
-    SELECT
-      column_name,
-      is_nullable,
-      column_default,
-      data_type,
-      udt_name
-    FROM information_schema.columns
-    WHERE table_schema = 'public'
-      AND table_name = ${tableName}
-  `;
-
-  return rows.reduce((accumulator, row) => {
-    accumulator[row.column_name] = {
-      nullable: row.is_nullable === "YES",
-      defaultValue: row.column_default,
-      dataType: row.data_type,
-      udtName: row.udt_name,
-    };
-    return accumulator;
-  }, {});
-}
-
-function getValueSql(columnMeta, value) {
-  if (!columnMeta || value === null || typeof value === "undefined") {
-    return Prisma.sql`${value ?? null}`;
-  }
-  if (columnMeta.udtName === "uuid") {
-    return Prisma.sql`${value}::uuid`;
-  }
-  if (columnMeta.dataType === "USER-DEFINED" && columnMeta.udtName) {
-    return Prisma.sql`${value}::${Prisma.raw(columnMeta.udtName)}`;
-  }
-  if (columnMeta.dataType === "json" || columnMeta.dataType === "jsonb") {
-    return Prisma.sql`${value}::${Prisma.raw(columnMeta.dataType)}`;
-  }
-  return Prisma.sql`${value}`;
-}
-
-function addColumn(columns, values, columnMap, name, value) {
-  columns.push(Prisma.raw(`"${name}"`));
-  values.push(getValueSql(columnMap[name], value));
-}
-
-function ensureSupportedRequiredColumns(tableName, columns, supportedColumns) {
-  const missing = Object.entries(columns)
-    .filter(
-      ([columnName, meta]) =>
-        !meta.nullable && !meta.defaultValue && !supportedColumns.has(columnName)
-    )
-    .map(([columnName]) => columnName);
-
-  if (missing.length) {
-    throw new Error(
-      `${tableName} requires unsupported columns: ${missing.join(", ")}.`
-    );
-  }
 }
 
 async function getRoleId(roleName, tx) {
@@ -97,6 +40,43 @@ function splitName(fullName) {
   };
 }
 
+function getClassCode(classLevel) {
+  const normalized = normalizeClassLevel(classLevel);
+  const codes = {
+    "Pre-Nursery": "PN",
+    Nursery: "NUR",
+    "KG-1": "KG1",
+    "KG-2": "KG2",
+  };
+
+  if (!normalized || !codes[normalized]) {
+    throw new Error("Invalid class level for roll number generation.");
+  }
+
+  return codes[normalized];
+}
+
+async function generateNextRollNo(classLevel, tx) {
+  const classCode = getClassCode(classLevel);
+
+  await tx.$executeRaw`
+    SELECT pg_advisory_xact_lock(hashtext(${`student-roll:${classCode}`}))
+  `;
+
+  const [row] = await tx.$queryRaw`
+    SELECT COALESCE(MAX(SUBSTRING(admission_no FROM '[0-9]+$')::int), 0)::int AS last_no
+    FROM student_profiles
+    WHERE admission_no LIKE ${`${classCode}-%`}
+      AND admission_no ~ ${`^${classCode}-[0-9]+$`}
+  `;
+
+  return `${classCode}-${String(Number(row?.last_no || 0) + 1).padStart(4, "0")}`;
+}
+
+function buildStudentEmailFromRollNo(rollNo) {
+  return `${String(rollNo || "").trim().toLowerCase()}@students.local`;
+}
+
 async function insertAuditLog(
   actorUserId,
   targetId,
@@ -106,195 +86,242 @@ async function insertAuditLog(
   tx = prisma,
   options = {}
 ) {
-  const columns = await getTableColumns("audit_logs", tx);
-  if (!Object.keys(columns).length) return;
-
-  const insertColumns = [];
-  const insertValues = [];
-  const supportedColumns = new Set();
+  const auditId = crypto.randomUUID();
   const entityType = options.entityType || "registration_leads";
   const entityId = options.entityId || targetId;
 
-  if (columns.id) { addColumn(insertColumns, insertValues, columns, "id", crypto.randomUUID()); supportedColumns.add("id"); }
-  if (columns.actor_user_id) { addColumn(insertColumns, insertValues, columns, "actor_user_id", actorUserId); supportedColumns.add("actor_user_id"); }
-  if (columns.target_user_id) { addColumn(insertColumns, insertValues, columns, "target_user_id", targetId); supportedColumns.add("target_user_id"); }
-  if (columns.entity_type) { addColumn(insertColumns, insertValues, columns, "entity_type", entityType); supportedColumns.add("entity_type"); }
-  if (columns.entity_id) { addColumn(insertColumns, insertValues, columns, "entity_id", entityId); supportedColumns.add("entity_id"); }
-  if (columns.action) { addColumn(insertColumns, insertValues, columns, "action", action); supportedColumns.add("action"); }
-  if (columns.description) { addColumn(insertColumns, insertValues, columns, "description", description); supportedColumns.add("description"); }
-  if (columns.metadata) { addColumn(insertColumns, insertValues, columns, "metadata", JSON.stringify(metadata)); supportedColumns.add("metadata"); }
-  if (columns.meta) { addColumn(insertColumns, insertValues, columns, "meta", JSON.stringify(metadata)); supportedColumns.add("meta"); }
-
-  ensureSupportedRequiredColumns("audit_logs", columns, supportedColumns);
-
-  await tx.$executeRaw(
-    Prisma.sql`
-      INSERT INTO audit_logs (${Prisma.join(insertColumns, ", ")})
-      VALUES (${Prisma.join(insertValues, ", ")})
-    `
-  );
+  await tx.$executeRaw`
+    INSERT INTO audit_logs (
+      id,
+      actor_user_id,
+      entity_type,
+      entity_id,
+      action
+    )
+    VALUES (
+      ${auditId}::uuid,
+      ${actorUserId}::uuid,
+      ${entityType},
+      ${entityId}::uuid,
+      ${action}
+    )
+  `;
 }
 
 async function insertFeeVerification(payload, tx) {
-  const columns = await getTableColumns("fee_verifications", tx);
-  const insertColumns = [];
-  const insertValues = [];
-  const supportedColumns = new Set();
   const verificationId = crypto.randomUUID();
 
-  if (columns.id) { addColumn(insertColumns, insertValues, columns, "id", verificationId); supportedColumns.add("id"); }
-  if (columns.fee_submission_id) { addColumn(insertColumns, insertValues, columns, "fee_submission_id", payload.feeSubmissionId); supportedColumns.add("fee_submission_id"); }
-  if (columns.fee_voucher_id) { addColumn(insertColumns, insertValues, columns, "fee_voucher_id", payload.feeVoucherId); supportedColumns.add("fee_voucher_id"); }
-  if (columns.registration_lead_id) { addColumn(insertColumns, insertValues, columns, "registration_lead_id", payload.registrationLeadId); supportedColumns.add("registration_lead_id"); }
-  if (columns.verified_by_user_id) { addColumn(insertColumns, insertValues, columns, "verified_by_user_id", payload.verifiedByUserId); supportedColumns.add("verified_by_user_id"); }
-  if (columns.status) { addColumn(insertColumns, insertValues, columns, "status", payload.status); supportedColumns.add("status"); }
-  if (columns.rejection_reason) { addColumn(insertColumns, insertValues, columns, "rejection_reason", payload.rejectionReason || null); supportedColumns.add("rejection_reason"); }
-  if (columns.notes) { addColumn(insertColumns, insertValues, columns, "notes", payload.notes || null); supportedColumns.add("notes"); }
-  if (columns.verified_at) { addColumn(insertColumns, insertValues, columns, "verified_at", new Date().toISOString()); supportedColumns.add("verified_at"); }
-
-  ensureSupportedRequiredColumns("fee_verifications", columns, supportedColumns);
-
-  await tx.$executeRaw(
-    Prisma.sql`
-      INSERT INTO fee_verifications (${Prisma.join(insertColumns, ", ")})
-      VALUES (${Prisma.join(insertValues, ", ")})
-    `
-  );
+  await tx.$executeRaw`
+    INSERT INTO fee_verifications (
+      id,
+      fee_submission_id,
+      verified_by,
+      verified_at
+    )
+    VALUES (
+      ${verificationId}::uuid,
+      ${payload.feeSubmissionId}::uuid,
+      ${payload.verifiedByUserId}::uuid,
+      NOW()
+    )
+  `;
 }
 
-async function findExistingUser({ email, phone, roleName }, tx) {
-  const conditions = [];
-  if (email) conditions.push(Prisma.sql`LOWER(u.email) = ${email.toLowerCase()}`);
-  if (phone) conditions.push(Prisma.sql`u.phone = ${phone}`);
-  if (!conditions.length) return null;
 
-  const [user] = await tx.$queryRaw(
-    Prisma.sql`
-      SELECT u.id::text AS id, LOWER(r.name) AS role_name
-      FROM users u
-      INNER JOIN roles r ON r.id = u.role_id
-      WHERE ${Prisma.join(conditions, Prisma.sql` OR `)}
-      LIMIT 1
-    `
-  );
+async function findExistingUser({ email, phone, roleName }, tx) {
+  if (!email && !phone) return null;
+
+  const [user] = email && phone
+    ? await tx.$queryRaw`
+        SELECT u.id::text AS id, LOWER(r.name) AS role_name
+        FROM users u
+        INNER JOIN roles r ON r.id = u.role_id
+        WHERE LOWER(u.email) = ${email.toLowerCase()}
+           OR u.phone = ${phone}
+        LIMIT 1
+      `
+    : email
+      ? await tx.$queryRaw`
+          SELECT u.id::text AS id, LOWER(r.name) AS role_name
+          FROM users u
+          INNER JOIN roles r ON r.id = u.role_id
+          WHERE LOWER(u.email) = ${email.toLowerCase()}
+          LIMIT 1
+        `
+      : await tx.$queryRaw`
+          SELECT u.id::text AS id, LOWER(r.name) AS role_name
+          FROM users u
+          INNER JOIN roles r ON r.id = u.role_id
+          WHERE u.phone = ${phone}
+          LIMIT 1
+        `;
+
   return user?.id && user.role_name === roleName ? user : null;
 }
 
 async function createUser({ roleId, fullName, email, phone, passwordHash }, tx) {
-  const columns = await getTableColumns("users", tx);
-  const insertColumns = [];
-  const insertValues = [];
-  const supportedColumns = new Set();
   const userId = crypto.randomUUID();
-  const { firstName, lastName } = splitName(fullName);
 
-  if (columns.id) { addColumn(insertColumns, insertValues, columns, "id", userId); supportedColumns.add("id"); }
-  if (columns.role_id) { addColumn(insertColumns, insertValues, columns, "role_id", roleId); supportedColumns.add("role_id"); }
-  if (columns.full_name) { addColumn(insertColumns, insertValues, columns, "full_name", fullName); supportedColumns.add("full_name"); }
-  if (columns.email) { addColumn(insertColumns, insertValues, columns, "email", email || null); supportedColumns.add("email"); }
-  if (columns.phone) { addColumn(insertColumns, insertValues, columns, "phone", phone || null); supportedColumns.add("phone"); }
-  if (columns.password_hash) { addColumn(insertColumns, insertValues, columns, "password_hash", passwordHash); supportedColumns.add("password_hash"); }
-  if (columns.status) { addColumn(insertColumns, insertValues, columns, "status", "active"); supportedColumns.add("status"); }
-  if (columns.must_change_password) { addColumn(insertColumns, insertValues, columns, "must_change_password", true); supportedColumns.add("must_change_password"); }
-  if (columns.name) { addColumn(insertColumns, insertValues, columns, "name", fullName); supportedColumns.add("name"); }
-  if (columns.first_name) { addColumn(insertColumns, insertValues, columns, "first_name", firstName); supportedColumns.add("first_name"); }
-  if (columns.last_name) { addColumn(insertColumns, insertValues, columns, "last_name", lastName); supportedColumns.add("last_name"); }
+  await tx.$executeRaw`
+    INSERT INTO users (
+      id,
+      role_id,
+      full_name,
+      email,
+      phone,
+      password_hash,
+      status,
+      must_change_password
+    )
+    VALUES (
+      ${userId}::uuid,
+      ${roleId}::uuid,
+      ${fullName},
+      ${email || null},
+      ${phone || null},
+      ${passwordHash},
+      'active'::user_status,
+      true
+    )
+  `;
 
-  ensureSupportedRequiredColumns("users", columns, supportedColumns);
-
-  await tx.$executeRaw(
-    Prisma.sql`
-      INSERT INTO users (${Prisma.join(insertColumns, ", ")})
-      VALUES (${Prisma.join(insertValues, ", ")})
-    `
-  );
   return userId;
 }
 
 async function createProfile(tableName, payload, tx) {
-  const columns = await getTableColumns(tableName, tx);
-  if (!Object.keys(columns).length) return;
+  const profileId = crypto.randomUUID();
 
-  const insertColumns = [];
-  const insertValues = [];
-  const supportedColumns = new Set();
-  const { firstName, lastName } = splitName(payload.fullName);
+  if (tableName === "parent_profiles") {
+    await tx.$executeRaw`
+      INSERT INTO parent_profiles (
+        id,
+        user_id,
+        relation
+      )
+      VALUES (
+        ${profileId}::uuid,
+        ${payload.userId}::uuid,
+        ${payload.relation || "parent"}
+      )
+    `;
 
-  if (columns.id) { addColumn(insertColumns, insertValues, columns, "id", crypto.randomUUID()); supportedColumns.add("id"); }
-  if (columns.user_id) { addColumn(insertColumns, insertValues, columns, "user_id", payload.userId); supportedColumns.add("user_id"); }
-  if (columns.full_name) { addColumn(insertColumns, insertValues, columns, "full_name", payload.fullName); supportedColumns.add("full_name"); }
-  if (columns.name) { addColumn(insertColumns, insertValues, columns, "name", payload.fullName); supportedColumns.add("name"); }
-  if (columns.first_name) { addColumn(insertColumns, insertValues, columns, "first_name", firstName); supportedColumns.add("first_name"); }
-  if (columns.last_name) { addColumn(insertColumns, insertValues, columns, "last_name", lastName); supportedColumns.add("last_name"); }
-  if (columns.email) { addColumn(insertColumns, insertValues, columns, "email", payload.email || null); supportedColumns.add("email"); }
-  if (columns.phone) { addColumn(insertColumns, insertValues, columns, "phone", payload.phone || null); supportedColumns.add("phone"); }
-  if (columns.status) { addColumn(insertColumns, insertValues, columns, "status", "active"); supportedColumns.add("status"); }
-  if (columns.class_level) { addColumn(insertColumns, insertValues, columns, "class_level", payload.classLevel || null); supportedColumns.add("class_level"); }
-  if (columns.address) { addColumn(insertColumns, insertValues, columns, "address", payload.address || null); supportedColumns.add("address"); }
-  if (columns.city) { addColumn(insertColumns, insertValues, columns, "city", payload.city || null); supportedColumns.add("city"); }
-  if (columns.student_age) { addColumn(insertColumns, insertValues, columns, "student_age", payload.studentAge || null); supportedColumns.add("student_age"); }
-  if (columns.registration_lead_id) { addColumn(insertColumns, insertValues, columns, "registration_lead_id", payload.registrationLeadId || null); supportedColumns.add("registration_lead_id"); }
+    return profileId;
+  }
 
-  ensureSupportedRequiredColumns(tableName, columns, supportedColumns);
+  if (tableName === "student_profiles") {
+    await tx.$executeRaw`
+      INSERT INTO student_profiles (
+        id,
+        user_id,
+        admission_no,
+        age,
+        grade_level,
+        status
+      )
+      VALUES (
+        ${profileId}::uuid,
+        ${payload.userId}::uuid,
+        ${payload.admissionNo || null},
+        ${payload.studentAge ? Number(payload.studentAge) : null},
+        ${payload.classLevel || null},
+        'active'::user_status
+      )
+    `;
 
-  await tx.$executeRaw(
-    Prisma.sql`
-      INSERT INTO ${Prisma.raw(`"${tableName}"`)} (${Prisma.join(insertColumns, ", ")})
-      VALUES (${Prisma.join(insertValues, ", ")})
-    `
-  );
+    return profileId;
+  }
+
+  return null;
 }
 
 async function createStudentParentLink(studentId, parentId, tx) {
-  const columns = await getTableColumns("student_parents", tx);
-  if (!Object.keys(columns).length) return;
+  await tx.$executeRaw`
+    INSERT INTO student_parents (
+      id,
+      student_id,
+      parent_id,
+      is_primary
+    )
+    VALUES (
+      ${crypto.randomUUID()}::uuid,
+      ${studentId}::uuid,
+      ${parentId}::uuid,
+      true
+    )
+  `;
+}
 
-  const insertColumns = [];
-  const insertValues = [];
-  const supportedColumns = new Set();
+async function createEnrollmentForStudent(studentProfileId, registrationLeadId, classLevel, tx) {
+  const normalizedClassLevel = normalizeClassLevel(classLevel);
 
-  if (columns.id) { addColumn(insertColumns, insertValues, columns, "id", crypto.randomUUID()); supportedColumns.add("id"); }
-  if (columns.student_id) { addColumn(insertColumns, insertValues, columns, "student_id", studentId); supportedColumns.add("student_id"); }
-  if (columns.parent_id) { addColumn(insertColumns, insertValues, columns, "parent_id", parentId); supportedColumns.add("parent_id"); }
-  if (columns.is_primary) { addColumn(insertColumns, insertValues, columns, "is_primary", true); supportedColumns.add("is_primary"); }
+  if (!normalizedClassLevel) {
+    throw new Error("Registration class_level is invalid. Allowed values: Pre-Nursery, Nursery, KG-1, KG-2.");
+  }
 
-  ensureSupportedRequiredColumns("student_parents", columns, supportedColumns);
+  const [course] = await tx.$queryRaw`
+    SELECT id::text AS id
+    FROM courses
+    WHERE class_level = ${normalizedClassLevel}
+      AND COALESCE(status, 'active'::user_status) = 'active'::user_status
+    LIMIT 1
+  `;
 
-  await tx.$executeRaw(
-    Prisma.sql`
-      INSERT INTO student_parents (${Prisma.join(insertColumns, ", ")})
-      VALUES (${Prisma.join(insertValues, ", ")})
-    `
-  );
+  if (!course?.id) {
+    throw new Error(`Class not found for class_level: ${normalizedClassLevel}. Run prisma/seed-academic.sql.`);
+  }
+
+  const enrollmentId = crypto.randomUUID();
+
+  await tx.$executeRaw`
+    INSERT INTO enrollments (
+      id,
+      student_id,
+      course_id,
+      registration_id,
+      start_date,
+      status,
+      created_at,
+      updated_at
+    )
+    VALUES (
+      ${enrollmentId}::uuid,
+      ${studentProfileId}::uuid,
+      ${course.id}::uuid,
+      ${registrationLeadId}::uuid,
+      CURRENT_DATE,
+      'active',
+      NOW(),
+      NOW()
+    )
+    ON CONFLICT (student_id, course_id) DO NOTHING
+  `;
+
+  return enrollmentId;
 }
 
 async function insertCredentialDispatchLog(payload, tx) {
-  const columns = await getTableColumns("credential_dispatch_logs", tx);
-  if (!Object.keys(columns).length) return;
-
-  const insertColumns = [];
-  const insertValues = [];
-  const supportedColumns = new Set();
-
-  if (columns.id) { addColumn(insertColumns, insertValues, columns, "id", crypto.randomUUID()); supportedColumns.add("id"); }
-  if (columns.user_id) { addColumn(insertColumns, insertValues, columns, "user_id", payload.userId); supportedColumns.add("user_id"); }
-  if (columns.channel) { addColumn(insertColumns, insertValues, columns, "channel", payload.channel); supportedColumns.add("channel"); }
-  if (columns.recipient) { addColumn(insertColumns, insertValues, columns, "recipient", payload.recipient || null); supportedColumns.add("recipient"); }
-  if (columns.status) { addColumn(insertColumns, insertValues, columns, "status", payload.status); supportedColumns.add("status"); }
-  if (columns.dispatch_status) { addColumn(insertColumns, insertValues, columns, "dispatch_status", payload.status); supportedColumns.add("dispatch_status"); }
-  if (columns.message) { addColumn(insertColumns, insertValues, columns, "message", payload.message); supportedColumns.add("message"); }
-  if (columns.metadata) { addColumn(insertColumns, insertValues, columns, "metadata", JSON.stringify(payload.metadata || {})); supportedColumns.add("metadata"); }
-  if (columns.meta) { addColumn(insertColumns, insertValues, columns, "meta", JSON.stringify(payload.metadata || {})); supportedColumns.add("meta"); }
-  if (columns.notes) { addColumn(insertColumns, insertValues, columns, "notes", payload.message || null); supportedColumns.add("notes"); }
-
-  ensureSupportedRequiredColumns("credential_dispatch_logs", columns, supportedColumns);
-
-  await tx.$executeRaw(
-    Prisma.sql`
-      INSERT INTO credential_dispatch_logs (${Prisma.join(insertColumns, ", ")})
-      VALUES (${Prisma.join(insertValues, ", ")})
-    `
-  );
+  await tx.$executeRaw`
+    INSERT INTO credential_dispatch_logs (
+      id,
+      registration_id,
+      sent_to_email,
+      sent_to_phone,
+      channel,
+      status,
+      error_message,
+      created_at
+    )
+    VALUES (
+      ${crypto.randomUUID()}::uuid,
+      ${payload.metadata?.registrationLeadId || null}::uuid,
+      ${payload.channel?.includes("email") ? payload.recipient || null : null},
+      ${payload.channel?.includes("email") ? null : payload.recipient || null},
+      ${payload.channel},
+      ${payload.status},
+      ${payload.message || null},
+      NOW()
+    )
+  `;
 }
 
 async function getSubmissionRecord(id, tx = prisma) {
@@ -318,7 +345,7 @@ async function getSubmissionRecord(id, tx = prisma) {
       rl.address,
       rl.city,
       rl.class_level,
-      rl.student_age
+      rl.age AS student_age
     FROM fee_submissions fs
     INNER JOIN fee_vouchers fv ON fv.id = fs.voucher_id
     INNER JOIN registration_leads rl ON rl.id = fv.registration_id
@@ -387,11 +414,20 @@ export async function POST(request, { params }) {
           { rejectionReason, feeSubmissionId: submission.id },
           tx
         );
-      });
+      }, TRANSACTION_OPTIONS);
       return json("Payment rejected.", 200);
     }
 
     // APPROVE FLOW
+    const parentTemporaryPassword = generatePassword();
+    const studentTemporaryPassword = generatePassword();
+    const [parentPasswordHash, studentPasswordHash] = await Promise.all([
+      bcrypt.hash(parentTemporaryPassword, 12),
+      bcrypt.hash(studentTemporaryPassword, 12),
+    ]);
+    let studentLoginEmail = "";
+    let parentLogin = submission.email || submission.phone || "";
+
     await prisma.$transaction(async (tx) => {
       await tx.$executeRaw`
         UPDATE fee_submissions
@@ -430,10 +466,6 @@ export async function POST(request, { params }) {
 
       const parentRoleId = await getRoleId("parent", tx);
       const studentRoleId = await getRoleId("student", tx);
-      const parentTemporaryPassword = generatePassword();
-      const studentTemporaryPassword = generatePassword();
-      const parentPasswordHash = await bcrypt.hash(parentTemporaryPassword, 12);
-      const studentPasswordHash = await bcrypt.hash(studentTemporaryPassword, 12);
 
       const existingParent = await findExistingUser({
         email: submission.email,
@@ -441,16 +473,21 @@ export async function POST(request, { params }) {
         roleName: "parent",
       }, tx);
 
-      const parentUserId = existingParent?.id || (await createUser({
-        roleId: parentRoleId,
-        fullName: submission.parent_name || `${submission.student_name} Parent`,
-        email: submission.email,
-        phone: submission.phone,
-        passwordHash: parentPasswordHash,
-      }, tx));
+
+      let parentUserId = existingParent?.id || null;
+      let parentProfileId = null;
+
 
       if (!existingParent) {
-        await createProfile("parent_profiles", {
+        parentUserId = await createUser({
+          roleId: parentRoleId,
+          fullName: submission.parent_name || `${submission.student_name} Parent`,
+          email: submission.email,
+          phone: submission.phone,
+          passwordHash: parentPasswordHash,
+        }, tx);
+
+        parentProfileId = await createProfile("parent_profiles", {
           userId: parentUserId,
           fullName: submission.parent_name || `${submission.student_name} Parent`,
           email: submission.email,
@@ -467,29 +504,71 @@ export async function POST(request, { params }) {
           tx
         );
       }
+      else {
+        await tx.$executeRaw`
+          UPDATE users
+          SET
+            password_hash = ${parentPasswordHash},
+            status = 'active'::user_status,
+            must_change_password = TRUE,
+            updated_at = NOW()
+          WHERE id = ${parentUserId}::uuid
+        `;
+
+        const [parentProfile] = await tx.$queryRaw`
+          SELECT id::text AS id
+          FROM parent_profiles
+          WHERE user_id = ${parentUserId}::uuid
+          LIMIT 1
+        `;
+        parentProfileId = parentProfile?.id || null;
+
+        if (!parentProfileId) {
+          parentProfileId = await createProfile("parent_profiles", {
+            userId: parentUserId,
+            fullName: submission.parent_name || `${submission.student_name} Parent`,
+            email: submission.email,
+            phone: submission.phone,
+            registrationLeadId: submission.registration_lead_id,
+          }, tx);
+        }
+      }
+
+      const studentRollNo = await generateNextRollNo(submission.class_level, tx);
+      studentLoginEmail = buildStudentEmailFromRollNo(studentRollNo);
 
       const studentUserId = await createUser({
         roleId: studentRoleId,
         fullName: submission.student_name,
-        email: null,
+        email: studentLoginEmail,
         phone: null,
         passwordHash: studentPasswordHash,
       }, tx);
 
-      await createProfile("student_profiles", {
+      const studentProfileId = await createProfile("student_profiles", {
         userId: studentUserId,
         fullName: submission.student_name,
         email: null,
         phone: null,
+        admissionNo: studentRollNo,
         classLevel: submission.class_level,
         address: submission.address,
         city: submission.city,
         studentAge: submission.student_age,
         registrationLeadId: submission.registration_lead_id,
       }, tx);
-
-      await createStudentParentLink(studentUserId, parentUserId, tx);
-
+      await createStudentParentLink(studentProfileId, parentProfileId, tx);
+      await createEnrollmentForStudent(
+        studentProfileId,
+        submission.registration_lead_id,
+        submission.class_level,
+        tx
+      );
+      await tx.$executeRaw`
+        UPDATE fee_vouchers
+        SET student_id = ${studentProfileId}::uuid
+        WHERE id = ${submission.fee_voucher_id || submission.voucher_id}::uuid
+      `;
       await insertAuditLog(
         session.user.id,
         studentUserId,
@@ -507,19 +586,19 @@ export async function POST(request, { params }) {
 
       await insertCredentialDispatchLog({
         userId: parentUserId,
-        channel: submission.email ? "email_placeholder" : "whatsapp_placeholder",
+        channel: submission.email ? "sendgrid_email" : "whatsapp_placeholder",
         recipient: submission.email || submission.phone || null,
         status: "pending_manual_dispatch",
-        message: "Parent credentials queued for placeholder dispatch.",
+        message: "Parent credentials queued for SendGrid dispatch.",
         metadata: { registrationLeadId: submission.registration_lead_id, voucherNo: submission.voucher_no },
       }, tx);
 
       await insertCredentialDispatchLog({
         userId: studentUserId,
-        channel: "parent_delivery_placeholder",
+        channel: submission.email ? "sendgrid_email_parent_delivery" : "parent_delivery_placeholder",
         recipient: submission.email || submission.phone || null,
         status: "pending_manual_dispatch",
-        message: "Student credentials queued for placeholder dispatch.",
+        message: "Student credentials queued for parent delivery.",
         metadata: { registrationLeadId: submission.registration_lead_id, voucherNo: submission.voucher_no },
       }, tx);
 
@@ -531,7 +610,32 @@ export async function POST(request, { params }) {
         { parentUserId, studentUserId },
         tx
       );
-    });
+    }, TRANSACTION_OPTIONS);
+
+    if (submission.email) {
+      try {
+        const portalUrl = getAppUrl()
+          ? `${getAppUrl().replace(/\/+$/, "")}/login`
+          : "http://localhost:3000/login";
+
+        await sendEmail({
+          to: submission.email,
+          subject: "Your LMS access credentials",
+          text: `Your LMS access is ready.\n\nParent login: ${parentLogin}\nParent temporary password: ${parentTemporaryPassword}\n\nStudent login: ${studentLoginEmail}\nStudent temporary password: ${studentTemporaryPassword}\n\nLogin: ${portalUrl}`,
+          html: buildCredentialsEmailHtml({
+            recipientName: submission.parent_name || "Parent",
+            studentName: submission.student_name,
+            parentLogin,
+            parentPassword: parentTemporaryPassword,
+            studentLogin: studentLoginEmail,
+            studentPassword: studentTemporaryPassword,
+            portalUrl,
+          }),
+        });
+      } catch (emailError) {
+        console.error("SendGrid credential email failed:", emailError);
+      }
+    }
 
     return json("Payment verified and LMS access granted.", 200);
   } catch (error) {

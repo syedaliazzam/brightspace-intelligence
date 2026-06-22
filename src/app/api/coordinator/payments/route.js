@@ -1,4 +1,3 @@
-import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import prisma from "@/lib/prisma";
@@ -47,15 +46,8 @@ export async function GET(request) {
   const { searchParams } = new URL(request.url);
   const filter = normalizeText(searchParams.get("status")).toLowerCase();
   const dbStatus = FILTER_TO_DB_STATUS[filter] || "";
-  const conditions = [];
-
-  if (dbStatus) {
-    conditions.push(Prisma.sql`fs."status"::text = ${dbStatus}`);
-  }
-
-  const whereClause = conditions.length
-    ? Prisma.sql`WHERE ${Prisma.join(conditions, Prisma.sql` AND `)}`
-    : Prisma.empty;
+  const whereClause = dbStatus ? `WHERE fs."status"::text = $1` : "";
+  const values = dbStatus ? [dbStatus] : [];
 
   try {
     // 🟢 FIXED: Safe enum casting and exact string mapping
@@ -63,7 +55,8 @@ export async function GET(request) {
       prisma.$queryRaw`SELECT COUNT(*)::int AS total FROM fee_submissions WHERE "status"::text = 'pending'`,
       prisma.$queryRaw`SELECT COUNT(*)::int AS total FROM fee_submissions WHERE "status"::text = 'verified'`,
       prisma.$queryRaw`SELECT COUNT(*)::int AS total FROM fee_submissions WHERE "status"::text = 'rejected'`,
-      prisma.$queryRaw`
+      prisma.$queryRawUnsafe(
+        `
         SELECT
           fs.id::text AS id,
           fs.payer_name,
@@ -86,7 +79,9 @@ export async function GET(request) {
         INNER JOIN registration_leads rl ON rl.id = fv.registration_id
         ${whereClause}
         ORDER BY fs.paid_at DESC NULLS LAST, fs.id DESC
-      `,
+        `,
+        ...values
+      ),
     ]);
 
     return json("Coordinator payments fetched.", 200, {

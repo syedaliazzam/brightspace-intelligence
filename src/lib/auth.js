@@ -81,6 +81,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           throw toAuthError("inactive_account");
         }
 
+        if (!user.password_hash) {
+          return null;
+        }
+
         const passwordMatches = await bcrypt.compare(password, user.password_hash);
 
         if (!passwordMatches) {

@@ -212,12 +212,6 @@ export default function AdminFeeSettingsPage() {
       <AdminDashboardCards
         items={[
           {
-            key: "settings",
-            label: "Fee settings",
-            value: state.finance.totalSettings,
-            tone: "bg-slate-950 text-white",
-          },
-          {
             key: "voucherCreated",
             label: "Vouchers created",
             value: state.finance.voucherCreated,
@@ -244,25 +238,8 @@ export default function AdminFeeSettingsPage() {
         </section>
       ) : null}
 
-      <section className="rounded-[1.75rem] border border-white/70 bg-white/90 p-5 shadow-[0_20px_70px_-36px_rgba(15,23,42,0.25)]">
-        <div className="mb-5">
-          <p className="text-sm font-semibold uppercase tracking-[0.22em] text-sky-700">
-            Editable settings
-          </p>
-          <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">
-            Fee configuration records
-          </h2>
-        </div>
-
-        {!state.available ? (
-          <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-6 text-sm text-slate-600">
-            Fee configuration will appear here as soon as this section is enabled in the live schema.
-          </div>
-        ) : !state.settings.length ? (
-          <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-6 text-sm text-slate-600">
-            No fee configuration records are available yet.
-          </div>
-        ) : (
+      {state.available && state.settings.length ? (
+        <section className="rounded-[1.75rem] border border-white/70 bg-white/90 p-5 shadow-[0_20px_70px_-36px_rgba(15,23,42,0.25)]">
           <div className="space-y-4">
             {state.settings.map((setting) => {
               const draft = drafts[setting.id] || {};
@@ -384,8 +361,8 @@ export default function AdminFeeSettingsPage() {
               );
             })}
           </div>
-        )}
-      </section>
+        </section>
+      ) : null}
 
       <section className="grid gap-6 xl:grid-cols-2">
         <div className="rounded-[1.75rem] border border-white/70 bg-white/90 p-5 shadow-[0_20px_70px_-36px_rgba(15,23,42,0.25)]">

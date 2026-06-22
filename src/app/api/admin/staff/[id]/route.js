@@ -115,57 +115,16 @@ async function getRoleId(roleName, tx = prisma) {
 }
 
 async function insertAuditLog(actorUserId, targetId, action, description, metadata = {}, tx = prisma) {
-  const columns = await getTableColumns("audit_logs", tx);
-
-  if (!Object.keys(columns).length) {
-    return;
-  }
-
-  const insertColumns = [];
-  const insertValues = [];
-  const supportedColumns = new Set();
-
-  if (columns.id) {
-    addColumn(insertColumns, insertValues, columns, "id", crypto.randomUUID());
-    supportedColumns.add("id");
-  }
-  if (columns.actor_user_id) {
-    addColumn(insertColumns, insertValues, columns, "actor_user_id", actorUserId);
-    supportedColumns.add("actor_user_id");
-  }
-  if (columns.target_user_id) {
-    addColumn(insertColumns, insertValues, columns, "target_user_id", targetId);
-    supportedColumns.add("target_user_id");
-  }
-  if (columns.entity_type) {
-    addColumn(insertColumns, insertValues, columns, "entity_type", "users");
-    supportedColumns.add("entity_type");
-  }
-  if (columns.entity_id) {
-    addColumn(insertColumns, insertValues, columns, "entity_id", targetId);
-    supportedColumns.add("entity_id");
-  }
-  if (columns.action) {
-    addColumn(insertColumns, insertValues, columns, "action", action);
-    supportedColumns.add("action");
-  }
-  if (columns.description) {
-    addColumn(insertColumns, insertValues, columns, "description", description);
-    supportedColumns.add("description");
-  }
-  if (columns.metadata) {
-    addColumn(insertColumns, insertValues, columns, "metadata", JSON.stringify(metadata));
-    supportedColumns.add("metadata");
-  }
-  if (columns.meta) {
-    addColumn(insertColumns, insertValues, columns, "meta", JSON.stringify(metadata));
-    supportedColumns.add("meta");
-  }
-
   await tx.$executeRaw(
     Prisma.sql`
-      INSERT INTO audit_logs (${Prisma.join(insertColumns, ", ")})
-      VALUES (${Prisma.join(insertValues, ", ")})
+      INSERT INTO audit_logs (id, actor_user_id, entity_type, entity_id, action)
+      VALUES (
+        ${crypto.randomUUID()}::uuid,
+        ${actorUserId}::uuid,
+        ${"users"},
+        ${targetId}::uuid,
+        ${action}
+      )
     `
   );
 }
@@ -210,14 +169,14 @@ async function syncProfile(tableName, payload, tx) {
       updates.push(Prisma.sql`phone = ${payload.phone || null}`);
     }
     if (columns.status) {
-      updates.push(Prisma.sql`status = ${payload.status}`);
+      updates.push(Prisma.sql`status = ${payload.status}::user_status`);
     }
 
     if (updates.length) {
       await tx.$executeRaw(
         Prisma.sql`
           UPDATE ${Prisma.raw(`"${tableName}"`)}
-          SET ${Prisma.join(updates, ", ")}
+          SET ${Prisma.join(updates, Prisma.sql`, `)}
           WHERE user_id = ${payload.userId}::uuid
         `
       );
@@ -226,53 +185,22 @@ async function syncProfile(tableName, payload, tx) {
     return;
   }
 
-  const insertColumns = [];
-  const insertValues = [];
-  const supportedColumns = new Set();
+  const profileId = crypto.randomUUID();
 
-  if (columns.id) {
-    addColumn(insertColumns, insertValues, columns, "id", crypto.randomUUID());
-    supportedColumns.add("id");
-  }
-  if (columns.user_id) {
-    addColumn(insertColumns, insertValues, columns, "user_id", payload.userId);
-    supportedColumns.add("user_id");
-  }
-  if (columns.full_name) {
-    addColumn(insertColumns, insertValues, columns, "full_name", payload.fullName);
-    supportedColumns.add("full_name");
-  }
-  if (columns.name) {
-    addColumn(insertColumns, insertValues, columns, "name", payload.fullName);
-    supportedColumns.add("name");
-  }
-  if (columns.first_name) {
-    addColumn(insertColumns, insertValues, columns, "first_name", firstName);
-    supportedColumns.add("first_name");
-  }
-  if (columns.last_name) {
-    addColumn(insertColumns, insertValues, columns, "last_name", lastName);
-    supportedColumns.add("last_name");
-  }
-  if (columns.email) {
-    addColumn(insertColumns, insertValues, columns, "email", payload.email || null);
-    supportedColumns.add("email");
-  }
-  if (columns.phone) {
-    addColumn(insertColumns, insertValues, columns, "phone", payload.phone || null);
-    supportedColumns.add("phone");
-  }
-  if (columns.status) {
-    addColumn(insertColumns, insertValues, columns, "status", payload.status);
-    supportedColumns.add("status");
+  if (tableName === "coordinator_profiles") {
+    await tx.$executeRaw`
+      INSERT INTO coordinator_profiles (id, user_id, status)
+      VALUES (${profileId}::uuid, ${payload.userId}::uuid, ${payload.status}::user_status)
+    `;
+    return;
   }
 
-  await tx.$executeRaw(
-    Prisma.sql`
-      INSERT INTO ${Prisma.raw(`"${tableName}"`)} (${Prisma.join(insertColumns, ", ")})
-      VALUES (${Prisma.join(insertValues, ", ")})
-    `
-  );
+  if (tableName === "teacher_profiles") {
+    await tx.$executeRaw`
+      INSERT INTO teacher_profiles (id, user_id, status)
+      VALUES (${profileId}::uuid, ${payload.userId}::uuid, ${payload.status}::user_status)
+    `;
+  }
 }
 
 async function getUserById(id, tx = prisma) {
@@ -383,7 +311,7 @@ export async function PATCH(request, { params }) {
       updates.push(Prisma.sql`role_id = ${roleId}::uuid`);
     }
     if (userColumns.status) {
-      updates.push(Prisma.sql`status = ${nextStatus}`);
+      updates.push(Prisma.sql`status = ${nextStatus}::user_status`);
     }
 
     await prisma.$transaction(async (tx) => {
@@ -391,7 +319,7 @@ export async function PATCH(request, { params }) {
         await tx.$executeRaw(
           Prisma.sql`
             UPDATE users
-            SET ${Prisma.join(updates, ", ")}
+            SET ${Prisma.join(updates, Prisma.sql`, `)}
             WHERE id = ${id}::uuid
           `
         );

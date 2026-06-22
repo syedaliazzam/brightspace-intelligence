@@ -1,4 +1,3 @@
-import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import prisma from "@/lib/prisma";
@@ -38,51 +37,76 @@ export async function GET(request) {
   const status = normalizeSearch(searchParams.get("status")).toLowerCase();
   const search = normalizeSearch(searchParams.get("search"));
   const conditions = [];
+  const values = [];
 
   if (status && VALID_STATUSES.has(status)) {
-    conditions.push(Prisma.sql`status = ${status}`);
+    values.push(status);
+    conditions.push(`effective_status = $${values.length}`);
   }
 
   if (search) {
     const term = `%${search}%`;
-    conditions.push(
-      Prisma.sql`(
-        student_name ILIKE ${term}
-        OR parent_name ILIKE ${term}
-        OR email ILIKE ${term}
-        OR phone ILIKE ${term}
-      )`
-    );
+    values.push(term);
+    conditions.push(`(
+        student_name ILIKE $${values.length}
+        OR parent_name ILIKE $${values.length}
+        OR email ILIKE $${values.length}
+        OR phone ILIKE $${values.length}
+      )`);
   }
 
   const whereClause = conditions.length
-    ? Prisma.sql`WHERE ${Prisma.join(conditions, Prisma.sql` AND `)}`
-    : Prisma.empty;
+    ? `WHERE ${conditions.join(" AND ")}`
+    : "";
 
   try {
-    const leads = await prisma.$queryRaw`
+    const leads = await prisma.$queryRawUnsafe(
+      `
+      WITH lead_rows AS (
+        SELECT
+          rl.*,
+          EXISTS (
+            SELECT 1
+            FROM fee_vouchers fv
+            WHERE fv.registration_id = rl.id
+          ) AS has_voucher,
+          CASE
+            WHEN rl.status::text = 'voucher_created'
+              AND NOT EXISTS (
+                SELECT 1
+                FROM fee_vouchers fv
+                WHERE fv.registration_id = rl.id
+              )
+            THEN 'new_lead'
+            ELSE LOWER(rl.status::text)
+          END AS effective_status
+        FROM registration_leads rl
+      )
       SELECT
         id::text AS id,
         google_sheet_row_id,
-        submitted_at,
+        created_at AS submitted_at,
         student_name,
         parent_name,
-        parent_relation,
+        NULL::text AS parent_relation,
         email,
         phone,
-        student_age,
+        age AS student_age,
         class_level,
         subject_interest,
         preferred_schedule,
         address,
-        city,
+        NULL::text AS city,
         notes,
         source,
-        status
-      FROM registration_leads
+        has_voucher,
+        effective_status AS status
+      FROM lead_rows
       ${whereClause}
-      ORDER BY submitted_at DESC NULLS LAST, id DESC
-    `;
+      ORDER BY updated_at DESC NULLS LAST, created_at DESC NULLS LAST, id DESC
+      `,
+      ...values
+    );
 
     return json("Registration leads fetched.", 200, { items: leads });
   } catch (error) {

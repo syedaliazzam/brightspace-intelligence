@@ -17,6 +17,31 @@ function getCalendarId() {
   return process.env.GOOGLE_CALENDAR_ID || process.env.GOOGLE_SERVICE_CALENDAR_ID || "primary";
 }
 
+function shouldUseCalendarAttendees() {
+  return String(process.env.GOOGLE_USE_CALENDAR_ATTENDEES || "false").toLowerCase() === "true";
+}
+
+function getFallbackMeetLink() {
+  return String(process.env.GOOGLE_FALLBACK_MEET_LINK || process.env.NEXT_PUBLIC_FALLBACK_MEET_LINK || "").trim();
+}
+
+function assertValidMeetLink(value) {
+  if (!value) return "";
+
+  try {
+    const url = new URL(value);
+    const isGoogleMeet = url.protocol === "https:" && url.hostname === "meet.google.com";
+
+    if (!isGoogleMeet) {
+      throw new Error("Fallback link must be a Google Meet URL.");
+    }
+
+    return url.toString();
+  } catch {
+    throw new Error("GOOGLE_FALLBACK_MEET_LINK must be a valid https://meet.google.com/... URL.");
+  }
+}
+
 function base64UrlEncode(value) {
   return Buffer.from(value)
     .toString("base64")
@@ -33,7 +58,7 @@ async function getGoogleAccessToken() {
   const header = { alg: "RS256", typ: "JWT" };
   const payload = {
     iss: clientEmail,
-    scope: "https://www.googleapis.com/auth/calendar.events",
+    scope: "https://www.googleapis.com/auth/calendar",
     aud: GOOGLE_TOKEN_URL,
     exp: now + 3600,
     iat: now,
@@ -85,7 +110,15 @@ async function calendarRequest(path, options = {}) {
   });
 
   if (!response.ok) {
-    throw new Error(`Google Calendar request failed: ${await response.text()}`);
+    const responseText = await response.text();
+    let message = responseText;
+
+    try {
+      const payload = JSON.parse(responseText);
+      message = payload?.error?.message || responseText;
+    } catch {}
+
+    throw new Error(`Google Calendar request failed (${response.status}): ${message}`);
   }
 
   if (response.status === 204) {
@@ -95,19 +128,29 @@ async function calendarRequest(path, options = {}) {
   return response.json();
 }
 
-function buildEventPayload(payload, includeConferenceData = true) {
-  const attendees = Array.isArray(payload?.attendees)
-    ? payload.attendees
-        .filter((item) => item?.email)
-        .map((item) => ({ email: item.email, displayName: item.name || undefined }))
-    : [];
+async function getCalendarConferenceTypes(calendarId) {
+  const calendar = await calendarRequest(`/calendars/${calendarId}`);
+  return calendar?.conferenceProperties?.allowedConferenceSolutionTypes || [];
+}
 
-  return {
+function buildEventPayload(payload, includeConferenceData = true) {
+  const attendees = shouldUseCalendarAttendees() && Array.isArray(payload?.attendees)
+    ? payload.attendees
+        .filter((item) => item?.email && String(item.email).includes("@"))
+        .map((item) => ({ email: String(item.email).trim(), displayName: item.name || undefined }))
+    : [];
+  const start = new Date(payload.start);
+  const end = new Date(payload.end);
+
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+    throw new Error("Invalid Google Calendar date/time payload.");
+  }
+
+  const eventPayload = {
     summary: payload.title,
     description: payload.description || "",
-    start: { dateTime: payload.start, timeZone: payload.timeZone || "Asia/Karachi" },
-    end: { dateTime: payload.end, timeZone: payload.timeZone || "Asia/Karachi" },
-    attendees,
+    start: { dateTime: start.toISOString(), timeZone: payload.timeZone || "Asia/Karachi" },
+    end: { dateTime: end.toISOString(), timeZone: payload.timeZone || "Asia/Karachi" },
     conferenceData: includeConferenceData
       ? {
           createRequest: {
@@ -117,21 +160,39 @@ function buildEventPayload(payload, includeConferenceData = true) {
         }
       : undefined,
   };
+
+  if (attendees.length) {
+    eventPayload.attendees = attendees;
+  }
+
+  return eventPayload;
 }
 
 export async function createCalendarLectureEvent(payload) {
   const calendarId = encodeURIComponent(getCalendarId());
+  const allowedTypes = await getCalendarConferenceTypes(calendarId);
+  const canCreateMeet = allowedTypes.includes("hangoutsMeet");
+  const fallbackMeetLink = assertValidMeetLink(getFallbackMeetLink());
+
+  if (!canCreateMeet && !fallbackMeetLink) {
+    throw new Error(
+      `Google Calendar cannot create Meet links for this calendar. Allowed conference types: ${allowedTypes.join(", ") || "none"}. Set GOOGLE_FALLBACK_MEET_LINK or use a Google Workspace calendar with Meet enabled.`
+    );
+  }
+
   const data = await calendarRequest(
     `/calendars/${calendarId}/events?conferenceDataVersion=1&sendUpdates=none`,
     {
       method: "POST",
-      body: JSON.stringify(buildEventPayload(payload, true)),
+      body: JSON.stringify(buildEventPayload(payload, canCreateMeet)),
     }
   );
 
+  const videoEntryPoint = data?.conferenceData?.entryPoints?.find((entry) => entry?.entryPointType === "video");
+
   return {
     eventId: data?.id || "",
-    meetLink: data?.hangoutLink || data?.conferenceData?.entryPoints?.[0]?.uri || "",
+    meetLink: data?.hangoutLink || videoEntryPoint?.uri || fallbackMeetLink,
     meetSpaceId: data?.conferenceData?.conferenceId || "",
     eventHtmlLink: data?.htmlLink || "",
   };
@@ -143,6 +204,7 @@ export async function updateCalendarLectureEvent(eventId, payload) {
   }
 
   const calendarId = encodeURIComponent(getCalendarId());
+  const fallbackMeetLink = assertValidMeetLink(getFallbackMeetLink());
   const data = await calendarRequest(
     `/calendars/${calendarId}/events/${encodeURIComponent(eventId)}?conferenceDataVersion=1&sendUpdates=none`,
     {
@@ -151,9 +213,11 @@ export async function updateCalendarLectureEvent(eventId, payload) {
     }
   );
 
+  const videoEntryPoint = data?.conferenceData?.entryPoints?.find((entry) => entry?.entryPointType === "video");
+
   return {
     eventId: data?.id || eventId,
-    meetLink: data?.hangoutLink || data?.conferenceData?.entryPoints?.[0]?.uri || "",
+    meetLink: data?.hangoutLink || videoEntryPoint?.uri || fallbackMeetLink,
     meetSpaceId: data?.conferenceData?.conferenceId || "",
     eventHtmlLink: data?.htmlLink || "",
   };
@@ -170,4 +234,3 @@ export async function cancelCalendarLectureEvent(eventId) {
     method: "DELETE",
   });
 }
-

@@ -19,6 +19,11 @@ function normalizeText(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 
+function isValidGoogleMeetLink(link) {
+  const value = String(link || "").trim();
+  return Boolean(value) && value.startsWith("https://meet.google.com/");
+}
+
 async function getLecture(id) {
   const [lecture] = await prisma.$queryRaw`
     SELECT
@@ -72,6 +77,7 @@ export async function PATCH(request, context) {
     const description = normalizeText(body?.description);
     const scheduledStart = normalizeText(body?.scheduledStart);
     const scheduledEnd = normalizeText(body?.scheduledEnd);
+    const manualMeetLink = normalizeText(body?.googleMeetLink || body?.google_meet_link);
 
     const lecture = await getLecture(id);
     if (!lecture?.id) {
@@ -80,6 +86,10 @@ export async function PATCH(request, context) {
 
     if (!["update", "reschedule", "cancel"].includes(action)) {
       return json("Invalid lecture schedule action.", 400);
+    }
+
+    if (!isValidGoogleMeetLink(manualMeetLink)) {
+      return json("Google Meet link is required.", 400);
     }
 
     if (action === "cancel") {
@@ -136,7 +146,9 @@ export async function PATCH(request, context) {
           start: scheduledStart,
           end: scheduledEnd,
         });
-      } catch {}
+      } catch {
+        calendarData = { eventId: lecture.google_calendar_event_id || "", meetLink: "", meetSpaceId: "" };
+      }
 
       await prisma.$transaction(async (tx) => {
         await tx.$executeRaw`
@@ -146,7 +158,11 @@ export async function PATCH(request, context) {
               scheduled_start = ${scheduledStart}::timestamp,
               scheduled_end = ${scheduledEnd}::timestamp,
               google_calendar_event_id = ${calendarData.eventId || lecture.google_calendar_event_id || null},
-              google_meet_link = COALESCE(${calendarData.meetLink || null}, google_meet_link),
+              google_meet_link = COALESCE(${manualMeetLink || null}, google_meet_link),
+              meet_link_source = CASE
+                WHEN ${manualMeetLink || null} IS NOT NULL THEN 'manual'::text
+                ELSE meet_link_source
+              END,
               google_meet_space_id = COALESCE(${calendarData.meetSpaceId || null}, google_meet_space_id),
               updated_at = NOW()
           WHERE id = ${id}::uuid
@@ -178,15 +194,13 @@ export async function PATCH(request, context) {
       return json("Lecture schedule updated.", 200);
     }
 
-    let calendarData = { eventId: "", meetLink: "", meetSpaceId: "" };
-    try {
-      calendarData = await createCalendarLectureEvent({
-        title: title || lecture.title,
-        description: description || lecture.description,
-        start: scheduledStart,
-        end: scheduledEnd,
-      });
-    } catch {}
+    if (action === "reschedule" && !manualMeetLink) {
+      return json("Google Meet link is required.", 400);
+    }
+
+    const calendarData = { eventId: lecture.google_calendar_event_id || "", meetLink: manualMeetLink, meetSpaceId: "" };
+    const resolvedMeetLink = manualMeetLink;
+    const resolvedMeetSource = "manual";
 
     const [newLecture] = await prisma.$transaction(async (tx) => {
       await tx.$executeRaw`
@@ -210,6 +224,7 @@ export async function PATCH(request, context) {
           scheduled_end,
           google_calendar_event_id,
           google_meet_link,
+          meet_link_source,
           google_meet_space_id,
           status,
           rescheduled_from_id,
@@ -228,7 +243,8 @@ export async function PATCH(request, context) {
           ${scheduledStart}::timestamp,
           ${scheduledEnd}::timestamp,
           ${calendarData.eventId || null},
-          ${calendarData.meetLink || null},
+          ${resolvedMeetLink || null},
+          ${resolvedMeetSource},
           ${calendarData.meetSpaceId || null},
           'scheduled'::lecture_status,
           ${id}::uuid,
@@ -271,6 +287,7 @@ export async function PATCH(request, context) {
           ls.status::text AS status,
           ls.google_calendar_event_id,
           ls.google_meet_link,
+          ls.meet_link_source,
           ls.google_meet_space_id,
           ls.rescheduled_from_id::text AS rescheduled_from_id
         FROM lecture_schedules ls
@@ -291,4 +308,3 @@ export async function PATCH(request, context) {
     );
   }
 }
-

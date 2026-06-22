@@ -15,7 +15,6 @@ const SHEET_HEADERS = [
   "phone",
   "student_age",
   "class_level",
-  "subject_interest",
   "preferred_schedule",
   "address",
   "city",

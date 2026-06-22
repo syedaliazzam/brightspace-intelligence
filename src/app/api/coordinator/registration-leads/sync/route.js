@@ -1,6 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
+import { normalizeClassLevel } from "@/lib/academicCatalog";
 import prisma from "@/lib/prisma";
 
 // USE ENVIRONMENT VARIABLE FOR SPREADSHEET ID
@@ -8,21 +9,6 @@ const SPREADSHEET_ID = process.env.GOOGLE_SHEETS_SPREADSHEET_ID;
 const PUBLIC_GVIZ_URL = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?tqx=out:json`;
 
 const ALLOWED_ROLES = new Set(["admin", "coordinator"]);
-const LOCKED_STATUSES = [
-  "voucher_created",
-  "fee_submitted",
-  "fee_verified",
-  "access_granted",
-];
-const VALID_STATUSES = new Set([
-  "new_lead",
-  "voucher_created",
-  "fee_submitted",
-  "fee_verified",
-  "access_granted",
-  "rejected",
-  "pending_clarification",
-]);
 
 function json(message, status = 200, extra = {}) {
   return NextResponse.json({ message, ...extra }, { status });
@@ -96,17 +82,17 @@ function mapGvizRowToLead(row, rowIndex) {
     phone: value(6),
     student_age: value(7),
     class_level: value(8),
-    subject_interest: value(9),
-    preferred_schedule: value(10),
-    address: value(11),
-    city: value(12),
-    notes: value(13),
-    source: value(14),
-    status: normalizeText(value(15)).toLowerCase(),
-    synced_to_database: value(16),
-    database_registration_id: value(17),
-    last_synced_at: value(18),
-    sync_error: value(19),
+    subject_interest: "",
+    preferred_schedule: value(9),
+    address: value(10),
+    city: value(11),
+    notes: value(12),
+    source: value(13),
+    status: normalizeText(value(14)).toLowerCase(),
+    synced_to_database: value(15),
+    database_registration_id: value(16),
+    last_synced_at: value(17),
+    sync_error: value(18),
   };
 }
 
@@ -121,7 +107,6 @@ function cleanValue(value) {
 function normalizeLead(row) {
   const submittedAt = normalizeText(row.submitted_at);
   const studentAge = normalizeText(row.student_age);
-  const incomingStatus = normalizeText(row.status).toLowerCase();
   const extraNotes = [];
 
   if (row.parent_relation) {
@@ -144,14 +129,16 @@ function normalizeLead(row) {
     email: normalizeText(row.email).toLowerCase(),
     phone: normalizeText(row.phone),
     studentAge: studentAge ? Number(studentAge) : null,
-    classLevel: normalizeText(row.class_level),
-    subjectInterest: normalizeText(row.subject_interest),
+    classLevel: normalizeClassLevel(row.class_level),
+    subjectInterest: "",
     preferredSchedule: normalizeText(row.preferred_schedule),
     address: normalizeText(row.address),
     city: normalizeText(row.city),
     notes,
     source: normalizeText(row.source) || "google_sheet",
-    status: VALID_STATUSES.has(incomingStatus) ? incomingStatus : "new_lead",
+    // Google Sheet status is not source of truth after sync.
+    // New intake rows always enter PostgreSQL as new_lead.
+    status: "new_lead",
   };
 }
 
@@ -169,7 +156,7 @@ function validateLead(lead) {
   }
 
   if (!lead.classLevel) {
-    return "Missing class_level.";
+    return "Missing or invalid class_level. Allowed values: Pre-Nursery, Nursery, KG-1, KG-2.";
   }
 
   if (
@@ -188,6 +175,32 @@ function validateLead(lead) {
 }
 
 async function upsertLead(lead) {
+  const [existing] = await prisma.$queryRaw`
+    SELECT
+      rl.id::text AS id,
+      rl.student_name,
+      rl.email,
+      rl.phone,
+      EXISTS (
+        SELECT 1
+        FROM fee_vouchers fv
+        WHERE fv.registration_id = rl.id
+      ) AS has_voucher
+    FROM registration_leads rl
+    WHERE rl.google_sheet_row_id = ${lead.googleSheetRowId}
+    LIMIT 1
+  `;
+  const collidesWithVoucherLead =
+    existing?.has_voucher &&
+    (
+      normalizeText(existing.student_name).toLowerCase() !== lead.studentName.toLowerCase() ||
+      normalizeText(existing.email).toLowerCase() !== lead.email.toLowerCase() ||
+      normalizeText(existing.phone) !== lead.phone
+    );
+  const googleSheetRowId = collidesWithVoucherLead
+    ? `${lead.googleSheetRowId}-row-${lead.rowNumber}`
+    : lead.googleSheetRowId;
+
   const [record] = await prisma.$queryRaw`
     INSERT INTO registration_leads (
       google_sheet_row_id,
@@ -206,7 +219,7 @@ async function upsertLead(lead) {
       status
     )
     VALUES (
-      ${lead.googleSheetRowId},
+      ${googleSheetRowId},
       ${lead.submittedAt}::timestamp,
       ${lead.studentName},
       ${lead.parentName || null},
@@ -214,12 +227,12 @@ async function upsertLead(lead) {
       ${lead.phone || null},
       ${lead.studentAge},
       ${lead.classLevel},
-      ${lead.subjectInterest || null},
+      NULL,
       ${lead.preferredSchedule || null},
       ${lead.address || null},
       ${lead.notes || null},
       ${lead.source},
-      CAST(${lead.status} AS registration_status)
+      CAST('new_lead' AS registration_status)
     )
     ON CONFLICT (google_sheet_row_id)
     DO UPDATE SET
@@ -229,20 +242,45 @@ async function upsertLead(lead) {
       phone = EXCLUDED.phone,
       age = EXCLUDED.age,
       class_level = EXCLUDED.class_level,
-      subject_interest = EXCLUDED.subject_interest,
+      subject_interest = NULL,
       preferred_schedule = EXCLUDED.preferred_schedule,
       address = EXCLUDED.address,
       notes = EXCLUDED.notes,
       source = EXCLUDED.source,
+      -- Google Sheet status is not source of truth after sync.
+      -- Preserve database workflow status; voucher creation owns voucher_created.
       status = CASE
-        WHEN registration_leads.status::text IN (${Prisma.join(LOCKED_STATUSES)})
-          THEN registration_leads.status
-        ELSE CAST(EXCLUDED.status AS registration_status)
+        WHEN registration_leads.status::text = 'voucher_created'
+          AND NOT EXISTS (
+            SELECT 1
+            FROM fee_vouchers fv
+            WHERE fv.registration_id = registration_leads.id
+          )
+          THEN CAST('new_lead' AS registration_status)
+        ELSE registration_leads.status
       END
+    WHERE NOT EXISTS (
+      SELECT 1
+      FROM fee_vouchers fv
+      WHERE fv.registration_id = registration_leads.id
+    )
     RETURNING id::text AS id, status::text AS status
   `;
 
-  return record;
+  return record || existing;
+}
+
+async function resetFalseVoucherCreatedLeads() {
+  await prisma.$executeRaw`
+    UPDATE registration_leads rl
+    SET status = CAST('new_lead' AS registration_status)
+    WHERE rl.status::text = 'voucher_created'
+      AND NOT EXISTS (
+        SELECT 1
+        FROM fee_vouchers fv
+        WHERE fv.registration_id = rl.id
+      )
+  `;
 }
 
 export async function POST() {
@@ -282,6 +320,8 @@ export async function POST() {
         failed += 1;
       }
     }
+
+    await resetFalseVoucherCreatedLeads();
 
     return json("Google Sheet sync completed.", 200, {
       stats: {

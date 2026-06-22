@@ -15,6 +15,93 @@ function normalizeText(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 
+async function getLectureDetails(id) {
+  const [lecture] = await prisma.$queryRaw`
+    SELECT
+      ls.id::text AS id,
+      ls.id::text AS lecture_id,
+      ls.enrollment_id::text AS enrollment_id,
+      ls.student_id::text AS student_id,
+      ls.teacher_id::text AS teacher_id,
+      ls.subject_id::text AS subject_id,
+      ls.title,
+      ls.description,
+      ls.scheduled_start::text AS scheduled_start,
+      ls.scheduled_end::text AS scheduled_end,
+      ls.status::text AS status,
+      ls.google_meet_link,
+      COALESCE(NULLIF(c.class_level, ''), NULLIF(c.title, ''), 'Class') AS course_title,
+      sub.name AS subject_name,
+      tu.id::text AS teacher_user_id,
+      tu.full_name AS teacher_name,
+      tu.email AS teacher_email,
+      su.id::text AS student_user_id,
+      su.full_name AS student_name,
+      su.email AS student_email,
+      su.phone AS student_phone,
+      COALESCE(lcr.id::text, '') AS completion_report_id,
+      lcr.topic_covered,
+      lcr.summary,
+      lcr.homework_given,
+      lcr.student_performance,
+      lv.id::text AS verification_id,
+      lv.decision::text AS verification_decision,
+      lv.remarks AS verification_remarks,
+      lv.verified_at,
+      teacher_att.joined_at AS teacher_joined_at,
+      teacher_att.left_at AS teacher_left_at,
+      COALESCE(teacher_att.duration_minutes, 0) AS teacher_duration_minutes,
+      COALESCE(teacher_att.status::text, 'absent') AS teacher_attendance_status,
+      student_att.joined_at AS student_joined_at,
+      student_att.left_at AS student_left_at,
+      COALESCE(student_att.duration_minutes, 0) AS student_duration_minutes,
+      COALESCE(student_att.status::text, 'absent') AS student_attendance_status,
+      CASE WHEN teacher_att.joined_at IS NOT NULL THEN TRUE ELSE FALSE END AS teacher_joined,
+      CASE WHEN student_att.joined_at IS NOT NULL THEN TRUE ELSE FALSE END AS student_joined
+    FROM lecture_schedules ls
+    INNER JOIN enrollments e ON e.id = ls.enrollment_id
+    INNER JOIN courses c ON c.id = e.course_id
+    INNER JOIN subjects sub ON sub.id = ls.subject_id
+    INNER JOIN teacher_profiles tp ON tp.id = ls.teacher_id
+    INNER JOIN users tu ON tu.id = tp.user_id
+    INNER JOIN student_profiles sp ON sp.id = ls.student_id
+    INNER JOIN users su ON su.id = sp.user_id
+    LEFT JOIN lecture_completion_reports lcr ON lcr.lecture_id = ls.id
+    LEFT JOIN lecture_verifications lv ON lv.lecture_id = ls.id
+    LEFT JOIN lecture_attendance teacher_att ON teacher_att.lecture_id = ls.id AND teacher_att.user_id = tu.id
+    LEFT JOIN lecture_attendance student_att ON student_att.lecture_id = ls.id AND student_att.user_id = su.id
+    WHERE ls.id = ${id}::uuid
+    LIMIT 1
+  `;
+
+  if (!lecture?.id) return null;
+
+  return {
+    ...lecture,
+    teacher_attendance: {
+      joined_at: lecture.teacher_joined_at,
+      left_at: lecture.teacher_left_at,
+      duration_minutes: lecture.teacher_duration_minutes,
+      status: lecture.teacher_attendance_status,
+    },
+    student_attendance_rows: [
+      {
+        student_name: lecture.student_name,
+        email: lecture.student_email,
+        phone: lecture.student_phone,
+        joined_at: lecture.student_joined_at,
+        left_at: lecture.student_left_at,
+        duration_minutes: lecture.student_duration_minutes,
+        status: lecture.student_attendance_status || "absent",
+      },
+    ],
+    total_students_count: 1,
+    joined_students_count: lecture.student_joined ? 1 : 0,
+    absent_students_count: lecture.student_joined ? 0 : 1,
+    unmatched_participants: [],
+  };
+}
+
 async function upsertVerification(tx, payload) {
   const [existing] = await tx.$queryRaw`
     SELECT id::text AS id
@@ -27,6 +114,11 @@ async function upsertVerification(tx, payload) {
     await tx.$executeRaw`
       UPDATE lecture_verifications
       SET verified_by = ${payload.verifiedBy}::uuid,
+          teacher_joined = ${Boolean(payload.teacherJoined)},
+          student_joined = ${Boolean(payload.studentJoined)},
+          minimum_duration_met = ${Boolean(payload.minimumDurationMet)},
+          teacher_duration_minutes = ${payload.teacherDurationMinutes || 0},
+          student_duration_minutes = ${payload.studentDurationMinutes || 0},
           decision = ${payload.decision}::verification_decision,
           remarks = ${payload.remarks || null},
           verified_at = NOW()
@@ -41,6 +133,11 @@ async function upsertVerification(tx, payload) {
       id,
       lecture_id,
       verified_by,
+      teacher_joined,
+      student_joined,
+      minimum_duration_met,
+      teacher_duration_minutes,
+      student_duration_minutes,
       decision,
       remarks,
       verified_at
@@ -49,6 +146,11 @@ async function upsertVerification(tx, payload) {
       ${id}::uuid,
       ${payload.lectureId}::uuid,
       ${payload.verifiedBy}::uuid,
+      ${Boolean(payload.teacherJoined)},
+      ${Boolean(payload.studentJoined)},
+      ${Boolean(payload.minimumDurationMet)},
+      ${payload.teacherDurationMinutes || 0},
+      ${payload.studentDurationMinutes || 0},
       ${payload.decision}::verification_decision,
       ${payload.remarks || null},
       NOW()
@@ -68,20 +170,7 @@ export async function PATCH(request, context) {
     const scheduledStart = normalizeText(body?.scheduledStart);
     const scheduledEnd = normalizeText(body?.scheduledEnd);
 
-    const [lecture] = await prisma.$queryRaw`
-      SELECT
-        ls.id::text AS id,
-        ls.enrollment_id::text AS enrollment_id,
-        ls.student_id::text AS student_id,
-        ls.teacher_id::text AS teacher_id,
-        ls.subject_id::text AS subject_id,
-        ls.title,
-        ls.description,
-        ls.status::text AS status
-      FROM lecture_schedules ls
-      WHERE ls.id = ${id}::uuid
-      LIMIT 1
-    `;
+    const lecture = await getLectureDetails(id);
 
     if (!lecture?.id) {
       return json("Lecture not found.", 404);
@@ -93,11 +182,20 @@ export async function PATCH(request, context) {
 
     const result = await prisma.$transaction(async (tx) => {
       if (action === "approve") {
+        if (!lecture.completion_report_id && body?.manualConfirm !== true) {
+          throw new Error("Teacher completion report is required before approval, unless coordinator confirms manually.");
+        }
+
         const verificationId = await upsertVerification(tx, {
           lectureId: id,
           verifiedBy: session.user.id,
           decision: "approved",
           remarks,
+          teacherJoined: lecture.teacher_joined,
+          studentJoined: lecture.student_joined,
+          minimumDurationMet: Number(lecture.teacher_duration_minutes || 0) >= Number(process.env.LECTURE_PRESENT_THRESHOLD_MINUTES || 20),
+          teacherDurationMinutes: Number(lecture.teacher_duration_minutes || 0),
+          studentDurationMinutes: Number(lecture.student_duration_minutes || 0),
         });
 
         await tx.$executeRaw`
@@ -203,8 +301,8 @@ export async function PATCH(request, context) {
           scheduled_by,
           title,
           description,
-          scheduled_start,
-          scheduled_end,
+          scheduled_start::text AS scheduled_start,
+          scheduled_end::text AS scheduled_end,
           google_calendar_event_id,
           google_meet_link,
           google_meet_space_id,
@@ -278,3 +376,26 @@ export async function PATCH(request, context) {
   }
 }
 
+export async function GET(_request, context) {
+  try {
+    await requireRole(ALLOWED_ROLES);
+    const { id } = await context.params;
+    const lecture = await getLectureDetails(id);
+
+    if (!lecture?.id) {
+      return json("Lecture not found.", 404);
+    }
+
+    return json("Lecture verification details fetched.", 200, { item: lecture });
+  } catch (error) {
+    const guard = roleGuardResponse(error);
+    if (guard) {
+      return guard;
+    }
+
+    return json(
+      error instanceof Error ? error.message : "Unable to fetch lecture verification details.",
+      500
+    );
+  }
+}

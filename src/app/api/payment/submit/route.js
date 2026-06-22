@@ -1,5 +1,4 @@
 import crypto from "crypto";
-import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { uploadPaymentProof } from "@/lib/supabaseStorage";
@@ -12,75 +11,6 @@ function json(message, status = 200, extra = {}) {
 
 function normalizeText(value) {
   return typeof value === "string" ? value.trim() : "";
-}
-
-async function getTableColumns(tableName, tx = prisma) {
-  const rows = await tx.$queryRaw`
-    SELECT
-      column_name,
-      is_nullable,
-      column_default,
-      data_type,
-      udt_name
-    FROM information_schema.columns
-    WHERE table_schema = 'public'
-      AND table_name = ${tableName}
-  `;
-
-  return rows.reduce((accumulator, row) => {
-    accumulator[row.column_name] = {
-      nullable: row.is_nullable === "YES",
-      defaultValue: row.column_default,
-      dataType: row.data_type,
-      udtName: row.udt_name,
-    };
-    return accumulator;
-  }, {});
-}
-
-function getValueSql(columnMeta, value) {
-  if (!columnMeta || value === null || typeof value === "undefined") {
-    return Prisma.sql`${value ?? null}`;
-  }
-
-  if (columnMeta.udtName === "uuid") {
-    return Prisma.sql`${value}::uuid`;
-  }
-
-  if (columnMeta.dataType === "USER-DEFINED" && columnMeta.udtName) {
-    return Prisma.sql`${value}::${Prisma.raw(columnMeta.udtName)}`;
-  }
-
-  if (columnMeta.dataType === "json" || columnMeta.dataType === "jsonb") {
-    return Prisma.sql`${value}::${Prisma.raw(columnMeta.dataType)}`;
-  }
-
-  return Prisma.sql`${value}`;
-}
-
-function addColumn(columns, values, columnMap, name, value) {
-  columns.push(Prisma.raw(`"${name}"`));
-  if (name === "paid_at") {
-    values.push(Prisma.sql`${value}::timestamp`);
-    return;
-  }
-
-  values.push(getValueSql(columnMap[name], value));
-}
-
-function ensureSupportedRequiredColumns(tableName, columns, supportedColumns) {
-  const missing = Object.entries(columns)
-    .filter(
-      ([columnName, meta]) =>
-        !meta.nullable && !meta.defaultValue && !supportedColumns.has(columnName)
-    )
-    .map(([columnName]) => columnName);
-
-  if (missing.length) {
-    throw new Error(
-      `${tableName} requires unsupported columns: ${missing.join(", ")}.`
-    );
-  }
 }
 
 function normalizePaidAt(value) {
@@ -154,53 +84,30 @@ export async function POST(request) {
     });
 
     const item = await prisma.$transaction(async (tx) => {
-      const columns = await getTableColumns("fee_submissions", tx);
-      const insertColumns = [];
-      const insertValues = [];
-      const supportedColumns = new Set();
       const submissionId = crypto.randomUUID();
 
-      if (columns.id) {
-        addColumn(insertColumns, insertValues, columns, "id", submissionId);
-        supportedColumns.add("id");
-      }
-      if (columns.voucher_id) {
-        addColumn(insertColumns, insertValues, columns, "voucher_id", voucher.id);
-        supportedColumns.add("voucher_id");
-      }
-      if (columns.payer_name) {
-        addColumn(insertColumns, insertValues, columns, "payer_name", payerName);
-        supportedColumns.add("payer_name");
-      }
-      if (columns.transaction_id) {
-        addColumn(insertColumns, insertValues, columns, "transaction_id", transactionId);
-        supportedColumns.add("transaction_id");
-      }
-      if (columns.paid_amount) {
-        addColumn(insertColumns, insertValues, columns, "paid_amount", paidAmount);
-        supportedColumns.add("paid_amount");
-      }
-      if (columns.paid_at) {
-        addColumn(insertColumns, insertValues, columns, "paid_at", paidAt);
-        supportedColumns.add("paid_at");
-      }
-      if (columns.proof_file_path) {
-        addColumn(insertColumns, insertValues, columns, "proof_file_path", upload.storedPath);
-        supportedColumns.add("proof_file_path");
-      }
-      if (columns.status) {
-        addColumn(insertColumns, insertValues, columns, "status", Prisma.sql`submitted::fee_submission_status`);
-        supportedColumns.add("status");
-      }
-
-      ensureSupportedRequiredColumns("fee_submissions", columns, supportedColumns);
-
-      await tx.$executeRaw(
-        Prisma.sql`
-          INSERT INTO fee_submissions (${Prisma.join(insertColumns, ", ")})
-          VALUES (${Prisma.join(insertValues, ", ")})
-        `
-      );
+      await tx.$executeRaw`
+        INSERT INTO fee_submissions (
+          id,
+          voucher_id,
+          payer_name,
+          transaction_id,
+          paid_amount,
+          paid_at,
+          proof_file_path,
+          status
+        )
+        VALUES (
+          ${submissionId}::uuid,
+          ${voucher.id}::uuid,
+          ${payerName},
+          ${transactionId},
+          ${paidAmount},
+          ${paidAt}::timestamp,
+          ${upload.storedPath},
+          'pending'::fee_submission_status
+        )
+      `;
 
       await tx.$executeRaw`
         UPDATE fee_vouchers

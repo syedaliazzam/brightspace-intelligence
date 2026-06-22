@@ -1,0 +1,335 @@
+"use client";
+
+import { useEffect, useMemo, useRef, useState } from "react";
+import FullCalendar from "@fullcalendar/react";
+import dayGridPlugin from "@fullcalendar/daygrid";
+import timeGridPlugin from "@fullcalendar/timegrid";
+import interactionPlugin from "@fullcalendar/interaction";
+import { getLectureDisplayStatus } from "@/lib/lectureStatus";
+
+const APP_TIMEZONE = "Asia/Karachi";
+
+function isJsonResponse(response) {
+  const contentType = response.headers.get("content-type") || "";
+  return contentType.includes("application/json");
+}
+
+function parseDate(value) {
+  if (!value) return "";
+  const text = String(value).trim();
+  if (!text) return "";
+  const normalized = text.includes("T") ? text : text.replace(" ", "T");
+  const date = new Date(normalized);
+  return Number.isNaN(date.getTime()) ? "" : date.toISOString();
+}
+
+function formatLocalDate(value) {
+  const date = value ? new Date(value) : new Date();
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toLocaleDateString("en-CA", { timeZone: APP_TIMEZONE });
+}
+
+function formatLocalDateTime(value) {
+  if (!value) return "Not available";
+  const date = new Date(String(value).includes("T") ? value : String(value).replace(" ", "T"));
+  if (Number.isNaN(date.getTime())) return "Not available";
+  return date.toLocaleString("en-PK", {
+    timeZone: APP_TIMEZONE,
+    dateStyle: "medium",
+    timeStyle: "short",
+  });
+}
+
+function pickActiveTime(lecture) {
+  const start =
+    lecture?.rescheduled_start ||
+    lecture?.rescheduledStartTime ||
+    lecture?.rescheduled_scheduled_start ||
+    lecture?.scheduled_start ||
+    lecture?.scheduledStart;
+  const end =
+    lecture?.rescheduled_end ||
+    lecture?.rescheduledEndTime ||
+    lecture?.rescheduled_scheduled_end ||
+    lecture?.scheduled_end ||
+    lecture?.scheduledEnd;
+
+  return { start, end };
+}
+
+function getLectureTimeState(lecture) {
+  const { start: startValue, end: endValue } = pickActiveTime(lecture);
+  const start = startValue ? new Date(String(startValue).replace(" ", "T")) : null;
+  const end = endValue ? new Date(String(endValue).replace(" ", "T")) : null;
+
+  if (!start || Number.isNaN(start.getTime()) || !end || Number.isNaN(end.getTime())) {
+    return "upcoming";
+  }
+
+  const now = new Date();
+  if (now < start) return "upcoming";
+  if (now >= start && now <= end) return "live";
+  return "ended";
+}
+
+function canShowMeetLink(lecture) {
+  const timeState = getLectureTimeState(lecture);
+  if (timeState === "ended") return false;
+  const rawStatus = String(lecture?.status || "").toLowerCase();
+  return !["cancelled", "rescheduled", "missed", "disputed"].includes(rawStatus);
+}
+
+export default function LMSCalendar({
+  apiUrl,
+  filters = {},
+  onDateSelect,
+  onEventClick,
+  title = "Lecture calendar",
+}) {
+  const calendarRef = useRef(null);
+  const [events, setEvents] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [selected, setSelected] = useState(null);
+  const [view, setView] = useState("dayGridMonth");
+
+  const query = useMemo(() => {
+    const params = new URLSearchParams({
+      range: "all",
+      date: filters.date || formatLocalDate(new Date()),
+      subjectId: filters.subjectId || "",
+      status: filters.status || "",
+    });
+    return params.toString();
+  }, [filters.date, filters.subjectId, filters.status]);
+
+  useEffect(() => {
+    let ignore = false;
+
+    async function load() {
+      if (!apiUrl) {
+        setLoading(false);
+        return;
+      }
+
+      setLoading(true);
+      setError("");
+
+      try {
+        const response = await fetch(`${apiUrl}?${query}`, { cache: "no-store" });
+        const payload = isJsonResponse(response)
+          ? await response.json()
+          : { message: await response.text() };
+
+        if (!response.ok) {
+          throw new Error(payload?.message || "Unable to load lectures.");
+        }
+
+        if (ignore) return;
+
+        const rows = Array.isArray(payload?.items) ? payload.items : [];
+        setEvents(
+          rows.map((lecture) => {
+            const displayStatus = lecture.display_status || getLectureDisplayStatus(lecture);
+            const timeState = getLectureTimeState(lecture);
+            const canJoin = canShowMeetLink(lecture);
+            const { start: activeStartValue, end: activeEndValue } = pickActiveTime(lecture);
+            const startDate = parseDate(activeStartValue);
+            const endDate = parseDate(activeEndValue);
+            const startText = startDate
+              ? new Date(startDate).toLocaleTimeString("en-PK", {
+                  timeZone: APP_TIMEZONE,
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })
+              : "";
+            const endText = endDate
+              ? new Date(endDate).toLocaleTimeString("en-PK", {
+                  timeZone: APP_TIMEZONE,
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })
+              : "";
+
+            return {
+              id: lecture.id,
+              title: `${startText}${endText ? ` - ${endText}` : ""}${lecture.subject_name ? ` ${lecture.subject_name}` : ""}`,
+              start: startDate,
+              end: endDate,
+              backgroundColor:
+                displayStatus === "live"
+                  ? "#2563eb"
+                  : displayStatus === "completed"
+                    ? "#0f766e"
+                    : displayStatus === "verified"
+                      ? "#4f46e5"
+                      : "#64748b",
+              borderColor:
+                displayStatus === "live"
+                  ? "#2563eb"
+                  : displayStatus === "completed"
+                    ? "#0f766e"
+                    : displayStatus === "verified"
+                      ? "#4f46e5"
+                      : "#64748b",
+              textColor: "#ffffff",
+              extendedProps: {
+                lecture_id: lecture.id,
+                title: lecture.title,
+                subject_name: lecture.subject_name,
+                teacher_name: lecture.teacher_name,
+                scheduled_start: activeStartValue,
+                scheduled_end: activeEndValue,
+                display_status: displayStatus,
+                status: lecture.status,
+                google_meet_link: lecture.google_meet_link,
+                can_join: canJoin,
+                description: lecture.description,
+                rescheduled_start: lecture.rescheduled_start || lecture.rescheduledStartTime || lecture.rescheduled_scheduled_start,
+                rescheduled_end: lecture.rescheduled_end || lecture.rescheduledEndTime || lecture.rescheduled_scheduled_end,
+              },
+            };
+          })
+        );
+      } catch (fetchError) {
+        if (!ignore) {
+          setError(fetchError instanceof Error ? fetchError.message : "Unable to load lectures.");
+        }
+      } finally {
+        if (!ignore) setLoading(false);
+      }
+    }
+
+    load();
+    return () => {
+      ignore = true;
+    };
+  }, [apiUrl, query]);
+
+  function handleEventClick(info) {
+    const lecture = info.event.extendedProps || null;
+    setSelected(lecture);
+    onEventClick?.(lecture);
+  }
+
+  function handleDateClick(info) {
+    onDateSelect?.(info.dateStr);
+  }
+
+  function changeView(nextView) {
+    setView(nextView);
+    calendarRef.current?.getApi?.().changeView(nextView);
+  }
+
+  function scrollToLectureDate(dateStr) {
+    if (!dateStr) return;
+    onDateSelect?.(dateStr);
+    changeView("timeGridDay");
+  }
+
+  return (
+    <div className="rounded-[1.75rem] border border-slate-200 bg-white p-4 shadow-[0_20px_70px_-36px_rgba(15,23,42,0.25)]">
+      <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div>
+          <p className="text-sm font-semibold uppercase tracking-[0.22em] text-sky-700">{title}</p>
+          <h3 className="mt-1 text-xl font-semibold tracking-tight text-slate-950">
+            Month, week and day view
+          </h3>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {[
+            ["dayGridMonth", "Month"],
+            ["timeGridWeek", "Week"],
+            ["timeGridDay", "Day"],
+          ].map(([nextView, label]) => (
+            <button
+              key={nextView}
+              type="button"
+              onClick={() => changeView(nextView)}
+              className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
+                view === nextView
+                  ? "bg-slate-950 text-white shadow"
+                  : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {error ? (
+        <div className="mb-4 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">
+          {error}
+        </div>
+      ) : null}
+
+      <div className="grid gap-4 xl:grid-cols-[1fr_320px]">
+        <div className="overflow-hidden rounded-[1.5rem] border border-slate-200 bg-slate-50 p-3">
+          <FullCalendar
+            ref={calendarRef}
+            plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
+            initialView={view}
+            headerToolbar={{
+              left: "prev,next today",
+              center: "title",
+              right: "dayGridMonth,timeGridWeek,timeGridDay",
+            }}
+            events={events}
+            eventClick={handleEventClick}
+            dateClick={handleDateClick}
+            height="auto"
+            nowIndicator
+            selectable={false}
+            editable={false}
+            weekends
+            timeZone={APP_TIMEZONE}
+            eventDisplay="block"
+            eventTimeFormat={{ hour: "numeric", minute: "2-digit", hour12: true }}
+            loading={setLoading}
+            slotMinTime="06:00:00"
+            slotMaxTime="22:00:00"
+            eventClassNames={() => ["cursor-pointer"]}
+            eventContent={(arg) => (
+              <div className="overflow-hidden px-1 text-[11px] leading-tight">
+                <div className="truncate font-semibold">{arg.event.title}</div>
+              </div>
+            )}
+          />
+          {loading ? <p className="mt-3 text-sm text-slate-500">Loading lectures...</p> : null}
+        </div>
+
+        <div className="rounded-[1.5rem] border border-slate-200 bg-white p-4">
+          <p className="text-sm font-semibold uppercase tracking-[0.22em] text-sky-700">
+            Lecture details
+          </p>
+          {selected ? (
+            <div className="mt-4 space-y-3 text-sm text-slate-600">
+              <p><strong className="text-slate-900">Title:</strong> {selected.title || "Not available"}</p>
+              <p><strong className="text-slate-900">Subject:</strong> {selected.subject_name || "Not available"}</p>
+              <p><strong className="text-slate-900">Teacher:</strong> {selected.teacher_name || "Not available"}</p>
+              <p><strong className="text-slate-900">Start:</strong> {formatLocalDateTime(selected.scheduled_start)}</p>
+              <p><strong className="text-slate-900">End:</strong> {formatLocalDateTime(selected.scheduled_end)}</p>
+              <p><strong className="text-slate-900">Status:</strong> {selected.display_status || selected.status || "Not available"}</p>
+              <p className="whitespace-pre-line"><strong className="text-slate-900">Description:</strong> {selected.description || "Not available"}</p>
+              {selected.google_meet_link && canShowMeetLink(selected) ? (
+                <a
+                  href={selected.google_meet_link}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800"
+                >
+                  Open Meet
+                </a>
+              ) : null}
+            </div>
+          ) : (
+            <p className="mt-4 text-sm text-slate-500">
+              Click a lecture to view details.
+            </p>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}

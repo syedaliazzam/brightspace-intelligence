@@ -275,30 +275,33 @@ export async function GET(request) {
   const status = normalizeText(searchParams.get("status")).toLowerCase();
   const search = normalizeText(searchParams.get("search"));
   const conditions = [];
+  const values = [];
 
   if (status && VALID_VOUCHER_STATUSES.has(status)) {
-    conditions.push(Prisma.sql`LOWER(fv.status::text) = ${status}`);
+    values.push(status);
+    conditions.push(`LOWER(fv.status::text) = $${values.length}`);
   }
 
   if (search) {
     const term = `%${search}%`;
-    conditions.push(
-      Prisma.sql`(
-        fv.voucher_no ILIKE ${term}
-        OR rl.student_name ILIKE ${term}
-        OR rl.parent_name ILIKE ${term}
-        OR rl.phone ILIKE ${term}
-        OR rl.email ILIKE ${term}
-      )`
-    );
+    values.push(term);
+    conditions.push(`(
+        COALESCE(fv.voucher_no, '') ILIKE $${values.length}
+        OR COALESCE(rl.student_name, '') ILIKE $${values.length}
+        OR COALESCE(rl.parent_name, '') ILIKE $${values.length}
+        OR COALESCE(rl.phone, '') ILIKE $${values.length}
+        OR COALESCE(rl.email, '') ILIKE $${values.length}
+        OR fv.amount::text ILIKE $${values.length}
+      )`);
   }
 
   const whereClause = conditions.length
-    ? Prisma.sql`WHERE ${Prisma.join(conditions, Prisma.sql` AND `)}`
-    : Prisma.empty;
+    ? `WHERE ${conditions.join(" AND ")}`
+    : "";
 
   try {
-    const items = await prisma.$queryRaw`
+    const items = await prisma.$queryRawUnsafe(
+      `
       SELECT
         fv.id::text AS id,
         fv.voucher_no,
@@ -315,8 +318,10 @@ export async function GET(request) {
       FROM fee_vouchers fv
       INNER JOIN registration_leads rl ON rl.id = fv.registration_id
       ${whereClause}
-      ORDER BY fv.due_date ASC NULLS LAST, fv.id DESC
-    `;
+      ORDER BY fv.created_at DESC NULLS LAST, fv.id DESC
+      `,
+      ...values
+    );
 
     return json("Fee vouchers fetched.", 200, { items });
   } catch (error) {
@@ -361,6 +366,34 @@ export async function POST(request) {
 
     if (!paymentMethod) {
       return json("Payment method is required.", 400);
+    }
+
+    const [existingVoucher] = await prisma.$queryRaw`
+      SELECT
+        fv.id::text AS id,
+        fv.voucher_no,
+        fv.amount,
+        fv.due_date,
+        fv.payment_method,
+        fv.payment_instructions,
+        LOWER(fv.status::text) AS status,
+        rl.id::text AS registration_lead_id,
+        rl.student_name,
+        rl.parent_name,
+        rl.email,
+        rl.phone
+      FROM fee_vouchers fv
+      INNER JOIN registration_leads rl ON rl.id = fv.registration_id
+      WHERE fv.registration_id = ${registrationLeadId}::uuid
+      ORDER BY fv.created_at DESC NULLS LAST, fv.id DESC
+      LIMIT 1
+    `;
+
+    if (existingVoucher?.id) {
+      return json("Fee voucher already exists for this registration lead.", 200, {
+        item: existingVoucher,
+        existing: true,
+      });
     }
 
     const voucherNo = await generateVoucherNumber();

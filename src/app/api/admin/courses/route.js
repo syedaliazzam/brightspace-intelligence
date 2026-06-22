@@ -3,6 +3,13 @@ import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import prisma from "@/lib/prisma";
+import {
+  ALLOWED_CLASS_LEVELS,
+  CLASS_SUBJECTS,
+  normalizeClassLevel,
+} from "@/lib/academicCatalog";
+
+const CLASS_LEVELS = [...ALLOWED_CLASS_LEVELS];
 
 function json(message, status = 200, extra = {}) {
   return NextResponse.json({ message, ...extra }, { status });
@@ -10,6 +17,13 @@ function json(message, status = 200, extra = {}) {
 
 function normalizeText(value) {
   return typeof value === "string" ? value.trim() : "";
+}
+
+function normalizeCourseStatus(value) {
+  const status = normalizeText(value).toLowerCase();
+  return ["active", "pending", "suspended", "archived"].includes(status)
+    ? status
+    : "active";
 }
 
 async function requireAdminSession() {
@@ -81,40 +95,40 @@ function addColumn(columns, values, columnMap, name, value) {
   values.push(getValueSql(columnMap[name], value));
 }
 
-async function insertAuditLog(actorUserId, targetId, action, description, metadata = {}, tx = prisma) {
-  const columns = await getTableColumns("audit_logs", tx);
+async function syncCourseSubjects(tx, courseId, classLevel) {
+  const subjects = CLASS_SUBJECTS[classLevel] || [];
 
-  if (!Object.keys(columns).length) {
+  if (!subjects.length) {
     return;
   }
 
-  const insertColumns = [];
-  const insertValues = [];
+  await tx.$executeRaw`
+    DELETE FROM course_subjects
+    WHERE course_id = ${courseId}::uuid
+  `;
 
-  const pushColumn = (name, value) => {
-    if (columns[name]) {
-      insertColumns.push(Prisma.raw(`"${name}"`));
-      insertValues.push(getValueSql(columns[name], value));
-    }
-  };
+  await tx.$executeRaw(
+    Prisma.sql`
+      INSERT INTO course_subjects (course_id, subject_id)
+      SELECT ${courseId}::uuid, s.id
+      FROM subjects s
+      WHERE s.name IN (${Prisma.join(subjects)})
+      ON CONFLICT (course_id, subject_id) DO NOTHING
+    `
+  );
+}
 
-  pushColumn("id", crypto.randomUUID());
-  pushColumn("actor_user_id", actorUserId);
-  pushColumn("entity_type", "courses");
-  pushColumn("entity_id", targetId);
-  pushColumn("action", action);
-  pushColumn("description", description);
-  pushColumn("metadata", JSON.stringify(metadata));
-  pushColumn("meta", JSON.stringify(metadata));
-
-  if (insertColumns.length) {
-    await tx.$executeRaw(
-      Prisma.sql`
-        INSERT INTO audit_logs (${Prisma.join(insertColumns, ", ")})
-        VALUES (${Prisma.join(insertValues, ", ")})
-      `
-    );
-  }
+async function insertAuditLog(actorUserId, targetId, action, description, metadata = {}, tx = prisma) {
+  await tx.$executeRaw`
+    INSERT INTO audit_logs (id, actor_user_id, entity_type, entity_id, action)
+    VALUES (
+      ${crypto.randomUUID()}::uuid,
+      ${actorUserId}::uuid,
+      ${"courses"},
+      ${targetId}::uuid,
+      ${action}
+    )
+  `;
 }
 
 export async function GET(request) {
@@ -127,6 +141,7 @@ export async function GET(request) {
   try {
     const coursesExists = await tableExists("courses");
     const subjectsExists = await tableExists("subjects");
+    const courseSubjectsExists = await tableExists("course_subjects");
     const schedulesExists = await tableExists("lecture_schedules");
 
     if (!coursesExists) {
@@ -146,8 +161,25 @@ export async function GET(request) {
     const subjectId = normalizeText(searchParams.get("subjectId"));
     const conditions = [];
 
+    if (columns.class_level) {
+      conditions.push(Prisma.sql`c.class_level IN (${Prisma.join(CLASS_LEVELS)})`);
+    } else if (columns.title) {
+      conditions.push(Prisma.sql`c.title IN (${Prisma.join(CLASS_LEVELS)})`);
+    }
+
     if (status && columns.status) {
       conditions.push(Prisma.sql`LOWER(c.status::text) = ${status}`);
+    }
+
+    if (subjectId && courseSubjectsExists) {
+      conditions.push(Prisma.sql`
+        EXISTS (
+          SELECT 1
+          FROM course_subjects cs_filter
+          WHERE cs_filter.course_id = c.id
+            AND cs_filter.subject_id = ${subjectId}::uuid
+        )
+      `);
     }
 
     if (search) {
@@ -178,55 +210,38 @@ export async function GET(request) {
       ? Prisma.sql`WHERE ${Prisma.join(conditions, Prisma.sql` AND `)}`
       : Prisma.empty;
 
-    const items =
-      subjectsExists && columns.subject_id
-        ? await prisma.$queryRaw(
-            Prisma.sql`
-              SELECT
-                c.id::text AS id,
-                ${columns.name ? Prisma.sql`c.name,` : Prisma.sql`NULL AS name,`}
-                ${columns.code ? Prisma.sql`c.code,` : Prisma.sql`NULL AS code,`}
-                ${columns.description ? Prisma.sql`c.description,` : Prisma.sql`NULL AS description,`}
-                ${columns.class_mode ? Prisma.sql`c.class_mode,` : Prisma.sql`NULL AS class_mode,`}
-                ${columns.capacity ? Prisma.sql`c.capacity,` : Prisma.sql`NULL AS capacity,`}
-                ${columns.subject_id ? Prisma.sql`c.subject_id::text AS subject_id,` : Prisma.sql`NULL AS subject_id,`}
-                ${columns.status ? Prisma.sql`LOWER(c.status::text) AS status,` : Prisma.sql`'draft' AS status,`}
-                s.name AS subject_name
-              FROM courses c
-              LEFT JOIN subjects s ON s.id = c.subject_id
-              ${whereClause}
-              ORDER BY ${columns.created_at ? Prisma.sql`c.created_at DESC NULLS LAST` : Prisma.sql`c.id DESC`}
-            `
-          )
-        : await prisma.$queryRaw(
-            Prisma.sql`
-              SELECT
-                c.id::text AS id,
-                ${
-                  columns.name
-                    ? Prisma.sql`c.name,`
-                    : columns.title
-                      ? Prisma.sql`c.title AS name,`
-                      : Prisma.sql`NULL AS name,`
-                }
-                ${columns.code ? Prisma.sql`c.code,` : Prisma.sql`NULL AS code,`}
-                ${columns.description ? Prisma.sql`c.description,` : Prisma.sql`NULL AS description,`}
-                ${
-                  columns.class_mode
-                    ? Prisma.sql`c.class_mode,`
-                    : columns.class_level
-                      ? Prisma.sql`c.class_level AS class_mode,`
-                      : Prisma.sql`NULL AS class_mode,`
-                }
-                ${columns.capacity ? Prisma.sql`c.capacity,` : Prisma.sql`NULL AS capacity,`}
-                ${columns.subject_id ? Prisma.sql`c.subject_id::text AS subject_id,` : Prisma.sql`NULL AS subject_id,`}
-                ${columns.status ? Prisma.sql`LOWER(c.status::text) AS status,` : Prisma.sql`'draft' AS status,`}
-                NULL AS subject_name
-              FROM courses c
-              ${whereClause}
-              ORDER BY ${columns.created_at ? Prisma.sql`c.created_at DESC NULLS LAST` : Prisma.sql`c.id DESC`}
-            `
-          );
+    const items = await prisma.$queryRaw(
+      Prisma.sql`
+        SELECT
+          c.id::text AS id,
+          ${columns.title ? Prisma.sql`c.title AS name,` : Prisma.sql`NULL AS name,`}
+          NULL AS code,
+          ${columns.description ? Prisma.sql`c.description,` : Prisma.sql`NULL AS description,`}
+          ${columns.class_level ? Prisma.sql`c.class_level AS class_mode,` : Prisma.sql`c.title AS class_mode,`}
+          NULL AS capacity,
+          NULL AS subject_id,
+          ${columns.status ? Prisma.sql`LOWER(c.status::text) AS status,` : Prisma.sql`'pending' AS status,`}
+          ${columns.created_at ? Prisma.sql`c.created_at::text AS created_at,` : Prisma.sql`NULL AS created_at,`}
+          ${
+            subjectsExists && courseSubjectsExists
+              ? Prisma.sql`STRING_AGG(s.name, ', ' ORDER BY s.name) AS assigned_subjects`
+              : Prisma.sql`NULL AS assigned_subjects`
+          },
+          NULL AS subject_name
+        FROM courses c
+        ${
+          subjectsExists && courseSubjectsExists
+            ? Prisma.sql`
+                LEFT JOIN course_subjects cs ON cs.course_id = c.id
+                LEFT JOIN subjects s ON s.id = cs.subject_id
+              `
+            : Prisma.empty
+        }
+        ${whereClause}
+        GROUP BY c.id
+        ORDER BY ${columns.created_at ? Prisma.sql`c.created_at DESC NULLS LAST` : Prisma.sql`c.id DESC`}
+      `
+    );
 
     const subjects =
       subjectsExists
@@ -251,7 +266,7 @@ export async function GET(request) {
           `
         : [];
 
-    return json("Courses fetched.", 200, {
+    return json("Classes fetched.", 200, {
       available: true,
       items,
       subjects,
@@ -259,13 +274,13 @@ export async function GET(request) {
       summary: {
         total: items.length,
         active: items.filter((item) => item.status === "active").length,
-        draft: items.filter((item) => item.status === "draft").length,
+        draft: items.filter((item) => item.status === "pending").length,
         schedules: schedules.length,
       },
     });
   } catch (error) {
     return json(
-      error instanceof Error ? error.message : "Unable to fetch courses.",
+      error instanceof Error ? error.message : "Unable to fetch classes.",
       500
     );
   }
@@ -284,105 +299,74 @@ export async function POST(request) {
     }
 
     const body = await request.json();
-    const name = normalizeText(body?.name);
-    const code = normalizeText(body?.code);
-    const subjectId = normalizeText(body?.subjectId);
+    const classLevel = normalizeClassLevel(body?.classMode || body?.name);
     const description = normalizeText(body?.description);
-    const classMode = normalizeText(body?.classMode);
-    const capacity = body?.capacity === "" ? null : Number(body?.capacity);
-    const status = normalizeText(body?.status).toLowerCase() || "draft";
+    const status = normalizeCourseStatus(body?.status);
 
-    if (!name) {
-      return json("Course name is required.", 400);
+    if (!classLevel) {
+      return json("Please select a valid class level.", 400);
     }
 
-    const columns = await getTableColumns("courses");
+    const [existing] = await prisma.$queryRaw`
+      SELECT id::text
+      FROM courses
+      WHERE class_level = ${classLevel}
+         OR title = ${classLevel}
+      LIMIT 1
+    `;
+
+    if (existing?.id) {
+      return json("This class already exists.", 409);
+    }
+
     const id = crypto.randomUUID();
-    const insertColumns = [];
-    const insertValues = [];
-
-    if (columns.id) {
-      addColumn(insertColumns, insertValues, columns, "id", id);
-    }
-    if (columns.name) {
-      addColumn(insertColumns, insertValues, columns, "name", name);
-    }
-    if (columns.code) {
-      addColumn(insertColumns, insertValues, columns, "code", code || null);
-    }
-    if (columns.subject_id) {
-      addColumn(
-        insertColumns,
-        insertValues,
-        columns,
-        "subject_id",
-        subjectId || null
-      );
-    }
-    if (columns.description) {
-      addColumn(
-        insertColumns,
-        insertValues,
-        columns,
-        "description",
-        description || null
-      );
-    }
-    if (columns.class_mode) {
-      addColumn(
-        insertColumns,
-        insertValues,
-        columns,
-        "class_mode",
-        classMode || null
-      );
-    }
-    if (columns.capacity) {
-      addColumn(
-        insertColumns,
-        insertValues,
-        columns,
-        "capacity",
-        Number.isFinite(capacity) ? capacity : null
-      );
-    }
-    if (columns.status) {
-      addColumn(insertColumns, insertValues, columns, "status", status);
-    }
 
     await prisma.$transaction(async (tx) => {
-      await tx.$executeRaw(
-        Prisma.sql`
-          INSERT INTO courses (${Prisma.join(insertColumns, ", ")})
-          VALUES (${Prisma.join(insertValues, ", ")})
-        `
-      );
+      await tx.$executeRaw`
+        INSERT INTO courses (
+          id,
+          title,
+          class_level,
+          description,
+          status
+        )
+        VALUES (
+          ${id}::uuid,
+          ${classLevel},
+          ${classLevel},
+          ${description || null},
+          ${status}::user_status
+        )
+      `;
+
+      await syncCourseSubjects(tx, id, classLevel);
 
       await insertAuditLog(
         authState.session.user.id,
         id,
         "course_created",
-        `Course ${name} created by admin.`,
-        { code, status },
+        `Class ${classLevel} created by admin.`,
+        { status },
         tx
       );
     });
 
-    return json("Course created.", 201, {
+    return json("Class created.", 201, {
       item: {
         id,
-        name,
-        code,
-        subject_id: subjectId || null,
+        name: classLevel,
+        code: null,
+        subject_id: null,
         description,
-        class_mode: classMode,
-        capacity,
+        class_mode: classLevel,
+        capacity: null,
+        assigned_subjects: (CLASS_SUBJECTS[classLevel] || []).join(", "),
         status,
       },
     });
   } catch (error) {
     return json(
-      error instanceof Error ? error.message : "Unable to create course.",
+      error instanceof Error ? error.message : "Unable to create class.",
       500
     );
   }

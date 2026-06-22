@@ -4,8 +4,10 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { createAuditLog } from "@/lib/auditLog";
 import { requireRole, roleGuardResponse } from "@/lib/roleGuard";
+import { ALLOWED_CLASS_LEVELS } from "@/lib/academicCatalog";
 
 const ALLOWED_ROLES = ["admin", "coordinator"];
+const CLASS_LEVELS = [...ALLOWED_CLASS_LEVELS];
 
 function json(message, status = 200, extra = {}) {
   return NextResponse.json({ message, ...extra }, { status });
@@ -16,7 +18,7 @@ function normalizeText(value) {
 }
 
 async function getOptions() {
-  const [teachers, students, courses, subjects] = await Promise.all([
+  const [teachers, students, courses, subjects, courseSubjects] = await Promise.all([
     prisma.$queryRaw`
       SELECT tp.id::text AS id, u.full_name
       FROM teacher_profiles tp
@@ -32,9 +34,10 @@ async function getOptions() {
       ORDER BY u.full_name ASC
     `,
     prisma.$queryRaw`
-      SELECT id::text AS id, title
+      SELECT id::text AS id, COALESCE(NULLIF(class_level, ''), title) AS title
       FROM courses
       WHERE status = 'active'
+        AND COALESCE(NULLIF(class_level, ''), title) IN (${Prisma.join(CLASS_LEVELS)})
       ORDER BY title ASC
     `,
     prisma.$queryRaw`
@@ -43,9 +46,22 @@ async function getOptions() {
       WHERE status = 'active'
       ORDER BY name ASC
     `,
+    prisma.$queryRaw`
+      SELECT
+        cs.course_id::text AS course_id,
+        s.id::text AS id,
+        s.name
+      FROM course_subjects cs
+      INNER JOIN subjects s ON s.id = cs.subject_id
+      INNER JOIN courses c ON c.id = cs.course_id
+      WHERE COALESCE(s.status, 'active'::user_status) = 'active'::user_status
+        AND COALESCE(c.status, 'active'::user_status) = 'active'::user_status
+        AND COALESCE(NULLIF(c.class_level, ''), c.title) IN (${Prisma.join(CLASS_LEVELS)})
+      ORDER BY s.name ASC
+    `,
   ]);
 
-  return { teachers, students, courses, subjects };
+  return { teachers, students, courses, subjects, courseSubjects };
 }
 
 export async function GET(request) {
@@ -56,29 +72,31 @@ export async function GET(request) {
     const search = normalizeText(searchParams.get("search"));
     const status = normalizeText(searchParams.get("status")).toLowerCase();
     const conditions = [];
+    const values = [];
 
     if (search) {
       const term = `%${search}%`;
-      conditions.push(
-        Prisma.sql`(
-          tu.full_name ILIKE ${term}
-          OR su.full_name ILIKE ${term}
-          OR c.title ILIKE ${term}
-          OR s.name ILIKE ${term}
-        )`
-      );
+      values.push(term);
+      conditions.push(`(
+          tu.full_name ILIKE $${values.length}
+          OR su.full_name ILIKE $${values.length}
+          OR c.title ILIKE $${values.length}
+          OR s.name ILIKE $${values.length}
+        )`);
     }
 
     if (status) {
-      conditions.push(Prisma.sql`LOWER(ta.status::text) = ${status}`);
+      values.push(status);
+      conditions.push(`LOWER(ta.status::text) = $${values.length}`);
     }
 
     const whereClause = conditions.length
-      ? Prisma.sql`WHERE ${Prisma.join(conditions, Prisma.sql` AND `)}`
-      : Prisma.empty;
+      ? `WHERE ${conditions.join(" AND ")}`
+      : "";
 
     const [items, options] = await Promise.all([
-      prisma.$queryRaw`
+      prisma.$queryRawUnsafe(
+        `
         SELECT
           ta.id::text AS id,
           ta.teacher_id::text AS teacher_id,
@@ -88,7 +106,7 @@ export async function GET(request) {
           ta.status::text AS status,
           tu.full_name AS teacher_name,
           su.full_name AS student_name,
-          c.title AS course_title,
+          COALESCE(NULLIF(c.class_level, ''), c.title) AS course_title,
           s.name AS subject_name,
           ta.created_at
         FROM teacher_assignments ta
@@ -100,7 +118,9 @@ export async function GET(request) {
         INNER JOIN subjects s ON s.id = ta.subject_id
         ${whereClause}
         ORDER BY ta.created_at DESC
-      `,
+        `,
+        ...values
+      ),
       getOptions(),
     ]);
 
@@ -123,12 +143,39 @@ export async function POST(request) {
     const session = await requireRole(ALLOWED_ROLES);
     const body = await request.json();
     const teacherId = normalizeText(body?.teacherId);
-    const studentId = normalizeText(body?.studentId);
     const courseId = normalizeText(body?.courseId);
     const subjectId = normalizeText(body?.subjectId);
 
-    if (!teacherId || !subjectId) {
-      return json("Teacher and subject are required.", 400);
+    if (!teacherId || !courseId || !subjectId) {
+      return json("Teacher, class, and subject are required.", 400);
+    }
+
+    const [subjectAllowed] = await prisma.$queryRaw`
+      SELECT s.id::text AS id
+      FROM course_subjects cs
+      INNER JOIN subjects s ON s.id = cs.subject_id
+      WHERE cs.course_id = ${courseId}::uuid
+        AND s.id = ${subjectId}::uuid
+      LIMIT 1
+    `;
+
+    if (!subjectAllowed?.id) {
+      return json("Selected subject is not available for this class.", 400);
+    }
+
+    const [existing] = await prisma.$queryRaw`
+      SELECT id::text AS id
+      FROM teacher_assignments
+      WHERE teacher_id = ${teacherId}::uuid
+        AND course_id = ${courseId}::uuid
+        AND subject_id = ${subjectId}::uuid
+        AND student_id IS NULL
+        AND status = 'active'::user_status
+      LIMIT 1
+    `;
+
+    if (existing?.id) {
+      return json("This teacher is already assigned to this class subject.", 409);
     }
 
     const [created] = await prisma.$transaction(async (tx) => {
@@ -147,8 +194,8 @@ export async function POST(request) {
         VALUES (
           ${crypto.randomUUID()}::uuid,
           ${teacherId}::uuid,
-          ${studentId || null}::uuid,
-          ${courseId || null}::uuid,
+          NULL,
+          ${courseId}::uuid,
           ${subjectId}::uuid,
           ${session.user.id}::uuid,
           'active'::user_status,
@@ -158,16 +205,23 @@ export async function POST(request) {
         RETURNING id::text AS id
       `;
 
-      await createAuditLog(
-        {
-          actorUserId: session.user.id,
-          action: "teacher_assigned",
-          entityType: "teacher_assignments",
-          entityId: rows[0].id,
-          newData: { teacherId, studentId, courseId, subjectId, status: "active" },
-        },
-        tx
-      );
+      if (rows[0]?.id) {
+        await createAuditLog(
+          {
+            actorUserId: session.user.id,
+            action: "teacher_assigned",
+            entityType: "teacher_assignments",
+            entityId: rows[0].id,
+            newData: {
+              teacherId,
+              courseId,
+              subjectId,
+              status: "active",
+            },
+          },
+          tx
+        );
+      }
 
       return tx.$queryRaw`
         SELECT
@@ -179,7 +233,7 @@ export async function POST(request) {
           ta.status::text AS status,
           tu.full_name AS teacher_name,
           su.full_name AS student_name,
-          c.title AS course_title,
+          COALESCE(NULLIF(c.class_level, ''), c.title) AS course_title,
           s.name AS subject_name,
           ta.created_at
         FROM teacher_assignments ta
@@ -193,7 +247,7 @@ export async function POST(request) {
       `;
     });
 
-    return json("Teacher assignment created.", 201, { item: created });
+    return json("Teacher assigned to class subject.", 201, { item: created });
   } catch (error) {
     const guard = roleGuardResponse(error);
     if (guard) {
@@ -206,4 +260,3 @@ export async function POST(request) {
     );
   }
 }
-

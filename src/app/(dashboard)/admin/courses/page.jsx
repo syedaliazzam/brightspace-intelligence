@@ -9,9 +9,20 @@ const CACHE_TTL = 60 * 1000;
 
 function formatLabel(value) {
   const text = String(value || "");
+  if (text.toLowerCase() === "pending") return "Draft";
+
   return text
     ? text.replace(/_/g, " ").replace(/\b\w/g, (char) => char.toUpperCase())
     : "-";
+}
+
+function formatDate(value) {
+  if (!value) return "-";
+  return new Intl.DateTimeFormat("en", {
+    month: "short",
+    day: "2-digit",
+    year: "numeric",
+  }).format(new Date(value));
 }
 
 function getCacheKey(filters) {
@@ -112,7 +123,7 @@ export default function AdminCoursesPage() {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data?.message || "Unable to load courses.");
+        throw new Error(data?.message || "Unable to load classes.");
       }
 
       writeCache(cacheKey, data);
@@ -128,7 +139,7 @@ export default function AdminCoursesPage() {
     } catch (error) {
       setState({
         loading: false,
-        error: error instanceof Error ? error.message : "Unable to load courses.",
+        error: error instanceof Error ? error.message : "Unable to load classes.",
         available: false,
         items: [],
         subjects: [],
@@ -152,13 +163,13 @@ export default function AdminCoursesPage() {
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div className="max-w-3xl">
             <p className="text-sm font-semibold uppercase tracking-[0.24em] text-sky-700">
-              Course and class management
+              Class Management
             </p>
             <h1 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">
-              Organize academic offerings
+              Manage Academic Classes
             </h1>
             <p className="mt-3 text-sm leading-7 text-slate-600 sm:text-base">
-              Manage course records, class shells, and a view of lecture schedules from a single admin page.
+              View approved class levels, assigned subjects, and related lecture activity from one admin page.
             </p>
           </div>
 
@@ -167,7 +178,7 @@ export default function AdminCoursesPage() {
             onClick={() => setModal({ open: true, record: null })}
             className="inline-flex items-center justify-center rounded-2xl bg-slate-950 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800"
           >
-            Create course
+            Create Class
           </button>
         </div>
       </section>
@@ -176,19 +187,19 @@ export default function AdminCoursesPage() {
         items={[
           {
             key: "total",
-            label: "Total courses",
+            label: "Total Classes",
             value: state.summary.total,
             tone: "bg-slate-950 text-white",
           },
           {
             key: "active",
-            label: "Active courses",
+            label: "Active Classes",
             value: state.summary.active,
             tone: "bg-emerald-50 text-emerald-800",
           },
           {
             key: "draft",
-            label: "Draft courses",
+            label: "Draft Classes",
             value: state.summary.draft,
             tone: "bg-amber-50 text-amber-800",
           },
@@ -211,7 +222,7 @@ export default function AdminCoursesPage() {
         >
           <label className="block">
             <span className="mb-2 block text-sm font-medium text-slate-700">
-              Search courses
+              Search Classes
             </span>
             <input
               type="text"
@@ -222,7 +233,7 @@ export default function AdminCoursesPage() {
                   search: event.target.value,
                 }))
               }
-              placeholder="Name, code, or description"
+              placeholder="Class name or description"
               className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-950 outline-none transition focus:border-sky-400 focus:bg-white focus:ring-4 focus:ring-sky-100"
             />
           </label>
@@ -243,9 +254,9 @@ export default function AdminCoursesPage() {
               className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-950 outline-none transition focus:border-sky-400 focus:bg-white focus:ring-4 focus:ring-sky-100"
             >
               <option value="">All statuses</option>
-              <option value="draft">Draft</option>
+              <option value="pending">Draft</option>
               <option value="active">Active</option>
-              <option value="inactive">Inactive</option>
+              <option value="suspended">Suspended</option>
               <option value="archived">Archived</option>
             </select>
           </label>
@@ -295,29 +306,39 @@ export default function AdminCoursesPage() {
             columns={[
               {
                 key: "name",
-                label: "Course",
+                label: "Class Name",
                 render: (row) => (
                   <div>
                     <p className="font-semibold text-slate-950">{row.name}</p>
-                    <p className="mt-1 text-xs text-slate-500">
-                      {row.code || "No code"}
-                    </p>
                   </div>
                 ),
               },
-              { key: "subject_name", label: "Subject" },
-              { key: "class_mode", label: "Mode" },
+              {
+                key: "class_mode",
+                label: "Class / Grade",
+                render: (row) => row.class_mode || row.name || "-",
+              },
+              {
+                key: "assigned_subjects",
+                label: "Assigned Subjects",
+                render: (row) => row.assigned_subjects || row.subject_name || "-",
+              },
               {
                 key: "status",
                 label: "Status",
                 render: (row) => formatLabel(row.status),
               },
+              {
+                key: "created_at",
+                label: "Created Date",
+                render: (row) => formatDate(row.created_at),
+              },
             ]}
             rows={state.loading ? [] : state.items}
             emptyMessage={
               state.loading
-                ? "Loading courses..."
-                : "No courses matched the current filters."
+                ? "Loading classes..."
+                : "No classes matched the current filters."
             }
             actions={(row) => (
               <button

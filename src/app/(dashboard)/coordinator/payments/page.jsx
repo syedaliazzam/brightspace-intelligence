@@ -1,7 +1,9 @@
 import { Prisma } from "@prisma/client";
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import CoordinatorPortalNavbar from "@/components/coordinator/CoordinatorPortalNavbar";
 import PaymentVerificationTable from "@/components/coordinator/PaymentVerificationTable";
+import ShowMoreSection from "@/components/coordinator/ShowMoreSection";
 import { auth, roleToDashboard } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 import { createSignedPaymentProofUrl } from "@/lib/supabaseStorage";
@@ -59,18 +61,12 @@ async function getCounts() {
 }
 
 async function getItems(status) {
-  const conditions = [];
   const dbStatus = FILTER_TO_DB_STATUS[status] || "";
+  const whereClause = dbStatus ? `WHERE fs."status"::text = $1` : "";
+  const values = dbStatus ? [dbStatus] : [];
 
-  if (dbStatus) {
-    conditions.push(Prisma.sql`fs."status"::text = ${dbStatus}`);
-  }
-
-  const whereClause = conditions.length
-    ? Prisma.sql`WHERE ${Prisma.join(conditions, Prisma.sql` AND `)}`
-    : Prisma.empty;
-
-  const rows = await prisma.$queryRaw`
+  const rows = await prisma.$queryRawUnsafe(
+    `
     SELECT
       fs."id"::text AS id,
       fs."payer_name",
@@ -92,8 +88,10 @@ async function getItems(status) {
     INNER JOIN "fee_vouchers" fv ON fv."id" = fs."voucher_id"
     INNER JOIN "registration_leads" rl ON rl."id" = fv."registration_id"
     ${whereClause}
-    ORDER BY fs."paid_at" DESC NULLS LAST, fs."id" DESC
-  `;
+    ORDER BY fs."created_at" DESC NULLS LAST, fs."paid_at" DESC NULLS LAST, fs."id" DESC
+    `,
+    ...values
+  );
 
   return Promise.all(
     rows.map(async (item) => ({
@@ -124,67 +122,45 @@ export default async function CoordinatorPaymentsPage({ searchParams }) {
   const session = await auth();
   const role = String(session?.user?.role || "").toLowerCase();
 
-  if (!session?.user) {
-    redirect("/login");
-  }
-
-  if (!ALLOWED_ROLES.has(role)) {
-    redirect(roleToDashboard[role] || "/");
+  if (!session?.user || !ALLOWED_ROLES.has(role)) {
+    redirect(session?.user ? roleToDashboard[role] || "/login" : "/login");
   }
 
   const resolvedParams = await searchParams;
-  const status = normalizeStatus(resolvedParams?.status);
-  const [counts, items] = await Promise.all([getCounts(), getItems(status)]);
+  const status = normalizeStatus(resolvedParams?.status) || "pending";
+  const safeStatus = FILTER_TO_DB_STATUS[status] ? status : "pending";
+  const [counts, items] = await Promise.all([getCounts(), getItems(safeStatus)]);
 
   return (
     <div className="space-y-6">
+      <CoordinatorPortalNavbar profile={session.user} />
       <section className="rounded-[2rem] border border-white/70 bg-[linear-gradient(135deg,rgba(255,255,255,0.92),rgba(241,248,255,0.92))] p-6 shadow-[0_24px_80px_-36px_rgba(15,23,42,0.25)] sm:p-8">
-        <div className="max-w-3xl">
-          <p className="text-sm font-semibold uppercase tracking-[0.24em] text-sky-700">
-            Coordinator verification
-          </p>
-          <h1 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">
-            Payment verification
-          </h1>
-          <p className="mt-3 text-sm leading-7 text-slate-600 sm:text-base">
-            Review voucher payments, confirm submitted proofs, and unlock LMS access once the transaction is verified.
-          </p>
-        </div>
+        <p className="text-sm font-semibold uppercase tracking-[0.24em] text-sky-700">Payments</p>
+        <h1 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">Payment verification queue</h1>
+        <p className="mt-3 text-sm leading-7 text-slate-600 sm:text-base">
+          Review submitted proof files, approve verified payments, or reject incomplete submissions.
+        </p>
       </section>
 
-      <section className="grid gap-4 md:grid-cols-3">
-        <div className="rounded-[1.75rem] border border-white/70 bg-white/90 p-5 shadow-[0_18px_60px_-36px_rgba(15,23,42,0.22)]">
-          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-amber-700">Pending payments</p>
-          <p className="mt-4 text-3xl font-semibold tracking-tight text-slate-950">{counts.pending}</p>
-        </div>
-        <div className="rounded-[1.75rem] border border-white/70 bg-white/90 p-5 shadow-[0_18px_60px_-36px_rgba(15,23,42,0.22)]">
-          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-emerald-700">Verified payments</p>
-          <p className="mt-4 text-3xl font-semibold tracking-tight text-slate-950">{counts.verified}</p>
-        </div>
-        <div className="rounded-[1.75rem] border border-white/70 bg-white/90 p-5 shadow-[0_18px_60px_-36px_rgba(15,23,42,0.22)]">
-          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-rose-700">Rejected payments</p>
-          <p className="mt-4 text-3xl font-semibold tracking-tight text-slate-950">{counts.rejected}</p>
-        </div>
-      </section>
+      <div className="flex flex-wrap gap-3">
+        {[
+          ["pending", `Pending (${counts.pending})`],
+          ["verified", `Verified (${counts.verified})`],
+          ["rejected", `Rejected (${counts.rejected})`],
+        ].map(([value, label]) => (
+          <Link key={value} href={`/coordinator/payments?status=${value}`}>
+            <StatusChip label={label} active={safeStatus === value} />
+          </Link>
+        ))}
+      </div>
 
-      <section className="rounded-[1.75rem] border border-white/70 bg-white/90 p-4 shadow-[0_20px_70px_-36px_rgba(15,23,42,0.25)] backdrop-blur-xl sm:p-5">
-        <div className="flex flex-wrap items-center gap-3">
-          <Link href="/coordinator/payments">
-            <StatusChip label="All" active={!status} />
-          </Link>
-          <Link href="/coordinator/payments?status=pending">
-            <StatusChip label="Pending" active={status === "pending"} />
-          </Link>
-          <Link href="/coordinator/payments?status=verified">
-            <StatusChip label="Verified" active={status === "verified"} />
-          </Link>
-          <Link href="/coordinator/payments?status=rejected">
-            <StatusChip label="Rejected" active={status === "rejected"} />
-          </Link>
-        </div>
-      </section>
-
-      <PaymentVerificationTable items={items} />
+      <ShowMoreSection
+        items={items}
+        initialCount={10}
+        step={10}
+        renderItems={(visibleItems) => <PaymentVerificationTable items={visibleItems} />}
+        emptyMessage="No payment submissions match this filter."
+      />
     </div>
   );
 }

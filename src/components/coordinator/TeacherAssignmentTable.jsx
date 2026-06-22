@@ -20,12 +20,17 @@ export default function TeacherAssignmentTable({ items = [], onRefresh }) {
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="overflow-hidden rounded-[1.75rem] border border-white/70 bg-white/90 shadow-[0_20px_70px_-36px_rgba(15,23,42,0.25)]">
+      <div className="hidden grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_120px] gap-3 border-b border-slate-200 bg-slate-50/80 px-5 py-4 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 lg:grid lg:items-center">
+        <span>Teacher</span>
+        <span>Class</span>
+        <span>Subject / Status</span>
+        <span className="text-right">Action</span>
+      </div>
       <div className="divide-y divide-slate-200">
         {items.length ? (
           items.map((item) => (
-            <div key={item.id} className="grid gap-3 px-5 py-4 lg:grid-cols-[1fr_1fr_1fr_1fr_auto] lg:items-center">
+            <div key={item.id} className="grid gap-3 px-5 py-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_120px] lg:items-center">
               <p className="text-sm font-semibold text-slate-950">{item.teacher_name}</p>
-              <p className="text-sm text-slate-600">{item.student_name || "-"}</p>
               <p className="text-sm text-slate-600">{item.course_title || "-"}</p>
               <div>
                 <p className="text-sm text-slate-700">{item.subject_name}</p>
@@ -34,13 +39,13 @@ export default function TeacherAssignmentTable({ items = [], onRefresh }) {
               <button
                 type="button"
                 onClick={() =>
-                  updateStatus(item.id, item.status === "active" ? "inactive" : "active").catch((error) =>
+                  updateStatus(item.id, item.status === "active" ? "suspended" : "active").catch((error) =>
                     window.alert(error.message)
                   )
                 }
-                className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700"
+                className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 lg:justify-self-end"
               >
-                {item.status === "active" ? "Deactivate" : "Activate"}
+                {item.status === "active" ? "Suspend" : "Activate"}
               </button>
             </div>
           ))
@@ -51,4 +56,3 @@ export default function TeacherAssignmentTable({ items = [], onRefresh }) {
     </motion.div>
   );
 }
-
