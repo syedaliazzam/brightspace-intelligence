@@ -25,6 +25,14 @@ export default function FeeVoucherFilters({ initialSearch, initialStatus }) {
     setStatus(initialStatus);
   }, [initialSearch, initialStatus]);
 
+  function replaceWithHash(nextParams) {
+    const hash = typeof window !== "undefined" ? window.location.hash : "";
+    router.replace(
+      nextParams.toString() ? `${pathname}?${nextParams.toString()}${hash}` : `${pathname}${hash}`,
+      { scroll: false }
+    );
+  }
+
   function applyFilters(nextSearch, nextStatus) {
     const params = new URLSearchParams(searchParams.toString());
 
@@ -39,9 +47,13 @@ export default function FeeVoucherFilters({ initialSearch, initialStatus }) {
     } else {
       params.delete("status");
     }
-
     startTransition(() => {
-      router.replace(params.toString() ? `${pathname}?${params}` : pathname);
+      replaceWithHash(params);
+      if (typeof window !== "undefined") {
+        window.requestAnimationFrame(() => {
+          window.scrollTo({ top: window.scrollY, behavior: "smooth" });
+        });
+      }
     });
   }
 

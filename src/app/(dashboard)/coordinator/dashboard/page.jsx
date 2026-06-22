@@ -252,11 +252,6 @@ export default function CoordinatorDashboardPage() {
         title="Dashboard"
         description="Monitor intake, payments, access approvals, teacher activity, and lecture scheduling from one coordinated portal."
       >
-        <div className="max-w-3xl">
-          <h1 className="text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">
-            Daily command view
-          </h1>
-        </div>
       </CoordinatorPortalSection>
 
       {state.error ? (
