@@ -1,5 +1,4 @@
 import crypto from "crypto";
-import bcrypt from "bcrypt";
 import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
@@ -334,7 +333,7 @@ export async function POST(request) {
     await ensureUniqueUser(email, phone);
 
     const roleId = await getRoleId(role);
-    const hashedPassword = await bcrypt.hash(password, 12);
+    const hashedPassword = await password;
     const userId = crypto.randomUUID();
     await prisma.$transaction(async (tx) => {
       await tx.$executeRaw`

@@ -2,7 +2,7 @@ import crypto from "crypto";
 import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { buildCredentialsEmailHtml, getAppUrl, sendEmail } from "@/lib/email";
+import { getAppUrl, sendEmail } from "@/lib/email";
 import { normalizeClassLevel } from "@/lib/academicCatalog";
 import prisma from "@/lib/prisma";
 
@@ -59,6 +59,116 @@ function buildStudentUsername(studentName, classLevel, registrationNumber) {
   ].filter(Boolean);
 
   return parts.join(".");
+}
+
+function buildCredentialsEmailBodies({
+  parentName,
+  parentEmail,
+  parentPhone,
+  parentPassword,
+  studentName,
+  studentUsername,
+  studentPassword,
+  loginUrl,
+}) {
+  const html = `
+    <div style="font-family:Arial,sans-serif;background:#f8fafc;padding:24px;color:#0f172a;">
+      <div style="max-width:720px;margin:0 auto;background:#fff;border:1px solid #e2e8f0;border-radius:18px;padding:24px;">
+        <h2 style="margin:0 0 16px;">Login Credentials Created</h2>
+        <div style="display:grid;gap:16px;">
+          <div style="border:1px solid #e2e8f0;border-radius:14px;padding:16px;">
+            <h3 style="margin:0 0 10px;">Parent Login</h3>
+            <p style="margin:4px 0;"><strong>Name:</strong> ${parentName || "-"}</p>
+            <p style="margin:4px 0;"><strong>Email:</strong> ${parentEmail || "-"}</p>
+            <p style="margin:4px 0;"><strong>Phone:</strong> ${parentPhone || "-"}</p>
+            <p style="margin:4px 0;"><strong>Temporary Password:</strong> ${parentPassword || "-"}</p>
+          </div>
+          <div style="border:1px solid #e2e8f0;border-radius:14px;padding:16px;">
+            <h3 style="margin:0 0 10px;">Student Login</h3>
+            <p style="margin:4px 0;"><strong>Name:</strong> ${studentName || "-"}</p>
+            <p style="margin:4px 0;"><strong>Username:</strong> ${studentUsername || "-"}</p>
+            <p style="margin:4px 0;"><strong>Temporary Password:</strong> ${studentPassword || "-"}</p>
+          </div>
+          <div style="border:1px solid #dbeafe;background:#eff6ff;border-radius:14px;padding:16px;">
+            <p style="margin:0 0 8px;"><strong>Login Page:</strong></p>
+            <a href="${loginUrl}" style="color:#2563eb;text-decoration:none;">${loginUrl}</a>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+
+  const text = `
+Login Credentials Created
+
+Parent Login
+Name: ${parentName || "-"}
+Email: ${parentEmail || "-"}
+Phone: ${parentPhone || "-"}
+Temporary Password: ${parentPassword || "-"}
+
+Student Login
+Name: ${studentName || "-"}
+Username: ${studentUsername || "-"}
+Temporary Password: ${studentPassword || "-"}
+
+Login Page:
+${loginUrl}
+`.trim();
+
+  return { html, text };
+}
+
+async function insertCredentialsMessage({
+  paymentId,
+  recipientEmail,
+  subject,
+  body,
+  bodyText,
+  createdBy,
+  tx,
+}) {
+  const messageId = crypto.randomUUID();
+
+  await tx.$executeRaw`
+    INSERT INTO outbound_messages (
+      id,
+      message_type,
+      related_entity_type,
+      related_entity_id,
+      recipient_email,
+      subject,
+      body,
+      body_text,
+      sent_status,
+      created_by,
+      created_at,
+      updated_at
+    )
+    VALUES (
+      ${messageId}::uuid,
+      'payment_credentials',
+      'payment',
+      ${paymentId}::uuid,
+      ${recipientEmail},
+      ${subject},
+      ${body},
+      ${bodyText},
+      'pending',
+      CAST(${createdBy || null} AS uuid),
+      NOW(),
+      NOW()
+    )
+  `;
+
+  return {
+    id: messageId,
+    recipient_email: recipientEmail,
+    subject,
+    body_html: body,
+    body_text: bodyText,
+    sent_status: "pending",
+  };
 }
 
 function getClassCode(classLevel) {
@@ -494,7 +604,7 @@ export async function POST(request, { params }) {
     let studentLoginUsername = "";
     let parentLogin = parentContactEmail || parentContactPhone || "";
 
-    await prisma.$transaction(async (tx) => {
+    const transactionResult = await prisma.$transaction(async (tx) => {
       await tx.$executeRaw`
         UPDATE fee_submissions
         SET status = 'verified'::fee_submission_status
@@ -682,34 +792,119 @@ export async function POST(request, { params }) {
         { parentUserId, studentUserId },
         tx
       );
+
+      const loginUrl = `${getAppUrl().replace(/\/+$/, "")}/login`;
+      const { html: credentialsHtml, text: credentialsText } = buildCredentialsEmailBodies({
+        parentName: submission.parent_name || "Parent",
+        parentEmail: parentContactEmail,
+        parentPhone: parentContactPhone,
+        parentPassword: parentTemporaryPassword,
+        studentName: submission.student_name,
+        studentUsername: studentLoginUsername,
+        studentPassword: studentTemporaryPassword,
+        loginUrl,
+      });
+
+      const credentialsMessage = await insertCredentialsMessage({
+        paymentId: submission.id,
+        recipientEmail: parentContactEmail || parentContactPhone || "",
+        subject: "Your LMS access credentials",
+        body: credentialsHtml,
+        bodyText: credentialsText,
+        createdBy: session.user.id,
+        tx,
+      });
+
+      return {
+        parentUserId,
+        studentUserId,
+        credentialsMessage,
+        credentialsHtml,
+        credentialsText,
+        loginUrl,
+      };
     }, TRANSACTION_OPTIONS);
+
+    let credentialsEmail = null;
+    let credentialsEmailSent = false;
+    let credentialsSendError = "";
 
     if (parentContactEmail) {
       try {
         const portalUrl = getAppUrl()
           ? `${getAppUrl().replace(/\/+$/, "")}/login`
           : "http://localhost:3000/login";
+        const { html, text } = buildCredentialsEmailBodies({
+          parentName: submission.parent_name || "Parent",
+          parentEmail: parentContactEmail,
+          parentPhone: parentContactPhone,
+          parentPassword: parentTemporaryPassword,
+          studentName: submission.student_name,
+          studentUsername: studentLoginUsername,
+          studentPassword: studentTemporaryPassword,
+          loginUrl: portalUrl,
+        });
 
         await sendEmail({
           to: parentContactEmail,
           subject: "Your LMS access credentials",
-          text: `Your LMS access is ready.\n\nParent login: ${parentLogin}\nParent temporary password: ${parentTemporaryPassword}\n\nStudent login: ${studentLoginUsername}\nStudent temporary password: ${studentTemporaryPassword}\n\nLogin: ${portalUrl}`,
-          html: buildCredentialsEmailHtml({
-            recipientName: submission.parent_name || "Parent",
-            studentName: submission.student_name,
-            parentLogin,
-            parentPassword: parentTemporaryPassword,
-            studentLogin: studentLoginUsername,
-            studentPassword: studentTemporaryPassword,
-            portalUrl,
-          }),
+          text,
+          html,
         });
+        credentialsEmailSent = true;
+        credentialsEmail = {
+          id: transactionResult?.credentialsMessage?.id || crypto.randomUUID(),
+          recipient_email: parentContactEmail,
+          subject: "Your LMS access credentials",
+          body_html: html,
+          body_text: text,
+          sent_status: "sent",
+          parent_phone: parentContactPhone || "",
+        };
+        if (transactionResult?.credentialsMessage?.id) {
+          await prisma.$executeRaw`
+            UPDATE outbound_messages
+            SET sent_status = 'sent',
+                sent_at = NOW(),
+                updated_at = NOW()
+            WHERE id = ${transactionResult.credentialsMessage.id}::uuid
+          `;
+        }
       } catch (emailError) {
         console.error("SendGrid credential email failed:", emailError);
+        credentialsSendError =
+          emailError instanceof Error ? emailError.message : "Credentials email failed to send.";
+        credentialsEmail = {
+          id: transactionResult?.credentialsMessage?.id || crypto.randomUUID(),
+          recipient_email: parentContactEmail,
+          subject: "Your LMS access credentials",
+          body_html: "",
+          body_text: `Login Credentials Created\n\nParent Login\nName: ${submission.parent_name || "Parent"}\nEmail: ${parentContactEmail || "-"}\nPhone: ${parentContactPhone || "-"}\nTemporary Password: ${parentTemporaryPassword}\n\nStudent Login\nName: ${submission.student_name}\nUsername: ${studentLoginUsername}\nTemporary Password: ${studentTemporaryPassword}\n\nLogin Page:\n${getAppUrl().replace(/\/+$/, "")}/login`,
+          sent_status: "failed",
+          parent_phone: parentContactPhone || "",
+        };
+        if (transactionResult?.credentialsMessage?.id) {
+          await prisma.$executeRaw`
+            UPDATE outbound_messages
+            SET sent_status = 'failed',
+                updated_at = NOW()
+            WHERE id = ${transactionResult.credentialsMessage.id}::uuid
+          `;
+        }
       }
     }
 
-    return json("Payment verified and LMS access granted.", 200);
+    return json(
+      credentialsEmailSent
+        ? "Payment approved and credentials sent successfully."
+        : "Payment approved, but credentials email failed to send.",
+      200,
+      {
+        success: true,
+        credentials_email: credentialsEmail || null,
+        ...(credentialsEmailSent ? {} : { email_error: credentialsSendError || "Failed to send credentials email." }),
+      }
+    );
   } catch (error) {
     return json(
       error instanceof Error ? error.message : "Unable to verify payment.",

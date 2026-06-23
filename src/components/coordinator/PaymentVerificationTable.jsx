@@ -38,6 +38,7 @@ function formatDate(value) {
 export default function PaymentVerificationTable({ items, onRefresh }) {
   const [pendingId, setPendingId] = useState("");
   const [selectedItem, setSelectedItem] = useState(null);
+  const [credentialsEmail, setCredentialsEmail] = useState(null);
 
   function openProofPreview(item) {
     const previewItem = {
@@ -79,6 +80,9 @@ export default function PaymentVerificationTable({ items, onRefresh }) {
         return;
       }
 
+      if (data?.credentials_email) {
+        setCredentialsEmail(data.credentials_email);
+      }
       onRefresh?.();
     } catch (error) {
       window.alert(error instanceof Error ? error.message : "Payment verification failed.");
@@ -258,6 +262,43 @@ export default function PaymentVerificationTable({ items, onRefresh }) {
         onApprove={(item) => verifyPayment(item.id, "approve")}
         onReject={(item) => verifyPayment(item.id, "reject")}
       />
+
+      {credentialsEmail ? (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/50 px-4 py-8">
+          <div className="w-full max-w-2xl rounded-[2rem] border border-white/70 bg-white p-6 shadow-[0_24px_80px_-36px_rgba(15,23,42,0.32)] sm:p-8">
+            <p className="text-sm font-semibold uppercase tracking-[0.24em] text-emerald-700">
+              Payment Approved Successfully
+            </p>
+            <div className="mt-4 space-y-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
+              <p><span className="font-semibold text-slate-950">Recipient Email:</span> {credentialsEmail.recipient_email || "—"}</p>
+              <p><span className="font-semibold text-slate-950">Subject:</span> {credentialsEmail.subject || "—"}</p>
+              <p><span className="font-semibold text-slate-950">Parent Phone:</span> {credentialsEmail.parent_phone || "—"}</p>
+              <div>
+                <p className="font-semibold text-slate-950">Credentials Email Content</p>
+                <pre className="mt-2 max-h-72 overflow-auto whitespace-pre-wrap rounded-2xl border border-slate-200 bg-white p-4 text-xs text-slate-700">
+                  {credentialsEmail.body_text || ""}
+                </pre>
+              </div>
+            </div>
+            <div className="mt-6 flex flex-wrap justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => navigator.clipboard.writeText(credentialsEmail.body_text || "")}
+                className="rounded-2xl bg-slate-950 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800"
+              >
+                Copy Message
+              </button>
+              <button
+                type="button"
+                onClick={() => setCredentialsEmail(null)}
+                className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </>
   );
 }

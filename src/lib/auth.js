@@ -59,7 +59,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
   if (!rawIdentifier) {
     throw toAuthError("missing_identifier");
-  }
+  }    
 
   if (!password.trim()) {
     throw toAuthError("missing_password");
@@ -67,7 +67,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
   const isEmail = rawIdentifier.includes("@");
   const phoneIdentifier = rawIdentifier.replace(/\D/g, "");
-  const normalizedUsername = normalizeIdentifier(rawIdentifier).toLowerCase();
 
   // Only allow email OR valid phone.
   // Do not search phone when phoneIdentifier is empty.
@@ -81,10 +80,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     whereCondition = Prisma.sql`
       REGEXP_REPLACE(COALESCE(u.phone, ''), '\\D', '', 'g') = ${phoneIdentifier}
     `;
-  } else if (normalizedUsername) {
-    whereCondition = Prisma.sql`
-      LOWER(TRIM(COALESCE(u.username, ''))) = ${normalizedUsername}
-    `;
   } else {
     // Blocks wrong input like "admin", "teacher", "parent"
     return null;
@@ -94,7 +89,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     Prisma.sql`
       SELECT
         u.id::text AS id,
-        u.username,
         u.email,
         u.phone,
         u.password_hash,
@@ -132,7 +126,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     return null;
   }
 
-  if (role === "student") {
+  if (role === "parent" || role === "student") {
     const dueRows = role === "student"
       ? await prisma.$queryRaw`
           SELECT fv.due_date
@@ -143,7 +137,18 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           ORDER BY fv.due_date ASC NULLS LAST, fv.created_at DESC
           LIMIT 1
         `
-      : [];
+      : await prisma.$queryRaw`
+          SELECT fv.due_date
+          FROM fee_vouchers fv
+          INNER JOIN registration_leads rl ON rl.id = fv.registration_id
+          WHERE (
+              LOWER(TRIM(COALESCE(rl.email, ''))) = LOWER(TRIM(COALESCE(${user.email || ""}, '')))
+              OR REGEXP_REPLACE(COALESCE(rl.phone, ''), '\\D', '', 'g') = REGEXP_REPLACE(COALESCE(${user.phone || ""}, ''), '\\D', '', 'g')
+            )
+            AND LOWER(fv.status::text) IN ('unpaid', 'rejected', 'submitted')
+          ORDER BY fv.due_date ASC NULLS LAST, fv.created_at DESC
+          LIMIT 1
+        `;
 
     if (isPastDueDate(dueRows?.[0]?.due_date)) {
       return null;
@@ -152,7 +157,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
   return {
     id: user.id,
-    username: user.username || "",
     email: user.email,
     phone: user.phone,
     role,
@@ -165,7 +169,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 async jwt({ token, user }) {
   if (user) {
     token.userId = user.id;
-    token.username = user.username || "";
     token.email = user.email || "";
     token.role = user.role;
     token.status = user.status;
@@ -177,7 +180,6 @@ async jwt({ token, user }) {
     async session({ session, token }) {
       if (session.user) {
         session.user.id = token.userId;
-        session.user.username = token.username;
         session.user.email = token.email;
         session.user.role = token.role;
         session.user.status = token.status;

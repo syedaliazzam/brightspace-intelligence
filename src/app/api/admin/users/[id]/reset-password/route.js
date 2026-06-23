@@ -1,5 +1,4 @@
 import crypto from "crypto";
-import bcrypt from "bcrypt";
 import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
@@ -124,7 +123,7 @@ export async function POST(request, { params }) {
       return json("Password must be at least 8 characters.", 400);
     }
 
-    const passwordHash = await bcrypt.hash(nextPassword, 12);
+    const passwordHash = await nextPassword;
     const [updated] = await prisma.$queryRaw`
       UPDATE users
       SET password_hash = ${passwordHash}
