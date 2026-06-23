@@ -67,6 +67,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
   const isEmail = rawIdentifier.includes("@");
   const phoneIdentifier = rawIdentifier.replace(/\D/g, "");
+  const normalizedUsername = normalizeIdentifier(rawIdentifier).toLowerCase();
 
   // Only allow email OR valid phone.
   // Do not search phone when phoneIdentifier is empty.
@@ -80,6 +81,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     whereCondition = Prisma.sql`
       REGEXP_REPLACE(COALESCE(u.phone, ''), '\\D', '', 'g') = ${phoneIdentifier}
     `;
+  } else if (normalizedUsername) {
+    whereCondition = Prisma.sql`
+      LOWER(TRIM(COALESCE(u.username, ''))) = ${normalizedUsername}
+    `;
   } else {
     // Blocks wrong input like "admin", "teacher", "parent"
     return null;
@@ -89,6 +94,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     Prisma.sql`
       SELECT
         u.id::text AS id,
+        u.username,
         u.email,
         u.phone,
         u.password_hash,
@@ -146,6 +152,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
   return {
     id: user.id,
+    username: user.username || "",
     email: user.email,
     phone: user.phone,
     role,
@@ -158,6 +165,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 async jwt({ token, user }) {
   if (user) {
     token.userId = user.id;
+    token.username = user.username || "";
     token.email = user.email || "";
     token.role = user.role;
     token.status = user.status;
@@ -169,6 +177,7 @@ async jwt({ token, user }) {
     async session({ session, token }) {
       if (session.user) {
         session.user.id = token.userId;
+        session.user.username = token.username;
         session.user.email = token.email;
         session.user.role = token.role;
         session.user.status = token.status;

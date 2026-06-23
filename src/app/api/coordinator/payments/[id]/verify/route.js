@@ -1,5 +1,4 @@
 import crypto from "crypto";
-import bcrypt from "bcrypt";
 import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
@@ -52,6 +51,16 @@ function buildStudentPassword(studentName, registrationNumber) {
   return `${sanitizeCredentialPart(firstName)}${sanitizeCredentialPart(registrationNumber)}`;
 }
 
+function buildStudentUsername(studentName, classLevel, registrationNumber) {
+  const parts = [
+    sanitizeCredentialPart(studentName),
+    sanitizeCredentialPart(classLevel),
+    sanitizeCredentialPart(registrationNumber),
+  ].filter(Boolean);
+
+  return parts.join(".");
+}
+
 function getClassCode(classLevel) {
   const normalized = normalizeClassLevel(classLevel);
   const codes = {
@@ -83,11 +92,6 @@ async function generateNextRollNo(classLevel, tx) {
   `;
 
   return `${classCode}-${String(Number(row?.last_no || 0) + 1).padStart(4, "0")}`;
-}
-
-function buildStudentEmailFromRollNo(rollNo) {
-  const value = String(rollNo || "").trim().toLowerCase();
-  return value ? `${value}@students.lms` : "";
 }
 
 async function insertAuditLog(
@@ -172,7 +176,7 @@ async function findExistingUser({ email, phone, roleName }, tx) {
   return user?.id && user.role_name === roleName ? user : null;
 }
 
-async function createUser({ roleId, fullName, email, phone, passwordHash }, tx) {
+async function createUser({ roleId, fullName, username, email, phone, passwordHash }, tx) {
   const userId = crypto.randomUUID();
 
   await tx.$executeRaw`
@@ -180,6 +184,7 @@ async function createUser({ roleId, fullName, email, phone, passwordHash }, tx) 
       id,
       role_id,
       full_name,
+      username,
       email,
       phone,
       password_hash,
@@ -190,6 +195,7 @@ async function createUser({ roleId, fullName, email, phone, passwordHash }, tx) 
       ${userId}::uuid,
       ${roleId}::uuid,
       ${fullName},
+      ${username || null},
       ${email || null},
       ${phone || null},
       ${passwordHash},
@@ -199,6 +205,26 @@ async function createUser({ roleId, fullName, email, phone, passwordHash }, tx) 
   `;
 
   return userId;
+}
+
+async function createUniqueStudentUsername({ studentName, classLevel, registrationNumber }, tx) {
+  const baseUsername = buildStudentUsername(studentName, classLevel, registrationNumber);
+  const safeBase = baseUsername || sanitizeCredentialPart(registrationNumber) || crypto.randomBytes(3).toString("hex");
+
+  const [existing] = await tx.$queryRaw`
+    SELECT username
+    FROM users
+    WHERE LOWER(username) LIKE ${`${safeBase.toLowerCase()}%`}
+    ORDER BY username DESC NULLS LAST
+    LIMIT 1
+  `;
+
+  if (!existing?.username) {
+    return safeBase;
+  }
+
+  const suffix = sanitizeCredentialPart(registrationNumber) || crypto.randomBytes(2).toString("hex");
+  return `${safeBase}.${suffix}`;
 }
 
 async function createProfile(tableName, payload, tx) {
@@ -458,14 +484,14 @@ export async function POST(request, { params }) {
       studentRollNo
     );
     const [parentPasswordHash, studentPasswordHash] = await Promise.all([
-      bcrypt.hash(parentTemporaryPassword, 12),
-      bcrypt.hash(studentTemporaryPassword, 12),
+      parentTemporaryPassword,
+      studentTemporaryPassword
     ]);
     const parentContactEmail =
       submission.email || submission.parent_email || submission.parentEmail || "";
     const parentContactPhone =
       submission.phone || submission.parent_phone || submission.parentPhone || "";
-    let studentLoginEmail = "";
+    let studentLoginUsername = "";
     let parentLogin = parentContactEmail || parentContactPhone || "";
 
     await prisma.$transaction(async (tx) => {
@@ -576,12 +602,17 @@ export async function POST(request, { params }) {
         }
       }
 
-      studentLoginEmail = `${sanitizeCredentialPart(submission.student_name)}${sanitizeCredentialPart(studentRollNo)}@students.lms`;
+      studentLoginUsername = await createUniqueStudentUsername({
+        studentName: submission.student_name,
+        classLevel: submission.class_level,
+        registrationNumber: studentRollNo,
+      }, tx);
 
       const studentUserId = await createUser({
         roleId: studentRoleId,
         fullName: submission.student_name,
-        email: studentLoginEmail,
+        username: studentLoginUsername,
+        email: null,
         phone: null,
         passwordHash: studentPasswordHash,
       }, tx);
@@ -662,13 +693,13 @@ export async function POST(request, { params }) {
         await sendEmail({
           to: parentContactEmail,
           subject: "Your LMS access credentials",
-          text: `Your LMS access is ready.\n\nParent login: ${parentLogin}\nParent temporary password: ${parentTemporaryPassword}\n\nStudent login: ${studentLoginEmail}\nStudent temporary password: ${studentTemporaryPassword}\n\nLogin: ${portalUrl}`,
+          text: `Your LMS access is ready.\n\nParent login: ${parentLogin}\nParent temporary password: ${parentTemporaryPassword}\n\nStudent login: ${studentLoginUsername}\nStudent temporary password: ${studentTemporaryPassword}\n\nLogin: ${portalUrl}`,
           html: buildCredentialsEmailHtml({
             recipientName: submission.parent_name || "Parent",
             studentName: submission.student_name,
             parentLogin,
             parentPassword: parentTemporaryPassword,
-            studentLogin: studentLoginEmail,
+            studentLogin: studentLoginUsername,
             studentPassword: studentTemporaryPassword,
             portalUrl,
           }),

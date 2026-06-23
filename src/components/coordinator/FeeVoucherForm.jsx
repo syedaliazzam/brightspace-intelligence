@@ -44,20 +44,21 @@ export default function FeeVoucherForm({ leads, initialLeadId = "", showTrigger 
   }, [initialLeadId]);
 
   useEffect(() => {
-    if (open || !initialLeadId) {
-      return;
-    }
+    if (!initialLeadId || !open) return;
 
-    setForm((current) => ({
-      ...current,
-      registrationLeadId: "",
-    }));
-  }, [open, initialLeadId]);
+    setForm((current) => {
+      if (current.registrationLeadId === initialLeadId) return current;
+      return {
+        ...current,
+        registrationLeadId: initialLeadId,
+      };
+    });
+  }, [initialLeadId, open]);
 
-  const selectedLead = useMemo(
-    () => leads.find((lead) => lead.id === form.registrationLeadId),
-    [form.registrationLeadId, leads]
-  );
+  const selectedLead = useMemo(() => {
+    const selectedId = initialLeadId || form.registrationLeadId;
+    return leads.find((lead) => lead.id === selectedId) || null;
+  }, [initialLeadId, form.registrationLeadId, leads]);
   const selectedRegularFee = useMemo(() => {
     if (!selectedLead) return 0;
     const match = options.regularFees.find(
@@ -98,7 +99,7 @@ export default function FeeVoucherForm({ leads, initialLeadId = "", showTrigger 
   const admissionFeeAmount = Number(form.admissionFeeAmount || selectedOtherFee?.amount || 0);
   const discountPercent = Number(form.discountPercent || 0);
   const subtotalAmount = regularFeeAmount + admissionFeeAmount;
-  const discountAmount = subtotalAmount * (discountPercent / 100);
+  const discountAmount = regularFeeAmount * (discountPercent / 100);
   const totalAmount = subtotalAmount - discountAmount;
   const hasEligibleLead = eligibleLeads.length > 0;
 
@@ -214,6 +215,20 @@ export default function FeeVoucherForm({ leads, initialLeadId = "", showTrigger 
     await navigator.clipboard.writeText(successEmail.body_text);
   }
 
+  async function copyParentNumber() {
+    const parentNumber =
+      selectedLead?.phone ||
+      selectedLead?.parent_phone ||
+      successEmail?.recipient_phone ||
+      "";
+
+    if (!parentNumber) {
+      return;
+    }
+
+    await navigator.clipboard.writeText(parentNumber);
+  }
+
   return (
     <>
       {showTrigger ? (
@@ -258,26 +273,56 @@ export default function FeeVoucherForm({ leads, initialLeadId = "", showTrigger 
             </div>
 
             <form className="mt-6 grid gap-4 md:grid-cols-2" onSubmit={handleSubmit}>
-              <label className="block md:col-span-2">
-                <span className="mb-2 block text-sm font-medium text-slate-700">
-                  Registration lead
-                </span>
-                <select
-                  value={form.registrationLeadId}
-                  disabled={Boolean(initialLeadId)}
-                  onChange={(event) => updateField("registrationLeadId", event.target.value)}
-                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-950 outline-none transition focus:border-sky-400 focus:bg-white focus:ring-4 focus:ring-sky-100"
-                >
-                  <option value="" disabled>
-                    Select registration lead
-                  </option>
-                  {eligibleLeads.map((lead) => (
-                    <option key={lead.id} value={lead.id}>
-                      {lead.student_name} - {lead.class_level}
+              {initialLeadId && selectedLead ? (
+                <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white md:col-span-2">
+                  <div className="border-b border-slate-200 bg-slate-50 px-4 py-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-sm font-semibold text-slate-700">Selected registration lead</span>
+                      <span className="rounded-full bg-slate-950 px-3 py-1 text-xs font-semibold text-white">
+                        Locked
+                      </span>
+                    </div>
+                  </div>
+                  <div className="grid gap-0 sm:grid-cols-2 lg:grid-cols-4">
+                    <div className="border-b border-r border-slate-200 px-4 py-3">
+                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Student</p>
+                      <p className="mt-1 text-sm font-semibold text-slate-950">{selectedLead.student_name || "—"}</p>
+                    </div>
+                    <div className="border-b border-slate-200 px-4 py-3 sm:border-r">
+                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Parent</p>
+                      <p className="mt-1 text-sm font-semibold text-slate-950">{selectedLead.parent_name || "Parent pending"}</p>
+                    </div>
+                    <div className="border-b border-r border-slate-200 px-4 py-3 lg:border-b-0">
+                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Class</p>
+                      <p className="mt-1 text-sm font-semibold text-slate-950">{selectedLead.class_level || "—"}</p>
+                    </div>
+                    <div className="px-4 py-3">
+                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Contact</p>
+                      <p className="mt-1 text-sm font-semibold text-slate-950">{selectedLead.phone || selectedLead.email || "No contact"}</p>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <label className="block md:col-span-2">
+                  <span className="mb-2 block text-sm font-medium text-slate-700">
+                    Registration lead
+                  </span>
+                  <select
+                    value={form.registrationLeadId}
+                    onChange={(event) => updateField("registrationLeadId", event.target.value)}
+                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-950 outline-none transition focus:border-sky-400 focus:bg-white focus:ring-4 focus:ring-sky-100"
+                  >
+                    <option value="" disabled>
+                      Select registration lead
                     </option>
-                  ))}
-                </select>
-              </label>
+                    {eligibleLeads.map((lead) => (
+                      <option key={lead.id} value={lead.id}>
+                        {lead.student_name} - {lead.class_level}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
 
               <label className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 md:col-span-2">
                 <input
@@ -424,9 +469,10 @@ export default function FeeVoucherForm({ leads, initialLeadId = "", showTrigger 
               </label>
 
               <div className="grid gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-700 md:col-span-2 sm:grid-cols-3">
-                <p>Subtotal: <span className="font-semibold text-slate-950">PKR {subtotalAmount.toFixed(2)}</span></p>
-                <p>Discount: <span className="font-semibold text-slate-950">PKR {discountAmount.toFixed(2)}</span></p>
-                <p>Total: <span className="font-semibold text-slate-950">PKR {totalAmount.toFixed(2)}</span></p>
+                <p>Regular Fee: <span className="font-semibold text-slate-950">PKR {regularFeeAmount.toFixed(2)}</span></p>
+                <p>Other Fee: <span className="font-semibold text-slate-950">PKR {admissionFeeAmount.toFixed(2)}</span></p>
+                <p>Discount on Regular Fee: <span className="font-semibold text-slate-950">PKR {discountAmount.toFixed(2)}</span></p>
+                <p className="sm:col-span-3">Total Payable: <span className="font-semibold text-slate-950">PKR {totalAmount.toFixed(2)}</span></p>
               </div>
 
               {selectedLead ? (
@@ -477,6 +523,19 @@ export default function FeeVoucherForm({ leads, initialLeadId = "", showTrigger 
             <div className="mt-4 space-y-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
               <p><span className="font-semibold text-slate-950">Recipient:</span> {successEmail.recipient_email || "—"}</p>
               <p><span className="font-semibold text-slate-950">Subject:</span> {successEmail.subject || "—"}</p>
+              <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3">
+                <p className="text-sm text-slate-700">
+                  <span className="font-semibold text-slate-950">Parent Number:</span>{" "}
+                  {selectedLead?.phone || selectedLead?.parent_phone || "—"}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => void copyParentNumber()}
+                  className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-100"
+                >
+                  Copy Number
+                </button>
+              </div>
               <div>
                 <p className="font-semibold text-slate-950">Email Body</p>
                 <pre className="mt-2 max-h-72 overflow-auto whitespace-pre-wrap rounded-2xl border border-slate-200 bg-white p-4 text-xs text-slate-700">
@@ -503,7 +562,7 @@ export default function FeeVoucherForm({ leads, initialLeadId = "", showTrigger 
                 onClick={copyEmailBody}
                 className="rounded-2xl bg-slate-950 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800"
               >
-                Copy Email
+                Copy Message
               </button>
               {successEmail.payment_submit_url ? (
                 <a

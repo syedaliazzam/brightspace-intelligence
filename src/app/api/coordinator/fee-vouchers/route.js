@@ -398,8 +398,8 @@ function buildVoucherEmailContent({
     regularFeeAmount > 0 ? `<tr><td>Regular Fee</td><td>${regularFeeAmount}</td></tr>` : "",
     otherFeeAmount > 0 ? `<tr><td>Other Fee</td><td>${otherFeeAmount}</td></tr>` : "",
     `<tr><td>Subtotal</td><td>${Number(regularFeeAmount + otherFeeAmount).toFixed(2)}</td></tr>`,
-    `<tr><td>Discount</td><td>${discountPercent}% (${discountAmount.toFixed(2)})</td></tr>`,
-    `<tr><td>Total</td><td>${totalAmount.toFixed(2)}</td></tr>`,
+    `<tr><td>Discount on Regular Fee</td><td>${discountPercent}% (${discountAmount.toFixed(2)})</td></tr>`,
+    `<tr><td>Total Payable</td><td>${totalAmount.toFixed(2)}</td></tr>`,
     dueDate ? `<tr><td>Due Date</td><td>${dueDate}</td></tr>` : "",
     paymentMethod?.name || paymentMethodName ? `<tr><td>Payment Method</td><td>${paymentMethod?.name || paymentMethodName}</td></tr>` : "",
     paymentMethod?.bank_name ? `<tr><td>Bank Name</td><td>${paymentMethod.bank_name}</td></tr>` : "",
@@ -441,8 +441,8 @@ Voucher No: ${voucherNo}
 Regular Fee: ${regularFeeAmount > 0 ? regularFeeAmount.toFixed(2) : "0.00"}
 Other Fee: ${otherFeeAmount > 0 ? otherFeeAmount.toFixed(2) : "0.00"}
 Subtotal: ${Number(regularFeeAmount + otherFeeAmount).toFixed(2)}
-Discount: ${discountPercent}% (${discountAmount.toFixed(2)})
-Total: ${totalAmount.toFixed(2)}
+Discount on Regular Fee: ${discountPercent}% (${discountAmount.toFixed(2)})
+Total Payable: ${totalAmount.toFixed(2)}
 Due Date: ${dueDate || "-"}
 
 Payment Method: ${paymentMethod?.name || "-"}
@@ -835,7 +835,7 @@ export async function POST(request) {
       }
 
       const subtotalAmount = Number((regularFeeAmount + admissionFeeAmount).toFixed(2));
-      const discountAmount = Number(((subtotalAmount * discountPercent) / 100).toFixed(2));
+      const discountAmount = Number((regularFeeAmount * discountPercent / 100).toFixed(2));
       const totalAmount = Number((subtotalAmount - discountAmount).toFixed(2));
       if (totalAmount <= 0) {
         throw new Error("Voucher total must be greater than zero.");
