@@ -72,8 +72,8 @@ function writeNamedCache(key, payload) {
 }
 
 export default function CoordinatorDashboardPage() {
-  const [leadFilter, setLeadFilter] = useState({ search: "", status: "" });
-  const [voucherFilter, setVoucherFilter] = useState({ search: "", status: "" });
+  const [leadFilter, setLeadFilter] = useState({ search: "", status: "new_lead" });
+  const [voucherFilter, setVoucherFilter] = useState({ search: "", status: "unpaid" });
   const [voucherLeadId, setVoucherLeadId] = useState("");
   const [state, setState] = useState({
     loading: true,
@@ -324,6 +324,8 @@ export default function CoordinatorDashboardPage() {
     .filter((voucher) => {
       const search = String(voucherFilter.search || "").trim().toLowerCase();
       const status = String(voucherFilter.status || "").trim().toLowerCase();
+      const leadStatus = String(voucher.lead_status || "").toLowerCase();
+      const voucherStatus = String(voucher.voucher_status || voucher.status || "").toLowerCase();
       const haystack = [
         voucher.voucher_no,
         voucher.student_name,
@@ -331,9 +333,14 @@ export default function CoordinatorDashboardPage() {
         voucher.phone,
         voucher.email,
         voucher.amount,
-      ].join(" ").toLowerCase();
+        voucher.payment_method,
+        voucher.payment_instructions,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
       const matchesSearch = !search || haystack.includes(search);
-      const matchesStatus = !status || String(voucher.status || "").toLowerCase() === status;
+      const matchesStatus = !status || voucherStatus === status || leadStatus === status;
       return matchesSearch && matchesStatus;
     })
     .sort((a, b) => new Date(b.created_at || 0) - new Date(a.created_at || 0));
@@ -341,14 +348,6 @@ export default function CoordinatorDashboardPage() {
   return (
     <div className="space-y-6">
       <CoordinatorPortalNavbar />
-      <CoordinatorPortalSection
-        id="dashboard"
-        title="Dashboard"
-        description="Monitor intake, payments, access approvals, teacher activity, and lecture scheduling from one coordinated portal."
-        showBrand={true}
-      >
-      </CoordinatorPortalSection>
-
       {state.error ? (
         <section className="rounded-[1.75rem] border border-rose-200 bg-rose-50 p-5 text-sm text-rose-700">
           {state.error}
@@ -367,7 +366,6 @@ export default function CoordinatorDashboardPage() {
             { key: "pendingVouchers", label: "Pending vouchers", value: state.loading ? "..." : stats.pendingVouchers || 0 },
             { key: "pendingPaymentVerifications", label: "Pending payment verifications", value: state.loading ? "..." : stats.pendingPaymentVerifications || 0 },
             { key: "activeStudents", label: "Active students", value: state.loading ? "..." : stats.activeStudents || 0 },
-            { key: "lectureNeedsApproval", label: "Lecture needs approval", value: state.loading ? "..." : stats.lectureNeedsApproval || 0 },
           ]}
         />
       </CoordinatorPortalSection>
@@ -399,7 +397,7 @@ export default function CoordinatorDashboardPage() {
         <div className="space-y-4">
           <RegistrationLeadFilters
             initialSearch={leadFilter.search}
-            initialStatus={leadFilter.status}
+            initialStatus={leadFilter.status || "new_lead"}
             canSync={false}
             onFilterChange={(next) => setLeadFilter(next)}
           />
@@ -420,6 +418,7 @@ export default function CoordinatorDashboardPage() {
         <div className="space-y-4">
           <FeeVoucherFilters
             initialSearch={voucherFilter.search}
+            initialStatus={voucherFilter.status}
             onFilterChange={(next) =>
               setVoucherFilter((current) => ({
                 ...current,

@@ -652,6 +652,7 @@ export async function GET(request) {
         fv.amount,
         fv.due_date,
         fv.payment_method,
+        pm.bank_name,
         fv.payment_instructions,
         LOWER(rl.status::text) AS lead_status,
         LOWER(fv.status::text) AS voucher_status,
@@ -663,6 +664,7 @@ export async function GET(request) {
         rl.phone
       FROM fee_vouchers fv
       INNER JOIN registration_leads rl ON rl.id = fv.registration_id
+      LEFT JOIN payment_methods pm ON pm.id = fv.payment_method_id
       ${whereClause}
       ORDER BY fv.created_at DESC NULLS LAST, fv.id DESC
       `,
@@ -723,6 +725,7 @@ export async function POST(request) {
         fv.amount,
         fv.due_date,
         fv.payment_method,
+        pm.bank_name,
         fv.payment_instructions,
         LOWER(rl.status::text) AS lead_status,
         LOWER(fv.status::text) AS voucher_status,
@@ -734,6 +737,7 @@ export async function POST(request) {
         rl.phone
       FROM fee_vouchers fv
       INNER JOIN registration_leads rl ON rl.id = fv.registration_id
+      LEFT JOIN payment_methods pm ON pm.id = fv.payment_method_id
       WHERE fv.registration_id = ${registrationLeadId}::uuid
       ORDER BY fv.created_at DESC NULLS LAST, fv.id DESC
       LIMIT 1
@@ -934,6 +938,7 @@ export async function POST(request) {
           fv.total_amount,
           fv.due_date,
           fv.payment_method,
+          pm.bank_name,
           fv.payment_instructions,
           LOWER(rl.status::text) AS lead_status,
           LOWER(fv.status::text) AS voucher_status,
@@ -945,6 +950,7 @@ export async function POST(request) {
           rl.phone
         FROM fee_vouchers fv
         INNER JOIN registration_leads rl ON rl.id = fv.registration_id
+        LEFT JOIN payment_methods pm ON pm.id = fv.payment_method_id
         WHERE fv.id = ${voucherId}::uuid
         LIMIT 1
       `;

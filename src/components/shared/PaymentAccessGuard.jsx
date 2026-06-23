@@ -1,0 +1,83 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { signOut } from "next-auth/react";
+
+export default function PaymentAccessGuard({ children }) {
+  const [loading, setLoading] = useState(true);
+  const [status, setStatus] = useState({ blocked: false });
+
+  useEffect(() => {
+    let active = true;
+
+    async function load() {
+      try {
+        const response = await fetch("/api/payment-access-status", { cache: "no-store" });
+        const data = await response.json();
+        if (active) {
+          setStatus(data || { blocked: false });
+        }
+      } catch {
+        if (active) {
+          setStatus({ blocked: false });
+        }
+      } finally {
+        if (active) setLoading(false);
+      }
+    }
+
+    void load();
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="flex min-h-[50vh] items-center justify-center">
+        <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-600 shadow-sm">
+          Checking access...
+        </div>
+      </div>
+    );
+  }
+
+  if (!status.blocked) {
+    return children;
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 px-4">
+      <div className="w-full max-w-lg rounded-[2rem] border border-white/70 bg-white p-6 shadow-[0_24px_80px_-36px_rgba(15,23,42,0.35)]">
+        <p className="text-sm font-semibold uppercase tracking-[0.24em] text-rose-700">
+          Payment Due Date Passed
+        </p>
+        <h2 className="mt-3 text-2xl font-semibold tracking-tight text-slate-950">
+          Payment submission due date has passed.
+        </h2>
+        <p className="mt-3 text-sm leading-6 text-slate-600">
+          {status.message || "Please contact administration."}
+        </p>
+        {status.voucher_no ? (
+          <p className="mt-3 text-sm text-slate-700">
+            <span className="font-semibold text-slate-950">Voucher No:</span> {status.voucher_no}
+          </p>
+        ) : null}
+        {status.due_date ? (
+          <p className="mt-1 text-sm text-slate-700">
+            <span className="font-semibold text-slate-950">Due Date:</span> {String(status.due_date)}
+          </p>
+        ) : null}
+        <div className="mt-6 flex justify-end">
+          <button
+            type="button"
+            onClick={() => signOut({ callbackUrl: "/login" })}
+            className="rounded-2xl bg-slate-950 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800"
+          >
+            OK
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}

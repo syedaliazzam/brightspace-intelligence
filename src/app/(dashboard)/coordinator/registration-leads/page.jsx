@@ -98,7 +98,7 @@ export default async function CoordinatorRegistrationLeadsPage({ searchParams })
 
   const resolvedParams = await searchParams;
   const search = normalizeSearch(resolvedParams?.search);
-  const status = normalizeSearch(resolvedParams?.status).toLowerCase();
+  const status = normalizeSearch(resolvedParams?.status).toLowerCase() || "new_lead";
   const leads = await getLeads(status, search);
 
   return (

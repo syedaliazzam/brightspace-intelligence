@@ -45,6 +45,15 @@ function getDisplayStatus(voucher) {
   return voucher?.lead_status || voucher?.voucher_status || voucher?.status || "";
 }
 
+function getDisplayBankName(voucher) {
+  return (
+    voucher?.bank_name ||
+    voucher?.payment_method_details?.bank_name ||
+    voucher?.payment_method ||
+    "Payment method unavailable"
+  );
+}
+
 export default function FeeVoucherTable({ vouchers }) {
   const [selectedVoucher, setSelectedVoucher] = useState(null);
 
@@ -91,7 +100,7 @@ export default function FeeVoucherTable({ vouchers }) {
                   >
                     <td className="px-6 py-5">
                       <p className="font-semibold text-slate-950">{voucher.voucher_no}</p>
-                      <p className="mt-1 text-sm text-slate-500">{voucher.payment_method}</p>
+                      <p className="mt-1 text-sm text-slate-500">{getDisplayBankName(voucher)}</p>
                     </td>
                     <td className="px-6 py-5">
                       <p className="font-semibold text-slate-950">{voucher.student_name}</p>
@@ -165,7 +174,7 @@ export default function FeeVoucherTable({ vouchers }) {
                   <p className="text-lg font-semibold text-slate-950">{voucher.voucher_no}</p>
                   <p className="mt-1 text-sm text-slate-600">{voucher.student_name}</p>
                   <p className="mt-1 text-sm text-slate-500">
-                    {voucher.parent_name || "Parent pending"}
+                    {getDisplayBankName(voucher)}
                   </p>
                 </div>
                 <span

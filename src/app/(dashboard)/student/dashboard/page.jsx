@@ -7,6 +7,7 @@ import StudentStatsCards from "@/components/student/StudentStatsCards";
 import HomeworkList from "@/components/student/HomeworkList";
 import AttendanceSummary from "@/components/student/AttendanceSummary";
 import LMSCalendar from "@/components/calendar/LMSCalendar";
+import PaymentAccessGuard from "@/components/shared/PaymentAccessGuard";
 
 function todayDate() {
   const date = new Date();
@@ -84,7 +85,8 @@ export default function StudentDashboardPage() {
   const profile = state.profile || {};
 
   return (
-    <div className="space-y-6">
+    <PaymentAccessGuard>
+      <div className="space-y-6">
       <StudentPortalNavbar profile={profile} />
 
       <section id="dashboard" className="scroll-mt-28 rounded-[2rem] border border-white/70 bg-[linear-gradient(135deg,rgba(255,255,255,0.95),rgba(238,248,255,0.94))] p-6 shadow-[0_24px_80px_-36px_rgba(15,23,42,0.25)] sm:p-8">
@@ -147,6 +149,7 @@ export default function StudentDashboardPage() {
           <p><strong>Father phone:</strong> {profile.father_phone || "Not assigned"}</p>
         </div>
       </motion.section>
-    </div>
+      </div>
+    </PaymentAccessGuard>
   );
 }

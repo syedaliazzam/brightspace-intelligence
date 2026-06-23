@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import ChildSwitcher from "@/components/parent/ChildSwitcher";
 import ParentStatsCards from "@/components/parent/ParentStatsCards";
 import UpcomingClassesCard from "@/components/parent/UpcomingClassesCard";
+import PaymentAccessGuard from "@/components/shared/PaymentAccessGuard";
 
 export default function ParentDashboardPage() {
   const [state, setState] = useState({
@@ -39,7 +40,8 @@ export default function ParentDashboardPage() {
   }, []);
 
   return (
-    <div className="space-y-6">
+    <PaymentAccessGuard>
+      <div className="space-y-6">
       <section className="rounded-[2rem] border border-white/70 bg-[linear-gradient(135deg,rgba(255,255,255,0.94),rgba(239,248,255,0.92))] p-6 shadow-[0_24px_80px_-36px_rgba(15,23,42,0.25)] sm:p-8">
         <p className="text-sm font-semibold uppercase tracking-[0.24em] text-sky-700">Parent dashboard</p>
         <h1 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">Child learning overview</h1>
@@ -64,6 +66,7 @@ export default function ParentDashboardPage() {
       />
 
       <UpcomingClassesCard items={state.upcoming} />
-    </div>
+      </div>
+    </PaymentAccessGuard>
   );
 }

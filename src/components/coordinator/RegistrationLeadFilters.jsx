@@ -119,7 +119,7 @@ export default function RegistrationLeadFilters({
                   applyFilters(search.trim(), status);
                 }
               }}
-              placeholder="Student, parent, email, or phone"
+              placeholder="Student, class, parent, email, or phone"
               className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-950 outline-none transition focus:border-sky-400 focus:bg-white focus:ring-4 focus:ring-sky-100"
             />
           </label>

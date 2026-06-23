@@ -67,22 +67,46 @@ export async function GET() {
         LIMIT 5
       `,
       prisma.$queryRaw`
-        SELECT
-          ls.id::text AS id,
-          ls.title,
-          sub.name AS subject_name,
-          COALESCE(tu.full_name, 'Unknown teacher') AS teacher_name,
-          COALESCE(c.title, c.class_level, 'Unassigned') AS class_name,
-          ls.scheduled_start,
-          ls.scheduled_end,
-          ls.status::text AS status
-        FROM lecture_schedules ls
-        LEFT JOIN subjects sub ON sub.id = ls.subject_id
-        LEFT JOIN teacher_profiles tp ON tp.id = ls.teacher_id
-        LEFT JOIN users tu ON tu.id = tp.user_id
-        LEFT JOIN enrollments e ON e.id = ls.enrollment_id
-        LEFT JOIN courses c ON c.id = e.course_id
-        ORDER BY ls.created_at DESC NULLS LAST, ls.id DESC
+        SELECT *
+        FROM (
+          SELECT DISTINCT ON (
+            COALESCE(ls.title, ''),
+            COALESCE(ls.scheduled_start::text, ''),
+            COALESCE(ls.scheduled_end::text, ''),
+            COALESCE(sub.name, ''),
+            COALESCE(tu.full_name, ''),
+            COALESCE(c.title, ''),
+            COALESCE(c.class_level, ''),
+            COALESCE(ls.status::text, '')
+          )
+            ls.id::text AS id,
+            ls.title,
+            sub.name AS subject_name,
+            COALESCE(tu.full_name, 'Unknown teacher') AS teacher_name,
+            COALESCE(c.title, c.class_level, 'Unassigned') AS class_name,
+            ls.scheduled_start,
+            ls.scheduled_end,
+            ls.status::text AS status,
+            ls.created_at
+          FROM lecture_schedules ls
+          LEFT JOIN subjects sub ON sub.id = ls.subject_id
+          LEFT JOIN teacher_profiles tp ON tp.id = ls.teacher_id
+          LEFT JOIN users tu ON tu.id = tp.user_id
+          LEFT JOIN enrollments e ON e.id = ls.enrollment_id
+          LEFT JOIN courses c ON c.id = e.course_id
+          ORDER BY
+            COALESCE(ls.title, ''),
+            COALESCE(ls.scheduled_start::text, ''),
+            COALESCE(ls.scheduled_end::text, ''),
+            COALESCE(sub.name, ''),
+            COALESCE(tu.full_name, ''),
+            COALESCE(c.title, ''),
+            COALESCE(c.class_level, ''),
+            COALESCE(ls.status::text, ''),
+            ls.created_at DESC NULLS LAST,
+            ls.id DESC
+        ) recent_lectures
+        ORDER BY created_at DESC NULLS LAST, id DESC
         LIMIT 5
       `,
     ]);

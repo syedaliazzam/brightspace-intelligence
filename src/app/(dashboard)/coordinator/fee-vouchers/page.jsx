@@ -11,10 +11,10 @@ import prisma from "@/lib/prisma";
 const ALLOWED_ROLES = new Set(["admin", "coordinator"]);
 const VALID_VOUCHER_STATUSES = new Set([
   "unpaid",
-  "fee_submitted",
-  "fee_verified",
-  "access_granted",
+  "submitted",
+  "verified",
   "rejected",
+  "expired",
 ]);
 const ELIGIBLE_LEAD_STATUSES = new Set(["new_lead", "pending_clarification"]);
 
@@ -52,9 +52,14 @@ async function getEligibleLeads() {
   `;
 }
 
-async function getVouchers(search) {
+async function getVouchers(search, status) {
   const conditions = [];
   const values = [];
+
+  if (status && VALID_VOUCHER_STATUSES.has(status)) {
+    values.push(status);
+    conditions.push(`LOWER(fv.status::text) = $${values.length}`);
+  }
 
   if (search) {
     const term = `%${search}%`;
@@ -66,6 +71,8 @@ async function getVouchers(search) {
         OR COALESCE(rl.phone, '') ILIKE $${values.length}
         OR COALESCE(rl.email, '') ILIKE $${values.length}
         OR fv.amount::text ILIKE $${values.length}
+        OR COALESCE(fv.payment_method::text, '') ILIKE $${values.length}
+        OR COALESCE(fv.payment_instructions, '') ILIKE $${values.length}
       )`);
   }
 
@@ -75,12 +82,13 @@ async function getVouchers(search) {
 
   return prisma.$queryRawUnsafe(
     `
-    SELECT
+      SELECT
       fv.id::text AS id,
       fv.voucher_no,
       fv.amount::text AS amount,
       fv.due_date,
       fv.payment_method,
+      pm.bank_name,
       fv.payment_instructions,
       LOWER(fv.status::text) AS status,
       rl.id::text AS registration_lead_id,
@@ -90,6 +98,7 @@ async function getVouchers(search) {
       rl.phone
     FROM fee_vouchers fv
     INNER JOIN registration_leads rl ON rl.id = fv.registration_id
+    LEFT JOIN payment_methods pm ON pm.id = fv.payment_method_id
     ${whereClause}
     ORDER BY fv.created_at DESC NULLS LAST, fv.id DESC
     `,
@@ -109,9 +118,10 @@ export default async function CoordinatorFeeVouchersPage({ searchParams }) {
 
   const resolvedParams = await searchParams;
   const search = normalizeText(resolvedParams?.search);
+  const status = normalizeText(resolvedParams?.status).toLowerCase() || "unpaid";
   const [eligibleLeads, vouchers] = await Promise.all([
     getEligibleLeads(),
-    getVouchers(search),
+    getVouchers(search, status),
   ]);
 
   return (
@@ -130,7 +140,7 @@ export default async function CoordinatorFeeVouchersPage({ searchParams }) {
         </div>
       </section>
 
-      <FeeVoucherFilters initialSearch={search} />
+      <FeeVoucherFilters initialSearch={search} initialStatus={status} />
       <ShowMoreSection
         items={vouchers}
         initialCount={10}

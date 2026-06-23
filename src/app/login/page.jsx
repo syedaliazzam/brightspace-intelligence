@@ -151,7 +151,7 @@ export default function LoginPage() {
                 Sign in to your account
               </h2>
               <p className="mt-2 text-sm leading-6 text-slate-600">
-                Use your email number with your password.
+                Use your email,number with your password.
               </p>
             </div>
 
@@ -170,7 +170,7 @@ export default function LoginPage() {
                   htmlFor="identifier"
                   className="mb-2 block text-sm font-medium text-slate-700"
                 >
-                  Email
+                  Email or Phone Number
                 </label>
                 <input
                   id="identifier"

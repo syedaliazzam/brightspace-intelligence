@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 const LABELS = {
   new_lead: "New leads",
   voucher_created: "Voucher created",
-  fee_submitted: "Payment proof submitted",
+  fee_submitted: "Fee submitted",
   fee_verified: "Payment verified",
   access_granted: "LMS access granted",
   rejected: "Rejected",
@@ -73,6 +73,28 @@ function humanize(value) {
   return LABELS[text.toLowerCase()] || text.replace(/_/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
+function uniqueById(rows = []) {
+  const seen = new Set();
+  return rows.filter((row) => {
+    const key = [
+      row?.title,
+      row?.subject_name,
+      row?.teacher_name,
+      row?.class_name,
+      row?.scheduled_start,
+      row?.scheduled_end,
+      row?.status,
+    ]
+      .map((value) => String(value || "").trim().toLowerCase())
+      .join("|");
+    if (!key || seen.has(key)) {
+      return false;
+    }
+    seen.add(key);
+    return true;
+  });
+}
+
 function ReportCard({ title, description, rows, itemLabel, valueLabel }) {
   const [visibleCount, setVisibleCount] = useState(5);
 
@@ -123,6 +145,7 @@ function ReportCard({ title, description, rows, itemLabel, valueLabel }) {
 
 export default function CoordinatorReportsPanel({ data }) {
   const summary = data?.summary || data || {};
+  const recentLectures = uniqueById(data?.recentLectures || []);
   return (
     <div className="grid gap-6">
       <div className="grid gap-6 xl:grid-cols-2">
@@ -152,7 +175,7 @@ export default function CoordinatorReportsPanel({ data }) {
               <span className="text-right">Scheduled Time</span>
               <span className="text-right">Status</span>
             </div>
-            {(data?.recentLectures || []).length ? data.recentLectures.map((row) => (
+            {recentLectures.length ? recentLectures.map((row) => (
               <div key={row.id} className="grid grid-cols-[1fr_1fr_1fr_1fr_120px_110px] border-t border-slate-100 px-6 py-3 text-sm">
                 <span className="text-slate-600">{row.title}</span>
                 <span className="text-slate-600">{row.subject_name || "-"}</span>

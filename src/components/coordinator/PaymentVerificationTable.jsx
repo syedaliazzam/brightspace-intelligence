@@ -91,6 +91,12 @@ export default function PaymentVerificationTable({ items, onRefresh }) {
     }
   }
 
+  async function copyParentPhone() {
+    const phone = credentialsEmail?.parent_phone || "";
+    if (!phone) return;
+    await navigator.clipboard.writeText(phone);
+  }
+
   if (!items.length) {
     return (
       <section className="rounded-[1.75rem] border border-dashed border-slate-300 bg-white/85 p-10 text-center text-sm text-slate-500 shadow-[0_18px_60px_-36px_rgba(15,23,42,0.18)]">
@@ -272,7 +278,19 @@ export default function PaymentVerificationTable({ items, onRefresh }) {
             <div className="mt-4 space-y-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
               <p><span className="font-semibold text-slate-950">Recipient Email:</span> {credentialsEmail.recipient_email || "—"}</p>
               <p><span className="font-semibold text-slate-950">Subject:</span> {credentialsEmail.subject || "—"}</p>
-              <p><span className="font-semibold text-slate-950">Parent Phone:</span> {credentialsEmail.parent_phone || "—"}</p>
+              <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3">
+                <p className="text-sm text-slate-700">
+                  <span className="font-semibold text-slate-950">Parent Phone:</span>{" "}
+                  {credentialsEmail.parent_phone || "—"}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => void copyParentPhone()}
+                  className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-100"
+                >
+                  Copy Number
+                </button>
+              </div>
               <div>
                 <p className="font-semibold text-slate-950">Credentials Email Content</p>
                 <pre className="mt-2 max-h-72 overflow-auto whitespace-pre-wrap rounded-2xl border border-slate-200 bg-white p-4 text-xs text-slate-700">

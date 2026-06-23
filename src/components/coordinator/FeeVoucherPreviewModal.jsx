@@ -18,6 +18,12 @@ function formatDate(value) {
 }
 
 export default function FeeVoucherPreviewModal({ voucher, onClose }) {
+  const bankName =
+    voucher?.bank_name ||
+    voucher?.payment_method_details?.bank_name ||
+    voucher?.payment_method ||
+    "Payment method unavailable";
+
   return (
     <AnimatePresence>
       {voucher ? (
@@ -77,9 +83,9 @@ export default function FeeVoucherPreviewModal({ voucher, onClose }) {
               </div>
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-                  Payment method
+                  Bank name
                 </p>
-                <p className="mt-2 font-semibold text-slate-950">{voucher.payment_method}</p>
+                <p className="mt-2 font-semibold text-slate-950">{bankName}</p>
               </div>
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
