@@ -5,6 +5,7 @@ import CoordinatorStatsCards from "@/components/coordinator/CoordinatorStatsCard
 import CoordinatorPortalNavbar from "@/components/coordinator/CoordinatorPortalNavbar";
 import CoordinatorPortalSection from "@/components/coordinator/CoordinatorPortalSection";
 import ShowMoreSection from "@/components/coordinator/ShowMoreSection";
+import InterestedStudentsPanel from "@/components/coordinator/InterestedStudentsPanel";
 import RegistrationLeadFilters from "@/components/coordinator/RegistrationLeadFilters";
 import RegistrationLeadTable from "@/components/coordinator/RegistrationLeadTable";
 import FeeVoucherFilters from "@/components/coordinator/FeeVoucherFilters";
@@ -73,6 +74,7 @@ function writeNamedCache(key, payload) {
 export default function CoordinatorDashboardPage() {
   const [leadFilter, setLeadFilter] = useState({ search: "", status: "" });
   const [voucherFilter, setVoucherFilter] = useState({ search: "", status: "" });
+  const [voucherLeadId, setVoucherLeadId] = useState("");
   const [state, setState] = useState({
     loading: true,
     error: "",
@@ -80,6 +82,7 @@ export default function CoordinatorDashboardPage() {
     recentLectures: [],
     recentLeads: [],
     reports: null,
+    interestedStudents: [],
     leads: [],
     vouchers: [],
     payments: [],
@@ -107,6 +110,7 @@ export default function CoordinatorDashboardPage() {
           recentLectures: cached.recentLectures || [],
           recentLeads: cached.recentLeads || [],
           reports: cached.reports || null,
+          interestedStudents: cached.interestedStudents || [],
           leads: cached.leads || [],
           vouchers: cached.vouchers || [],
           payments: cached.payments || [],
@@ -138,6 +142,7 @@ export default function CoordinatorDashboardPage() {
             recentLectures: data.recentLectures || [],
             recentLeads: data.recentLeads || [],
             reports: data.reports || null,
+            interestedStudents: [],
             leads: [],
             vouchers: [],
             payments: [],
@@ -197,6 +202,12 @@ export default function CoordinatorDashboardPage() {
               writeNamedCache("coordinator-registration-leads", payload);
               if (active) setState((current) => ({ ...current, leads: payload.items || [] }));
             }),
+          fetch("/api/coordinator/interested-students", { cache: "no-store" })
+            .then((result) => result.json())
+            .then((payload) => {
+              writeNamedCache("coordinator-interested-students", payload);
+              if (active) setState((current) => ({ ...current, interestedStudents: payload.items || [] }));
+            }),
           fetch("/api/coordinator/fee-vouchers", { cache: "no-store" })
             .then((result) => result.json())
             .then((payload) => {
@@ -222,6 +233,7 @@ export default function CoordinatorDashboardPage() {
             recentLectures: [],
             recentLeads: [],
             reports: null,
+            interestedStudents: [],
             leads: [],
             vouchers: [],
             payments: [],
@@ -271,6 +283,24 @@ export default function CoordinatorDashboardPage() {
       throw new Error(payload?.message || "Unable to refresh payments.");
     }
     setState((current) => ({ ...current, payments: payload.items || [] }));
+  }
+
+  async function refreshLeads() {
+    const response = await fetch("/api/coordinator/registration-leads", { cache: "no-store" });
+    const payload = await response.json();
+    if (!response.ok) {
+      throw new Error(payload?.message || "Unable to refresh registration leads.");
+    }
+    setState((current) => ({ ...current, leads: payload.items || [] }));
+  }
+
+  async function refreshVouchers() {
+    const response = await fetch("/api/coordinator/fee-vouchers", { cache: "no-store" });
+    const payload = await response.json();
+    if (!response.ok) {
+      throw new Error(payload?.message || "Unable to refresh vouchers.");
+    }
+    setState((current) => ({ ...current, vouchers: payload.items || [], voucherLeads: payload.eligibleLeads || [] }));
   }
   const filteredLeads = state.leads
     .filter((lead) => {
@@ -343,6 +373,24 @@ export default function CoordinatorDashboardPage() {
       </CoordinatorPortalSection>
 
       <CoordinatorPortalSection
+        id="interested-students"
+        title="Interested Students"
+        description="Contact us inquiries awaiting registration link generation."
+        showBrand={false}
+      >
+        <InterestedStudentsPanel
+          items={state.interestedStudents}
+          onRefresh={async () => {
+            const response = await fetch("/api/coordinator/interested-students", { cache: "no-store" });
+            const payload = await response.json();
+            if (response.ok) {
+              setState((current) => ({ ...current, interestedStudents: payload.items || [] }));
+            }
+          }}
+        />
+      </CoordinatorPortalSection>
+
+      <CoordinatorPortalSection
         id="registration-leads"
         title="Registration Leads"
         description="Latest intake and pipeline summary."
@@ -357,7 +405,12 @@ export default function CoordinatorDashboardPage() {
           />
           <ShowMoreSection
             items={filteredLeads}
-            renderItems={(visibleItems) => <RegistrationLeadTable leads={visibleItems} />}
+            renderItems={(visibleItems) => (
+              <RegistrationLeadTable
+                leads={visibleItems}
+                onCreateVoucher={(lead) => setVoucherLeadId(lead?.id || "")}
+              />
+            )}
             emptyMessage="No registration leads match the current filters."
           />
         </div>
@@ -374,7 +427,15 @@ export default function CoordinatorDashboardPage() {
               }))
             }
           />
-          <FeeVoucherForm leads={state.leads} />
+          <FeeVoucherForm
+            leads={state.leads}
+            initialLeadId={voucherLeadId}
+            showTrigger={false}
+            onCreated={async () => {
+              await Promise.allSettled([refreshLeads(), refreshVouchers()]);
+            }}
+            onClose={() => setVoucherLeadId("")}
+          />
           <ShowMoreSection
             items={filteredVouchers}
             renderItems={(visibleItems) => <FeeVoucherTable vouchers={visibleItems} />}

@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 
 const NAV_ITEMS = [
   { id: "dashboard", label: "Dashboard" },
+  { id: "interested-students", label: "Interested Students" },
   { id: "registration-leads", label: "Registration Leads" },
   { id: "fee-vouchers", label: "Fee Vouchers" },
   { id: "payments", label: "Payments" },

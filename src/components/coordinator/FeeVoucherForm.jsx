@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { useRouter } from "next/navigation";
 
-export default function FeeVoucherForm({ leads }) {
+export default function FeeVoucherForm({ leads, initialLeadId = "", showTrigger = true, onCreated, onClose }) {
   const router = useRouter();
   const normalizeClassLevel = (value) =>
     String(value || "").trim().toLowerCase();
@@ -33,6 +33,26 @@ export default function FeeVoucherForm({ leads }) {
     paymentMethod: "",
     paymentInstructions: "",
   });
+
+  useEffect(() => {
+    if (!initialLeadId) return;
+    setOpen(true);
+    setForm((current) => ({
+      ...current,
+      registrationLeadId: initialLeadId,
+    }));
+  }, [initialLeadId]);
+
+  useEffect(() => {
+    if (open || !initialLeadId) {
+      return;
+    }
+
+    setForm((current) => ({
+      ...current,
+      registrationLeadId: "",
+    }));
+  }, [open, initialLeadId]);
 
   const selectedLead = useMemo(
     () => leads.find((lead) => lead.id === form.registrationLeadId),
@@ -160,6 +180,7 @@ export default function FeeVoucherForm({ leads }) {
       }
 
       setSuccessEmail(data?.email || null);
+      await onCreated?.(data);
       router.refresh();
       setForm({
         registrationLeadId: "",
@@ -195,14 +216,16 @@ export default function FeeVoucherForm({ leads }) {
 
   return (
     <>
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        disabled={pending || loadingOptions || !hasEligibleLead}
-        className="inline-flex items-center justify-center rounded-2xl bg-slate-950 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
-      >
-        Create fee voucher
-      </button>
+      {showTrigger ? (
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          disabled={pending || loadingOptions || !hasEligibleLead}
+          className="inline-flex items-center justify-center rounded-2xl bg-slate-950 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          Create fee voucher
+        </button>
+      ) : null}
 
       {open ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 px-4 py-8">
@@ -224,7 +247,10 @@ export default function FeeVoucherForm({ leads }) {
 
               <button
                 type="button"
-                onClick={() => setOpen(false)}
+                onClick={() => {
+                  setOpen(false);
+                  onClose?.();
+                }}
                 className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
               >
                 Close
@@ -238,6 +264,7 @@ export default function FeeVoucherForm({ leads }) {
                 </span>
                 <select
                   value={form.registrationLeadId}
+                  disabled={Boolean(initialLeadId)}
                   onChange={(event) => updateField("registrationLeadId", event.target.value)}
                   className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-950 outline-none transition focus:border-sky-400 focus:bg-white focus:ring-4 focus:ring-sky-100"
                 >
@@ -362,7 +389,14 @@ export default function FeeVoucherForm({ leads }) {
 
               {selectedLead ? (
                 <div className="rounded-2xl bg-slate-50 px-4 py-4 text-sm text-slate-600 md:col-span-2">
-                  <p className="font-semibold text-slate-900">{selectedLead.student_name}</p>
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="font-semibold text-slate-900">{selectedLead.student_name}</p>
+                    {initialLeadId ? (
+                      <span className="rounded-full bg-slate-950 px-3 py-1 text-xs font-semibold text-white">
+                        Selected lead locked
+                      </span>
+                    ) : null}
+                  </div>
                   <p className="mt-1">Class: {selectedLead.class_level || "—"}</p>
                   {form.regularFeeApplied ? (
                     selectedRegularFee > 0 ? (
@@ -413,7 +447,10 @@ export default function FeeVoucherForm({ leads }) {
               <div className="flex justify-end gap-3 md:col-span-2">
                 <button
                   type="button"
-                  onClick={() => setOpen(false)}
+                  onClick={() => {
+                    setOpen(false);
+                    onClose?.();
+                  }}
                   className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
                 >
                   Cancel
@@ -478,15 +515,16 @@ export default function FeeVoucherForm({ leads }) {
                   Open Payment Page
                 </a>
               ) : null}
-              <button
-                type="button"
-                onClick={() => {
-                  setSuccessEmail(null);
-                  setOpen(false);
-                }}
-                className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
-              >
-                Close
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSuccessEmail(null);
+                    setOpen(false);
+                    onClose?.();
+                  }}
+                  className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                >
+                  Close
               </button>
             </div>
           </div>

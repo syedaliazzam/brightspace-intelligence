@@ -40,7 +40,7 @@ function getDisplayStatus(lead) {
   return lead?.status || "";
 }
 
-export default function RegistrationLeadTable({ leads }) {
+export default function RegistrationLeadTable({ leads, onCreateVoucher }) {
   if (!leads.length) {
     return (
       <section className="rounded-[1.75rem] border border-dashed border-slate-300 bg-white/85 p-10 text-center text-sm text-slate-500 shadow-[0_18px_60px_-36px_rgba(15,23,42,0.18)]">
@@ -62,11 +62,16 @@ export default function RegistrationLeadTable({ leads }) {
                 <th className="px-6 py-4">Contact</th>
                 <th className="px-6 py-4">Submitted</th>
                 <th className="px-6 py-4">Status</th>
+                <th className="px-6 py-4 text-right">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {leads.map((lead, index) => {
                 const displayStatus = getDisplayStatus(lead);
+                const canCreateVoucher =
+                  lead?.can_create_voucher === true ||
+                  lead?.canCreateVoucher === true ||
+                  lead?.status === "new_lead";
 
                 return (
                 <motion.tr
@@ -101,6 +106,19 @@ export default function RegistrationLeadTable({ leads }) {
                     >
                       {formatStatus(displayStatus)}
                     </span>
+                  </td>
+                  <td className="px-6 py-5 text-right">
+                    <div className="flex flex-wrap justify-end gap-2">
+                      {canCreateVoucher ? (
+                        <button
+                          type="button"
+                          onClick={() => onCreateVoucher?.(lead)}
+                          className="rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800"
+                        >
+                          Create Voucher
+                        </button>
+                      ) : null}
+                    </div>
                   </td>
                 </motion.tr>
                 );
@@ -154,6 +172,17 @@ export default function RegistrationLeadTable({ leads }) {
                 <dd className="mt-1 text-slate-800">{formatDate(lead.submitted_at)}</dd>
               </div>
             </dl>
+            <div className="mt-4 flex flex-wrap gap-2">
+              {(lead?.can_create_voucher === true || lead?.canCreateVoucher === true || lead?.status === "new_lead") ? (
+                <button
+                  type="button"
+                  onClick={() => onCreateVoucher?.(lead)}
+                  className="rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800"
+                >
+                  Create Voucher
+                </button>
+              ) : null}
+            </div>
           </motion.article>
           );
         })}

@@ -27,6 +27,7 @@ export async function POST(request) {
     const address = normalizeText(body?.address);
     const city = normalizeText(body?.city);
     const notes = normalizeText(body?.notes);
+    const leadToken = normalizeText(body?.leadToken);
 
     if (!studentName) return json(false, "Student name is required.", 400);
     if (!parentName) return json(false, "Parent name is required.", 400);
@@ -36,7 +37,23 @@ export async function POST(request) {
     if (!Number.isFinite(age) || age <= 0) return json(false, "Student age must be a valid number.", 400);
     if (!classLevel) return json(false, "Class level is required.", 400);
 
-    await prisma.$executeRaw`
+    if (leadToken) {
+      const [linkedLead] = await prisma.$queryRaw`
+        SELECT
+          id::text AS id,
+          status::text AS status,
+          registration_lead_id::text AS registration_lead_id
+        FROM interested_students
+        WHERE registration_token = ${leadToken}
+        LIMIT 1
+      `;
+
+      if (linkedLead?.status === "registered" && linkedLead?.registration_lead_id) {
+        return json(true, "Registration already completed.", 200);
+      }
+    }
+
+    const [createdLead] = await prisma.$queryRaw`
       INSERT INTO registration_leads (
         student_name,
         parent_name,
@@ -50,7 +67,8 @@ export async function POST(request) {
         notes,
         source,
         status,
-        created_at
+        created_at,
+        updated_at
       )
       VALUES (
         ${studentName},
@@ -65,9 +83,22 @@ export async function POST(request) {
         ${notes || null},
         ${"website_registration"},
         CAST(${ "new_lead" } AS registration_status),
+        NOW(),
         NOW()
       )
+      RETURNING id::text AS id
     `;
+
+    if (leadToken && createdLead?.id) {
+      await prisma.$executeRaw`
+        UPDATE interested_students
+        SET
+          status = 'registered',
+          registration_lead_id = ${createdLead.id}::uuid,
+          updated_at = NOW()
+        WHERE registration_token = ${leadToken}
+      `;
+    }
 
     return json(true, "Registration submitted successfully. Our coordinator will contact you soon.", 201);
   } catch (error) {

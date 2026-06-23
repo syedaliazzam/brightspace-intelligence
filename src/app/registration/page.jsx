@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
 import { ALLOWED_CLASS_LEVELS } from "@/lib/academicCatalog";
 
@@ -49,6 +50,52 @@ export default function RegistrationPage() {
   const [errors, setErrors] = useState(initialErrors);
   const [pending, setPending] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
+  const [leadToken, setLeadToken] = useState("");
+  const [tokenLoading, setTokenLoading] = useState(false);
+  const searchParams = useSearchParams();
+
+  useEffect(() => {
+    const token = searchParams?.get("leadToken") || "";
+    if (!token) return;
+
+    setLeadToken(token);
+    setTokenLoading(true);
+
+    let active = true;
+
+    async function loadLead() {
+      try {
+        const response = await fetch(`/api/public/interested-students/${encodeURIComponent(token)}`, {
+          cache: "no-store",
+        });
+        const data = await response.json();
+
+        if (!response.ok || !data?.item) {
+          return;
+        }
+
+        if (active) {
+          setForm((current) => ({
+            ...current,
+            studentName: data.item.student_name || current.studentName,
+            parentName: data.item.parent_name || current.parentName,
+            parentEmail: data.item.email || current.parentEmail,
+            phone: data.item.phone || current.phone,
+          }));
+        }
+      } catch {
+        // Keep manual registration working even if token prefill fails.
+      } finally {
+        if (active) setTokenLoading(false);
+      }
+    }
+
+    void loadLead();
+
+    return () => {
+      active = false;
+    };
+  }, [searchParams]);
 
   function updateField(name, value) {
     setForm((current) => ({ ...current, [name]: value }));
@@ -97,6 +144,7 @@ export default function RegistrationPage() {
           address: form.address,
           city: form.city,
           notes: form.notes,
+          leadToken,
         }),
       });
       const data = await response.json();
@@ -208,8 +256,8 @@ export default function RegistrationPage() {
                 <label className="mb-2 block text-sm font-medium text-slate-700" htmlFor="notes">Notes</label>
                 <textarea id="notes" rows={4} value={form.notes} onChange={(event) => updateField("notes", event.target.value)} className={inputClass(false)} />
               </div>
-              <motion.button type="submit" whileHover={{ y: -1 }} whileTap={{ scale: 0.99 }} disabled={pending} className="inline-flex w-full items-center justify-center rounded-2xl bg-slate-950 px-4 py-3.5 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-70 sm:col-span-2">
-                {pending ? "Submitting..." : "Submit registration"}
+              <motion.button type="submit" whileHover={{ y: -1 }} whileTap={{ scale: 0.99 }} disabled={pending || tokenLoading} className="inline-flex w-full items-center justify-center rounded-2xl bg-slate-950 px-4 py-3.5 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-70 sm:col-span-2">
+                {pending ? "Submitting..." : tokenLoading ? "Loading prefill..." : "Submit registration"}
               </motion.button>
 
               <div className="sm:col-span-2 text-center text-sm text-slate-600">
