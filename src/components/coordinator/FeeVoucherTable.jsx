@@ -10,11 +10,20 @@ const STATUS_STYLES = {
   verified: "bg-emerald-50 text-emerald-700",
   rejected: "bg-rose-50 text-rose-700",
   expired: "bg-violet-50 text-violet-700",
+  new_lead: "bg-sky-50 text-sky-700",
+  voucher_created: "bg-amber-50 text-amber-700",
+  fee_submitted: "bg-violet-50 text-violet-700",
+  fee_verified: "bg-emerald-50 text-emerald-700",
+  access_granted: "bg-teal-50 text-teal-700",
+  pending_clarification: "bg-orange-50 text-orange-700",
 };
 
 function formatStatus(value) {
-  const text = String(value || "");
-  return text ? text[0].toUpperCase() + text.slice(1) : "Unknown";
+  return String(value || "")
+    .split("_")
+    .filter(Boolean)
+    .map((part) => part[0].toUpperCase() + part.slice(1))
+    .join(" ");
 }
 
 function formatDate(value) {
@@ -30,6 +39,10 @@ function formatDate(value) {
   return new Intl.DateTimeFormat("en-US", {
     dateStyle: "medium",
   }).format(date);
+}
+
+function getDisplayStatus(voucher) {
+  return voucher?.lead_status || voucher?.voucher_status || voucher?.status || "";
 }
 
 export default function FeeVoucherTable({ vouchers }) {
@@ -67,6 +80,9 @@ export default function FeeVoucherTable({ vouchers }) {
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {vouchers.map((voucher, index) => (
+                  (() => {
+                    const displayStatus = getDisplayStatus(voucher);
+                    return (
                   <motion.tr
                     key={voucher.id}
                     initial={{ opacity: 0, y: 10 }}
@@ -92,10 +108,10 @@ export default function FeeVoucherTable({ vouchers }) {
                     <td className="px-6 py-5">
                       <span
                         className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${
-                          STATUS_STYLES[voucher.status] || "bg-slate-100 text-slate-700"
+                          STATUS_STYLES[displayStatus] || "bg-slate-100 text-slate-700"
                         }`}
                       >
-                        {formatStatus(voucher.status)}
+                        {formatStatus(displayStatus)}
                       </span>
                     </td>
                     <td className="px-6 py-5">
@@ -124,6 +140,8 @@ export default function FeeVoucherTable({ vouchers }) {
                       </div>
                     </td>
                   </motion.tr>
+                    );
+                  })()
                 ))}
               </tbody>
             </table>
@@ -132,6 +150,9 @@ export default function FeeVoucherTable({ vouchers }) {
 
         <div className="grid gap-4 lg:hidden">
           {vouchers.map((voucher, index) => (
+            (() => {
+              const displayStatus = getDisplayStatus(voucher);
+              return (
             <motion.article
               key={voucher.id}
               initial={{ opacity: 0, y: 10 }}
@@ -149,10 +170,10 @@ export default function FeeVoucherTable({ vouchers }) {
                 </div>
                 <span
                   className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${
-                    STATUS_STYLES[voucher.status] || "bg-slate-100 text-slate-700"
+                    STATUS_STYLES[displayStatus] || "bg-slate-100 text-slate-700"
                   }`}
                 >
-                  {formatStatus(voucher.status)}
+                  {formatStatus(displayStatus)}
                 </span>
               </div>
 
@@ -186,6 +207,8 @@ export default function FeeVoucherTable({ vouchers }) {
                 </button>
               </div>
             </motion.article>
+              );
+            })()
           ))}
         </div>
       </section>

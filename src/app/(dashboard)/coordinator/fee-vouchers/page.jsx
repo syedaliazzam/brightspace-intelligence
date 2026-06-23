@@ -11,10 +11,10 @@ import prisma from "@/lib/prisma";
 const ALLOWED_ROLES = new Set(["admin", "coordinator"]);
 const VALID_VOUCHER_STATUSES = new Set([
   "unpaid",
-  "submitted",
-  "verified",
+  "fee_submitted",
+  "fee_verified",
+  "access_granted",
   "rejected",
-  "expired",
 ]);
 const ELIGIBLE_LEAD_STATUSES = new Set(["new_lead", "pending_clarification"]);
 
@@ -52,14 +52,9 @@ async function getEligibleLeads() {
   `;
 }
 
-async function getVouchers(status, search) {
+async function getVouchers(search) {
   const conditions = [];
   const values = [];
-
-  if (status && VALID_VOUCHER_STATUSES.has(status)) {
-    values.push(status);
-    conditions.push(`LOWER(fv.status::text) = $${values.length}`);
-  }
 
   if (search) {
     const term = `%${search}%`;
@@ -114,10 +109,9 @@ export default async function CoordinatorFeeVouchersPage({ searchParams }) {
 
   const resolvedParams = await searchParams;
   const search = normalizeText(resolvedParams?.search);
-  const status = normalizeText(resolvedParams?.status).toLowerCase();
   const [eligibleLeads, vouchers] = await Promise.all([
     getEligibleLeads(),
-    getVouchers(status, search),
+    getVouchers(search),
   ]);
 
   return (
@@ -136,7 +130,7 @@ export default async function CoordinatorFeeVouchersPage({ searchParams }) {
         </div>
       </section>
 
-      <FeeVoucherFilters initialSearch={search} initialStatus={status} />
+      <FeeVoucherFilters initialSearch={search} />
       <ShowMoreSection
         items={vouchers}
         initialCount={10}

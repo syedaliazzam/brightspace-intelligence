@@ -6,7 +6,6 @@ import { auth } from "@/lib/auth";
 import { buildCredentialsEmailHtml, getAppUrl, sendEmail } from "@/lib/email";
 import { normalizeClassLevel } from "@/lib/academicCatalog";
 import prisma from "@/lib/prisma";
-import { generatePassword } from "@/lib/generatePassword";
 
 const ALLOWED_ROLES = new Set(["admin", "coordinator"]);
 const TRANSACTION_OPTIONS = { maxWait: 10000, timeout: 30000 };
@@ -38,6 +37,19 @@ function splitName(fullName) {
     firstName: parts[0] || "",
     lastName: parts.slice(1).join(" "),
   };
+}
+
+function sanitizeCredentialPart(value) {
+  return normalizeText(value).toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
+function buildParentPassword(parentName, registrationNumber) {
+  return `${sanitizeCredentialPart(parentName)}${sanitizeCredentialPart(registrationNumber)}`;
+}
+
+function buildStudentPassword(studentName, registrationNumber) {
+  const { firstName } = splitName(studentName);
+  return `${sanitizeCredentialPart(firstName)}${sanitizeCredentialPart(registrationNumber)}`;
 }
 
 function getClassCode(classLevel) {
@@ -416,18 +428,45 @@ export async function POST(request, { params }) {
           tx
         );
       }, TRANSACTION_OPTIONS);
+
+      if (submission.email) {
+        try {
+          const portalUrl = getAppUrl()
+            ? `${getAppUrl().replace(/\/+$/, "")}/login`
+            : "http://localhost:3000/login";
+          await sendEmail({
+            to: submission.email,
+            subject: "Payment rejected",
+            text: `Your payment submission for voucher ${submission.voucher_no} was rejected.\n\nReason: ${rejectionReason}\n\nPlease contact support if you need help.\n\nLogin: ${portalUrl}`,
+            html: `<div style="font-family:Arial,sans-serif;color:#0f172a;"><h2>Payment Rejected</h2><p>Your payment submission for voucher <strong>${submission.voucher_no}</strong> was rejected.</p><p><strong>Reason:</strong> ${rejectionReason}</p><p>Please contact support if you need help.</p><p><a href="${portalUrl}">Open LMS</a></p></div>`,
+          });
+        } catch (emailError) {
+          console.error("SendGrid payment rejection email failed:", emailError);
+        }
+      }
       return json("Payment rejected.", 200);
     }
 
     // APPROVE FLOW
-    const parentTemporaryPassword = generatePassword();
-    const studentTemporaryPassword = generatePassword();
+    const studentRollNo = await generateNextRollNo(submission.class_level, prisma);
+    const parentTemporaryPassword = buildParentPassword(
+      submission.parent_name || `${submission.student_name} Parent`,
+      studentRollNo
+    );
+    const studentTemporaryPassword = buildStudentPassword(
+      submission.student_name,
+      studentRollNo
+    );
     const [parentPasswordHash, studentPasswordHash] = await Promise.all([
       bcrypt.hash(parentTemporaryPassword, 12),
       bcrypt.hash(studentTemporaryPassword, 12),
     ]);
+    const parentContactEmail =
+      submission.email || submission.parent_email || submission.parentEmail || "";
+    const parentContactPhone =
+      submission.phone || submission.parent_phone || submission.parentPhone || "";
     let studentLoginEmail = "";
-    let parentLogin = submission.email || submission.phone || "";
+    let parentLogin = parentContactEmail || parentContactPhone || "";
 
     await prisma.$transaction(async (tx) => {
       await tx.$executeRaw`
@@ -469,8 +508,8 @@ export async function POST(request, { params }) {
       const studentRoleId = await getRoleId("student", tx);
 
       const existingParent = await findExistingUser({
-        email: submission.email,
-        phone: submission.phone,
+        email: parentContactEmail,
+        phone: parentContactPhone,
         roleName: "parent",
       }, tx);
 
@@ -483,16 +522,16 @@ export async function POST(request, { params }) {
         parentUserId = await createUser({
           roleId: parentRoleId,
           fullName: submission.parent_name || `${submission.student_name} Parent`,
-          email: submission.email,
-          phone: submission.phone,
+          email: parentContactEmail,
+          phone: parentContactPhone,
           passwordHash: parentPasswordHash,
         }, tx);
 
         parentProfileId = await createProfile("parent_profiles", {
           userId: parentUserId,
           fullName: submission.parent_name || `${submission.student_name} Parent`,
-          email: submission.email,
-          phone: submission.phone,
+          email: parentContactEmail,
+          phone: parentContactPhone,
           registrationLeadId: submission.registration_lead_id,
         }, tx);
 
@@ -510,6 +549,8 @@ export async function POST(request, { params }) {
           UPDATE users
           SET
             password_hash = ${parentPasswordHash},
+            email = ${parentContactEmail || null},
+            phone = ${parentContactPhone || null},
             status = 'active'::user_status,
             must_change_password = TRUE,
             updated_at = NOW()
@@ -528,15 +569,14 @@ export async function POST(request, { params }) {
           parentProfileId = await createProfile("parent_profiles", {
             userId: parentUserId,
             fullName: submission.parent_name || `${submission.student_name} Parent`,
-            email: submission.email,
-            phone: submission.phone,
+            email: parentContactEmail,
+            phone: parentContactPhone,
             registrationLeadId: submission.registration_lead_id,
           }, tx);
         }
       }
 
-      const studentRollNo = await generateNextRollNo(submission.class_level, tx);
-      studentLoginEmail = buildStudentEmailFromRollNo(studentRollNo);
+      studentLoginEmail = `${sanitizeCredentialPart(submission.student_name)}${sanitizeCredentialPart(studentRollNo)}@students.lms`;
 
       const studentUserId = await createUser({
         roleId: studentRoleId,
@@ -587,8 +627,8 @@ export async function POST(request, { params }) {
 
       await insertCredentialDispatchLog({
         userId: parentUserId,
-        channel: submission.email ? "sendgrid_email" : "whatsapp_placeholder",
-        recipient: submission.email || submission.phone || null,
+        channel: parentContactEmail ? "sendgrid_email" : "whatsapp_placeholder",
+        recipient: parentContactEmail || parentContactPhone || null,
         status: "pending_manual_dispatch",
         message: "Parent credentials queued for SendGrid dispatch.",
         metadata: { registrationLeadId: submission.registration_lead_id, voucherNo: submission.voucher_no },
@@ -596,8 +636,8 @@ export async function POST(request, { params }) {
 
       await insertCredentialDispatchLog({
         userId: studentUserId,
-        channel: submission.email ? "sendgrid_email_parent_delivery" : "parent_delivery_placeholder",
-        recipient: submission.email || submission.phone || null,
+        channel: parentContactEmail ? "sendgrid_email_parent_delivery" : "parent_delivery_placeholder",
+        recipient: parentContactEmail || parentContactPhone || null,
         status: "pending_manual_dispatch",
         message: "Student credentials queued for parent delivery.",
         metadata: { registrationLeadId: submission.registration_lead_id, voucherNo: submission.voucher_no },
@@ -613,14 +653,14 @@ export async function POST(request, { params }) {
       );
     }, TRANSACTION_OPTIONS);
 
-    if (submission.email) {
+    if (parentContactEmail) {
       try {
         const portalUrl = getAppUrl()
           ? `${getAppUrl().replace(/\/+$/, "")}/login`
           : "http://localhost:3000/login";
 
         await sendEmail({
-          to: submission.email,
+          to: parentContactEmail,
           subject: "Your LMS access credentials",
           text: `Your LMS access is ready.\n\nParent login: ${parentLogin}\nParent temporary password: ${parentTemporaryPassword}\n\nStudent login: ${studentLoginEmail}\nStudent temporary password: ${studentTemporaryPassword}\n\nLogin: ${portalUrl}`,
           html: buildCredentialsEmailHtml({

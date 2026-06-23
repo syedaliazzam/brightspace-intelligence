@@ -80,7 +80,15 @@ export async function GET(request) {
         ELSE false
       END AS can_create_voucher
     FROM registration_leads rl
-    LEFT JOIN fee_vouchers fv ON fv.registration_id = rl.id
+    LEFT JOIN LATERAL (
+      SELECT
+        fv_inner.id,
+        fv_inner.status
+      FROM fee_vouchers fv_inner
+      WHERE fv_inner.registration_id = rl.id
+      ORDER BY fv_inner.created_at DESC NULLS LAST, fv_inner.id DESC
+      LIMIT 1
+    ) fv ON true
     ${whereClause}
     ORDER BY rl.created_at DESC NULLS LAST, rl.id DESC
       `,

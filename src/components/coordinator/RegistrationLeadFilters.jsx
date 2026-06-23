@@ -8,7 +8,6 @@ const STATUS_OPTIONS = [
   { label: "New lead", value: "new_lead" },
   { label: "Voucher created", value: "voucher_created" },
   { label: "Fee submitted", value: "fee_submitted" },
-  { label: "Fee verified", value: "fee_verified" },
   { label: "Access granted", value: "access_granted" },
   { label: "Rejected", value: "rejected" },
   { label: "Pending clarification", value: "pending_clarification" },

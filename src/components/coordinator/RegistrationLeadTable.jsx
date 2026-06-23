@@ -37,10 +37,6 @@ function formatDate(value) {
 }
 
 function getDisplayStatus(lead) {
-  if (lead?.status === "voucher_created" && !lead?.has_voucher) {
-    return "new_lead";
-  }
-
   return lead?.status || "";
 }
 

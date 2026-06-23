@@ -292,8 +292,8 @@ export default function CoordinatorDashboardPage() {
 
   const filteredVouchers = state.vouchers
     .filter((voucher) => {
-      const search = voucherFilter.search.trim().toLowerCase();
-      const status = voucherFilter.status.trim().toLowerCase();
+      const search = String(voucherFilter.search || "").trim().toLowerCase();
+      const status = String(voucherFilter.status || "").trim().toLowerCase();
       const haystack = [
         voucher.voucher_no,
         voucher.student_name,
@@ -367,8 +367,12 @@ export default function CoordinatorDashboardPage() {
         <div className="space-y-4">
           <FeeVoucherFilters
             initialSearch={voucherFilter.search}
-            initialStatus={voucherFilter.status}
-            onFilterChange={(next) => setVoucherFilter(next)}
+            onFilterChange={(next) =>
+              setVoucherFilter((current) => ({
+                ...current,
+                ...next,
+              }))
+            }
           />
           <FeeVoucherForm leads={state.leads} />
           <ShowMoreSection

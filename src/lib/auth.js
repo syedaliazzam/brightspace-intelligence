@@ -25,6 +25,15 @@ function normalizeIdentifier(value) {
   return trimmed.replace(/\s+/g, "").replace(/[-()]/g, "");
 }
 
+function isPastDueDate(value) {
+  if (!value) return false;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return false;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return date < today;
+}
+
 function toAuthError(code) {
   const error = new Error(code);
   error.code = code;
@@ -115,6 +124,24 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
   if (!roleToDashboard[role]) {
     return null;
+  }
+
+  if (role === "student") {
+    const dueRows = role === "student"
+      ? await prisma.$queryRaw`
+          SELECT fv.due_date
+          FROM fee_vouchers fv
+          INNER JOIN student_profiles sp ON sp.id = fv.student_id
+          WHERE sp.user_id = ${user.id}::uuid
+            AND LOWER(fv.status::text) IN ('unpaid', 'rejected', 'submitted')
+          ORDER BY fv.due_date ASC NULLS LAST, fv.created_at DESC
+          LIMIT 1
+        `
+      : [];
+
+    if (isPastDueDate(dueRows?.[0]?.due_date)) {
+      return null;
+    }
   }
 
   return {
