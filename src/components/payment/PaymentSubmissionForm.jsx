@@ -75,8 +75,16 @@ export default function PaymentSubmissionForm({ voucher }) {
             </p>
           </div>
           <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Class level</p>
+            <p className="mt-2 text-base font-semibold text-slate-950">
+              {voucher.class_level || "Not provided"}
+            </p>
+          </div>
+          <div>
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Amount</p>
-            <p className="mt-2 text-base font-semibold text-slate-950">PKR {voucher.amount}</p>
+            <p className="mt-2 text-base font-semibold text-slate-950">
+              PKR {Number(voucher.total_amount || voucher.amount || 0).toFixed(2)}
+            </p>
           </div>
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Due date</p>
@@ -84,7 +92,33 @@ export default function PaymentSubmissionForm({ voucher }) {
           </div>
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Payment method</p>
-            <p className="mt-2 text-base font-semibold text-slate-950">{voucher.payment_method}</p>
+            <p className="mt-2 text-base font-semibold text-slate-950">
+              {voucher.payment_method_details?.name || voucher.payment_method || "Not provided"}
+            </p>
+            {voucher.payment_method_details ? (
+              <div className="mt-3 space-y-2 rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-700">
+                {voucher.payment_method_details.bank_name ? (
+                  <p><span className="font-semibold text-slate-950">Bank Name:</span> {voucher.payment_method_details.bank_name}</p>
+                ) : null}
+                {voucher.payment_method_details.account_title ? (
+                  <p><span className="font-semibold text-slate-950">Account Title:</span> {voucher.payment_method_details.account_title}</p>
+                ) : null}
+                {voucher.payment_method_details.account_number ? (
+                  <p><span className="font-semibold text-slate-950">Account Number:</span> {voucher.payment_method_details.account_number}</p>
+                ) : null}
+                {voucher.payment_method_details.iban ? (
+                  <p><span className="font-semibold text-slate-950">IBAN:</span> {voucher.payment_method_details.iban}</p>
+                ) : null}
+                {voucher.payment_method_details.branch_code ? (
+                  <p><span className="font-semibold text-slate-950">Branch Code:</span> {voucher.payment_method_details.branch_code}</p>
+                ) : null}
+                {voucher.payment_method_details.instructions ? (
+                  <p className="whitespace-pre-line">
+                    <span className="font-semibold text-slate-950">Instructions:</span> {voucher.payment_method_details.instructions}
+                  </p>
+                ) : null}
+              </div>
+            ) : null}
           </div>
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Instructions</p>
@@ -122,6 +156,32 @@ export default function PaymentSubmissionForm({ voucher }) {
             />
           </label>
 
+          <div className="grid gap-4 sm:grid-cols-2">
+            <label className="block">
+              <span className="mb-2 block text-sm font-medium text-slate-700">Payer email</span>
+              <input
+                type="email"
+                name="payerEmail"
+                disabled={submissionLocked || pending}
+                className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-950 outline-none transition focus:border-sky-400 focus:bg-white focus:ring-4 focus:ring-sky-100 disabled:opacity-60"
+                placeholder="payer@example.com"
+                required
+              />
+            </label>
+
+            <label className="block">
+              <span className="mb-2 block text-sm font-medium text-slate-700">Payer phone</span>
+              <input
+                type="tel"
+                name="payerPhone"
+                disabled={submissionLocked || pending}
+                className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-950 outline-none transition focus:border-sky-400 focus:bg-white focus:ring-4 focus:ring-sky-100 disabled:opacity-60"
+                placeholder="03xx-xxxxxxx"
+                required
+              />
+            </label>
+          </div>
+
           <label className="block">
             <span className="mb-2 block text-sm font-medium text-slate-700">Transaction ID</span>
             <input
@@ -138,26 +198,26 @@ export default function PaymentSubmissionForm({ voucher }) {
             <label className="block">
               <span className="mb-2 block text-sm font-medium text-slate-700">Paid amount</span>
               <input
-                type="number"
-                min="1"
-                step="0.01"
-                name="paidAmount"
-                disabled={submissionLocked || pending}
-                className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-950 outline-none transition focus:border-sky-400 focus:bg-white focus:ring-4 focus:ring-sky-100 disabled:opacity-60"
-                placeholder="5000"
-                required
-              />
+              type="number"
+              min="1"
+              step="0.01"
+              name="paidAmount"
+              disabled={submissionLocked || pending}
+              className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-950 outline-none transition focus:border-sky-400 focus:bg-white focus:ring-4 focus:ring-sky-100 disabled:opacity-60"
+              placeholder="5000"
+              required
+            />
             </label>
 
             <label className="block">
-              <span className="mb-2 block text-sm font-medium text-slate-700">Paid at</span>
-              <input
-                type="datetime-local"
-                name="paidAt"
-                disabled={submissionLocked || pending}
-                className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-950 outline-none transition focus:border-sky-400 focus:bg-white focus:ring-4 focus:ring-sky-100 disabled:opacity-60"
-                required
-              />
+            <span className="mb-2 block text-sm font-medium text-slate-700">Paid at</span>
+            <input
+              type="datetime-local"
+              name="paidAt"
+              disabled={submissionLocked || pending}
+              className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-950 outline-none transition focus:border-sky-400 focus:bg-white focus:ring-4 focus:ring-sky-100 disabled:opacity-60"
+              required
+            />
             </label>
           </div>
 

@@ -2,7 +2,7 @@ import crypto from "crypto";
 import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { buildFeeVoucherEmailHtml, sendEmail, getAppUrl } from "@/lib/email";
+import { sendEmail } from "@/lib/email";
 import prisma from "@/lib/prisma";
 import { generateVoucherNumber } from "@/lib/voucherNumber";
 
@@ -55,6 +55,10 @@ async function getTableColumns(tableName, tx = prisma) {
 
 function normalizeEnumValue(value) {
   return normalizeText(value).toLowerCase().replace(/\s+/g, " ");
+}
+
+function normalizeClassLevel(value) {
+  return String(value || "").trim().toLowerCase();
 }
 
 async function getEnumLabels(typeName, tx = prisma) {
@@ -122,6 +126,26 @@ async function getRegularFeeAmount(classLevel, tx = prisma) {
   `;
 
   return Number(row?.amount || 0);
+}
+
+async function getRegularFeeById(regularFeeId, tx = prisma) {
+  if (!regularFeeId) {
+    return null;
+  }
+
+  const [row] = await tx.$queryRaw`
+    SELECT
+      id::text AS id,
+      class_level,
+      name,
+      amount::text AS amount,
+      status
+    FROM regular_fee
+    WHERE id = ${regularFeeId}::uuid
+    LIMIT 1
+  `;
+
+  return row || null;
 }
 
 async function getDiscountById(discountId, tx = prisma) {
@@ -274,6 +298,170 @@ async function insertAuditLog(actorUserId, entityId, action, description, metada
   `;
 }
 
+async function insertOutboundMessage({
+  voucherId,
+  recipientEmail,
+  subject,
+  body,
+  bodyText,
+  paymentSubmitUrl,
+  createdBy,
+  tx,
+}) {
+  const columns = await getTableColumns("outbound_messages", tx);
+  if (!Object.keys(columns).length) {
+    return null;
+  }
+
+  const insertColumns = [];
+  const insertValues = [];
+  const push = (name, value) => {
+    if (!columns[name]) {
+      return;
+    }
+    insertColumns.push(Prisma.raw(`"${name}"`));
+    if (name === "id" || name.endsWith("_id") || name === "created_by") {
+      insertValues.push({ value: value ?? null, castType: "uuid" });
+      return;
+    }
+    insertValues.push(Prisma.sql`${value}`);
+  };
+
+  const messageId = crypto.randomUUID();
+  push("id", messageId);
+  push("message_type", "voucher_created");
+  push("related_entity_type", "fee_voucher");
+  push("related_entity_id", voucherId);
+  push("recipient_email", recipientEmail);
+  push("subject", subject);
+  push("body", body);
+  push("body_text", bodyText || "");
+  push("payment_submit_url", paymentSubmitUrl || "");
+  if (columns.created_by) {
+    push("created_by", createdBy ?? null);
+  }
+  push("sent_status", "pending");
+  push("created_at", new Date());
+  push("updated_at", new Date());
+
+  if (!insertColumns.length) {
+    return null;
+  }
+
+  await tx.$executeRaw`
+    INSERT INTO outbound_messages (${Prisma.join(insertColumns, ", ")})
+    VALUES (${Prisma.join(
+      insertValues.map((item) => {
+        if (item && typeof item === "object" && item.castType === "uuid") {
+          return Prisma.sql`${item.value ?? null}::uuid`;
+        }
+        return Prisma.sql`${item}`;
+      }),
+      ", "
+    )})
+  `;
+
+  return {
+    id: messageId,
+    recipient_email: recipientEmail,
+    subject,
+    body,
+    body_text: bodyText || "",
+    payment_submit_url: paymentSubmitUrl || "",
+    sent_status: "pending",
+  };
+}
+
+function buildVoucherEmailContent({
+  studentName,
+  parentName,
+  classLevel,
+  voucherNo,
+  regularFeeAmount,
+  otherFeeAmount,
+  discountPercent,
+  discountAmount,
+  totalAmount,
+  dueDate,
+  paymentMethod,
+  paymentInstructions,
+  supportEmail,
+  supportPhone,
+  paymentSubmitUrl,
+  paymentMethodName,
+}) {
+  const details = [
+    studentName ? `<tr><td>Student</td><td>${studentName}</td></tr>` : "",
+    parentName ? `<tr><td>Parent</td><td>${parentName}</td></tr>` : "",
+    classLevel ? `<tr><td>Class</td><td>${classLevel}</td></tr>` : "",
+    `<tr><td>Voucher No</td><td>${voucherNo}</td></tr>`,
+    regularFeeAmount > 0 ? `<tr><td>Regular Fee</td><td>${regularFeeAmount}</td></tr>` : "",
+    otherFeeAmount > 0 ? `<tr><td>Other Fee</td><td>${otherFeeAmount}</td></tr>` : "",
+    `<tr><td>Subtotal</td><td>${Number(regularFeeAmount + otherFeeAmount).toFixed(2)}</td></tr>`,
+    `<tr><td>Discount</td><td>${discountPercent}% (${discountAmount.toFixed(2)})</td></tr>`,
+    `<tr><td>Total</td><td>${totalAmount.toFixed(2)}</td></tr>`,
+    dueDate ? `<tr><td>Due Date</td><td>${dueDate}</td></tr>` : "",
+    paymentMethod?.name || paymentMethodName ? `<tr><td>Payment Method</td><td>${paymentMethod?.name || paymentMethodName}</td></tr>` : "",
+    paymentMethod?.bank_name ? `<tr><td>Bank Name</td><td>${paymentMethod.bank_name}</td></tr>` : "",
+    paymentMethod?.account_title ? `<tr><td>Account Title</td><td>${paymentMethod.account_title}</td></tr>` : "",
+    paymentMethod?.account_number ? `<tr><td>Account Number</td><td>${paymentMethod.account_number}</td></tr>` : "",
+    paymentMethod?.iban ? `<tr><td>IBAN</td><td>${paymentMethod.iban}</td></tr>` : "",
+    paymentMethod?.branch_code ? `<tr><td>Branch Code</td><td>${paymentMethod.branch_code}</td></tr>` : "",
+    paymentInstructions ? `<tr><td>Instructions</td><td>${paymentInstructions}</td></tr>` : "",
+    supportEmail ? `<tr><td>Support Email</td><td>${supportEmail}</td></tr>` : "",
+    supportPhone ? `<tr><td>Support Phone</td><td>${supportPhone}</td></tr>` : "",
+  ]
+    .filter(Boolean)
+    .join("");
+
+  const html = `
+    <div style="font-family:Arial,sans-serif;background:#f8fafc;padding:24px;color:#0f172a;">
+      <div style="max-width:720px;margin:0 auto;background:#fff;border:1px solid #e2e8f0;border-radius:18px;padding:24px;">
+        <h2 style="margin:0 0 16px;">Fee Voucher Created</h2>
+        <table style="width:100%;border-collapse:collapse;font-size:14px;">
+          ${details}
+        </table>
+        <div style="margin-top:20px;">
+          <a href="${paymentSubmitUrl}" style="display:inline-block;background:#2563eb;color:#ffffff;padding:12px 18px;border-radius:10px;text-decoration:none;font-weight:600;">Submit Payment</a>
+          <p style="margin:12px 0 0;font-size:12px;color:#64748b;">If the button does not work, open this link:</p>
+          <p style="margin:4px 0 0;font-size:12px;color:#2563eb;word-break:break-all;">${paymentSubmitUrl}</p>
+        </div>
+      </div>
+    </div>
+  `;
+
+  const text = `
+Fee Voucher Created
+
+Student: ${studentName || "-"}
+Parent: ${parentName || "-"}
+Class: ${classLevel || "-"}
+Voucher No: ${voucherNo}
+
+Regular Fee: ${regularFeeAmount > 0 ? regularFeeAmount.toFixed(2) : "0.00"}
+Other Fee: ${otherFeeAmount > 0 ? otherFeeAmount.toFixed(2) : "0.00"}
+Subtotal: ${Number(regularFeeAmount + otherFeeAmount).toFixed(2)}
+Discount: ${discountPercent}% (${discountAmount.toFixed(2)})
+Total: ${totalAmount.toFixed(2)}
+Due Date: ${dueDate || "-"}
+
+Payment Method: ${paymentMethod?.name || "-"}
+Account Title: ${paymentMethod?.account_title || "-"}
+Account Number: ${paymentMethod?.account_number || "-"}
+IBAN: ${paymentMethod?.iban || "-"}
+Branch Code: ${paymentMethod?.branch_code || "-"}
+Instructions: ${paymentInstructions || paymentMethod?.instructions || "-"}
+
+Submit Payment:
+${paymentSubmitUrl}
+
+Support Email: ${supportEmail || "-"}
+Support Phone: ${supportPhone || "-"}
+`.trim();
+
+  return { html, text };
+}
+
 function normalizeDueDate(value) {
   const trimmed = normalizeText(value);
 
@@ -303,6 +491,15 @@ async function getLeadById(id, tx = prisma) {
   return lead;
 }
 
+function buildPaymentSubmitUrl(voucherNo) {
+  const appUrl =
+    process.env.NEXT_PUBLIC_APP_URL ||
+    process.env.APP_URL ||
+    "";
+  const base = appUrl || "";
+  return `${base.replace(/\/+$/, "")}/payment/${encodeURIComponent(voucherNo)}`;
+}
+
 async function buildVoucherInsertPayload(voucherNo, payload, tx) {
   const columns = await getTableColumns("fee_vouchers", tx);
   const insertColumns = [];
@@ -311,7 +508,8 @@ async function buildVoucherInsertPayload(voucherNo, payload, tx) {
   const voucherId = crypto.randomUUID();
 
   if (columns.id) {
-    addColumn(insertColumns, insertValues, "id", voucherId);
+    insertColumns.push(Prisma.raw(`"id"`));
+    insertValues.push({ value: voucherId, castType: "uuid" });
     supportedColumns.add("id");
   }
   
@@ -348,7 +546,7 @@ async function buildVoucherInsertPayload(voucherNo, payload, tx) {
   }
   if (columns.discount_id) {
     insertColumns.push(Prisma.raw(`"discount_id"`));
-    insertValues.push(payload.discountId ? { value: payload.discountId, castType: "uuid" } : null);
+    insertValues.push({ value: payload.discountId || null, castType: "uuid" });
     supportedColumns.add("discount_id");
   }
   if (columns.discount_percent) {
@@ -395,7 +593,8 @@ async function buildVoucherInsertPayload(voucherNo, payload, tx) {
     supportedColumns.add("status");
   }
   if (columns.created_by_user_id) {
-    addColumn(insertColumns, insertValues, "created_by_user_id", payload.createdByUserId);
+    insertColumns.push(Prisma.raw(`"created_by_user_id"`));
+    insertValues.push({ value: payload.createdByUserId, castType: "uuid" });
     supportedColumns.add("created_by_user_id");
   }
 
@@ -493,6 +692,7 @@ export async function POST(request) {
     const body = await request.json();
     const registrationLeadId = normalizeText(body?.registration_lead_id || body?.registrationLeadId);
     const regularFeeApplied = normalizeBoolean(body?.regular_fee_applied ?? body?.regularFeeApplied);
+    const regularFeeId = normalizeText(body?.regular_fee_id ?? body?.regularFeeId);
     const otherFeeId = normalizeText(body?.other_fee_id ?? body?.otherFeeId);
     const admissionFeeAmountInput = toMoney(body?.admission_fee_amount ?? body?.admissionFeeAmount);
     const discountId = normalizeText(body?.discount_id ?? body?.discountId);
@@ -544,7 +744,8 @@ export async function POST(request) {
 
     const voucherNo = await generateVoucherNumber();
 
-    const { item, lead } = await prisma.$transaction(async (tx) => {
+    const { item, lead, emailMessage } = await prisma.$transaction(async (tx) => {
+      const createdBy = session?.user?.id || null;
       const lead = await getLeadById(registrationLeadId, tx);
 
       if (!lead?.id) {
@@ -569,16 +770,53 @@ export async function POST(request) {
         throw new Error("Selected other fee is not available.");
       }
 
+      let regularFeeRecord = null;
+      if (regularFeeApplied) {
+        if (!regularFeeId) {
+          throw new Error("Regular fee ID is missing.");
+        }
+
+        regularFeeRecord = await getRegularFeeById(regularFeeId, tx);
+        if (!regularFeeRecord?.id) {
+          console.log("REGULAR_FEE_VALIDATE_DEBUG", {
+            leadId: registrationLeadId,
+            leadClassLevel: lead?.class_level,
+            regularFeeId,
+            regularFeeClassLevel: regularFeeRecord?.class_level,
+            regularFeeStatus: regularFeeRecord?.status,
+            normalizedLeadClass: normalizeClassLevel(lead?.class_level),
+            normalizedFeeClass: normalizeClassLevel(regularFeeRecord?.class_level),
+          });
+          throw new Error("Regular fee record was not found.");
+        }
+
+        if (String(regularFeeRecord.status || "").toLowerCase() !== "active") {
+          throw new Error("Regular fee is inactive.");
+        }
+
+        if (
+          normalizeClassLevel(regularFeeRecord.class_level) !==
+          normalizeClassLevel(lead.class_level)
+        ) {
+          console.log("REGULAR_FEE_VALIDATE_DEBUG", {
+            leadId: registrationLeadId,
+            leadClassLevel: lead?.class_level,
+            regularFeeId,
+            regularFeeClassLevel: regularFeeRecord?.class_level,
+            regularFeeStatus: regularFeeRecord?.status,
+            normalizedLeadClass: normalizeClassLevel(lead?.class_level),
+            normalizedFeeClass: normalizeClassLevel(regularFeeRecord?.class_level),
+          });
+          throw new Error("Regular fee does not match the selected lead class.");
+        }
+      }
+
       const maxDiscountPercent =
         role === "admin" ? 100 : await getCoordinatorMaxDiscountPercent(tx);
       const discount = await getDiscountById(discountId, tx);
-      const leadRegularFeeAmount = regularFeeApplied
-        ? await getRegularFeeAmount(lead.class_level, tx)
+      const regularFeeAmount = regularFeeApplied
+        ? Number(regularFeeRecord?.amount || 0)
         : 0;
-      if (regularFeeApplied && leadRegularFeeAmount <= 0) {
-        throw new Error("Regular fee is not available for the selected class.");
-      }
-      const regularFeeAmount = regularFeeApplied ? leadRegularFeeAmount : 0;
       const admissionFeeAmount = selectedOtherFee
         ? Number(selectedOtherFee.amount || 0)
         : admissionFeeAmountInput;
@@ -600,6 +838,7 @@ export async function POST(request) {
       }
       const voucherAmount = totalAmount;
 
+      const paymentSubmitUrl = buildPaymentSubmitUrl(voucherNo);
       const payload = {
         registrationLeadId,
         amount: voucherAmount,
@@ -609,6 +848,7 @@ export async function POST(request) {
         paymentInstructions,
         createdByUserId: session.user.id,
         regularFeeApplied,
+        regularFeeId: regularFeeRecord?.id || null,
         regularFeeAmount,
         otherFeeId: selectedOtherFee?.id || null,
         admissionFeeAmount,
@@ -648,8 +888,8 @@ export async function POST(request) {
 
       if (regularFeeApplied && regularFeeAmount > 0 && tx.$executeRaw) {
         await tx.$executeRaw`
-          INSERT INTO voucher_line_items (id, voucher_id, fee_type, title, amount, created_at)
-          VALUES (${crypto.randomUUID()}::uuid, ${voucherId}::uuid, 'regular_fee', ${"Regular Fee"}, ${regularFeeAmount}, NOW())
+          INSERT INTO voucher_line_items (id, voucher_id, fee_type, title, amount, source_fee_id, created_at)
+          VALUES (${crypto.randomUUID()}::uuid, ${voucherId}::uuid, 'regular_fee', ${regularFeeRecord?.name || `Regular Fee - ${regularFeeRecord?.class_level || ""}`}, ${regularFeeAmount}, ${regularFeeRecord?.id || null}::uuid, NOW())
         `;
       }
 
@@ -703,31 +943,122 @@ export async function POST(request) {
         LIMIT 1
       `;
 
-      return { item: created, lead };
-    });
+      const supportEmail =
+        (await tx.$queryRaw`
+          SELECT value::text AS value
+          FROM fee_settings
+          WHERE key = 'payment_support_email'
+          LIMIT 1
+        `)[0]?.value || "";
+      const supportPhone =
+        (await tx.$queryRaw`
+          SELECT value::text AS value
+          FROM fee_settings
+          WHERE key = 'payment_support_phone'
+          LIMIT 1
+        `)[0]?.value || "";
+
+      const { html: emailHtml, text: emailText } = buildVoucherEmailContent({
+        studentName: lead.student_name || "",
+        parentName: lead.parent_name || "",
+        classLevel: lead.class_level || "",
+        voucherNo: created.voucher_no || voucherNo,
+        regularFeeAmount,
+        otherFeeAmount: admissionFeeAmount,
+        discountPercent,
+        discountAmount,
+        totalAmount,
+        dueDate,
+        paymentMethod: selectedPaymentMethod || { name: resolvedPaymentMethod },
+        paymentInstructions,
+        supportEmail,
+        supportPhone,
+        paymentSubmitUrl,
+        paymentMethodName: resolvedPaymentMethod,
+      });
+
+      const subject = `Fee voucher ${created.voucher_no || voucherNo}`;
+      const emailMessage = await insertOutboundMessage({
+        voucherId,
+        recipientEmail: lead.email,
+        subject,
+        body: emailHtml,
+        bodyText: emailText,
+        paymentSubmitUrl,
+        createdBy,
+        tx,
+      });
+
+      return {
+        item: created,
+        lead,
+        emailMessage: emailMessage ? { ...emailMessage, sent_status: "pending" } : null,
+      };
+    }, { timeout: 15000 });
+
+    let emailSendStatus = "sent";
+    let emailErrorMessage = "";
 
     try {
-      const portalBaseUrl = getAppUrl();
-      if (item?.id && portalBaseUrl && lead?.email) {
-        const html = buildFeeVoucherEmailHtml({
-          studentName: lead.student_name || item.student_name || "",
-          voucherNo: item.voucher_no || voucherNo,
-          amount: item.amount || amount,
-          dueDate: item.due_date || dueDate,
-          portalUrl: `${portalBaseUrl.replace(/\/+$/, "")}/vouchers/${item.id}`,
-        });
-
+      if (item?.id && lead?.email) {
         await sendEmail({
           to: lead.email,
-          subject: `Fee voucher ${item.voucher_no || voucherNo}`,
-          html,
+          subject: emailMessage?.subject || `Fee voucher ${item.voucher_no || voucherNo}`,
+          html: emailMessage?.body || "",
+          text: emailMessage?.body_text || "",
         });
       }
     } catch (emailError) {
-      console.error("Fee voucher email dispatch failed:", emailError);
+      emailSendStatus = "failed";
+      emailErrorMessage =
+        emailError instanceof Error ? emailError.message : "Voucher email dispatch failed.";
+      console.error("SENDGRID_VOUCHER_EMAIL_ERROR", {
+        message: emailError?.message,
+        response: emailError?.response?.body,
+      });
+      if (emailMessage?.id) {
+        await prisma.$executeRaw`
+          UPDATE outbound_messages
+          SET sent_status = 'failed',
+              updated_at = NOW()
+          WHERE id = ${emailMessage.id}::uuid
+        `;
+      }
     }
 
-    return json("Fee voucher created.", 201, { item });
+    if (emailSendStatus === "sent" && emailMessage?.id) {
+      await prisma.$executeRaw`
+        UPDATE outbound_messages
+        SET sent_status = 'sent',
+            sent_at = NOW(),
+            updated_at = NOW()
+        WHERE id = ${emailMessage.id}::uuid
+      `;
+    }
+
+    return json(
+      emailSendStatus === "sent"
+        ? "Voucher created and email sent successfully."
+        : "Voucher created successfully, but email sending failed.",
+      201,
+      {
+        success: true,
+        email_sent: emailSendStatus === "sent",
+        voucher: item,
+        email: emailMessage
+          ? {
+              ...emailMessage,
+              body_html: emailMessage.body,
+              body_text: emailMessage.body_text,
+              payment_submit_url: emailMessage.payment_submit_url,
+              sent_status: emailSendStatus,
+            }
+          : null,
+        ...(emailSendStatus === "sent"
+          ? {}
+          : { sendgrid_error: emailErrorMessage || "SendGrid email failed." }),
+      }
+    );
   } catch (error) {
     return json(
       error instanceof Error ? error.message : "Unable to create fee voucher.",

@@ -10,21 +10,55 @@ async function getVoucher(voucherNo) {
         fv.id::text AS id,
         fv.voucher_no,
         fv.amount,
+        fv.regular_fee_amount,
+        fv.admission_fee_amount,
+        fv.subtotal_amount,
+        fv.discount_amount,
+        fv.total_amount,
         fv.due_date,
         LOWER(fv.status::text) AS status,
+        fv.payment_method_id::text AS payment_method_id,
         fv.payment_method,
         fv.payment_instructions,
         rl.student_name,
-      rl.parent_name,
-      rl.email,
-      rl.phone
+        rl.parent_name,
+        rl.class_level,
+        rl.email,
+        rl.phone
     FROM fee_vouchers fv
     INNER JOIN registration_leads rl ON rl.id = fv.registration_id
     WHERE fv.voucher_no = ${voucherNo}
     LIMIT 1
   `;
 
-  return item;
+  if (!item?.id) {
+    return item;
+  }
+
+  const [paymentMethod] = item.payment_method_id
+    ? await prisma.$queryRaw`
+        SELECT
+          pm.id::text AS id,
+          pm.name,
+          pm.method_key,
+          pm.account_title,
+          pm.account_number,
+          pm.iban,
+          pm.bank_name,
+          pm.branch_code,
+          pm.instructions,
+          LOWER(pm.status::text) AS status
+        FROM payment_methods pm
+        WHERE pm.id = ${item.payment_method_id}::uuid
+          AND LOWER(pm.status::text) = 'active'
+        LIMIT 1
+      `
+    : [null];
+
+  return {
+    ...item,
+    payment_method_details: paymentMethod || null,
+  };
 }
 
 export default async function PaymentVoucherPage({ params }) {
@@ -34,6 +68,27 @@ export default async function PaymentVoucherPage({ params }) {
   if (!voucher?.id) {
     notFound();
   }
+
+  const serializedVoucher = {
+    id: String(voucher.id),
+    voucher_no: String(voucher.voucher_no || ""),
+    amount: Number(voucher.amount || 0),
+    regular_fee_amount: Number(voucher.regular_fee_amount || 0),
+    admission_fee_amount: Number(voucher.admission_fee_amount || 0),
+    subtotal_amount: Number(voucher.subtotal_amount || 0),
+    discount_amount: Number(voucher.discount_amount || 0),
+    total_amount: Number(voucher.total_amount || voucher.amount || 0),
+    due_date: voucher.due_date ? new Date(voucher.due_date).toISOString() : null,
+    status: String(voucher.status || ""),
+    payment_method: voucher.payment_method || "",
+    payment_instructions: voucher.payment_instructions || "",
+    payment_method_details: voucher.payment_method_details || null,
+    student_name: voucher.student_name || "",
+    parent_name: voucher.parent_name || "",
+    class_level: voucher.class_level || "",
+    email: voucher.email || "",
+    phone: voucher.phone || "",
+  };
 
   return (
     <main className="min-h-screen bg-[linear-gradient(180deg,#f8fbff_0%,#eef4ff_100%)] px-4 py-10 text-slate-900 sm:px-6 lg:px-8">
@@ -50,7 +105,7 @@ export default async function PaymentVoucherPage({ params }) {
           </p>
         </section>
 
-        <PaymentSubmissionForm voucher={voucher} />
+        <PaymentSubmissionForm voucher={serializedVoucher} />
       </div>
     </main>
   );

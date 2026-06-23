@@ -6,10 +6,13 @@ import { useRouter } from "next/navigation";
 
 export default function FeeVoucherForm({ leads }) {
   const router = useRouter();
+  const normalizeClassLevel = (value) =>
+    String(value || "").trim().toLowerCase();
   const [open, setOpen] = useState(false);
   const [pending, setPending] = useState(false);
   const [loadingOptions, setLoadingOptions] = useState(false);
   const [error, setError] = useState("");
+  const [successEmail, setSuccessEmail] = useState(null);
   const [options, setOptions] = useState({
     discounts: [],
     feeSettings: {},
@@ -20,6 +23,7 @@ export default function FeeVoucherForm({ leads }) {
   const [form, setForm] = useState({
     registrationLeadId: "",
     regularFeeApplied: true,
+    regularFeeId: "",
     otherFeeId: "",
     admissionFeeAmount: "",
     discountId: "",
@@ -38,9 +42,18 @@ export default function FeeVoucherForm({ leads }) {
     if (!selectedLead) return 0;
     const match = options.regularFees.find(
       (item) =>
-        String(item.class_level || "").toLowerCase() === String(selectedLead.class_level || "").toLowerCase()
+        normalizeClassLevel(item.class_level) === normalizeClassLevel(selectedLead.class_level)
     );
     return Number(match?.amount || 0);
+  }, [options.regularFees, selectedLead]);
+  const selectedRegularFeeRecord = useMemo(() => {
+    if (!selectedLead) return null;
+    return (
+      options.regularFees.find(
+        (item) =>
+          normalizeClassLevel(item.class_level) === normalizeClassLevel(selectedLead.class_level)
+      ) || null
+    );
   }, [options.regularFees, selectedLead]);
   const selectedOtherFee = useMemo(
     () => options.otherFees.find((item) => item.id === form.otherFeeId),
@@ -130,10 +143,15 @@ export default function FeeVoucherForm({ leads }) {
     setError("");
 
     try {
+      const payload = {
+        ...form,
+        regularFeeId: form.regularFeeApplied ? selectedRegularFeeRecord?.id || "" : "",
+        regularFeeAmount: form.regularFeeApplied ? Number(selectedRegularFeeRecord?.amount || 0) : 0,
+      };
       const response = await fetch("/api/coordinator/fee-vouchers", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
+        body: JSON.stringify(payload),
       });
       const data = await response.json();
 
@@ -141,10 +159,12 @@ export default function FeeVoucherForm({ leads }) {
         throw new Error(data?.message || "Unable to create voucher.");
       }
 
-      setOpen(false);
+      setSuccessEmail(data?.email || null);
+      router.refresh();
       setForm({
         registrationLeadId: "",
         regularFeeApplied: true,
+        regularFeeId: "",
         otherFeeId: "",
         admissionFeeAmount: "",
         discountId: "",
@@ -154,7 +174,6 @@ export default function FeeVoucherForm({ leads }) {
         paymentMethod: "",
         paymentInstructions: "",
       });
-      router.refresh();
     } catch (submitError) {
       setError(
         submitError instanceof Error
@@ -164,6 +183,14 @@ export default function FeeVoucherForm({ leads }) {
     } finally {
       setPending(false);
     }
+  }
+
+  async function copyEmailBody() {
+    if (!successEmail?.body_text) {
+      return;
+    }
+
+    await navigator.clipboard.writeText(successEmail.body_text);
   }
 
   return (
@@ -229,7 +256,11 @@ export default function FeeVoucherForm({ leads }) {
                 <input
                   type="checkbox"
                   checked={form.regularFeeApplied}
-                  onChange={(event) => updateField("regularFeeApplied", event.target.checked)}
+                  onChange={(event) => {
+                    const checked = event.target.checked;
+                    updateField("regularFeeApplied", checked);
+                    updateField("regularFeeId", checked ? selectedRegularFeeRecord?.id || "" : "");
+                  }}
                   className="h-4 w-4 rounded border-slate-300 text-slate-950"
                 />
                 <span className="text-sm font-medium text-slate-700">
@@ -397,6 +428,68 @@ export default function FeeVoucherForm({ leads }) {
               </div>
             </form>
           </motion.div>
+        </div>
+      ) : null}
+
+      {successEmail ? (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/50 px-4 py-8">
+          <div className="w-full max-w-2xl rounded-[2rem] border border-white/70 bg-white p-6 shadow-[0_24px_80px_-36px_rgba(15,23,42,0.32)] sm:p-8">
+            <p className="text-sm font-semibold uppercase tracking-[0.24em] text-emerald-700">
+              Voucher Created Successfully
+            </p>
+            <div className="mt-4 space-y-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
+              <p><span className="font-semibold text-slate-950">Recipient:</span> {successEmail.recipient_email || "—"}</p>
+              <p><span className="font-semibold text-slate-950">Subject:</span> {successEmail.subject || "—"}</p>
+              <div>
+                <p className="font-semibold text-slate-950">Email Body</p>
+                <pre className="mt-2 max-h-72 overflow-auto whitespace-pre-wrap rounded-2xl border border-slate-200 bg-white p-4 text-xs text-slate-700">
+                  {successEmail.body_text || successEmail.body_html || ""}
+                </pre>
+              </div>
+              {successEmail.payment_submit_url ? (
+                <div className="rounded-2xl border border-sky-100 bg-sky-50 p-4 text-sm text-sky-900">
+                  <p className="font-semibold">Payment submit link</p>
+                  <a
+                    href={successEmail.payment_submit_url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="mt-2 inline-flex break-all font-medium text-sky-700 underline-offset-4 hover:underline"
+                  >
+                    {successEmail.payment_submit_url}
+                  </a>
+                </div>
+              ) : null}
+            </div>
+            <div className="mt-6 flex flex-wrap justify-end gap-3">
+              <button
+                type="button"
+                onClick={copyEmailBody}
+                className="rounded-2xl bg-slate-950 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800"
+              >
+                Copy Email
+              </button>
+              {successEmail.payment_submit_url ? (
+                <a
+                  href={successEmail.payment_submit_url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm font-semibold text-sky-700 transition hover:bg-sky-100"
+                >
+                  Open Payment Page
+                </a>
+              ) : null}
+              <button
+                type="button"
+                onClick={() => {
+                  setSuccessEmail(null);
+                  setOpen(false);
+                }}
+                className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+              >
+                Close
+              </button>
+            </div>
+          </div>
         </div>
       ) : null}
     </>
