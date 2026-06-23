@@ -1,32 +1,50 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { useRouter } from "next/navigation";
-
-const PAYMENT_METHODS = [
-  "Bank transfer",
-  "JazzCash",
-  "EasyPaisa",
-  "Cash deposit",
-];
 
 export default function FeeVoucherForm({ leads }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [pending, setPending] = useState(false);
+  const [loadingOptions, setLoadingOptions] = useState(false);
   const [error, setError] = useState("");
+  const [options, setOptions] = useState({
+    discounts: [],
+    feeSettings: {},
+    otherFees: [],
+    regularFees: [],
+    paymentMethods: [],
+  });
   const [form, setForm] = useState({
-    registrationLeadId: leads[0]?.id || "",
-    amount: "",
+    registrationLeadId: "",
+    regularFeeApplied: true,
+    otherFeeId: "",
+    admissionFeeAmount: "",
+    discountId: "",
+    discountPercent: "",
     dueDate: "",
-    paymentMethod: PAYMENT_METHODS[0],
+    paymentMethodId: "",
+    paymentMethod: "",
     paymentInstructions: "",
   });
 
   const selectedLead = useMemo(
     () => leads.find((lead) => lead.id === form.registrationLeadId),
     [form.registrationLeadId, leads]
+  );
+  const selectedRegularFee = useMemo(() => {
+    if (!selectedLead) return 0;
+    const match = options.regularFees.find(
+      (item) =>
+        String(item.class_level || "").toLowerCase() === String(selectedLead.class_level || "").toLowerCase()
+    );
+    return Number(match?.amount || 0);
+  }, [options.regularFees, selectedLead]);
+  const selectedOtherFee = useMemo(
+    () => options.otherFees.find((item) => item.id === form.otherFeeId),
+    [form.otherFeeId, options.otherFees]
   );
   const eligibleLeads = useMemo(
     () =>
@@ -38,15 +56,66 @@ export default function FeeVoucherForm({ leads }) {
       ),
     [leads]
   );
+  const maxDiscountPercent = Number(options.coordinatorMaxDiscountPercent || options.feeSettings?.coordinator_max_discount_percent?.value || 20);
+  const selectedPaymentMethod = useMemo(
+    () => options.paymentMethods.find((method) => method.id === form.paymentMethodId),
+    [form.paymentMethodId, options.paymentMethods]
+  );
+  const regularFeeAmount = form.regularFeeApplied ? selectedRegularFee : 0;
+  const admissionFeeAmount = Number(form.admissionFeeAmount || selectedOtherFee?.amount || 0);
+  const discountPercent = Number(form.discountPercent || 0);
+  const subtotalAmount = regularFeeAmount + admissionFeeAmount;
+  const discountAmount = subtotalAmount * (discountPercent / 100);
+  const totalAmount = subtotalAmount - discountAmount;
   const hasEligibleLead = eligibleLeads.length > 0;
 
-  console.log("voucher leads state", {
-    leads,
-    eligibleLeads,
-    hasEligibleLead,
-    isCreatingVoucher: pending,
-    isLoading: false,
-  });
+  useEffect(() => {
+    let active = true;
+
+    async function loadOptions() {
+      setLoadingOptions(true);
+      setError("");
+      try {
+        const response = await fetch("/api/coordinator/fee-vouchers/options", {
+          cache: "no-store",
+        });
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data?.message || "Unable to load voucher options.");
+        }
+        if (active) {
+          setOptions({
+            discounts: data.discounts || [],
+            feeSettings: data.feeSettings || {},
+            otherFees: data.otherFees || [],
+            regularFees: data.regularFees || [],
+            paymentMethods: data.paymentMethods || [],
+            coordinatorMaxDiscountPercent: data.coordinatorMaxDiscountPercent || 20,
+          });
+        }
+      } catch (optionError) {
+        if (active) {
+          setError(
+            optionError instanceof Error
+              ? optionError.message
+              : "Unable to load voucher options."
+          );
+        }
+      } finally {
+        if (active) {
+          setLoadingOptions(false);
+        }
+      }
+    }
+
+    if (open) {
+      void loadOptions();
+    }
+
+    return () => {
+      active = false;
+    };
+  }, [open]);
 
   function updateField(name, value) {
     setForm((current) => ({
@@ -74,10 +143,15 @@ export default function FeeVoucherForm({ leads }) {
 
       setOpen(false);
       setForm({
-        registrationLeadId: leads[0]?.id || "",
-        amount: "",
+        registrationLeadId: "",
+        regularFeeApplied: true,
+        otherFeeId: "",
+        admissionFeeAmount: "",
+        discountId: "",
+        discountPercent: "",
         dueDate: "",
-        paymentMethod: PAYMENT_METHODS[0],
+        paymentMethodId: "",
+        paymentMethod: "",
         paymentInstructions: "",
       });
       router.refresh();
@@ -97,7 +171,7 @@ export default function FeeVoucherForm({ leads }) {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        disabled={pending || !hasEligibleLead}
+        disabled={pending || loadingOptions || !hasEligibleLead}
         className="inline-flex items-center justify-center rounded-2xl bg-slate-950 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
       >
         Create fee voucher
@@ -140,25 +214,72 @@ export default function FeeVoucherForm({ leads }) {
                   onChange={(event) => updateField("registrationLeadId", event.target.value)}
                   className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-950 outline-none transition focus:border-sky-400 focus:bg-white focus:ring-4 focus:ring-sky-100"
                 >
+                  <option value="" disabled>
+                    Select registration lead
+                  </option>
                   {eligibleLeads.map((lead) => (
                     <option key={lead.id} value={lead.id}>
-                      {lead.student_name} | {lead.parent_name || "Parent pending"} | {lead.phone || lead.email || "No contact"}
+                      {lead.student_name} - {lead.class_level}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 md:col-span-2">
+                <input
+                  type="checkbox"
+                  checked={form.regularFeeApplied}
+                  onChange={(event) => updateField("regularFeeApplied", event.target.checked)}
+                  className="h-4 w-4 rounded border-slate-300 text-slate-950"
+                />
+                <span className="text-sm font-medium text-slate-700">
+                  Apply regular fee
+                </span>
+                <span className="ml-auto text-sm font-semibold text-slate-950">
+                  {form.regularFeeApplied ? `PKR ${selectedRegularFee.toFixed(2)}` : "PKR 0.00"}
+                </span>
+              </label>
+
+              <label className="block">
+                <span className="mb-2 block text-sm font-medium text-slate-700">Other fee</span>
+                <select
+                  value={form.otherFeeId}
+                  onChange={(event) => {
+                    const nextOtherFee = options.otherFees.find((item) => item.id === event.target.value);
+                    updateField("otherFeeId", event.target.value);
+                    updateField("admissionFeeAmount", nextOtherFee ? String(nextOtherFee.amount || "") : "");
+                  }}
+                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-950 outline-none transition focus:border-sky-400 focus:bg-white focus:ring-4 focus:ring-sky-100"
+                >
+                  <option value="">Select other fee</option>
+                  {options.otherFees.map((fee) => (
+                    <option key={fee.id} value={fee.id}>
+                      {(fee.title || fee.name || "Other fee")} - Rs. {Number(fee.amount || 0).toFixed(2)}
                     </option>
                   ))}
                 </select>
               </label>
 
               <label className="block">
-                <span className="mb-2 block text-sm font-medium text-slate-700">Amount</span>
-                <input
-                  type="number"
-                  min="1"
-                  step="0.01"
-                  value={form.amount}
-                  onChange={(event) => updateField("amount", event.target.value)}
+                <span className="mb-2 block text-sm font-medium text-slate-700">Discount</span>
+                <select
+                  value={form.discountId}
+                  onChange={(event) => {
+                    const nextDiscount = options.discounts.find((item) => item.id === event.target.value);
+                    updateField("discountId", event.target.value);
+                    updateField("discountPercent", nextDiscount?.percent || "");
+                  }}
                   className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-950 outline-none transition focus:border-sky-400 focus:bg-white focus:ring-4 focus:ring-sky-100"
-                  placeholder="5000"
-                />
+                >
+                  <option value="">No discount</option>
+                  {options.discounts
+                    .filter((discount) => Number(discount.percent || 0) <= maxDiscountPercent)
+                    .map((discount) => (
+                      <option key={discount.id} value={discount.id}>
+                        {discount.label}
+                      </option>
+                    ))}
+                </select>
               </label>
 
               <label className="block">
@@ -176,17 +297,53 @@ export default function FeeVoucherForm({ leads }) {
                   Payment method
                 </span>
                 <select
-                  value={form.paymentMethod}
-                  onChange={(event) => updateField("paymentMethod", event.target.value)}
+                  value={form.paymentMethodId}
+                  onChange={(event) => {
+                    const method = options.paymentMethods.find((item) => item.id === event.target.value);
+                    updateField("paymentMethodId", event.target.value);
+                    updateField("paymentMethod", method?.method_key || method?.name || "");
+                    updateField("paymentInstructions", method?.instructions || "");
+                  }}
                   className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-950 outline-none transition focus:border-sky-400 focus:bg-white focus:ring-4 focus:ring-sky-100"
                 >
-                  {PAYMENT_METHODS.map((method) => (
-                    <option key={method} value={method}>
-                      {method}
+                  <option value="">Select payment method</option>
+                  {options.paymentMethods.map((method) => (
+                    <option key={method.id} value={method.id}>
+                      {method.name}
                     </option>
                   ))}
                 </select>
               </label>
+
+              {selectedPaymentMethod ? (
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-700 md:col-span-2">
+                  <p className="font-semibold text-slate-950">{selectedPaymentMethod.name}</p>
+                  <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                    {selectedPaymentMethod.bank_name ? <p><span className="font-medium text-slate-900">Bank Name:</span> {selectedPaymentMethod.bank_name}</p> : null}
+                    {selectedPaymentMethod.account_title ? <p><span className="font-medium text-slate-900">Account Title:</span> {selectedPaymentMethod.account_title}</p> : null}
+                    {selectedPaymentMethod.account_number ? <p><span className="font-medium text-slate-900">Account Number:</span> {selectedPaymentMethod.account_number}</p> : null}
+                    {selectedPaymentMethod.iban ? <p><span className="font-medium text-slate-900">IBAN:</span> {selectedPaymentMethod.iban}</p> : null}
+                    {selectedPaymentMethod.branch_code ? <p><span className="font-medium text-slate-900">Branch Code:</span> {selectedPaymentMethod.branch_code}</p> : null}
+                    {selectedPaymentMethod.instructions ? <p className="sm:col-span-2"><span className="font-medium text-slate-900">Instructions:</span> {selectedPaymentMethod.instructions}</p> : null}
+                  </div>
+                </div>
+              ) : null}
+
+              {selectedLead ? (
+                <div className="rounded-2xl bg-slate-50 px-4 py-4 text-sm text-slate-600 md:col-span-2">
+                  <p className="font-semibold text-slate-900">{selectedLead.student_name}</p>
+                  <p className="mt-1">Class: {selectedLead.class_level || "—"}</p>
+                  {form.regularFeeApplied ? (
+                    selectedRegularFee > 0 ? (
+                      <p className="mt-1">Regular fee: PKR {selectedRegularFee.toFixed(2)}</p>
+                    ) : (
+                      <p className="mt-1 text-amber-700">
+                        No regular fee configured for this class. Please ask admin to add it.
+                      </p>
+                    )
+                  ) : null}
+                </div>
+              ) : null}
 
               <label className="block md:col-span-2">
                 <span className="mb-2 block text-sm font-medium text-slate-700">
@@ -200,6 +357,12 @@ export default function FeeVoucherForm({ leads }) {
                   placeholder="Provide account title, account number, branch details, and reference notes."
                 />
               </label>
+
+              <div className="grid gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-700 md:col-span-2 sm:grid-cols-3">
+                <p>Subtotal: <span className="font-semibold text-slate-950">PKR {subtotalAmount.toFixed(2)}</span></p>
+                <p>Discount: <span className="font-semibold text-slate-950">PKR {discountAmount.toFixed(2)}</span></p>
+                <p>Total: <span className="font-semibold text-slate-950">PKR {totalAmount.toFixed(2)}</span></p>
+              </div>
 
               {selectedLead ? (
                 <div className="rounded-2xl bg-slate-50 px-4 py-4 text-sm text-slate-600 md:col-span-2">
@@ -226,7 +389,7 @@ export default function FeeVoucherForm({ leads }) {
                 </button>
                 <button
                   type="submit"
-                  disabled={pending}
+                  disabled={pending || loadingOptions}
                   className="rounded-2xl bg-slate-950 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-70"
                 >
                   {pending ? "Creating..." : "Create voucher"}

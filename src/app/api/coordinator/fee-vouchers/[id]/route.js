@@ -38,8 +38,7 @@ export async function GET(_request, { params }) {
         rl.parent_name,
         rl.email,
         rl.phone,
-        rl.class_level,
-        rl.subject_interest
+        rl.class_level
       FROM fee_vouchers fv
       INNER JOIN registration_leads rl ON rl.id = fv.registration_id
       WHERE fv.id = ${id}::uuid

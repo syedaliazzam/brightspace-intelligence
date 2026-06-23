@@ -24,6 +24,15 @@ function normalizeText(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 
+function normalizeBoolean(value) {
+  return value === true || value === "true" || value === 1 || value === "1";
+}
+
+function toMoney(value) {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) && numeric > 0 ? numeric : 0;
+}
+
 async function getTableColumns(tableName, tx = prisma) {
   const rows = await tx.$queryRaw`
     SELECT
@@ -87,6 +96,99 @@ async function resolvePaymentMethod(value, tx = prisma) {
   }
 
   return "";
+}
+
+async function getCoordinatorMaxDiscountPercent(tx = prisma) {
+  const [row] = await tx.$queryRaw`
+    SELECT value::text AS value
+    FROM fee_settings
+    WHERE key = 'coordinator_max_discount_percent'
+    LIMIT 1
+  `;
+
+  const parsed = Number(row?.value);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 20;
+}
+
+async function getRegularFeeAmount(classLevel, tx = prisma) {
+  const [row] = await tx.$queryRaw`
+    SELECT amount::float8 AS amount
+    FROM other_fee
+    WHERE LOWER(fee_type::text) = 'regular_fee'
+      AND LOWER(COALESCE(class_level, '')) = LOWER(${classLevel})
+      AND LOWER(status::text) = 'active'
+    ORDER BY created_at DESC NULLS LAST, id DESC
+    LIMIT 1
+  `;
+
+  return Number(row?.amount || 0);
+}
+
+async function getDiscountById(discountId, tx = prisma) {
+  if (!discountId) {
+    return null;
+  }
+
+  const [row] = await tx.$queryRaw`
+    SELECT
+      id::text AS id,
+      label,
+      percent::float8 AS percent
+    FROM discounts
+    WHERE id = ${discountId}::uuid
+      AND LOWER(status::text) = 'active'
+    LIMIT 1
+  `;
+
+  return row || null;
+}
+
+async function getOtherFeeById(otherFeeId, tx = prisma) {
+  if (!otherFeeId) {
+    return null;
+  }
+
+  const [row] = await tx.$queryRaw`
+    SELECT
+      id::text AS id,
+      COALESCE(name, title) AS name,
+      fee_type,
+      class_level,
+      amount::float8 AS amount,
+      LOWER(status::text) AS status
+    FROM other_fee
+    WHERE id = ${otherFeeId}::uuid
+      AND LOWER(status::text) = 'active'
+    LIMIT 1
+  `;
+
+  return row || null;
+}
+
+async function getPaymentMethodById(paymentMethodId, tx = prisma) {
+  if (!paymentMethodId) {
+    return null;
+  }
+
+  const [row] = await tx.$queryRaw`
+    SELECT
+      id::text AS id,
+      name,
+      method_key,
+      account_title,
+      account_number,
+      iban,
+      bank_name,
+      branch_code,
+      instructions,
+      LOWER(status::text) AS status
+    FROM payment_methods
+    WHERE id = ${paymentMethodId}::uuid
+      AND LOWER(status::text) = 'active'
+    LIMIT 1
+  `;
+
+  return row || null;
 }
 
 function addColumn(columns, values, name, value) {
@@ -189,6 +291,7 @@ async function getLeadById(id, tx = prisma) {
       id::text AS id,
       student_name,
       parent_name,
+      class_level,
       email,
       phone,
       LOWER(status::text) AS status
@@ -226,11 +329,53 @@ async function buildVoucherInsertPayload(voucherNo, payload, tx) {
     addColumn(insertColumns, insertValues, "amount", payload.amount);
     supportedColumns.add("amount");
   }
+  if (columns.regular_fee_applied) {
+    addColumn(insertColumns, insertValues, "regular_fee_applied", payload.regularFeeApplied ? true : false);
+    supportedColumns.add("regular_fee_applied");
+  }
+  if (columns.regular_fee_amount) {
+    addColumn(insertColumns, insertValues, "regular_fee_amount", payload.regularFeeAmount);
+    supportedColumns.add("regular_fee_amount");
+  }
+  if (columns.admission_fee_amount) {
+    addColumn(insertColumns, insertValues, "admission_fee_amount", payload.admissionFeeAmount);
+    supportedColumns.add("admission_fee_amount");
+  }
+  if (columns.other_fee_id && payload.otherFeeId) {
+    insertColumns.push(Prisma.raw(`"other_fee_id"`));
+    insertValues.push({ value: payload.otherFeeId, castType: "uuid" });
+    supportedColumns.add("other_fee_id");
+  }
+  if (columns.discount_id) {
+    insertColumns.push(Prisma.raw(`"discount_id"`));
+    insertValues.push(payload.discountId ? { value: payload.discountId, castType: "uuid" } : null);
+    supportedColumns.add("discount_id");
+  }
+  if (columns.discount_percent) {
+    addColumn(insertColumns, insertValues, "discount_percent", payload.discountPercent);
+    supportedColumns.add("discount_percent");
+  }
+  if (columns.subtotal_amount) {
+    addColumn(insertColumns, insertValues, "subtotal_amount", payload.subtotalAmount);
+    supportedColumns.add("subtotal_amount");
+  }
+  if (columns.discount_amount) {
+    addColumn(insertColumns, insertValues, "discount_amount", payload.discountAmount);
+    supportedColumns.add("discount_amount");
+  }
+  if (columns.total_amount) {
+    addColumn(insertColumns, insertValues, "total_amount", payload.totalAmount);
+    supportedColumns.add("total_amount");
+  }
   if (columns.due_date) {
     addColumn(insertColumns, insertValues, "due_date", new Date(payload.dueDate));
     supportedColumns.add("due_date");
   }
-  if (columns.payment_method) {
+  if (columns.payment_method_id && payload.paymentMethodId) {
+    insertColumns.push(Prisma.raw(`"payment_method_id"`));
+    insertValues.push({ value: payload.paymentMethodId, castType: "uuid" });
+    supportedColumns.add("payment_method_id");
+  } else if (columns.payment_method) {
     insertColumns.push(Prisma.raw(`"payment_method"`));
     insertValues.push({ value: payload.paymentMethod, castType: "payment_method" });
     supportedColumns.add("payment_method");
@@ -346,25 +491,26 @@ export async function POST(request) {
 
   try {
     const body = await request.json();
-    const registrationLeadId = normalizeText(body?.registrationLeadId);
-    const amount = Number(body?.amount);
+    const registrationLeadId = normalizeText(body?.registration_lead_id || body?.registrationLeadId);
+    const regularFeeApplied = normalizeBoolean(body?.regular_fee_applied ?? body?.regularFeeApplied);
+    const otherFeeId = normalizeText(body?.other_fee_id ?? body?.otherFeeId);
+    const admissionFeeAmountInput = toMoney(body?.admission_fee_amount ?? body?.admissionFeeAmount);
+    const discountId = normalizeText(body?.discount_id ?? body?.discountId);
+    const discountPercentInput = Number((body?.discount_percent ?? body?.discountPercent) || 0);
     const dueDate = normalizeDueDate(body?.dueDate);
     const paymentMethod = normalizeText(body?.paymentMethod);
+    const paymentMethodId = normalizeText(body?.paymentMethodId || body?.payment_method_id);
     const paymentInstructions = normalizeText(body?.paymentInstructions);
 
     if (!registrationLeadId) {
       return json("Registration lead is required.", 400);
     }
 
-    if (!Number.isFinite(amount) || amount <= 0) {
-      return json("Amount must be greater than zero.", 400);
-    }
-
     if (!dueDate) {
       return json("Valid due date is required.", 400);
     }
 
-    if (!paymentMethod) {
+    if (!paymentMethod && !paymentMethodId) {
       return json("Payment method is required.", 400);
     }
 
@@ -409,19 +555,68 @@ export async function POST(request) {
         throw new Error("Fee voucher can only be created for new or clarification-pending leads.");
       }
 
-      const resolvedPaymentMethod = await resolvePaymentMethod(paymentMethod, tx);
+      const selectedPaymentMethod = await getPaymentMethodById(paymentMethodId, tx);
+      const resolvedPaymentMethod = selectedPaymentMethod
+        ? selectedPaymentMethod.name || selectedPaymentMethod.method_key
+        : await resolvePaymentMethod(paymentMethod, tx);
 
       if (!resolvedPaymentMethod) {
         throw new Error("Invalid payment method.");
       }
 
+      const selectedOtherFee = await getOtherFeeById(otherFeeId, tx);
+      if (otherFeeId && !selectedOtherFee) {
+        throw new Error("Selected other fee is not available.");
+      }
+
+      const maxDiscountPercent =
+        role === "admin" ? 100 : await getCoordinatorMaxDiscountPercent(tx);
+      const discount = await getDiscountById(discountId, tx);
+      const leadRegularFeeAmount = regularFeeApplied
+        ? await getRegularFeeAmount(lead.class_level, tx)
+        : 0;
+      if (regularFeeApplied && leadRegularFeeAmount <= 0) {
+        throw new Error("Regular fee is not available for the selected class.");
+      }
+      const regularFeeAmount = regularFeeApplied ? leadRegularFeeAmount : 0;
+      const admissionFeeAmount = selectedOtherFee
+        ? Number(selectedOtherFee.amount || 0)
+        : admissionFeeAmountInput;
+      const discountPercent = discount ? Number(discount.percent || 0) : Number(discountPercentInput || 0);
+
+      if (role !== "admin" && discountPercent > maxDiscountPercent) {
+        throw new Error(`Coordinator can only apply up to ${maxDiscountPercent}% discount.`);
+      }
+
+      if (discountPercent < 0 || regularFeeAmount < 0 || admissionFeeAmount < 0) {
+        throw new Error("Fee values cannot be negative.");
+      }
+
+      const subtotalAmount = Number((regularFeeAmount + admissionFeeAmount).toFixed(2));
+      const discountAmount = Number(((subtotalAmount * discountPercent) / 100).toFixed(2));
+      const totalAmount = Number((subtotalAmount - discountAmount).toFixed(2));
+      if (totalAmount <= 0) {
+        throw new Error("Voucher total must be greater than zero.");
+      }
+      const voucherAmount = totalAmount;
+
       const payload = {
         registrationLeadId,
-        amount,
+        amount: voucherAmount,
         dueDate,
+        paymentMethodId: selectedPaymentMethod?.id || null,
         paymentMethod: resolvedPaymentMethod,
         paymentInstructions,
         createdByUserId: session.user.id,
+        regularFeeApplied,
+        regularFeeAmount,
+        otherFeeId: selectedOtherFee?.id || null,
+        admissionFeeAmount,
+        discountId: discount?.id || null,
+        discountPercent,
+        subtotalAmount,
+        discountAmount,
+        totalAmount,
       };
       
       const { voucherId, insertColumns, insertValues } = await buildVoucherInsertPayload(
@@ -451,6 +646,20 @@ export async function POST(request) {
         )})
       `;
 
+      if (regularFeeApplied && regularFeeAmount > 0 && tx.$executeRaw) {
+        await tx.$executeRaw`
+          INSERT INTO voucher_line_items (id, voucher_id, fee_type, title, amount, created_at)
+          VALUES (${crypto.randomUUID()}::uuid, ${voucherId}::uuid, 'regular_fee', ${"Regular Fee"}, ${regularFeeAmount}, NOW())
+        `;
+      }
+
+      if (admissionFeeAmount > 0) {
+        await tx.$executeRaw`
+          INSERT INTO voucher_line_items (id, voucher_id, fee_type, title, amount, created_at)
+          VALUES (${crypto.randomUUID()}::uuid, ${voucherId}::uuid, ${selectedOtherFee?.fee_type || 'admission_fee'}, ${selectedOtherFee?.name || "Other Fee"}, ${admissionFeeAmount}, NOW())
+        `;
+      }
+
       await tx.$executeRaw`
         UPDATE registration_leads
         SET status = CAST('voucher_created' AS registration_status)
@@ -471,6 +680,14 @@ export async function POST(request) {
           fv.id::text AS id,
           fv.voucher_no,
           fv.amount,
+          fv.regular_fee_applied,
+          fv.regular_fee_amount,
+          fv.admission_fee_amount,
+          fv.discount_id::text AS discount_id,
+          fv.discount_percent,
+          fv.subtotal_amount,
+          fv.discount_amount,
+          fv.total_amount,
           fv.due_date,
           fv.payment_method,
           fv.payment_instructions,

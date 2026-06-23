@@ -227,6 +227,16 @@ export default function LoginPage() {
                 {pending ? "Signing in..." : "Sign in"}
               </motion.button>
             </form>
+
+            <div className="mt-5 text-center text-sm text-slate-600">
+              New student?{" "}
+              <a
+                href="/registration"
+                className="font-semibold text-sky-700 transition hover:text-sky-800"
+              >
+                Register here
+              </a>
+            </div>
           </motion.section>
         </motion.div>
       </div>

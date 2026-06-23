@@ -160,11 +160,12 @@ export async function GET(request) {
     const status = normalizeText(searchParams.get("status")).toLowerCase();
     const subjectId = normalizeText(searchParams.get("subjectId"));
     const conditions = [];
+    const classLevelList = Prisma.join(CLASS_LEVELS.map((level) => Prisma.sql`${level}`));
 
     if (columns.class_level) {
-      conditions.push(Prisma.sql`c.class_level IN (${Prisma.join(CLASS_LEVELS)})`);
+      conditions.push(Prisma.sql`c.class_level IN (${classLevelList})`);
     } else if (columns.title) {
-      conditions.push(Prisma.sql`c.title IN (${Prisma.join(CLASS_LEVELS)})`);
+      conditions.push(Prisma.sql`c.title IN (${classLevelList})`);
     }
 
     if (status && columns.status) {

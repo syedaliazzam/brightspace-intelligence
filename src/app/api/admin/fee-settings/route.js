@@ -130,11 +130,14 @@ export async function GET() {
         ? await prisma.$queryRaw`
             SELECT
               id::text AS id,
-              COALESCE(name, key, label, 'Setting') AS name,
+              key,
+              COALESCE(label, name, key, 'Setting') AS label,
+              COALESCE(name, label, key, 'Setting') AS name,
               COALESCE(key, name, label, id::text) AS setting_key,
               COALESCE(value::text, '') AS value,
               COALESCE(description, '') AS description,
-              COALESCE(status::text, 'active') AS status
+              COALESCE(status::text, 'active') AS status,
+              updated_at
             FROM fee_settings
             ORDER BY created_at DESC NULLS LAST, id DESC
           `

@@ -28,7 +28,7 @@ async function getLeads(status, search) {
 
   if (status && VALID_STATUSES.has(status)) {
     values.push(status);
-    conditions.push(`effective_status = $${values.length}`);
+    conditions.push(`LOWER(rl.status::text) = $${values.length}`);
   }
 
   if (search) {
@@ -48,50 +48,39 @@ async function getLeads(status, search) {
 
   return prisma.$queryRawUnsafe(
     `
-    WITH lead_rows AS (
-      SELECT
-        rl.*,
-        EXISTS (
-          SELECT 1
-          FROM fee_vouchers fv
-          WHERE fv.registration_id = rl.id
-        ) AS has_voucher,
-        CASE
-          WHEN rl.status::text = 'new_lead'
-           AND NOT EXISTS (
-             SELECT 1
-             FROM fee_vouchers fv
-             WHERE fv.registration_id = rl.id
-           )
-          THEN true
-          ELSE false
-        END AS can_create_voucher,
-        LOWER(rl.status::text) AS effective_status
-      FROM registration_leads rl
-    )
     SELECT
-      id::text AS id,
-      google_sheet_row_id,
-      created_at AS submitted_at,
-      student_name,
-      parent_name,
-      NULL::text AS parent_relation,
-      email,
-      phone,
-      age AS student_age,
-      class_level,
-      subject_interest,
-      preferred_schedule,
-      address,
-      NULL::text AS city,
-      notes,
-      source,
-      has_voucher,
-      can_create_voucher,
-      effective_status AS status
-    FROM lead_rows
+      rl.id::text AS id,
+      rl.created_at AS submitted_at,
+      rl.student_name,
+      rl.parent_name,
+      rl.parent_relation,
+      rl.email,
+      rl.phone,
+      rl.age AS student_age,
+      rl.class_level,
+      rl.address,
+      rl.city,
+      rl.notes,
+      COALESCE(rl.source::text, 'website_registration') AS source,
+      EXISTS (
+        SELECT 1
+        FROM fee_vouchers fv
+        WHERE fv.registration_id = rl.id
+      ) AS has_voucher,
+      CASE
+        WHEN rl.status::text = 'new_lead'
+         AND NOT EXISTS (
+           SELECT 1
+           FROM fee_vouchers fv
+           WHERE fv.registration_id = rl.id
+         )
+        THEN true
+        ELSE false
+      END AS can_create_voucher,
+      LOWER(rl.status::text) AS status
+    FROM registration_leads rl
     ${whereClause}
-    ORDER BY updated_at DESC NULLS LAST, created_at DESC NULLS LAST, id DESC
+    ORDER BY rl.created_at DESC NULLS LAST, rl.id DESC
     `,
     ...values
   );
@@ -119,11 +108,11 @@ export default async function CoordinatorRegistrationLeadsPage({ searchParams })
         <p className="text-sm font-semibold uppercase tracking-[0.24em] text-sky-700">Registration leads</p>
         <h1 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">Google Sheet intake records</h1>
         <p className="mt-3 text-sm leading-7 text-slate-600 sm:text-base">
-          Sync, review, and prepare registration leads for voucher creation.
+          Review and prepare registration leads for voucher creation.
         </p>
       </section>
 
-      <RegistrationLeadFilters initialSearch={search} initialStatus={status} canSync />
+      <RegistrationLeadFilters initialSearch={search} initialStatus={status} canSync={false} />
       <ShowMoreSection
         items={leads}
         initialCount={10}

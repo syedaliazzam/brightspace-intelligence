@@ -4,7 +4,7 @@ export const dashboardNavigation = {
     { label: "User Management", href: "/admin/users" },
     { label: "Subject Catalog", href: "/admin/subjects" },
     { label: "Class Management", href: "/admin/courses" },
-    { label: "Fee Settings", href: "/admin/fee-settings" },
+    { label: "Fee Management", href: "/admin/fee-settings" },
     { label: "Audit History", href: "/admin/audit-logs" },
   ],
   coordinator: [

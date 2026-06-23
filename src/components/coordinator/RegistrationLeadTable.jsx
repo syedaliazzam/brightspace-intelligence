@@ -90,7 +90,7 @@ export default function RegistrationLeadTable({ leads }) {
                   </td>
                   <td className="px-6 py-5">
                     <p className="font-medium text-slate-800">{lead.class_level}</p>
-                    <p className="mt-1 text-sm text-slate-500">{lead.preferred_schedule || "Schedule pending"}</p>
+                    <p className="mt-1 text-sm text-slate-500">{lead.source || "website_registration"}</p>
                   </td>
                   <td className="px-6 py-5">
                     <p className="text-sm text-slate-700">{lead.email || "No email"}</p>
@@ -150,8 +150,8 @@ export default function RegistrationLeadTable({ leads }) {
                 <dd className="mt-1 text-slate-800">{lead.email || lead.phone || "Not provided"}</dd>
               </div>
               <div>
-                <dt className="font-medium text-slate-500">Schedule</dt>
-                <dd className="mt-1 text-slate-800">{lead.preferred_schedule || "Pending"}</dd>
+                <dt className="font-medium text-slate-500">Source</dt>
+                <dd className="mt-1 text-slate-800">{lead.source || "website_registration"}</dd>
               </div>
               <div>
                 <dt className="font-medium text-slate-500">Submitted</dt>
