@@ -352,7 +352,7 @@ export default function CoordinatorDashboardPage() {
           <RegistrationLeadFilters
             initialSearch={leadFilter.search}
             initialStatus={leadFilter.status}
-            canSync={true}
+            canSync={false}
             onFilterChange={(next) => setLeadFilter(next)}
           />
           <ShowMoreSection
