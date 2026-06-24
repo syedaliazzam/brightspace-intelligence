@@ -24,9 +24,10 @@ export default function TeacherAssignmentForm({ options, onSuccess }) {
       setSubjectsLoading(true);
 
       try {
-        const response = await fetch(`/api/coordinator/classes/${form.courseId}/subjects`, {
-          cache: "no-store",
-        });
+        const response = await fetch(
+          `/api/coordinator/teacher-assignments/lookup?course_id=${encodeURIComponent(form.courseId)}`,
+          { cache: "no-store" }
+        );
         const data = await response.json();
 
         if (!response.ok) {
@@ -91,11 +92,11 @@ export default function TeacherAssignmentForm({ options, onSuccess }) {
       </select>
       <div className="flex gap-3">
         <select value={form.subjectId} onChange={(event) => setForm((current) => ({ ...current, subjectId: event.target.value }))} className="flex-1 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm">
-          <option value="">
+          <option value="" disabled>
             {subjectsLoading
-              ? "Loading class subjects..."
+              ? "Loading available subjects..."
               : form.courseId
-                ? "Select class subject"
+                ? "Select available subject"
                 : "Select class first"}
           </option>
           {classSubjects.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}

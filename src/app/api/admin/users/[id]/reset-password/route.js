@@ -127,7 +127,7 @@ export async function POST(request, { params }) {
     const [updated] = await prisma.$queryRaw`
       UPDATE users
       SET password_hash = ${passwordHash}
-      WHERE id = ${id}
+      WHERE id = ${id}::uuid
       RETURNING id::text AS id
     `;
 

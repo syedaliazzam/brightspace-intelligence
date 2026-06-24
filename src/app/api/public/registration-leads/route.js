@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { normalizeClassLevel } from "@/lib/academicCatalog";
+import { sendEmail } from "@/lib/email";
 import prisma from "@/lib/prisma";
 
 function json(success, message, status) {
@@ -90,14 +91,115 @@ export async function POST(request) {
     `;
 
     if (leadToken && createdLead?.id) {
+      const [interestedStudent] = await prisma.$queryRaw`
+        SELECT
+          student_name,
+          parent_name,
+          email,
+          phone
+        FROM interested_students
+        WHERE registration_token = ${leadToken}
+        LIMIT 1
+      `;
+
+      const [coordinator] = await prisma.$queryRaw`
+        SELECT
+          u.email,
+          u.full_name
+        FROM users u
+        INNER JOIN roles r ON r.id = u.role_id
+        WHERE LOWER(r.name) = 'coordinator'
+          AND LOWER(u.status::text) = 'active'
+          AND COALESCE(NULLIF(TRIM(u.email), ''), '') <> ''
+        ORDER BY u.created_at ASC NULLS LAST, u.id ASC
+        LIMIT 1
+      `;
+
       await prisma.$executeRaw`
-        UPDATE interested_students
-        SET
-          status = 'registered',
-          registration_lead_id = ${createdLead.id}::uuid,
-          updated_at = NOW()
+        DELETE FROM interested_students
         WHERE registration_token = ${leadToken}
       `;
+
+      if (interestedStudent?.email) {
+        const parentSubject = `Registration form submitted for ${studentName}`;
+        const parentText = `Assalamualaikum ${parentName},
+
+Your child has been successfully submitted the registration form.
+
+Student: ${studentName}
+Parent: ${parentName}
+Email: ${email}
+Phone: ${phone}
+Class Level: ${classLevel}
+Status: submitted
+
+Our coordinator will contact you soon.`;
+        const parentHtml = `
+          <div style="font-family:Arial,sans-serif;background:#f8fafc;padding:24px;color:#0f172a;">
+            <div style="max-width:640px;margin:0 auto;background:#fff;border:1px solid #e2e8f0;border-radius:20px;padding:24px;">
+              <p style="margin:0 0 12px;font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:#0284c7;font-weight:700;">Registration form submitted</p>
+              <p style="margin:0 0 16px;font-size:15px;line-height:1.7;">Assalamualaikum <strong>${parentName}</strong>,</p>
+              <p style="margin:0 0 16px;font-size:15px;line-height:1.7;">Your child has been successfully .</p>
+              <div style="border:1px solid #e2e8f0;border-radius:16px;padding:16px;background:#f8fafc;font-size:14px;line-height:1.8;">
+                <div><strong>Student:</strong> ${studentName}</div>
+                <div><strong>Parent:</strong> ${parentName}</div>
+                <div><strong>Email:</strong> ${email}</div>
+                <div><strong>Phone:</strong> ${phone}</div>
+                <div><strong>Class Level:</strong> ${classLevel}</div>
+                <div><strong>Status:</strong> submitted</div>
+              </div>
+              <p style="margin:20px 0 0;font-size:13px;line-height:1.7;color:#64748b;">Our coordinator will contact you soon.</p>
+            </div>
+          </div>
+        `;
+
+        await sendEmail({
+          to: interestedStudent.email,
+          subject: parentSubject,
+          html: parentHtml,
+          text: parentText,
+        });
+      }
+
+      if (coordinator?.email) {
+        const coordinatorSubject = `Student submitted a registration form: ${studentName}`;
+        const coordinatorText = `Assalamualaikum ${coordinator?.full_name || "Coordinator"},
+
+A student has been successfully submitted a registration form.
+
+Student: ${studentName}
+Parent: ${parentName}
+Email: ${email}
+Phone: ${phone}
+Class Level: ${classLevel}
+Status: submitted
+
+Lead token: ${leadToken}`;
+        const coordinatorHtml = `
+          <div style="font-family:Arial,sans-serif;background:#f8fafc;padding:24px;color:#0f172a;">
+            <div style="max-width:640px;margin:0 auto;background:#fff;border:1px solid #e2e8f0;border-radius:20px;padding:24px;">
+              <p style="margin:0 0 12px;font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:#0284c7;font-weight:700;">Student submited a registration form</p>
+              <p style="margin:0 0 16px;font-size:15px;line-height:1.7;">Assalamualaikum <strong>${coordinator?.full_name || "Coordinator"}</strong>,</p>
+              <p style="margin:0 0 16px;font-size:15px;line-height:1.7;">A student has been successfully submitted the registration form.</p>
+              <div style="border:1px solid #e2e8f0;border-radius:16px;padding:16px;background:#f8fafc;font-size:14px;line-height:1.8;">
+                <div><strong>Student:</strong> ${studentName}</div>
+                <div><strong>Parent:</strong> ${parentName}</div>
+                <div><strong>Email:</strong> ${email}</div>
+                <div><strong>Phone:</strong> ${phone}</div>
+                <div><strong>Class Level:</strong> ${classLevel}</div>
+                <div><strong>Status:</strong> submitted</div>
+              </div>
+            </div>
+          </div>
+        `;
+
+        await sendEmail({
+          to: coordinator.email,
+          subject: coordinatorSubject,
+          html: coordinatorHtml,
+          text: coordinatorText,
+        });
+      }
     }
 
     return json(true, "Registration submitted successfully. Our coordinator will contact you soon.", 201);

@@ -188,7 +188,7 @@ export default function RegistrationPage() {
             </div>
             <div className="mt-10 rounded-3xl bg-slate-950 px-6 py-6 text-white shadow-lg">
               <p className="text-sm uppercase tracking-[0.24em] text-sky-200">What happens next</p>
-              <p className="mt-3 max-w-md text-sm leading-6 text-slate-300">New submissions go directly into the coordinator registration lead queue so the admissions process can begin right away.</p>
+              <p className="mt-3 max-w-md text-sm leading-6 text-slate-300">New submissions go directly into the coordinator registration record queue so the admissions process can begin right away.</p>
             </div>
           </motion.section>
 

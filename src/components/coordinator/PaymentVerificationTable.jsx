@@ -39,6 +39,9 @@ export default function PaymentVerificationTable({ items, onRefresh }) {
   const [pendingId, setPendingId] = useState("");
   const [selectedItem, setSelectedItem] = useState(null);
   const [credentialsEmail, setCredentialsEmail] = useState(null);
+  const [rejectingItem, setRejectingItem] = useState(null);
+  const [rejectionReason, setRejectionReason] = useState("");
+  const [rejecting, setRejecting] = useState(false);
 
   function openProofPreview(item) {
     const previewItem = {
@@ -54,12 +57,10 @@ export default function PaymentVerificationTable({ items, onRefresh }) {
   }
 
   async function verifyPayment(id, action) {
-    const rejectionReason =
-      action === "reject"
-        ? window.prompt("Enter rejection reason")
-        : "";
-
-    if (action === "reject" && !rejectionReason) {
+    if (action === "reject") {
+      const item = items.find((entry) => entry.id === id) || null;
+      setRejectingItem(item);
+      setRejectionReason("");
       return;
     }
 
@@ -69,7 +70,7 @@ export default function PaymentVerificationTable({ items, onRefresh }) {
       const response = await fetch(`/api/coordinator/payments/${id}/verify`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action, rejectionReason }),
+      body: JSON.stringify({ action, rejectionReason: "" }),
       });
 
       const data = await response.json();
@@ -95,6 +96,38 @@ export default function PaymentVerificationTable({ items, onRefresh }) {
     const phone = credentialsEmail?.parent_phone || "";
     if (!phone) return;
     await navigator.clipboard.writeText(phone);
+  }
+
+  async function submitRejection(event) {
+    event.preventDefault();
+    if (!rejectingItem) return;
+    if (!rejectionReason.trim()) return;
+
+    setRejecting(true);
+    setPendingId(`${rejectingItem.id}:reject`);
+
+    try {
+      const response = await fetch(`/api/coordinator/payments/${rejectingItem.id}/verify`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "reject", rejectionReason: rejectionReason.trim() }),
+      });
+
+      const data = await response.json();
+      if (!response.ok) {
+        alert(data.message || "Payment verification failed");
+        return;
+      }
+
+      onRefresh?.();
+    } catch (error) {
+      window.alert(error instanceof Error ? error.message : "Payment verification failed.");
+    } finally {
+      setRejecting(false);
+      setPendingId("");
+      setRejectingItem(null);
+      setRejectionReason("");
+    }
   }
 
   if (!items.length) {
@@ -270,8 +303,8 @@ export default function PaymentVerificationTable({ items, onRefresh }) {
       />
 
       {credentialsEmail ? (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/50 px-4 py-8">
-          <div className="w-full max-w-2xl rounded-[2rem] border border-white/70 bg-white p-6 shadow-[0_24px_80px_-36px_rgba(15,23,42,0.32)] sm:p-8">
+        <div className="fixed inset-0 z-[70] flex items-start justify-center overflow-hidden bg-slate-950/50 px-4 pt-28 pb-10">
+          <div className="w-full max-w-2xl max-h-[calc(100vh-6.5rem)] overflow-y-auto rounded-[2rem] border border-white/70 bg-white p-6 shadow-[0_24px_80px_-36px_rgba(15,23,42,0.32)] sm:p-8">
             <p className="text-sm font-semibold uppercase tracking-[0.24em] text-emerald-700">
               Payment Approved Successfully
             </p>
@@ -314,6 +347,51 @@ export default function PaymentVerificationTable({ items, onRefresh }) {
                 Close
               </button>
             </div>
+          </div>
+        </div>
+      ) : null}
+
+      {rejectingItem ? (
+        <div className="fixed inset-0 z-[70] flex items-start justify-center overflow-hidden bg-slate-950/50 px-4 pt-28 pb-10">
+          <div className="w-full max-w-2xl max-h-[calc(100vh-6.5rem)] overflow-y-auto rounded-[2rem] border border-white/70 bg-white p-6 shadow-[0_24px_80px_-36px_rgba(15,23,42,0.32)] sm:p-8">
+            <p className="text-sm font-semibold uppercase tracking-[0.24em] text-rose-700">Reject Payment</p>
+            <p className="mt-2 text-sm text-slate-600">
+              Enter the rejection reason for <span className="font-semibold text-slate-950">{rejectingItem.student_name || "this payment"}</span>.
+            </p>
+
+            <form onSubmit={submitRejection} className="mt-5 space-y-4">
+              <label className="space-y-2 block">
+                <span className="text-sm font-medium text-slate-700">Reason</span>
+                <textarea
+                  value={rejectionReason}
+                  onChange={(event) => setRejectionReason(event.target.value)}
+                  rows={5}
+                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-rose-400 focus:ring-4 focus:ring-rose-100"
+                  placeholder="Enter reason for rejection"
+                />
+              </label>
+
+              <div className="flex flex-wrap justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (rejecting) return;
+                    setRejectingItem(null);
+                    setRejectionReason("");
+                  }}
+                  className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={rejecting || !rejectionReason.trim()}
+                  className="rounded-2xl bg-rose-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {rejecting ? "Rejecting..." : "Reject payment"}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       ) : null}

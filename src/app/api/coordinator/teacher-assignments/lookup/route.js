@@ -20,8 +20,31 @@ export async function GET(request) {
     const courseId = normalizeText(searchParams.get("course_id") || searchParams.get("courseId"));
     const subjectId = normalizeText(searchParams.get("subject_id") || searchParams.get("subjectId"));
 
-    if (!courseId || !subjectId) {
-      return json("course_id and subject_id are required.", 400);
+    if (!courseId) {
+      return json("course_id is required.", 400);
+    }
+
+    if (!subjectId) {
+      const items = await prisma.$queryRaw`
+        SELECT
+          s.id::text AS id,
+          s.name
+        FROM course_subjects cs
+        INNER JOIN subjects s ON s.id = cs.subject_id
+        WHERE cs.course_id = ${courseId}::uuid
+          AND COALESCE(s.status, 'active'::user_status) = 'active'::user_status
+          AND NOT EXISTS (
+            SELECT 1
+            FROM teacher_assignments ta
+            WHERE ta.course_id = cs.course_id
+              AND ta.subject_id = cs.subject_id
+              AND ta.student_id IS NULL
+              AND ta.status = 'active'::user_status
+          )
+        ORDER BY s.name ASC
+      `;
+
+      return json("Available subjects fetched.", 200, { items });
     }
 
     const items = await prisma.$queryRaw`

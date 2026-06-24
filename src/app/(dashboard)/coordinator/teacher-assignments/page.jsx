@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import CoordinatorPortalNavbar from "@/components/coordinator/CoordinatorPortalNavbar";
 import TeacherAssignmentForm from "@/components/coordinator/TeacherAssignmentForm";
 import TeacherAssignmentTable from "@/components/coordinator/TeacherAssignmentTable";
 import ShowMoreSection from "@/components/coordinator/ShowMoreSection";
@@ -47,9 +46,7 @@ export default function CoordinatorTeacherAssignmentsPage() {
 
   return (
     <div className="space-y-6">
-      <CoordinatorPortalNavbar />
       <section className="rounded-[2rem] border border-white/70 bg-[linear-gradient(135deg,rgba(255,255,255,0.92),rgba(241,248,255,0.92))] p-6 shadow-[0_24px_80px_-36px_rgba(15,23,42,0.25)] sm:p-8">
-        <p className="text-sm font-semibold uppercase tracking-[0.24em] text-sky-700">Teacher assignments</p>
         <h1 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">Class and subject assignments</h1>
         <p className="mt-3 text-sm leading-7 text-slate-600 sm:text-base">
           Assign teachers to class subjects and manage active assignments.

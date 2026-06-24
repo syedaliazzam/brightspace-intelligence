@@ -15,7 +15,12 @@ function getInitials(value) {
 }
 
 export default function Topbar({ session, onMenuClick, onToggleCollapsed, collapsed }) {
-  const userName = session?.user?.name || session?.user?.email || "User";
+  const userName =
+  session?.user?.full_name ||
+  session?.user?.name ||
+  session?.user?.username ||
+  session?.user?.email ||
+  "User";
   const role = getRoleLabel(session?.user?.role);
 
   return (
@@ -55,14 +60,10 @@ export default function Topbar({ session, onMenuClick, onToggleCollapsed, collap
               {getInitials(userName)}
             </div>
             <div className="leading-tight">
-              <p className="text-sm font-semibold text-slate-950">{userName}</p>
+              <p className="text-sm font-semibold text-slate-950">{session?.user?.email}</p>
               <p className="text-xs text-slate-500">{role}</p>
             </div>
           </div>
-
-          <span className="rounded-full bg-sky-50 px-3 py-1 text-xs font-semibold text-sky-700">
-            {role}
-          </span>
 
           <button
             type="button"

@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 
 const LABELS = {
-  new_lead: "New leads",
+  new_lead: "New Records",
   voucher_created: "Voucher created",
   fee_submitted: "Fee submitted",
   fee_verified: "Payment verified",
@@ -31,7 +31,7 @@ const REPORTS = [
     title: "Registration Pipeline",
     description: "Where each student registration currently stands.",
     itemLabel: "Registration status",
-    valueLabel: "Leads",
+    valueLabel: "Records",
   },
   {
     key: "feeVerification",

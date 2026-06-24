@@ -46,11 +46,11 @@ export default function FeeVoucherFilters({ initialSearch, initialStatus = "", o
     if (safeStatus) {
       params.set("status", safeStatus);
     } else {
-      params.delete("status");
+      params.set("status", "all");
     }
     startTransition(() => {
       replaceWithHash(params);
-      onFilterChange?.({ search: safeSearch, status: safeStatus });
+      onFilterChange?.({ search: safeSearch, status: safeStatus || "all" });
       if (typeof window !== "undefined") {
         const hash = window.location.hash;
         if (hash) {

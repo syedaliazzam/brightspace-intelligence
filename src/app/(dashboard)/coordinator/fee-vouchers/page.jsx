@@ -1,10 +1,9 @@
 import { Prisma } from "@prisma/client";
 import { redirect } from "next/navigation";
-import CoordinatorPortalNavbar from "@/components/coordinator/CoordinatorPortalNavbar";
 import FeeVoucherFilters from "@/components/coordinator/FeeVoucherFilters";
 import FeeVoucherForm from "@/components/coordinator/FeeVoucherForm";
 import FeeVoucherTable from "@/components/coordinator/FeeVoucherTable";
-import ShowMoreSection from "@/components/coordinator/ShowMoreSection";
+import ShowMoreSectionServer from "@/components/coordinator/ShowMoreSectionServer";
 import { auth, roleToDashboard } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 
@@ -118,35 +117,36 @@ export default async function CoordinatorFeeVouchersPage({ searchParams }) {
 
   const resolvedParams = await searchParams;
   const search = normalizeText(resolvedParams?.search);
-  const status = normalizeText(resolvedParams?.status).toLowerCase() || "unpaid";
+  const statusParam = normalizeText(resolvedParams?.status).toLowerCase();
+  const status = statusParam === "all" ? "" : statusParam || "unpaid";
+  const page = Number(resolvedParams?.page || 1) || 1;
   const [eligibleLeads, vouchers] = await Promise.all([
     getEligibleLeads(),
     getVouchers(search, status),
   ]);
 
   return (
-    <div className="space-y-6">
-      <CoordinatorPortalNavbar profile={session.user} />
+    <div className="min-h-screen space-y-6">
       <section className="rounded-[2rem] border border-white/70 bg-[linear-gradient(135deg,rgba(255,255,255,0.92),rgba(241,248,255,0.92))] p-6 shadow-[0_24px_80px_-36px_rgba(15,23,42,0.25)] sm:p-8">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <p className="text-sm font-semibold uppercase tracking-[0.24em] text-sky-700">Fee vouchers</p>
-            <h1 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">Voucher creation and tracking</h1>
+            <h1 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">Fee vouchers tracking</h1>
             <p className="mt-3 text-sm leading-7 text-slate-600 sm:text-base">
               Create fee vouchers for eligible leads and monitor their payment status.
             </p>
           </div>
-          <FeeVoucherForm leads={eligibleLeads} />
+          <FeeVoucherForm leads={eligibleLeads} showTrigger={false} />
         </div>
       </section>
 
       <FeeVoucherFilters initialSearch={search} initialStatus={status} />
-      <ShowMoreSection
+      <ShowMoreSectionServer
         items={vouchers}
-        initialCount={10}
-        step={10}
+        page={page}
+        pageSize={7}
         renderItems={(visibleItems) => <FeeVoucherTable vouchers={visibleItems} />}
         emptyMessage="No fee vouchers match the current filters."
+        hrefBase="/coordinator/fee-vouchers"
       />
     </div>
   );

@@ -20,7 +20,16 @@ function parseDate(value) {
   if (!text) return "";
   const normalized = text.includes("T") ? text : text.replace(" ", "T");
   const date = new Date(normalized);
-  return Number.isNaN(date.getTime()) ? "" : date.toISOString();
+  if (Number.isNaN(date.getTime())) return "";
+
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  const hours = String(date.getHours()).padStart(2, "0");
+  const minutes = String(date.getMinutes()).padStart(2, "0");
+  const seconds = String(date.getSeconds()).padStart(2, "0");
+
+  return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}`;
 }
 
 function formatLocalDate(value) {
@@ -92,16 +101,35 @@ export default function LMSCalendar({
   const [error, setError] = useState("");
   const [selected, setSelected] = useState(null);
   const [view, setView] = useState("dayGridMonth");
+  const activeDate = filters.date || formatLocalDate(new Date());
+  const firstEventDate = events[0]?.start ? String(events[0].start).slice(0, 10) : "";
 
   const query = useMemo(() => {
     const params = new URLSearchParams({
       range: "all",
-      date: filters.date || formatLocalDate(new Date()),
+      date: activeDate,
       subjectId: filters.subjectId || "",
       status: filters.status || "",
     });
     return params.toString();
-  }, [filters.date, filters.subjectId, filters.status]);
+  }, [activeDate, filters.subjectId, filters.status]);
+
+  useEffect(() => {
+    calendarRef.current?.getApi?.().gotoDate?.(activeDate);
+  }, [activeDate, view]);
+
+  useEffect(() => {
+    const api = calendarRef.current?.getApi?.();
+    if (!api || !events.length) return;
+
+    if (view !== "dayGridMonth") {
+      const hasEventOnActiveDate = events.some((event) => String(event.start || "").slice(0, 10) === activeDate);
+      const targetDate = hasEventOnActiveDate ? activeDate : firstEventDate || activeDate;
+      if (targetDate) {
+        api.gotoDate?.(targetDate);
+      }
+    }
+  }, [activeDate, events, firstEventDate, view]);
 
   useEffect(() => {
     let ignore = false;
@@ -218,7 +246,12 @@ export default function LMSCalendar({
 
   function changeView(nextView) {
     setView(nextView);
-    calendarRef.current?.getApi?.().changeView(nextView);
+    const api = calendarRef.current?.getApi?.();
+    const targetDate = nextView === "timeGridDay" ? firstEventDate || activeDate : activeDate;
+    if (targetDate) {
+      api?.gotoDate?.(targetDate);
+    }
+    api?.changeView(nextView);
   }
 
   function scrollToLectureDate(dateStr) {
@@ -267,9 +300,11 @@ export default function LMSCalendar({
       <div className="grid gap-4 xl:grid-cols-[1fr_320px]">
         <div className="overflow-hidden rounded-[1.5rem] border border-slate-200 bg-slate-50 p-3">
           <FullCalendar
+            key={view}
             ref={calendarRef}
             plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
             initialView={view}
+            initialDate={activeDate}
             headerToolbar={{
               left: "prev,next today",
               center: "title",
@@ -287,8 +322,8 @@ export default function LMSCalendar({
             eventDisplay="block"
             eventTimeFormat={{ hour: "numeric", minute: "2-digit", hour12: true }}
             loading={setLoading}
-            slotMinTime="06:00:00"
-            slotMaxTime="22:00:00"
+            slotMinTime="00:00:00"
+            slotMaxTime="24:00:00"
             eventClassNames={() => ["cursor-pointer"]}
             eventContent={(arg) => (
               <div className="overflow-hidden px-1 text-[11px] leading-tight">

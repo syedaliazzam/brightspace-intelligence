@@ -57,7 +57,7 @@ export async function GET(request) {
       whereClause = `WHERE ${approvedCondition}`;
       orderClause = "ORDER BY ls.scheduled_start DESC";
     } else if (filter === "rejected") {
-      whereClause = `WHERE ${rejectedCondition}`;
+      whereClause = `WHERE ${rejectedCondition} OR ${missedCondition}`;
       orderClause = "ORDER BY ls.scheduled_start DESC";
     } else if (filter === "missed") {
       whereClause = `WHERE ${missedCondition}`;

@@ -22,8 +22,26 @@ export default function InterestedStudentsPanel({ items = [], onRefresh }) {
   const [loadingId, setLoadingId] = useState("");
   const [link, setLink] = useState("");
   const [message, setMessage] = useState("");
+  const [linkMessage, setLinkMessage] = useState("");
 
   const selectedLink = useMemo(() => selected?.registration_link || link || "", [selected, link]);
+
+  function buildLinkMessage(item, registrationLink) {
+    const studentName = item?.student_name || "Student";
+    const parentName = item?.parent_name || "Parent";
+    return [
+      "Assalamualaikum,",
+      "",
+      "Interested student details:",
+      `Student: ${studentName}`,
+      `Parent: ${parentName}`,
+      `Email: ${item?.email || "-"}`,
+      `Phone: ${item?.phone || "-"}`,
+      "",
+      "Registration Link:",
+      registrationLink,
+    ].join("\n");
+  }
 
   async function generateLink(item) {
     setLoadingId(item.id);
@@ -35,7 +53,7 @@ export default function InterestedStudentsPanel({ items = [], onRefresh }) {
       });
       const data = await response.json();
       if (!response.ok || !data?.success) {
-        throw new Error(data?.message || "Unable to generate registration link.");
+        throw new Error(data?.message || "Unable to generate registration message.");
       }
 
       setSelected((current) => ({
@@ -45,10 +63,11 @@ export default function InterestedStudentsPanel({ items = [], onRefresh }) {
         status: data.already_generated ? current?.status || item.status : "link_generated",
       }));
       setLink(data.registration_link || "");
-      setMessage(data.already_generated ? "Existing registration link loaded." : "Registration link generated.");
+      setLinkMessage(buildLinkMessage(item, data.registration_link || ""));
+      setMessage(data.already_generated ? "Existing registration message and link loaded." : "Registration message and link generated.");
       await onRefresh?.();
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Unable to generate registration link.");
+      setMessage(error instanceof Error ? error.message : "Unable to generate registration message.");
     } finally {
       setLoadingId("");
     }
@@ -58,6 +77,12 @@ export default function InterestedStudentsPanel({ items = [], onRefresh }) {
     if (!selectedLink) return;
     await navigator.clipboard.writeText(selectedLink);
     setMessage("Registration link copied.");
+  }
+
+  async function copyLinkMessage() {
+    if (!linkMessage) return;
+    await navigator.clipboard.writeText(linkMessage);
+    setMessage("Registration message copied.");
   }
 
   if (!items.length) {
@@ -112,8 +137,8 @@ export default function InterestedStudentsPanel({ items = [], onRefresh }) {
       </section>
 
       {selected ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 px-4 py-6">
-          <div className="w-full max-w-2xl rounded-[2rem] bg-white p-6 shadow-[0_24px_80px_-32px_rgba(15,23,42,0.35)]">
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-hidden bg-slate-950/50 px-4 pt-28 pb-10">
+          <div className="w-full max-w-2xl max-h-[calc(100vh-6.5rem)] overflow-y-auto rounded-[2rem] bg-white p-6 shadow-[0_24px_80px_-32px_rgba(15,23,42,0.35)]">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <p className="text-sm font-semibold uppercase tracking-[0.24em] text-sky-700">Interested student</p>
@@ -130,8 +155,49 @@ export default function InterestedStudentsPanel({ items = [], onRefresh }) {
               <div><dt className="text-slate-500">Phone</dt><dd className="mt-1 font-medium text-slate-900">{selected.phone || "-"}</dd></div>
               <div><dt className="text-slate-500">Status</dt><dd className="mt-1 font-medium text-slate-900">{statusLabel(selected.status)}</dd></div>
               <div><dt className="text-slate-500">Created At</dt><dd className="mt-1 font-medium text-slate-900">{formatDate(selected.created_at)}</dd></div>
-              <div><dt className="text-slate-500">Registration Link</dt><dd className="mt-1 break-all font-medium text-slate-900">{selectedLink || "Not generated yet."}</dd></div>
+              <div>
+                <dt className="flex items-center justify-between gap-3 text-slate-500">
+                  <span>Registration Link</span>
+                  {selectedLink ? (
+                    <button
+                      type="button"
+                      onClick={() => void copyLink()}
+                      className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700 transition hover:bg-slate-100"
+                      aria-label="Copy registration link"
+                      title="Copy registration link"
+                    >
+                      <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                        <rect x="9" y="9" width="11" height="11" rx="2" />
+                        <path d="M5 15V5a2 2 0 0 1 2-2h10" />
+                      </svg>
+                    </button>
+                  ) : null}
+                </dt>
+                <dd className="mt-1 break-all font-medium text-slate-900">{selectedLink || "Not generated yet."}</dd>
+              </div>
             </dl>
+
+            {linkMessage ? (
+              <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-700">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="space-y-1">
+                    <p className="font-semibold text-slate-950">Registration message</p>
+                    <p className="whitespace-pre-wrap leading-7">{linkMessage}</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => void copyLinkMessage()}
+                    className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-100"
+                  >
+                    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                      <rect x="9" y="9" width="11" height="11" rx="2" />
+                      <path d="M5 15V5a2 2 0 0 1 2-2h10" />
+                    </svg>
+                    Copy Msg
+                  </button>
+                </div>
+              </div>
+            ) : null}
 
             {message ? <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">{message}</div> : null}
 
@@ -142,13 +208,9 @@ export default function InterestedStudentsPanel({ items = [], onRefresh }) {
                 disabled={loadingId === selected.id}
                 className="rounded-full bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-70"
               >
-                {loadingId === selected.id ? "Generating..." : selected.registration_token ? "Generate Registration Link" : "Generate Registration Link"}
+                {loadingId === selected.id ? "Generating..." : selected.registration_token ? "Generate Registration Message" : "Generate Registration Message"}
               </button>
-              {selectedLink ? (
-                <button type="button" onClick={() => void copyLink()} className="rounded-full border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-100">
-                  Copy Link
-                </button>
-              ) : null}
+              {selectedLink ? null : null}
             </div>
           </div>
         </div>

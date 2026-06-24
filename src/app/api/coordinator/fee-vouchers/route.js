@@ -301,6 +301,7 @@ async function insertAuditLog(actorUserId, entityId, action, description, metada
 async function insertOutboundMessage({
   voucherId,
   recipientEmail,
+  recipientPhone,
   subject,
   body,
   bodyText,
@@ -333,6 +334,7 @@ async function insertOutboundMessage({
   push("related_entity_type", "fee_voucher");
   push("related_entity_id", voucherId);
   push("recipient_email", recipientEmail);
+  push("recipient_phone", recipientPhone || "");
   push("subject", subject);
   push("body", body);
   push("body_text", bodyText || "");
@@ -364,6 +366,7 @@ async function insertOutboundMessage({
   return {
     id: messageId,
     recipient_email: recipientEmail,
+    recipient_phone: recipientPhone || "",
     subject,
     body,
     body_text: bodyText || "",
@@ -652,7 +655,13 @@ export async function GET(request) {
         fv.amount,
         fv.due_date,
         fv.payment_method,
+        pm.name AS payment_method_name,
         pm.bank_name,
+        pm.account_title,
+        pm.account_number,
+        pm.iban,
+        pm.branch_code,
+        pm.instructions AS payment_method_instructions,
         fv.payment_instructions,
         LOWER(rl.status::text) AS lead_status,
         LOWER(fv.status::text) AS voucher_status,
@@ -660,8 +669,16 @@ export async function GET(request) {
         rl.id::text AS registration_lead_id,
         rl.student_name,
         rl.parent_name,
+        rl.class_level,
         rl.email,
-        rl.phone
+        rl.phone,
+        fv.regular_fee_applied,
+        fv.regular_fee_amount,
+        fv.admission_fee_amount,
+        fv.discount_percent,
+        fv.discount_amount,
+        fv.subtotal_amount,
+        fv.total_amount
       FROM fee_vouchers fv
       INNER JOIN registration_leads rl ON rl.id = fv.registration_id
       LEFT JOIN payment_methods pm ON pm.id = fv.payment_method_id
@@ -671,7 +688,20 @@ export async function GET(request) {
       ...values
     );
 
-    return json("Fee vouchers fetched.", 200, { items });
+    return json("Fee vouchers fetched.", 200, {
+      items: items.map((item) => ({
+        ...item,
+        payment_method_details: {
+          name: item.payment_method_name || item.payment_method || "",
+          bank_name: item.bank_name || "",
+          account_title: item.account_title || "",
+          account_number: item.account_number || "",
+          iban: item.iban || "",
+          branch_code: item.branch_code || "",
+          instructions: item.payment_method_instructions || item.payment_instructions || "",
+        },
+      })),
+    });
   } catch (error) {
     return json(
       error instanceof Error ? error.message : "Unable to fetch fee vouchers.",
@@ -725,7 +755,13 @@ export async function POST(request) {
         fv.amount,
         fv.due_date,
         fv.payment_method,
+        pm.name AS payment_method_name,
         pm.bank_name,
+        pm.account_title,
+        pm.account_number,
+        pm.iban,
+        pm.branch_code,
+        pm.instructions AS payment_method_instructions,
         fv.payment_instructions,
         LOWER(rl.status::text) AS lead_status,
         LOWER(fv.status::text) AS voucher_status,
@@ -733,8 +769,16 @@ export async function POST(request) {
         rl.id::text AS registration_lead_id,
         rl.student_name,
         rl.parent_name,
+        rl.class_level,
         rl.email,
-        rl.phone
+        rl.phone,
+        fv.regular_fee_applied,
+        fv.regular_fee_amount,
+        fv.admission_fee_amount,
+        fv.discount_percent,
+        fv.discount_amount,
+        fv.subtotal_amount,
+        fv.total_amount
       FROM fee_vouchers fv
       INNER JOIN registration_leads rl ON rl.id = fv.registration_id
       LEFT JOIN payment_methods pm ON pm.id = fv.payment_method_id
@@ -745,7 +789,21 @@ export async function POST(request) {
 
     if (existingVoucher?.id) {
       return json("Fee voucher already exists for this registration lead.", 200, {
-        item: existingVoucher,
+        item: {
+          ...existingVoucher,
+          payment_method_details: {
+            name: existingVoucher.payment_method_name || existingVoucher.payment_method || "",
+            bank_name: existingVoucher.bank_name || "",
+            account_title: existingVoucher.account_title || "",
+            account_number: existingVoucher.account_number || "",
+            iban: existingVoucher.iban || "",
+            branch_code: existingVoucher.branch_code || "",
+            instructions:
+              existingVoucher.payment_method_instructions ||
+              existingVoucher.payment_instructions ||
+              "",
+          },
+        },
         existing: true,
       });
     }
@@ -938,7 +996,13 @@ export async function POST(request) {
           fv.total_amount,
           fv.due_date,
           fv.payment_method,
+          pm.name AS payment_method_name,
           pm.bank_name,
+          pm.account_title,
+          pm.account_number,
+          pm.iban,
+          pm.branch_code,
+          pm.instructions AS payment_method_instructions,
           fv.payment_instructions,
           LOWER(rl.status::text) AS lead_status,
           LOWER(fv.status::text) AS voucher_status,
@@ -946,8 +1010,16 @@ export async function POST(request) {
           rl.id::text AS registration_lead_id,
           rl.student_name,
           rl.parent_name,
+          rl.class_level,
           rl.email,
-          rl.phone
+          rl.phone,
+          fv.regular_fee_applied,
+          fv.regular_fee_amount,
+          fv.admission_fee_amount,
+          fv.discount_percent,
+          fv.discount_amount,
+          fv.subtotal_amount,
+          fv.total_amount
         FROM fee_vouchers fv
         INNER JOIN registration_leads rl ON rl.id = fv.registration_id
         LEFT JOIN payment_methods pm ON pm.id = fv.payment_method_id
@@ -993,6 +1065,7 @@ export async function POST(request) {
       const emailMessage = await insertOutboundMessage({
         voucherId,
         recipientEmail: lead.email,
+        recipientPhone: lead.phone || "",
         subject,
         body: emailHtml,
         bodyText: emailText,
@@ -1048,10 +1121,10 @@ export async function POST(request) {
       `;
     }
 
-    return json(
-      emailSendStatus === "sent"
-        ? "Voucher created and email sent successfully."
-        : "Voucher created successfully, but email sending failed.",
+      return json(
+        emailSendStatus === "sent"
+          ? "Voucher created and email sent successfully."
+          : "Voucher created successfully, but email sending failed.",
       201,
       {
         success: true,
@@ -1060,11 +1133,12 @@ export async function POST(request) {
         email: emailMessage
           ? {
               ...emailMessage,
-              body_html: emailMessage.body,
-              body_text: emailMessage.body_text,
-              payment_submit_url: emailMessage.payment_submit_url,
-              sent_status: emailSendStatus,
-            }
+            body_html: emailMessage.body,
+            body_text: emailMessage.body_text,
+            payment_submit_url: emailMessage.payment_submit_url,
+            recipient_phone: emailMessage.recipient_phone,
+            sent_status: emailSendStatus,
+          }
           : null,
         ...(emailSendStatus === "sent"
           ? {}

@@ -12,7 +12,6 @@ export default function DashboardShell({ session, children }) {
   const [collapsed, setCollapsed] = useState(false);
   const role = String(session?.user?.role || "").toLowerCase();
   const isStudent = role === "student";
-  const isCoordinator = role === "coordinator";
 
   useEffect(() => {
     setMobileOpen(false);
@@ -32,7 +31,7 @@ export default function DashboardShell({ session, children }) {
 
   return (
     <div className="min-h-screen bg-[linear-gradient(180deg,#f8fbff_0%,#eef4ff_100%)] text-slate-900">
-      {!isStudent && !isCoordinator ? (
+      {!isStudent ? (
         <>
           <Sidebar
             session={session}
@@ -51,9 +50,9 @@ export default function DashboardShell({ session, children }) {
         </>
       ) : null}
 
-      <main className={`transition-[padding] duration-200 ${isStudent || isCoordinator ? "pt-0" : `pt-24 ${collapsed ? "lg:pl-20" : "lg:pl-72"}`}`}>
+      <main className={`transition-[padding] duration-200 ${isStudent ? "pt-0" : `pt-24 ${collapsed ? "lg:pl-20" : "lg:pl-72"}`}`}>
         <div className="px-4 pb-10 sm:px-6 lg:px-8">
-          {isStudent || isCoordinator ? children : (
+          {isStudent ? children : (
             <motion.section
               initial={{ opacity: 0, y: 14 }}
               animate={{ opacity: 1, y: 0 }}

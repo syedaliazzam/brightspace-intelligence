@@ -5,7 +5,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 const STATUS_OPTIONS = [
   { label: "All statuses", value: "" },
-  { label: "New lead", value: "new_lead" },
+  { label: "New registrations", value: "new_lead" },
   { label: "Voucher created", value: "voucher_created" },
   { label: "Fee submitted", value: "fee_submitted" },
   { label: "Access granted", value: "access_granted" },
@@ -46,6 +46,7 @@ export default function RegistrationLeadFilters({
 
   function applyFilters(nextSearch, nextStatus) {
     const params = new URLSearchParams(searchParams.toString());
+    const normalizedStatus = String(nextStatus || "").trim();
 
     if (nextSearch) {
       params.set("search", nextSearch);
@@ -53,14 +54,14 @@ export default function RegistrationLeadFilters({
       params.delete("search");
     }
 
-    if (nextStatus) {
-      params.set("status", nextStatus);
+    if (normalizedStatus) {
+      params.set("status", normalizedStatus);
     } else {
-      params.delete("status");
+      params.set("status", "all");
     }
     startTransition(() => {
       replaceWithHash(params);
-      onFilterChange?.({ search: nextSearch, status: nextStatus });
+      onFilterChange?.({ search: nextSearch, status: normalizedStatus || "all" });
       if (typeof window !== "undefined") {
         const hash = window.location.hash;
         if (hash) {
@@ -108,7 +109,7 @@ export default function RegistrationLeadFilters({
         <div className="grid flex-1 gap-3 md:grid-cols-[minmax(0,1.4fr)_minmax(220px,0.6fr)]">
           <label className="block">
             <span className="mb-2 block text-sm font-medium text-slate-700">
-              Search leads
+              Search Registrations
             </span>
             <input
               type="text"

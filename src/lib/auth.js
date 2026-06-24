@@ -84,6 +84,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           Prisma.sql`
       SELECT
         u.id::text AS id,
+        u.full_name,
         u.username,
         u.email,
         u.phone,
@@ -126,6 +127,8 @@ if (!passwordMatches) {
 
         return {
           id: user.id,
+          full_name: user.full_name || "",
+          name: user.full_name || "",
           username: user.username || "",
           email: user.email || "",
           phone: user.phone || "",
@@ -139,6 +142,8 @@ if (!passwordMatches) {
     async jwt({ token, user }) {
       if (user) {
         token.userId = user.id;
+        token.full_name = user.full_name || "";
+        token.name = user.full_name || "";
         token.username = user.username || "";
         token.email = user.email || "";
         token.role = user.role;
@@ -151,6 +156,8 @@ if (!passwordMatches) {
     async session({ session, token }) {
       if (session.user) {
         session.user.id = token.userId;
+        session.user.full_name = token.full_name || "";
+        session.user.name = token.name || token.full_name || "";
         session.user.username = token.username || "";
         session.user.email = token.email;
         session.user.role = token.role;

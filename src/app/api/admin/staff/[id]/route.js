@@ -148,35 +148,27 @@ async function syncProfile(tableName, payload, tx) {
   const { firstName, lastName } = splitName(payload.fullName);
 
   if (existing?.id) {
-    const updates = [];
+    const tableSql = Prisma.raw(`"${tableName}"`);
+    const fields = [];
 
-    if (columns.full_name) {
-      updates.push(Prisma.sql`full_name = ${payload.fullName}`);
-    }
-    if (columns.name) {
-      updates.push(Prisma.sql`name = ${payload.fullName}`);
-    }
-    if (columns.first_name) {
-      updates.push(Prisma.sql`first_name = ${firstName}`);
-    }
-    if (columns.last_name) {
-      updates.push(Prisma.sql`last_name = ${lastName}`);
-    }
-    if (columns.email) {
-      updates.push(Prisma.sql`email = ${payload.email || null}`);
-    }
-    if (columns.phone) {
-      updates.push(Prisma.sql`phone = ${payload.phone || null}`);
-    }
-    if (columns.status) {
-      updates.push(Prisma.sql`status = ${payload.status}::user_status`);
-    }
+    if (columns.full_name) fields.push(Prisma.sql`full_name = ${payload.fullName}`);
+    if (columns.name) fields.push(Prisma.sql`name = ${payload.fullName}`);
+    if (columns.first_name) fields.push(Prisma.sql`first_name = ${firstName}`);
+    if (columns.last_name) fields.push(Prisma.sql`last_name = ${lastName}`);
+    if (columns.email) fields.push(Prisma.sql`email = ${payload.email || null}`);
+    if (columns.phone) fields.push(Prisma.sql`phone = ${payload.phone || null}`);
+    if (columns.status) fields.push(Prisma.sql`status = ${payload.status}::user_status`);
 
-    if (updates.length) {
+    if (fields.length) {
+      const setClause = fields.reduce((acc, item, index) => {
+        if (index === 0) return item;
+        return Prisma.sql`${acc}, ${item}`;
+      });
+
       await tx.$executeRaw(
         Prisma.sql`
-          UPDATE ${Prisma.raw(`"${tableName}"`)}
-          SET ${Prisma.join(updates, Prisma.sql`, `)}
+          UPDATE ${tableSql}
+          SET ${setClause}
           WHERE user_id = ${payload.userId}::uuid
         `
       );
@@ -214,7 +206,7 @@ async function getUserById(id, tx = prisma) {
       LOWER(r.name) AS role
     FROM users u
     INNER JOIN roles r ON r.id = u.role_id
-    WHERE u.id = ${id}
+    WHERE u.id = ${id}::uuid
     LIMIT 1
   `;
 
@@ -285,45 +277,20 @@ export async function PATCH(request, { params }) {
     }
 
     const roleId = await getRoleId(nextRole);
-    const userColumns = await getTableColumns("users");
-    const updates = [];
     const { firstName, lastName } = splitName(fullName);
 
-    if (userColumns.full_name) {
-      updates.push(Prisma.sql`full_name = ${fullName}`);
-    }
-    if (userColumns.name) {
-      updates.push(Prisma.sql`name = ${fullName}`);
-    }
-    if (userColumns.first_name) {
-      updates.push(Prisma.sql`first_name = ${firstName}`);
-    }
-    if (userColumns.last_name) {
-      updates.push(Prisma.sql`last_name = ${lastName}`);
-    }
-    if (userColumns.email) {
-      updates.push(Prisma.sql`email = ${email || null}`);
-    }
-    if (userColumns.phone) {
-      updates.push(Prisma.sql`phone = ${phone || null}`);
-    }
-    if (userColumns.role_id) {
-      updates.push(Prisma.sql`role_id = ${roleId}::uuid`);
-    }
-    if (userColumns.status) {
-      updates.push(Prisma.sql`status = ${nextStatus}::user_status`);
-    }
-
     await prisma.$transaction(async (tx) => {
-      if (updates.length) {
-        await tx.$executeRaw(
-          Prisma.sql`
-            UPDATE users
-            SET ${Prisma.join(updates, Prisma.sql`, `)}
-            WHERE id = ${id}::uuid
-          `
-        );
-      }
+      await tx.$executeRaw`
+        UPDATE users
+        SET
+          full_name = ${fullName},
+          email = ${email || null},
+          phone = ${phone || null},
+          role_id = ${roleId}::uuid,
+          status = ${nextStatus}::user_status,
+          updated_at = NOW()
+        WHERE id = ${id}::uuid
+      `;
 
       const targetProfileTable =
         nextRole === "coordinator" ? "coordinator_profiles" : "teacher_profiles";

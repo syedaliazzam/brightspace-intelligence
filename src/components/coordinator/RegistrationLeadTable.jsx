@@ -44,7 +44,7 @@ export default function RegistrationLeadTable({ leads, onCreateVoucher }) {
   if (!leads.length) {
     return (
       <section className="rounded-[1.75rem] border border-dashed border-slate-300 bg-white/85 p-10 text-center text-sm text-slate-500 shadow-[0_18px_60px_-36px_rgba(15,23,42,0.18)]">
-        No registration leads match the current filters.
+        No registration records match the current filters.
       </section>
     );
   }

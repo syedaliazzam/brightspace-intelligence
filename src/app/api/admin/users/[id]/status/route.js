@@ -120,7 +120,7 @@ export async function PATCH(request, { params }) {
     const [updated] = await prisma.$queryRaw`
       UPDATE users
       SET status = ${nextStatus}
-      WHERE id = ${id}
+      WHERE id = ${id}::uuid
       RETURNING id::text AS id, status
     `;
 

@@ -5,9 +5,58 @@ import { signOut } from "next-auth/react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { getNavigationForRole } from "@/config/navigation";
+import {
+  LayoutDashboard,
+  Users,
+  UserCog,
+  ReceiptText,
+  CreditCard,
+  GraduationCap,
+  UserRound,
+  CalendarDays,
+  ClipboardCheck,
+  FileText,
+  BookOpen,
+  NotebookPen,
+  User,
+  CalendarRange,
+  Home,
+  Activity,
+  School,
+  ShieldCheck,
+  BookText,
+  Layers3,
+  PanelTop,
+} from "lucide-react";
 
 function isActive(pathname, href) {
   return pathname === href || pathname.startsWith(`${href}/`);
+}
+
+function getIconForLabel(label) {
+  const key = String(label || "").toLowerCase();
+  if (key.includes("dashboard")) return LayoutDashboard;
+  if (key.includes("interested students")) return Users;
+  if (key.includes("registration")) return UserCog;
+  if (key.includes("fee vouchers") || key.includes("fees")) return ReceiptText;
+  if (key.includes("payments")) return CreditCard;
+  if (key === "students") return GraduationCap;
+  if (key === "parents") return UserRound;
+  if (key.includes("teacher assignments")) return UserCog;
+  if (key.includes("lecture schedule")) return CalendarDays;
+  if (key.includes("lecture verification")) return ClipboardCheck;
+  if (key.includes("reports")) return FileText;
+  if (key.includes("lectures")) return BookOpen;
+  if (key.includes("homework")) return NotebookPen;
+  if (key.includes("calendar")) return CalendarRange;
+  if (key.includes("attendance")) return Activity;
+  if (key.includes("profile")) return User;
+  if (key.includes("class management")) return School;
+  if (key.includes("subject")) return BookText;
+  if (key.includes("audit")) return ShieldCheck;
+  if (key.includes("timeline")) return Layers3;
+  if (key.includes("overview")) return PanelTop;
+  return Home;
 }
 
 function getInitials(value) {
@@ -29,7 +78,7 @@ export default function Sidebar({
   const pathname = usePathname();
   const role = String(session?.user?.role || "student").toLowerCase();
   const items = getNavigationForRole(role);
-  const userName = session?.user?.name || session?.user?.email || "User";
+  const userName = session?.user?.full_name || session?.user?.email || "User";
 
   const shell = (
     <aside
@@ -54,7 +103,7 @@ export default function Sidebar({
             }`}
           >
             <p className="truncate text-sm font-semibold text-slate-950">Learning Platform</p>
-            <p className="truncate text-xs text-slate-500">{userName}</p>
+            <p className="truncate text-xs text-slate-500">{role}</p>
           </div>
         </div>
 
@@ -75,6 +124,7 @@ export default function Sidebar({
       <nav className="scrollbar-thin scrollbar-thumb-slate-200 flex-1 space-y-1 overflow-y-auto px-3 py-4">
         {items.map((item) => {
           const active = isActive(pathname, item.href);
+          const Icon = getIconForLabel(item.label);
           return (
             <Link
               key={item.href}
@@ -92,7 +142,7 @@ export default function Sidebar({
                   active ? "bg-sky-600 text-white" : "bg-slate-100 text-slate-600 group-hover:bg-slate-200"
                 }`}
               >
-                {getInitials(item.label)}
+                <Icon className="h-4 w-4" strokeWidth={2} />
               </span>
               <span className={`truncate transition-all duration-200 ${collapsed ? "lg:max-w-0 lg:overflow-hidden lg:opacity-0 lg:pointer-events-none" : "lg:max-w-full opacity-100"}`}>
                 {item.label}

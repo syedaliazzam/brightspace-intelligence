@@ -1,9 +1,8 @@
 import { Prisma } from "@prisma/client";
 import { redirect } from "next/navigation";
-import CoordinatorPortalNavbar from "@/components/coordinator/CoordinatorPortalNavbar";
 import RegistrationLeadFilters from "@/components/coordinator/RegistrationLeadFilters";
-import RegistrationLeadTable from "@/components/coordinator/RegistrationLeadTable";
-import ShowMoreSection from "@/components/coordinator/ShowMoreSection";
+import RegistrationLeadsPanel from "@/components/coordinator/RegistrationLeadsPanel";
+import ShowMoreSectionServer from "@/components/coordinator/ShowMoreSectionServer";
 import { auth, roleToDashboard } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 
@@ -98,27 +97,28 @@ export default async function CoordinatorRegistrationLeadsPage({ searchParams })
 
   const resolvedParams = await searchParams;
   const search = normalizeSearch(resolvedParams?.search);
-  const status = normalizeSearch(resolvedParams?.status).toLowerCase() || "new_lead";
+  const statusParam = normalizeSearch(resolvedParams?.status).toLowerCase();
+  const status = statusParam === "all" ? "" : statusParam || "new_lead";
+  const page = Number(resolvedParams?.page || 1) || 1;
   const leads = await getLeads(status, search);
 
   return (
-    <div className="space-y-6">
-      <CoordinatorPortalNavbar profile={session.user} />
+    <div className="space-y-6 min-h-screen">
       <section className="rounded-[2rem] border border-white/70 bg-[linear-gradient(135deg,rgba(255,255,255,0.92),rgba(241,248,255,0.92))] p-6 shadow-[0_24px_80px_-36px_rgba(15,23,42,0.25)] sm:p-8">
-        <p className="text-sm font-semibold uppercase tracking-[0.24em] text-sky-700">Registration leads</p>
-        <h1 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">Google Sheet intake records</h1>
+        <h1 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">Registration records of new students</h1>
         <p className="mt-3 text-sm leading-7 text-slate-600 sm:text-base">
-          Review and prepare registration leads for voucher creation.
+          Review and prepare registration records for voucher creation.
         </p>
       </section>
 
       <RegistrationLeadFilters initialSearch={search} initialStatus={status} canSync={false} />
-      <ShowMoreSection
+      <ShowMoreSectionServer
         items={leads}
-        initialCount={10}
-        step={10}
-        renderItems={(visibleItems) => <RegistrationLeadTable leads={visibleItems} />}
-        emptyMessage="No registration leads match the current filters."
+        page={page}
+        pageSize={7}
+        renderItems={(visibleItems) => <RegistrationLeadsPanel leads={visibleItems} />}
+        emptyMessage="No registration records match the current filters."
+        hrefBase="/coordinator/registration-leads"
       />
     </div>
   );

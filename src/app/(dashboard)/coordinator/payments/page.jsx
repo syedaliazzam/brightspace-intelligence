@@ -1,9 +1,8 @@
 import { Prisma } from "@prisma/client";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import CoordinatorPortalNavbar from "@/components/coordinator/CoordinatorPortalNavbar";
 import PaymentVerificationTable from "@/components/coordinator/PaymentVerificationTable";
-import ShowMoreSection from "@/components/coordinator/ShowMoreSection";
+import ShowMoreSectionServer from "@/components/coordinator/ShowMoreSectionServer";
 import { auth, roleToDashboard } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 import { createSignedPaymentProofUrl } from "@/lib/supabaseStorage";
@@ -129,13 +128,12 @@ export default async function CoordinatorPaymentsPage({ searchParams }) {
   const resolvedParams = await searchParams;
   const status = normalizeStatus(resolvedParams?.status) || "pending";
   const safeStatus = FILTER_TO_DB_STATUS[status] ? status : "pending";
+  const page = Number(resolvedParams?.page || 1) || 1;
   const [counts, items] = await Promise.all([getCounts(), getItems(safeStatus)]);
 
   return (
-    <div className="space-y-6">
-      <CoordinatorPortalNavbar profile={session.user} />
+    <div className="space-y-6 min-h-screen">
       <section className="rounded-[2rem] border border-white/70 bg-[linear-gradient(135deg,rgba(255,255,255,0.92),rgba(241,248,255,0.92))] p-6 shadow-[0_24px_80px_-36px_rgba(15,23,42,0.25)] sm:p-8">
-        <p className="text-sm font-semibold uppercase tracking-[0.24em] text-sky-700">Payments</p>
         <h1 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">Payment verification queue</h1>
         <p className="mt-3 text-sm leading-7 text-slate-600 sm:text-base">
           Review submitted proof files, approve verified payments, or reject incomplete submissions.
@@ -154,12 +152,13 @@ export default async function CoordinatorPaymentsPage({ searchParams }) {
         ))}
       </div>
 
-      <ShowMoreSection
+      <ShowMoreSectionServer
         items={items}
-        initialCount={10}
-        step={10}
+        page={page}
+        pageSize={7}
         renderItems={(visibleItems) => <PaymentVerificationTable items={visibleItems} />}
         emptyMessage="No payment submissions match this filter."
+        hrefBase={`/coordinator/payments?status=${safeStatus}`}
       />
     </div>
   );

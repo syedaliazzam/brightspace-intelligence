@@ -95,10 +95,10 @@ export async function GET(request) {
       ...values
     );
 
-    return json("Registration leads fetched.", 200, { items: leads });
+    return json("Registration records fetched.", 200, { items: leads });
   } catch (error) {
     return json(
-      error instanceof Error ? error.message : "Unable to fetch registration leads.",
+      error instanceof Error ? error.message : "Unable to fetch registration records.",
       500
     );
   }
