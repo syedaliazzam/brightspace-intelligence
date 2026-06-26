@@ -5,7 +5,7 @@ import FullCalendar from "@fullcalendar/react";
 import dayGridPlugin from "@fullcalendar/daygrid";
 import timeGridPlugin from "@fullcalendar/timegrid";
 import interactionPlugin from "@fullcalendar/interaction";
-import { getLectureDisplayStatus } from "@/lib/lectureStatus";
+import { canShowJoinMeet, getLectureDisplayStatus } from "@/lib/lectureStatus";
 
 const APP_TIMEZONE = "Asia/Karachi";
 
@@ -82,10 +82,7 @@ function getLectureTimeState(lecture) {
 }
 
 function canShowMeetLink(lecture) {
-  const timeState = getLectureTimeState(lecture);
-  if (timeState === "ended") return false;
-  const rawStatus = String(lecture?.status || "").toLowerCase();
-  return !["cancelled", "rescheduled", "missed", "disputed"].includes(rawStatus);
+  return canShowJoinMeet(lecture);
 }
 
 export default function LMSCalendar({
@@ -108,11 +105,12 @@ export default function LMSCalendar({
     const params = new URLSearchParams({
       range: "all",
       date: activeDate,
+      classLevel: filters.classLevel || "",
       subjectId: filters.subjectId || "",
       status: filters.status || "",
     });
     return params.toString();
-  }, [activeDate, filters.subjectId, filters.status]);
+  }, [activeDate, filters.classLevel, filters.subjectId, filters.status]);
 
   useEffect(() => {
     calendarRef.current?.getApi?.().gotoDate?.(activeDate);

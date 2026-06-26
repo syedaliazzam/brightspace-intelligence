@@ -28,7 +28,15 @@ export async function GET(_request, { params }) {
         lcr.student_performance
       FROM lecture_schedules ls
       INNER JOIN enrollments e ON e.id = ls.enrollment_id
-      INNER JOIN student_profiles sp ON (sp.id = ls.student_id OR sp.id = e.student_id)
+      INNER JOIN student_profiles sp ON (
+        sp.id = ls.student_id
+        OR sp.id = e.student_id
+        OR e.course_id IN (
+          SELECT course_id FROM enrollments
+          WHERE student_id = sp.id
+            AND LOWER(status) = 'active'
+        )
+      )
       INNER JOIN subjects sub ON sub.id = ls.subject_id
       INNER JOIN teacher_profiles tp ON tp.id = ls.teacher_id
       INNER JOIN users tu ON tu.id = tp.user_id

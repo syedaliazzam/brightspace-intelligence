@@ -26,7 +26,14 @@ export async function GET() {
         INNER JOIN lecture_schedules ls ON (
           ls.student_id = sp.id
           OR ls.enrollment_id IN (
-            SELECT e.id FROM enrollments e WHERE e.student_id = sp.id
+            SELECT e2.id
+            FROM enrollments e2
+            WHERE e2.course_id IN (
+              SELECT course_id
+              FROM enrollments
+              WHERE student_id = sp.id
+                AND LOWER(status) = 'active'
+            )
           )
         )
         LEFT JOIN lecture_attendance la ON la.lecture_id = ls.id AND la.user_id = sp.user_id
@@ -48,7 +55,14 @@ export async function GET() {
         INNER JOIN lecture_schedules ls ON (
           ls.student_id = sp.id
           OR ls.enrollment_id IN (
-            SELECT e.id FROM enrollments e WHERE e.student_id = sp.id
+            SELECT e2.id
+            FROM enrollments e2
+            WHERE e2.course_id IN (
+              SELECT course_id
+              FROM enrollments
+              WHERE student_id = sp.id
+                AND LOWER(status) = 'active'
+            )
           )
         )
         INNER JOIN subjects sub ON sub.id = ls.subject_id
@@ -58,7 +72,7 @@ export async function GET() {
         WHERE sp.user_id = ${session.user.id}::uuid
           AND ls.status::text IN ('completed_by_teacher', 'verified_by_coordinator')
         ORDER BY ls.scheduled_start DESC
-      `,
+      `
     ]);
     return json("Attendance fetched.", 200, { summary: summary?.[0] || {}, items });
   } catch (error) {

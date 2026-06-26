@@ -10,8 +10,11 @@ export default function LectureScheduleForm({ options, onSuccess }) {
     subjectId: "",
     title: "",
     description: "",
-    scheduledStart: "",
-    scheduledEnd: "",
+    startDate: "",
+    endDate: "",
+    startTime: "",
+    endTime: "",
+    days: [],
     googleMeetLink: "",
   });
   const [classes, setClasses] = useState([]);
@@ -133,13 +136,15 @@ export default function LectureScheduleForm({ options, onSuccess }) {
           if (lookupId === assignmentLookupRef.current) {
             if (assignedTeachers.length === 1) {
               setForm((current) => ({ ...current, teacherId: assignedTeachers[0].teacher_id }));
+              setTeacherNotice("");
             } else {
               setForm((current) => ({ ...current, teacherId: "" }));
+              setTeacherNotice(
+                assignedTeachers.length
+                  ? "Multiple teachers assigned for this class and subject. Please update the assignment so only one teacher is active."
+                  : "No teacher assigned for this class and subject."
+              );
             }
-          }
-
-          if (!assignedTeachers.length) {
-            setTeacherNotice("No teacher assigned for this class and subject.");
           }
         }
       } catch {
@@ -162,35 +167,6 @@ export default function LectureScheduleForm({ options, onSuccess }) {
     };
   }, [form.courseId, form.subjectId]);
 
-  function addMinutesToLocalInput(value, minutes) {
-    if (!value) return "";
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) return "";
-    date.setMinutes(date.getMinutes() + minutes);
-    const localDate = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
-    return localDate.toISOString().slice(0, 16);
-  }
-
-  function updateScheduledStart(value) {
-    setForm((current) => {
-      const nextEnd = addMinutesToLocalInput(value, 60);
-      const currentEnd = current.scheduledEnd ? new Date(current.scheduledEnd) : null;
-      const nextStart = value ? new Date(value) : null;
-
-      return {
-        ...current,
-        scheduledStart: value,
-        scheduledEnd:
-          !currentEnd ||
-          !nextStart ||
-          Number.isNaN(currentEnd.getTime()) ||
-          currentEnd <= nextStart
-            ? nextEnd
-            : current.scheduledEnd,
-      };
-    });
-  }
-
   function toggleStudent(studentId) {
     setForm((current) => ({
       ...current,
@@ -202,8 +178,8 @@ export default function LectureScheduleForm({ options, onSuccess }) {
 
   async function handleSubmit(event) {
     event.preventDefault();
-    const startDate = new Date(form.scheduledStart);
-    const endDate = new Date(form.scheduledEnd);
+    const startDate = new Date(form.startDate);
+    const endDate = new Date(form.endDate);
 
     if (!form.courseId || !form.subjectId || !form.teacherId || !form.title) {
       window.alert("Class, subject, teacher, and title are required.");
@@ -222,19 +198,43 @@ export default function LectureScheduleForm({ options, onSuccess }) {
       return;
     }
 
-    if (!form.studentIds.length) {
-      window.alert("Select at least one student.");
+    if (!form.startDate || !form.endDate || Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime()) || endDate < startDate) {
+      window.alert("Lecture end date must be on or after the start date.");
       return;
     }
 
+    if (!form.startTime || !form.endTime) {
+      window.alert("Lecture start and end times are required.");
+      return;
+    }
+
+    const [startHours, startMinutes] = form.startTime.split(":").map(Number);
+    const [endHours, endMinutes] = form.endTime.split(":").map(Number);
     if (
-      !form.scheduledStart ||
-      !form.scheduledEnd ||
-      Number.isNaN(startDate.getTime()) ||
-      Number.isNaN(endDate.getTime()) ||
-      endDate <= startDate
+      Number.isNaN(startHours) ||
+      Number.isNaN(startMinutes) ||
+      Number.isNaN(endHours) ||
+      Number.isNaN(endMinutes) ||
+      startHours < 0 ||
+      startHours > 23 ||
+      endHours < 0 ||
+      endHours > 23 ||
+      startMinutes < 0 ||
+      startMinutes > 59 ||
+      endMinutes < 0 ||
+      endMinutes > 59
     ) {
+      window.alert("Please provide valid lecture start and end times.");
+      return;
+    }
+
+    if (startHours > endHours || (startHours === endHours && startMinutes >= endMinutes)) {
       window.alert("Lecture end time must be later than the start time.");
+      return;
+    }
+
+    if (!form.days.length) {
+      window.alert("Select at least one lecture day.");
       return;
     }
 
@@ -259,8 +259,11 @@ export default function LectureScheduleForm({ options, onSuccess }) {
         subjectId: "",
         title: "",
         description: "",
-        scheduledStart: "",
-        scheduledEnd: "",
+        startDate: "",
+        endDate: "",
+        startTime: "",
+        endTime: "",
+        days: [],
         googleMeetLink: "",
       });
       setStudents([]);
@@ -275,11 +278,9 @@ export default function LectureScheduleForm({ options, onSuccess }) {
     }
   }
 
-  const allSelected = students.length > 0 && form.studentIds.length === students.length;
-
   return (
     <form onSubmit={handleSubmit} className="grid gap-3 rounded-[1.75rem] border border-white/70 bg-white/90 p-5 shadow-[0_20px_70px_-36px_rgba(15,23,42,0.25)] lg:grid-cols-2">
-      <select value={form.courseId} onChange={(event) => setForm((current) => ({ ...current, courseId: event.target.value, studentIds: [], subjectId: "", teacherId: "" }))} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm">
+      <select value={form.courseId} onChange={(event) => setForm((current) => ({ ...current, courseId: event.target.value, subjectId: "", teacherId: "" }))} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm">
         <option value="">Select class</option>
         {classes.map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}
       </select>
@@ -289,20 +290,13 @@ export default function LectureScheduleForm({ options, onSuccess }) {
         {subjects.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
       </select>
 
-      <select
-        value={form.teacherId}
-        onChange={(event) => setForm((current) => ({ ...current, teacherId: event.target.value }))}
-        className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm"
-      >
-        <option value="">
-          {teachersLoading ? "Loading assigned teacher..." : form.subjectId ? "Select assigned teacher" : "Select subject first"}
-        </option>
-        {teachers.map((item) => (
-          <option key={item.teacher_id} value={item.teacher_id}>
-            {item.teacher_name}
-          </option>
-        ))}
-      </select>
+      <input
+        type="text"
+        readOnly
+        value={teachers.length === 1 ? teachers[0].teacher_name : teacherNotice || ""}
+        placeholder={teachersLoading ? "Loading assigned teacher..." : "Assigned teacher appears here"}
+        className="rounded-2xl border border-slate-200 bg-slate-100 px-4 py-3 text-sm text-slate-700"
+      />
 
       {teacherNotice ? <p className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">{teacherNotice}</p> : null}
 
@@ -315,44 +309,63 @@ export default function LectureScheduleForm({ options, onSuccess }) {
       />
 
       <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 lg:col-span-2">
-        <label className="flex items-center gap-2 text-sm font-semibold text-slate-700">
-          <input
-            type="checkbox"
-            checked={allSelected}
-            onChange={(event) =>
-              setForm((current) => ({
-                ...current,
-                studentIds: event.target.checked ? students.map((student) => student.id) : [],
-              }))
-            }
-          />
-          Select all students
-        </label>
-        <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-          {students.map((student) => (
-            <label key={student.id} className="flex items-center gap-2 rounded-xl bg-white px-3 py-2 text-sm text-slate-700 ring-1 ring-slate-200">
-              <input
-                type="checkbox"
-                checked={form.studentIds.includes(student.id)}
-                onChange={() => toggleStudent(student.id)}
-              />
-              {student.full_name}
-            </label>
-          ))}
-          {!students.length ? (
         <p className="text-sm text-slate-500">
-          {form.courseId ? "No active students found for this class." : "Select a class to load students."}
+          Lecture will be scheduled for all active students enrolled in this class. New active students added later will also be included when the lecture is created.
         </p>
-      ) : null}
-      </div>
       </div>
 
-      <input type="datetime-local" value={form.scheduledStart} onChange={(event) => updateScheduledStart(event.target.value)} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm" />
-      <input type="datetime-local" value={form.scheduledEnd} onChange={(event) => setForm((current) => ({ ...current, scheduledEnd: event.target.value }))} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm" />
+      <div className="grid gap-3 sm:grid-cols-2 lg:col-span-2">
+        <div>
+          <label className="block text-sm font-semibold text-slate-700">Start date</label>
+          <input type="date" value={form.startDate} onChange={(event) => setForm((current) => ({ ...current, startDate: event.target.value }))} className="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm" />
+        </div>
+        <div>
+          <label className="block text-sm font-semibold text-slate-700">End date</label>
+          <input type="date" value={form.endDate} onChange={(event) => setForm((current) => ({ ...current, endDate: event.target.value }))} className="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm" />
+        </div>
+        <div>
+          <label className="block text-sm font-semibold text-slate-700">Start time</label>
+          <input type="time" value={form.startTime} onChange={(event) => setForm((current) => ({ ...current, startTime: event.target.value }))} className="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm" />
+        </div>
+        <div>
+          <label className="block text-sm font-semibold text-slate-700">End time</label>
+          <input type="time" value={form.endTime} onChange={(event) => setForm((current) => ({ ...current, endTime: event.target.value }))} className="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm" />
+        </div>
+      </div>
+
+      <div className="lg:col-span-2">
+        <p className="mb-2 text-sm font-semibold text-slate-700">Lecture days</p>
+        <div className="grid gap-2 grid-cols-3 lg:grid-cols-7">
+          {[
+            { key: "sun", label: "Sunday" },
+            { key: "mon", label: "Monday" },
+            { key: "tue", label: "Tuesday" },
+            { key: "wed", label: "Wednesday" },
+            { key: "thu", label: "Thursday" },
+            { key: "fri", label: "Friday" },
+            { key: "sat", label: "Saturday" },
+          ].map((weekday) => (
+            <label key={weekday.key} className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
+              <input
+                type="checkbox"
+                checked={form.days.includes(weekday.key)}
+                onChange={() => setForm((current) => ({
+                  ...current,
+                  days: current.days.includes(weekday.key)
+                    ? current.days.filter((value) => value !== weekday.key)
+                    : [...current.days, weekday.key],
+                }))}
+              />
+              {weekday.label}
+            </label>
+          ))}
+        </div>
+      </div>
+
       <textarea value={form.description} onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))} placeholder="Coordinator notes or agenda" className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm lg:col-span-2" />
 
       <button type="submit" disabled={submitting} className="rounded-2xl bg-slate-950 px-5 py-3 text-sm font-semibold text-white lg:col-span-2">
-        {submitting ? "Saving..." : "Schedule for selected students"}
+        {submitting ? "Saving..." : "Schedule for all active students"}
       </button>
     </form>
   );

@@ -10,9 +10,8 @@ export function getLectureJoinState(lecture, nowValue = Date.now()) {
 
   const now = typeof nowValue === "number" ? nowValue : new Date(nowValue).getTime();
   const openBefore = Number(process.env.NEXT_PUBLIC_CLASS_JOIN_OPEN_BEFORE_MINUTES || 10) * 60000;
-  const openAfter = Number(process.env.NEXT_PUBLIC_CLASS_JOIN_OPEN_AFTER_MINUTES || 15) * 60000;
   const opensAt = start.getTime() - openBefore;
-  const closesAt = end.getTime() + openAfter;
+  const closesAt = end.getTime();
 
   if (now < opensAt) {
     return { canJoin: false, label: "Class not open yet" };

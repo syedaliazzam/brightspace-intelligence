@@ -42,6 +42,7 @@ export async function GET(request) {
     const { searchParams } = new URL(request.url);
     const range = VALID_RANGES.has(clean(searchParams.get("range"))) ? clean(searchParams.get("range")) : "selected_date";
     const selectedDate = isoDate(searchParams.get("date"));
+    const classLevel = clean(searchParams.get("classLevel"));
     const subjectId = clean(searchParams.get("subjectId"));
     const status = clean(searchParams.get("status")).toLowerCase();
 
@@ -92,6 +93,11 @@ export async function GET(request) {
       conditions.push(`ls.subject_id = $${values.length}::uuid`);
     }
 
+    if (classLevel) {
+      values.push(classLevel);
+      conditions.push(`LOWER(TRIM(COALESCE(c.class_level, ''))) = LOWER(TRIM($${values.length}::text))`);
+    }
+
     if (status) {
       values.push(status);
       conditions.push(`LOWER(
@@ -105,24 +111,11 @@ export async function GET(request) {
     }
 
     const where = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
-    const [lectures, subjects, markedDates] = await Promise.all([
+    const [lectures, classes, subjects, markedDates] = await Promise.all([
       prisma.$queryRawUnsafe(
         `
-        WITH lecture_state AS (
-          SELECT
-            ls.*,
-            LOWER(
-              CASE
-                WHEN ls.status::text IN ('completed_by_teacher', 'verified_by_coordinator', 'missed', 'cancelled', 'rescheduled', 'disputed') THEN ls.status::text
-                WHEN ls.scheduled_start > ${LOCAL_NOW_SQL} THEN 'upcoming'
-                WHEN ls.scheduled_start <= ${LOCAL_NOW_SQL} AND ls.scheduled_end >= ${LOCAL_NOW_SQL} THEN 'live'
-                ELSE 'ended'
-              END
-            ) AS display_status
-          FROM lecture_schedules ls
-        )
         SELECT
-          MIN(ls.id::text) AS id,
+          ls.id::text AS id,
           ls.google_calendar_event_id,
           ls.google_meet_link,
           ls.meet_link_source,
@@ -130,32 +123,43 @@ export async function GET(request) {
           ls.description,
           ls.teacher_id::text AS teacher_id,
           ls.subject_id::text AS subject_id,
-          MIN(ls.scheduled_start)::text AS scheduled_start,
-          MIN(ls.scheduled_end)::text AS scheduled_end,
+          ls.scheduled_start::text AS scheduled_start,
+          ls.scheduled_end::text AS scheduled_end,
           ls.status::text AS status,
-          ls.display_status AS display_status,
-          COUNT(DISTINCT sp.id)::int AS student_count,
-          STRING_AGG(DISTINCT su.full_name, ', ' ORDER BY su.full_name) AS student_name,
-          sub.name AS subject_name
-        FROM lecture_state ls
-        INNER JOIN student_profiles sp ON sp.id = ls.student_id
-        INNER JOIN users su ON su.id = sp.user_id
+          LOWER(
+            CASE
+              WHEN ls.status::text IN ('completed_by_teacher', 'verified_by_coordinator', 'missed', 'cancelled', 'rescheduled', 'disputed') THEN ls.status::text
+              WHEN ls.scheduled_start > ${LOCAL_NOW_SQL} THEN 'upcoming'
+              WHEN ls.scheduled_start <= ${LOCAL_NOW_SQL} AND ls.scheduled_end >= ${LOCAL_NOW_SQL} THEN 'live'
+              ELSE 'ended'
+            END
+          ) AS display_status,
+          sub.name AS subject_name,
+          tu.full_name AS teacher_name,
+          c.title AS course_title
+        FROM lecture_schedules ls
+        INNER JOIN enrollments e ON e.id = ls.enrollment_id
+        INNER JOIN courses c ON c.id = e.course_id
         INNER JOIN subjects sub ON sub.id = ls.subject_id
+        INNER JOIN teacher_profiles tp ON tp.id = ls.teacher_id
+        INNER JOIN users tu ON tu.id = tp.user_id
         ${where}
-        GROUP BY
-          ls.google_calendar_event_id,
-          ls.google_meet_link,
-          ls.meet_link_source,
-          ls.title,
-          ls.description,
-          ls.teacher_id,
-          ls.subject_id,
-          ls.status,
-          ls.display_status,
-          sub.name
-        ORDER BY MIN(ls.scheduled_start) ASC
+        ORDER BY ls.scheduled_start ASC, ls.id ASC
         `,
         ...values
+      ),
+      prisma.$queryRawUnsafe(
+        `
+        SELECT DISTINCT
+          c.class_level,
+          c.title AS course_title
+        FROM lecture_schedules ls
+        INNER JOIN enrollments e ON e.id = ls.enrollment_id
+        INNER JOIN courses c ON c.id = e.course_id
+        ${teacherId ? "WHERE ls.teacher_id = $1::uuid" : ""}
+        ORDER BY c.class_level ASC, c.title ASC
+        `,
+        ...(teacherId ? [teacherId] : [])
       ),
       prisma.$queryRawUnsafe(
         `
@@ -180,6 +184,7 @@ export async function GET(request) {
 
     return json("Calendar lectures fetched.", 200, {
       items: lectures,
+      classes,
       subjects,
       markedDates,
       selectedDate,

@@ -47,13 +47,29 @@ export async function GET() {
             SELECT COUNT(DISTINCT ls.id)::int
             FROM lecture_schedules ls
             INNER JOIN enrollments e ON e.id = ls.enrollment_id
-            WHERE (ls.student_id = ${student.id}::uuid OR e.student_id = ${student.id}::uuid)
+            WHERE (
+              ls.student_id = ${student.id}::uuid
+              OR e.student_id = ${student.id}::uuid
+              OR e.course_id IN (
+                SELECT course_id FROM enrollments
+                WHERE student_id = ${student.id}::uuid
+                  AND LOWER(status) = 'active'
+              )
+            )
           ) AS total_lectures,
           (
             SELECT COUNT(DISTINCT ls.id)::int
             FROM lecture_schedules ls
             INNER JOIN enrollments e ON e.id = ls.enrollment_id
-            WHERE (ls.student_id = ${student.id}::uuid OR e.student_id = ${student.id}::uuid)
+            WHERE (
+              ls.student_id = ${student.id}::uuid
+              OR e.student_id = ${student.id}::uuid
+              OR e.course_id IN (
+                SELECT course_id FROM enrollments
+                WHERE student_id = ${student.id}::uuid
+                  AND LOWER(status) = 'active'
+              )
+            )
               AND ls.status::text IN ('completed_by_teacher','verified_by_coordinator')
           ) AS conducted_lectures,
           (
@@ -61,7 +77,15 @@ export async function GET() {
             FROM lecture_schedules ls
             INNER JOIN enrollments e ON e.id = ls.enrollment_id
             LEFT JOIN lecture_attendance la ON la.lecture_id = ls.id AND la.user_id = ${student.user_id}::uuid
-            WHERE (ls.student_id = ${student.id}::uuid OR e.student_id = ${student.id}::uuid)
+            WHERE (
+              ls.student_id = ${student.id}::uuid
+              OR e.student_id = ${student.id}::uuid
+              OR e.course_id IN (
+                SELECT course_id FROM enrollments
+                WHERE student_id = ${student.id}::uuid
+                  AND LOWER(status) = 'active'
+              )
+            )
               AND ls.status::text IN ('completed_by_teacher','verified_by_coordinator')
               AND COALESCE(la.status::text, 'absent') IN ('present','partial')
           ) AS lectures_present,
@@ -77,7 +101,15 @@ export async function GET() {
             FROM lecture_schedules ls
             INNER JOIN enrollments e ON e.id = ls.enrollment_id
             LEFT JOIN lecture_attendance la ON la.lecture_id = ls.id AND la.user_id = ${student.user_id}::uuid
-            WHERE (ls.student_id = ${student.id}::uuid OR e.student_id = ${student.id}::uuid)
+            WHERE (
+              ls.student_id = ${student.id}::uuid
+              OR e.student_id = ${student.id}::uuid
+              OR e.course_id IN (
+                SELECT course_id FROM enrollments
+                WHERE student_id = ${student.id}::uuid
+                  AND LOWER(status) = 'active'
+              )
+            )
               AND ls.status::text IN ('completed_by_teacher','verified_by_coordinator')
           ) AS attendance_percentage,
           COALESCE(

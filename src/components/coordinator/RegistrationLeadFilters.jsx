@@ -5,7 +5,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 const STATUS_OPTIONS = [
   { label: "All statuses", value: "" },
-  { label: "New registrations", value: "new_lead" },
+  { label: "New admissions", value: "new_lead" },
   { label: "Voucher created", value: "voucher_created" },
   { label: "Fee submitted", value: "fee_submitted" },
   { label: "Access granted", value: "access_granted" },
@@ -109,7 +109,7 @@ export default function RegistrationLeadFilters({
         <div className="grid flex-1 gap-3 md:grid-cols-[minmax(0,1.4fr)_minmax(220px,0.6fr)]">
           <label className="block">
             <span className="mb-2 block text-sm font-medium text-slate-700">
-              Search Registrations
+              Search Admissions
             </span>
             <input
               type="text"

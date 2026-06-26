@@ -63,7 +63,7 @@ export async function GET(request) {
     const items = await prisma.$queryRawUnsafe(
       `
       SELECT
-        MIN(ls.id::text) AS id,
+        ls.id::text AS id,
         ls.google_calendar_event_id,
         ls.google_meet_link,
         ls.meet_link_source,
@@ -72,40 +72,33 @@ export async function GET(request) {
         ls.subject_id::text AS subject_id,
         ls.title,
         ls.description,
-        MIN(ls.scheduled_start)::text AS scheduled_start,
-        MIN(ls.scheduled_end)::text AS scheduled_end,
+        ls.scheduled_start::text AS scheduled_start,
+        ls.scheduled_end::text AS scheduled_end,
         ls.recording_drive_url,
         ls.status::text AS status,
         ${DISPLAY_STATUS_SQL} AS display_status,
-        COUNT(DISTINCT sp.id)::int AS student_count,
-        STRING_AGG(DISTINCT su.full_name, ', ' ORDER BY su.full_name) AS student_name,
+        COALESCE(course_stats.student_count, 0) AS student_count,
+        COALESCE(course_stats.student_name, '') AS student_name,
         sub.name AS subject_name,
         c.title AS course_title,
         lcr.id::text AS report_id
       FROM lecture_schedules ls
-      INNER JOIN student_profiles sp ON sp.id = ls.student_id
-      INNER JOIN users su ON su.id = sp.user_id
-      INNER JOIN subjects sub ON sub.id = ls.subject_id
       INNER JOIN enrollments e ON e.id = ls.enrollment_id
+      INNER JOIN subjects sub ON sub.id = ls.subject_id
       INNER JOIN courses c ON c.id = e.course_id
       LEFT JOIN lecture_completion_reports lcr ON lcr.lecture_id = ls.id
+      LEFT JOIN LATERAL (
+        SELECT
+          COUNT(DISTINCT e2.student_id)::int AS student_count,
+          STRING_AGG(su2.full_name, ', ' ORDER BY su2.full_name) AS student_name
+        FROM enrollments e2
+        INNER JOIN student_profiles sp2 ON sp2.id = e2.student_id
+        INNER JOIN users su2 ON su2.id = sp2.user_id
+        WHERE e2.course_id = e.course_id
+          AND LOWER(e2.status) = 'active'
+      ) course_stats ON TRUE
       ${where}
-      GROUP BY
-        ls.google_calendar_event_id,
-        ls.google_meet_link,
-        ls.meet_link_source,
-        ls.google_meet_space_id,
-        ls.teacher_id,
-        ls.subject_id,
-        ls.title,
-        ls.description,
-        ls.recording_drive_url,
-        ls.status,
-        ${DISPLAY_STATUS_SQL},
-        sub.name,
-        c.title,
-        lcr.id
-      ORDER BY MIN(ls.scheduled_start) ASC
+      ORDER BY ls.scheduled_start ASC, ls.id ASC
       `,
       ...values
     );

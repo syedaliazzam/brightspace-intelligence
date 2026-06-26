@@ -67,8 +67,33 @@ export async function GET(request) {
         ${scope.where}
       )
       SELECT
-        (SELECT COUNT(*)::int FROM lecture_schedules ls INNER JOIN enrollments e ON e.id = ls.enrollment_id INNER JOIN course_subjects cs ON cs.course_id = e.course_id AND cs.subject_id = ls.subject_id INNER JOIN allowed_students a ON a.id = e.student_id WHERE ls.scheduled_start >= NOW() AND ls.status::text NOT IN ('cancelled','rescheduled')) AS upcoming_classes,
-        (SELECT COUNT(*)::int FROM lecture_schedules ls INNER JOIN enrollments e ON e.id = ls.enrollment_id INNER JOIN course_subjects cs ON cs.course_id = e.course_id AND cs.subject_id = ls.subject_id INNER JOIN allowed_students a ON a.id = e.student_id WHERE ls.status::text IN ('completed_by_teacher','verified_by_coordinator')) AS completed_classes,
+        (SELECT COUNT(DISTINCT ls.id)::int
+         FROM lecture_schedules ls
+         INNER JOIN enrollments e ON e.id = ls.enrollment_id
+         INNER JOIN course_subjects cs ON cs.course_id = e.course_id AND cs.subject_id = ls.subject_id
+         INNER JOIN allowed_students a ON (
+           a.id = e.student_id
+           OR e.course_id IN (
+             SELECT course_id FROM enrollments
+             WHERE student_id = a.id
+               AND LOWER(status) = 'active'
+           )
+         )
+         WHERE ls.scheduled_start >= NOW()
+           AND ls.status::text NOT IN ('cancelled','rescheduled')) AS upcoming_classes,
+        (SELECT COUNT(DISTINCT ls.id)::int
+         FROM lecture_schedules ls
+         INNER JOIN enrollments e ON e.id = ls.enrollment_id
+         INNER JOIN course_subjects cs ON cs.course_id = e.course_id AND cs.subject_id = ls.subject_id
+         INNER JOIN allowed_students a ON (
+           a.id = e.student_id
+           OR e.course_id IN (
+             SELECT course_id FROM enrollments
+             WHERE student_id = a.id
+               AND LOWER(status) = 'active'
+           )
+         )
+         WHERE ls.status::text IN ('completed_by_teacher','verified_by_coordinator')) AS completed_classes,
         (SELECT COUNT(*)::int FROM homework h INNER JOIN allowed_students a ON a.id = h.student_id WHERE COALESCE(h.status::text, 'pending') = 'pending') AS pending_homework,
         COALESCE((SELECT ROUND(100.0 * COUNT(*) FILTER (WHERE la.status::text = 'present') / NULLIF(COUNT(*), 0))::int FROM lecture_attendance la INNER JOIN student_profiles sp ON sp.user_id = la.user_id INNER JOIN allowed_students a ON a.id = sp.id), 0) AS attendance_percentage,
         COALESCE((
@@ -86,7 +111,14 @@ export async function GET(request) {
 
     const upcoming = await prisma.$queryRawUnsafe(
       `
-      SELECT
+      WITH allowed_students AS (
+        SELECT sp.id, u.full_name
+        FROM student_profiles sp
+        INNER JOIN users u ON u.id = sp.user_id
+        ${String(session.user.role).toLowerCase() === "admin" ? "" : "INNER JOIN student_parents spp ON spp.student_id = sp.id INNER JOIN parent_profiles pp ON pp.id = spp.parent_id"}
+        ${scope.where}
+      )
+      SELECT DISTINCT
         ls.id::text AS id,
         ls.title,
         ls.scheduled_start::text AS scheduled_start,
@@ -101,10 +133,17 @@ export async function GET(request) {
       INNER JOIN subjects sub ON sub.id = ls.subject_id
       INNER JOIN teacher_profiles tp ON tp.id = ls.teacher_id
       INNER JOIN users tu ON tu.id = tp.user_id
-      INNER JOIN student_profiles sp ON sp.id = e.student_id
-      ${String(session.user.role).toLowerCase() === "admin" ? "" : "INNER JOIN student_parents spp ON spp.student_id = sp.id INNER JOIN parent_profiles pp ON pp.id = spp.parent_id"}
-      ${scope.where}
-        ${scope.where ? "AND" : "WHERE"} ls.scheduled_end >= NOW()
+      INNER JOIN allowed_students a ON (
+        ls.student_id = a.id
+        OR e.student_id = a.id
+        OR e.course_id IN (
+          SELECT course_id
+          FROM enrollments
+          WHERE student_id = a.id
+            AND LOWER(status) = 'active'
+        )
+      )
+      WHERE ls.scheduled_end >= NOW()
       ORDER BY ls.scheduled_start ASC
       LIMIT 5
       `,

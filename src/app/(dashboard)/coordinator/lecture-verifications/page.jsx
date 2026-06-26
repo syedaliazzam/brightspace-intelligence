@@ -37,15 +37,11 @@ function writeCache(key, payload) {
 
 export default function CoordinatorLectureVerificationsPage() {
   const [filter, setFilter] = useState("pending");
-  const [state, setState] = useState(() => {
-    const cached = readCache(getCacheKey("pending"));
-
-    return {
-      counts: cached?.counts || { pending: 0, verified: 0, rejected: 0 },
-      items: cached?.items || [],
-      loading: !cached,
-      error: "",
-    };
+  const [state, setState] = useState({
+    counts: { pending: 0, verified: 0, rejected: 0 },
+    items: [],
+    loading: true,
+    error: "",
   });
 
   const load = useCallback(async (nextFilter = filter) => {
@@ -112,7 +108,7 @@ export default function CoordinatorLectureVerificationsPage() {
       />
 
       <div className="flex flex-wrap gap-3">
-        {["pending", "verified", "rejected"].map((item) => (
+      {["pending", "verified", "rejected", "all"].map((item) => (
           <button
             key={item}
             type="button"

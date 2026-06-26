@@ -141,7 +141,7 @@ export function isJoinWindowOpen(start, end, nowValue = Date.now()) {
   if (!startDate || !endDate || Number.isNaN(nowDate.getTime())) return false;
 
   const openBefore = Number(process.env.NEXT_PUBLIC_CLASS_JOIN_OPEN_BEFORE_MINUTES || 10) * 60 * 1000;
-  const openAfter = Number(process.env.NEXT_PUBLIC_CLASS_JOIN_OPEN_AFTER_MINUTES || 15) * 60 * 1000;
+  const openAfter = Number(process.env.NEXT_PUBLIC_CLASS_JOIN_OPEN_AFTER_MINUTES || 0) * 60 * 1000;
 
   return nowDate.getTime() >= startDate.getTime() - openBefore && nowDate.getTime() <= endDate.getTime() + openAfter;
 }

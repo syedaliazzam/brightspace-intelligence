@@ -41,10 +41,15 @@ export default function LectureScheduleTable({ items = [], onRefresh }) {
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="overflow-hidden rounded-[1.75rem] border border-white/70 bg-white/90 shadow-[0_20px_70px_-36px_rgba(15,23,42,0.25)]">
-      <div className="hidden grid-cols-[minmax(0,1.2fr)_minmax(0,0.9fr)_minmax(0,1fr)_minmax(0,1fr)_180px] gap-3 border-b border-slate-200 bg-slate-50/80 px-5 py-4 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 lg:grid lg:items-center">
+      <div className="hidden grid-cols-[minmax(0,1.2fr)_minmax(0,0.9fr)_minmax(0,0.8fr)_minmax(0,0.8fr)_minmax(0,0.8fr)_minmax(0,0.8fr)_minmax(0,0.8fr)_minmax(0,0.9fr)_minmax(0,1fr)_180px] gap-3 border-b border-slate-200 bg-slate-50/80 px-5 py-4 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 lg:grid lg:items-center">
         <span>Lecture</span>
         <span>Subject</span>
-        <span>Schedule / Status</span>
+        <span>Start date</span>
+        <span>End date</span>
+        <span>Start time</span>
+        <span>End time</span>
+        <span>Days</span>
+        <span>Status</span>
         <span>Class / Meet</span>
         <span className="text-right">Actions</span>
       </div>
@@ -55,7 +60,7 @@ export default function LectureScheduleTable({ items = [], onRefresh }) {
             const isFinal = finalStatuses.has(statusKey);
 
             return (
-              <div key={item.id} className="grid gap-3 px-5 py-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,0.9fr)_minmax(0,1fr)_minmax(0,1fr)_180px] lg:items-center">
+              <div key={item.id} className="grid gap-3 px-5 py-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,0.9fr)_minmax(0,0.8fr)_minmax(0,0.8fr)_minmax(0,0.8fr)_minmax(0,0.8fr)_minmax(0,0.8fr)_minmax(0,0.9fr)_minmax(0,1fr)_180px] lg:items-center">
                 <div>
                   <p className="font-semibold text-slate-950">{item.title}</p>
                   <p className="mt-1 text-sm text-slate-500">
@@ -63,21 +68,23 @@ export default function LectureScheduleTable({ items = [], onRefresh }) {
                   </p>
                 </div>
                 <p className="text-sm text-slate-600">{item.subject_name}</p>
-                <div className="text-sm text-slate-600">
-                  <p>{formatDateTimeRange(item.scheduled_start, item.scheduled_end)}</p>
-                  <p className="mt-1 text-xs text-slate-500">{item.display_status || getLectureDisplayStatus(item)}</p>
-                </div>
+                <p className="text-sm text-slate-600">{item.start_date || String(item.scheduled_start || '').split('T')[0]}</p>
+                <p className="text-sm text-slate-600">{item.end_date || String(item.scheduled_end || '').split('T')[0]}</p>
+                <p className="text-sm text-slate-600">{item.start_time || ''}</p>
+                <p className="text-sm text-slate-600">{item.end_time || ''}</p>
+                <p className="text-sm text-slate-600">{item.days_active || 'N/A'}</p>
+                <p className="text-sm text-slate-600">{item.display_status || item.status || getLectureDisplayStatus(item)}</p>
                 <div className="text-sm text-slate-600">
                   <p>{item.course_title}</p>
-                {item.meet_link_source ? <p className="mt-1 text-xs text-slate-500">Link source: {item.meet_link_source}</p> : null}
-                {item.google_meet_link && !isFinal && !["ended", "completed", "verified", "missed", "cancelled", "rescheduled", "disputed"].includes(String(item.display_status || getLectureDisplayStatus(item)).toLowerCase()) ? (
-                  <a href={item.google_meet_link} target="_blank" rel="noreferrer" className="mt-1 inline-flex text-xs font-semibold text-sky-700">
-                    Open Meet link
-                  </a>
-                ) : (
-                  <p className="mt-1 text-xs text-slate-500">No active Meet link</p>
-                )}
-              </div>
+                  {item.meet_link_source ? <p className="mt-1 text-xs text-slate-500">Link source: {item.meet_link_source}</p> : null}
+                  {item.google_meet_link && !isFinal && !["ended", "completed", "verified", "missed", "cancelled", "rescheduled", "disputed"].includes(String(item.display_status || getLectureDisplayStatus(item)).toLowerCase()) ? (
+                    <a href={item.google_meet_link} target="_blank" rel="noreferrer" className="mt-1 inline-flex text-xs font-semibold text-sky-700">
+                      Open Meet link
+                    </a>
+                  ) : (
+                    <p className="mt-1 text-xs text-slate-500">No active Meet link</p>
+                  )}
+                </div>
                 <div className="flex flex-wrap gap-2 lg:justify-end">
                   <button type="button" disabled={isFinal} onClick={() => patchSchedule(item.id, { action: "cancel" }).catch((error) => window.alert(error.message))} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 disabled:cursor-not-allowed disabled:opacity-50">
                     Cancel

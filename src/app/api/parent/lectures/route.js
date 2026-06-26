@@ -75,7 +75,14 @@ export async function GET(request) {
 
     const items = await prisma.$queryRawUnsafe(
       `
-      SELECT
+      WITH allowed_students AS (
+        SELECT sp.id, u.full_name
+        FROM student_profiles sp
+        INNER JOIN users u ON u.id = sp.user_id
+        ${String(session.user.role).toLowerCase() === "admin" ? "" : "INNER JOIN student_parents spp ON spp.student_id = sp.id INNER JOIN parent_profiles pp ON pp.id = spp.parent_id"}
+        ${scope.where}
+      )
+      SELECT DISTINCT
         ls.id::text AS id,
         ls.title,
         ls.description,
@@ -87,19 +94,24 @@ export async function GET(request) {
         ls.recording_drive_url,
         sub.name AS subject_name,
         tu.full_name AS teacher_name,
-        su.full_name AS student_name,
+        a.full_name AS student_name,
         c.title AS course_title
       FROM lecture_schedules ls
       INNER JOIN enrollments e ON e.id = ls.enrollment_id
-      INNER JOIN course_subjects cs ON cs.course_id = e.course_id AND cs.subject_id = ls.subject_id
-      INNER JOIN student_profiles sp ON sp.id = e.student_id
-      INNER JOIN users su ON su.id = sp.user_id
+      INNER JOIN allowed_students a ON (
+        ls.student_id = a.id
+        OR e.student_id = a.id
+        OR e.course_id IN (
+          SELECT course_id
+          FROM enrollments
+          WHERE student_id = a.id
+            AND LOWER(status) = 'active'
+        )
+      )
       INNER JOIN teacher_profiles tp ON tp.id = ls.teacher_id
       INNER JOIN users tu ON tu.id = tp.user_id
       INNER JOIN subjects sub ON sub.id = ls.subject_id
       INNER JOIN courses c ON c.id = e.course_id
-      ${scope.joins}
-      ${scope.where}
       ${extra}
       ORDER BY ls.scheduled_start ASC
       `,

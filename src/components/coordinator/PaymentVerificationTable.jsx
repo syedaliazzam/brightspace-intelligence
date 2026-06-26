@@ -2,6 +2,7 @@
 
 import { motion } from "framer-motion";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import PaymentProofPreview from "@/components/coordinator/PaymentProofPreview";
 
 const STATUS_STYLES = {
@@ -36,13 +37,14 @@ function formatDate(value) {
 }
 
 export default function PaymentVerificationTable({ items, onRefresh }) {
+  const router = useRouter();
   const [pendingId, setPendingId] = useState("");
   const [selectedItem, setSelectedItem] = useState(null);
   const [credentialsEmail, setCredentialsEmail] = useState(null);
   const [rejectingItem, setRejectingItem] = useState(null);
   const [rejectionReason, setRejectionReason] = useState("");
   const [rejecting, setRejecting] = useState(false);
-
+  const [refreshAfterCredentialsClose, setRefreshAfterCredentialsClose] = useState(false);
   function openProofPreview(item) {
     const previewItem = {
       ...item,
@@ -83,8 +85,8 @@ export default function PaymentVerificationTable({ items, onRefresh }) {
 
       if (data?.credentials_email) {
         setCredentialsEmail(data.credentials_email);
+        setRefreshAfterCredentialsClose(true);
       }
-      onRefresh?.();
     } catch (error) {
       window.alert(error instanceof Error ? error.message : "Payment verification failed.");
     } finally {
@@ -119,13 +121,16 @@ export default function PaymentVerificationTable({ items, onRefresh }) {
         return;
       }
 
-      onRefresh?.();
+      setRejectingItem(null);
+      requestAnimationFrame(() => {
+        if (onRefresh) onRefresh();
+        else router.refresh();
+      });
     } catch (error) {
       window.alert(error instanceof Error ? error.message : "Payment verification failed.");
     } finally {
       setRejecting(false);
       setPendingId("");
-      setRejectingItem(null);
       setRejectionReason("");
     }
   }
@@ -341,7 +346,16 @@ export default function PaymentVerificationTable({ items, onRefresh }) {
               </button>
               <button
                 type="button"
-                onClick={() => setCredentialsEmail(null)}
+                onClick={() => {
+                  setCredentialsEmail(null);
+                  if (refreshAfterCredentialsClose) {
+                    setRefreshAfterCredentialsClose(false);
+                    requestAnimationFrame(() => {
+                      if (onRefresh) onRefresh();
+                      else router.refresh();
+                    });
+                  }
+                }}
                 className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
               >
                 Close
@@ -378,6 +392,10 @@ export default function PaymentVerificationTable({ items, onRefresh }) {
                     if (rejecting) return;
                     setRejectingItem(null);
                     setRejectionReason("");
+                    requestAnimationFrame(() => {
+                      if (onRefresh) onRefresh();
+                      else router.refresh();
+                    });
                   }}
                   className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
                 >

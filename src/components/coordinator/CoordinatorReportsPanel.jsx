@@ -47,24 +47,13 @@ const REPORTS = [
     itemLabel: "Teacher",
     valueLabel: "Classes",
   },
-  {
-    key: "studentActivity",
-    title: "Student Activity",
-    description: "Students with the highest number of scheduled classes.",
-    itemLabel: "Student",
-    valueLabel: "Classes",
-  },
 ];
 
 function formatDate(value) {
   if (!value) return "No date";
-  const date = new Date(value);
-  return Number.isNaN(date.getTime())
-    ? "Invalid date"
-    : new Intl.DateTimeFormat("en-US", {
-        dateStyle: "medium",
-        timeStyle: "short",
-      }).format(date);
+  const text = String(value).trim();
+  if (!text) return "No date";
+  return text.replace("T", " ").replace(".000", "").replace(/z$/i, "");
 }
 
 function humanize(value) {
@@ -76,17 +65,7 @@ function humanize(value) {
 function uniqueById(rows = []) {
   const seen = new Set();
   return rows.filter((row) => {
-    const key = [
-      row?.title,
-      row?.subject_name,
-      row?.teacher_name,
-      row?.class_name,
-      row?.scheduled_start,
-      row?.scheduled_end,
-      row?.status,
-    ]
-      .map((value) => String(value || "").trim().toLowerCase())
-      .join("|");
+    const key = String(row?.id || "").trim().toLowerCase();
     if (!key || seen.has(key)) {
       return false;
     }
@@ -182,7 +161,11 @@ export default function CoordinatorReportsPanel({ data }) {
                 <span className="text-slate-600">{row.teacher_name || "-"}</span>
                 <span className="text-slate-600">{row.class_name || "-"}</span>
                 <span className="text-right text-slate-500">{formatDate(row.scheduled_start)}</span>
-                <span className="text-right text-slate-600">{row.status || "-"}</span>
+                <span className="text-right text-slate-600">
+                  {String(row.display_status || row.status || "").toLowerCase() === "ended"
+                    ? "Ended"
+                    : humanize(row.display_status || row.status)}
+                </span>
               </div>
             )) : <p className="border-t border-slate-100 px-4 py-4 text-sm text-slate-500">No recent lectures found.</p>}
             </div>

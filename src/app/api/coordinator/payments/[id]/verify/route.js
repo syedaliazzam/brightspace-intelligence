@@ -258,13 +258,19 @@ async function insertFeeVerification(payload, tx) {
 async function findExistingUser({ email, phone, roleName }, tx) {
   if (!email && !phone) return null;
 
-  const [user] = email && phone
+  const normalizedRole = normalizeText(roleName).toLowerCase();
+  const normalizedEmail = normalizeText(email).toLowerCase();
+
+  const [parentUser] = email && phone
     ? await tx.$queryRaw`
         SELECT u.id::text AS id, LOWER(r.name) AS role_name
         FROM users u
         INNER JOIN roles r ON r.id = u.role_id
-        WHERE LOWER(u.email) = ${email.toLowerCase()}
-           OR u.phone = ${phone}
+        WHERE LOWER(r.name) = ${normalizedRole}
+          AND (
+            LOWER(u.email) = ${normalizedEmail}
+            OR u.phone = ${phone}
+          )
         LIMIT 1
       `
     : email
@@ -272,18 +278,53 @@ async function findExistingUser({ email, phone, roleName }, tx) {
           SELECT u.id::text AS id, LOWER(r.name) AS role_name
           FROM users u
           INNER JOIN roles r ON r.id = u.role_id
-          WHERE LOWER(u.email) = ${email.toLowerCase()}
+          WHERE LOWER(r.name) = ${normalizedRole}
+            AND LOWER(u.email) = ${normalizedEmail}
           LIMIT 1
         `
       : await tx.$queryRaw`
           SELECT u.id::text AS id, LOWER(r.name) AS role_name
           FROM users u
           INNER JOIN roles r ON r.id = u.role_id
+          WHERE LOWER(r.name) = ${normalizedRole}
+            AND u.phone = ${phone}
+          LIMIT 1
+        `;
+
+  if (parentUser?.id) return parentUser;
+
+  const [anyUser] = email && phone
+    ? await tx.$queryRaw`
+        SELECT u.id::text AS id, LOWER(r.name) AS role_name
+        FROM users u
+        LEFT JOIN roles r ON r.id = u.role_id
+        WHERE LOWER(u.email) = ${normalizedEmail}
+           OR u.phone = ${phone}
+        LIMIT 1
+      `
+    : email
+      ? await tx.$queryRaw`
+          SELECT u.id::text AS id, LOWER(r.name) AS role_name
+          FROM users u
+          LEFT JOIN roles r ON r.id = u.role_id
+          WHERE LOWER(u.email) = ${normalizedEmail}
+          LIMIT 1
+        `
+      : await tx.$queryRaw`
+          SELECT u.id::text AS id, LOWER(r.name) AS role_name
+          FROM users u
+          LEFT JOIN roles r ON r.id = u.role_id
           WHERE u.phone = ${phone}
           LIMIT 1
         `;
 
-  return user?.id && user.role_name === roleName ? user : null;
+  if (anyUser?.id) {
+    throw new Error(
+      `A user with this ${email ? "email" : "phone"} already exists${anyUser.role_name ? ` as ${anyUser.role_name}` : ""}.`
+    );
+  }
+
+  return null;
 }
 
 async function createUser({ roleId, fullName, username, email, phone, passwordHash }, tx) {
@@ -681,12 +722,46 @@ export async function POST(request, { params }) {
         );
       }
       else {
+        const [existingParentRecord] = await tx.$queryRaw`
+          SELECT email, phone
+          FROM users
+          WHERE id = ${parentUserId}::uuid
+          LIMIT 1
+        `;
+
+        const [emailConflict] = parentContactEmail
+          ? await tx.$queryRaw`
+              SELECT id::text AS id
+              FROM users
+              WHERE id <> ${parentUserId}::uuid
+                AND LOWER(email) = ${parentContactEmail.toLowerCase()}
+              LIMIT 1
+            `
+          : [null];
+
+        const [phoneConflict] = parentContactPhone
+          ? await tx.$queryRaw`
+              SELECT id::text AS id
+              FROM users
+              WHERE id <> ${parentUserId}::uuid
+                AND phone = ${parentContactPhone}
+              LIMIT 1
+            `
+          : [null];
+
+        const safeParentEmail = emailConflict
+          ? existingParentRecord?.email || null
+          : parentContactEmail || existingParentRecord?.email || null;
+        const safeParentPhone = phoneConflict
+          ? existingParentRecord?.phone || null
+          : parentContactPhone || existingParentRecord?.phone || null;
+
         await tx.$executeRaw`
           UPDATE users
           SET
             password_hash = ${parentPasswordHash},
-            email = ${parentContactEmail || null},
-            phone = ${parentContactPhone || null},
+            email = ${safeParentEmail},
+            phone = ${safeParentPhone},
             status = 'active'::user_status,
             must_change_password = TRUE,
             updated_at = NOW()

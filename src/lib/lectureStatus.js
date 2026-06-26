@@ -33,7 +33,7 @@ export function getLectureDisplayStatus(lecture) {
 
   if (!start || !end) return dbStatus || "scheduled";
   const joinOpenBefore = Number(process.env.NEXT_PUBLIC_CLASS_JOIN_OPEN_BEFORE_MINUTES || 10) * 60 * 1000;
-  const joinOpenAfter = Number(process.env.NEXT_PUBLIC_CLASS_JOIN_OPEN_AFTER_MINUTES || 15) * 60 * 1000;
+  const joinOpenAfter = Number(process.env.NEXT_PUBLIC_CLASS_JOIN_OPEN_AFTER_MINUTES || 0) * 60 * 1000;
 
   if (now < start.getTime() - joinOpenBefore) return "upcoming";
   if (now >= start.getTime() && now <= end.getTime()) return "live";

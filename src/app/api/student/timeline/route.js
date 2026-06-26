@@ -36,12 +36,21 @@ export async function GET(request) {
         tu.full_name AS teacher_name,
         su.full_name AS student_name
       FROM lecture_schedules ls
-      INNER JOIN student_profiles sp ON sp.id = ls.student_id
+      INNER JOIN enrollments e ON e.id = ls.enrollment_id
+      INNER JOIN student_profiles sp ON sp.user_id = $1::uuid
       INNER JOIN users su ON su.id = sp.user_id
       INNER JOIN teacher_profiles tp ON tp.id = ls.teacher_id
       INNER JOIN users tu ON tu.id = tp.user_id
       INNER JOIN subjects sub ON sub.id = ls.subject_id
-      WHERE (ls.student_id = $1::uuid OR sp.id = $1::uuid)
+      WHERE (
+        ls.student_id = sp.id
+        OR e.student_id = sp.id
+        OR e.course_id IN (
+          SELECT course_id FROM enrollments
+          WHERE student_id = sp.id
+            AND LOWER(status) = 'active'
+        )
+      )
       ORDER BY ls.scheduled_start ASC
       LIMIT 50
       `,

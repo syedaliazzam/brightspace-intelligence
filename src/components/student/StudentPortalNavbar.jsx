@@ -145,7 +145,7 @@ export default function StudentPortalNavbar({ profile = {} }) {
                   {profile?.full_name || profile?.name || "Student"}
                 </p>
                 <p className="text-xs text-slate-500">
-                  {profile?.email || "student@lms.local"}
+                  {profile?.username || profile?.email || "Student"}
                 </p>
               </div>
               <button
@@ -176,7 +176,7 @@ export default function StudentPortalNavbar({ profile = {} }) {
                     {profile?.full_name || profile?.name || "Student"}
                   </p>
                   <p className="text-xs text-slate-500">
-                    {profile?.email || "student@lms.local"}
+                    {profile?.username || profile?.email || "Student"}
                   </p>
                 </div>
 

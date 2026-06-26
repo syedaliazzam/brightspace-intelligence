@@ -10,7 +10,7 @@ export const dashboardNavigation = {
   coordinator: [
     { label: "Dashboard", href: "/coordinator/dashboard" },
     { label: "Interested Students", href: "/coordinator/interested-students" },
-    { label: "Registration Records", href: "/coordinator/registration-leads" },
+    { label: "Admission Records", href: "/coordinator/registration-leads" },
     { label: "Fee Vouchers", href: "/coordinator/fee-vouchers" },
     { label: "Payments", href: "/coordinator/payments" },
     { label: "Students", href: "/coordinator/students" },

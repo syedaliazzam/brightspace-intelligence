@@ -2,10 +2,8 @@
 
 import { useEffect, useState } from "react";
 import TeacherStatsCards from "@/components/teacher/TeacherStatsCards";
-import TodayClassesCard from "@/components/teacher/TodayClassesCard";
 import ClassActionModal from "@/components/teacher/ClassActionModal";
-import TeacherLectureCalendar from "@/components/teacher/TeacherLectureCalendar";
-import TeacherSelectedDateLectures from "@/components/teacher/TeacherSelectedDateLectures";
+import LMSCalendar from "@/components/calendar/LMSCalendar";
 
 function todayDate() {
   const date = new Date();
@@ -16,15 +14,13 @@ function todayDate() {
 export default function TeacherDashboardPage() {
   const [state, setState] = useState({
     stats: {},
-    today: [],
+    classes: [],
     selected: null,
-    calendarLectures: [],
-    subjects: [],
-    markedDates: [],
-    calendarLoading: true,
+    calendarRefreshKey: 0,
     filters: {
-      date: "",
+      date: todayDate(),
       range: "today",
+      classLevel: "",
       subjectId: "",
       status: "",
     },
@@ -35,37 +31,32 @@ export default function TeacherDashboardPage() {
     const response = await fetch("/api/teacher/dashboard", { cache: "no-store" });
     const data = await response.json();
     if (!response.ok) throw new Error(data?.message || "Unable to load dashboard.");
-    setState((current) => ({ ...current, stats: data.stats || {}, today: data.today || [], error: "" }));
+    setState((current) => ({ ...current, stats: data.stats || {}, error: "" }));
   }
 
-  async function loadCalendar(filters = state.filters) {
-    const safeFilters = { ...filters, date: filters.date || todayDate() };
-    setState((current) => ({ ...current, calendarLoading: true }));
-    const params = new URLSearchParams({
-      date: safeFilters.date,
-      range: safeFilters.range,
-      subjectId: safeFilters.subjectId,
-      status: safeFilters.status,
+  async function loadLectures(filters = state.filters) {
+    const safeFilters = {
+      ...filters,
+      date: filters.date || todayDate(),
+      classLevel: filters.classLevel || "",
+      subjectId: filters.subjectId || "",
+      status: filters.status || "",
+    };
+    const response = await fetch(`/api/teacher/calendar-lectures?${new URLSearchParams(safeFilters).toString()}`, {
+      cache: "no-store",
     });
-    const response = await fetch(`/api/teacher/calendar-lectures?${params.toString()}`, { cache: "no-store" });
     const data = await response.json();
-    if (!response.ok) throw new Error(data?.message || "Unable to load calendar lectures.");
+    if (!response.ok) throw new Error(data?.message || "Unable to load lectures.");
     setState((current) => ({
       ...current,
-      calendarLectures: data.items || [],
-      subjects: data.subjects || current.subjects,
-      markedDates: data.markedDates || current.markedDates,
-      filters: { ...current.filters, date: safeFilters.date },
-      calendarLoading: false,
-      error: "",
+      filters: safeFilters,
+      classes: Array.isArray(data.classes) ? data.classes : [],
     }));
   }
 
   function updateFilters(nextFilters) {
     setState((current) => ({ ...current, filters: nextFilters }));
-    loadCalendar(nextFilters).catch((error) => {
-      setState((current) => ({ ...current, calendarLoading: false, error: error.message }));
-    });
+    loadLectures(nextFilters).catch((error) => setState((current) => ({ ...current, error: error.message })));
   }
 
   async function markConducted(item) {
@@ -75,14 +66,33 @@ export default function TeacherDashboardPage() {
       window.alert(data?.message || "Unable to mark conducted.");
       return;
     }
-    await Promise.all([load(), loadCalendar()]);
+    await load();
+    setState((current) => ({ ...current, calendarRefreshKey: current.calendarRefreshKey + 1 }));
   }
 
-  useEffect(() => { load().catch((error) => setState((current) => ({ ...current, error: error.message }))); }, []);
   useEffect(() => {
-    const initialFilters = { ...state.filters, date: todayDate() };
-    setState((current) => ({ ...current, filters: initialFilters }));
-    loadCalendar(initialFilters).catch((error) => setState((current) => ({ ...current, calendarLoading: false, error: error.message })));
+    async function initialize() {
+      try {
+        await load();
+      } catch (error) {
+        setState((current) => ({ ...current, error: error instanceof Error ? error.message : String(error) }));
+      }
+
+      try {
+        await loadLectures({
+          date: todayDate(),
+          range: "today",
+          classLevel: "",
+          subjectId: "",
+          status: "",
+        });
+      } catch (error) {
+        setState((current) => ({ ...current, error: error instanceof Error ? error.message : String(error) }));
+      }
+    }
+
+    initialize();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (
@@ -95,14 +105,36 @@ export default function TeacherDashboardPage() {
       <TeacherStatsCards items={[
         { key: "today", label: "Today lectures", value: state.stats.today_lectures || 0 },
         { key: "upcoming", label: "Upcoming lectures", value: state.stats.upcoming_lectures || 0 },
-        { key: "completed", label: "Completed this week", value: state.stats.completed_this_week || 0 },
-        { key: "pending", label: "Pending reports", value: state.stats.pending_completion_reports || 0 },
         { key: "students", label: "Assigned students", value: state.stats.assigned_students || 0 },
         { key: "subjects", label: "Assigned subjects", value: state.stats.assigned_subjects || 0 },
       ]} />
-      <TodayClassesCard items={state.today} onOpen={(item) => setState((current) => ({ ...current, selected: item }))} />
-      <TeacherLectureCalendar filters={state.filters} subjects={state.subjects} markedDates={state.markedDates} onChange={updateFilters} />
-      <TeacherSelectedDateLectures items={state.calendarLectures} loading={state.calendarLoading} onMarkConducted={markConducted} />
+      <section className="rounded-[2rem] border border-white/70 bg-white/90 p-5 shadow-[0_20px_70px_-36px_rgba(15,23,42,0.25)]">
+        <div className="mb-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+          <label className="block">
+            <span className="mb-2 block text-sm font-medium text-slate-700">Class</span>
+            <select
+              value={state.filters.classLevel}
+              onChange={(event) => updateFilters({ ...state.filters, classLevel: event.target.value })}
+              className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 outline-none transition focus:border-sky-400"
+            >
+              <option value="">All classes</option>
+              {state.classes.map((item) => (
+                <option key={item.class_level} value={item.class_level}>
+                  {item.class_level}
+                  {item.title ? ` - ${item.title}` : ""}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+        <LMSCalendar
+          key={state.calendarRefreshKey}
+          apiUrl="/api/teacher/calendar-lectures"
+          filters={state.filters}
+          onDateSelect={(date) => updateFilters({ ...state.filters, date, range: "selected_date" })}
+          onEventClick={(item) => setState((current) => ({ ...current, selected: item }))}
+        />
+      </section>
       <ClassActionModal lecture={state.selected} open={Boolean(state.selected)} onClose={() => setState((current) => ({ ...current, selected: null }))} onChanged={() => load()} />
     </div>
   );

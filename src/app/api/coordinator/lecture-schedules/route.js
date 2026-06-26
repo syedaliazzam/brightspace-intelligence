@@ -330,16 +330,82 @@ export async function GET(request) {
           ls.subject_id::text AS subject_id,
           ls.title,
           ls.description,
+          TO_CHAR(MIN(ls.scheduled_start), 'YYYY-MM-DD') AS start_date,
+          TO_CHAR(MAX(ls.scheduled_end), 'YYYY-MM-DD') AS end_date,
+          TO_CHAR(MIN(ls.scheduled_start), 'HH24:MI') AS start_time,
+          TO_CHAR(MAX(ls.scheduled_end), 'HH24:MI') AS end_time,
+          COUNT(*)::int AS occurrence_count,
+          COUNT(*) FILTER (WHERE ls.status::text = 'completed_by_teacher')::int AS completed_count,
+          COUNT(*) FILTER (WHERE ls.status::text = 'verified_by_coordinator')::int AS verified_count,
+          (
+            SELECT STRING_AGG(day_name, ', ' ORDER BY day_order)
+            FROM (
+              SELECT DISTINCT
+                TO_CHAR(ls2.scheduled_start, 'Dy') AS day_name,
+                EXTRACT(DOW FROM ls2.scheduled_start) AS day_order
+              FROM lecture_schedules ls2
+              INNER JOIN enrollments e2 ON e2.id = ls2.enrollment_id
+              WHERE
+                ls2.google_calendar_event_id IS NOT DISTINCT FROM ls.google_calendar_event_id
+                AND ls2.google_meet_link IS NOT DISTINCT FROM ls.google_meet_link
+                AND ls2.meet_link_source IS NOT DISTINCT FROM ls.meet_link_source
+                AND ls2.google_meet_space_id IS NOT DISTINCT FROM ls.google_meet_space_id
+                AND ls2.teacher_id = ls.teacher_id
+                AND ls2.subject_id = ls.subject_id
+                AND ls2.title = ls.title
+                AND ls2.description = ls.description
+                AND ls2.rescheduled_from_id IS NOT DISTINCT FROM ls.rescheduled_from_id
+                AND e2.course_id = e.course_id
+            ) AS day_parts
+          ) AS days_active,
           MIN(ls.scheduled_start)::text AS scheduled_start,
-          MIN(ls.scheduled_end)::text AS scheduled_end,
-          ls.status::text AS status,
-          ${DISPLAY_STATUS_SQL} AS display_status,
+          MAX(ls.scheduled_end)::text AS scheduled_end,
+          CASE
+            WHEN COUNT(*) FILTER (WHERE ls.status::text = 'verified_by_coordinator') = COUNT(*) THEN 'verified_by_coordinator'
+            WHEN COUNT(*) FILTER (WHERE ls.status::text = 'completed_by_teacher') = COUNT(*) THEN 'completed_by_teacher'
+            WHEN COUNT(*) FILTER (WHERE ls.status::text = 'missed') = COUNT(*) AND COUNT(*) > 0 THEN 'missed'
+            WHEN COUNT(*) FILTER (WHERE ls.status::text = 'cancelled') = COUNT(*) AND COUNT(*) > 0 THEN 'cancelled'
+            WHEN COUNT(*) FILTER (WHERE ls.status::text = 'rescheduled') = COUNT(*) AND COUNT(*) > 0 THEN 'rescheduled'
+            WHEN COUNT(*) FILTER (WHERE ls.status::text = 'disputed') = COUNT(*) AND COUNT(*) > 0 THEN 'disputed'
+            WHEN MIN(ls.scheduled_start) > ${LOCAL_NOW_SQL} THEN 'upcoming'
+            WHEN MIN(ls.scheduled_start) <= ${LOCAL_NOW_SQL}
+              AND MAX(ls.scheduled_end) >= ${LOCAL_NOW_SQL} THEN 'live'
+            ELSE 'ended'
+          END AS status,
+          LOWER(
+            CASE
+              WHEN COUNT(*) FILTER (WHERE ls.status::text = 'verified_by_coordinator') = COUNT(*) THEN 'verified_by_coordinator'
+              WHEN COUNT(*) FILTER (WHERE ls.status::text = 'completed_by_teacher') = COUNT(*) THEN 'completed_by_teacher'
+              WHEN COUNT(*) FILTER (WHERE ls.status::text = 'missed') = COUNT(*) AND COUNT(*) > 0 THEN 'missed'
+              WHEN COUNT(*) FILTER (WHERE ls.status::text = 'cancelled') = COUNT(*) AND COUNT(*) > 0 THEN 'cancelled'
+              WHEN COUNT(*) FILTER (WHERE ls.status::text = 'rescheduled') = COUNT(*) AND COUNT(*) > 0 THEN 'rescheduled'
+              WHEN COUNT(*) FILTER (WHERE ls.status::text = 'disputed') = COUNT(*) AND COUNT(*) > 0 THEN 'disputed'
+              WHEN MIN(ls.scheduled_start) > ${LOCAL_NOW_SQL} THEN 'upcoming'
+              WHEN MIN(ls.scheduled_start) <= ${LOCAL_NOW_SQL}
+                AND MAX(ls.scheduled_end) >= ${LOCAL_NOW_SQL} THEN 'live'
+              ELSE 'ended'
+            END
+          ) AS display_status,
           ls.rescheduled_from_id::text AS rescheduled_from_id,
-          tu.full_name AS teacher_name,
-          sub.name AS subject_name,
-          c.title AS course_title,
-          COUNT(DISTINCT e.student_id)::int AS student_count,
-          STRING_AGG(DISTINCT su.full_name, ', ') AS student_names
+          MIN(tu.full_name) AS teacher_name,
+          MIN(sub.name) AS subject_name,
+          MIN(c.title) AS course_title,
+          (SELECT COUNT(DISTINCT e2.student_id)::int
+           FROM enrollments e2
+           INNER JOIN student_profiles sp2 ON sp2.id = e2.student_id
+           INNER JOIN users su2 ON su2.id = sp2.user_id
+           WHERE e2.course_id = e.course_id
+             AND LOWER(e2.status) = 'active'
+             AND su2.status = 'active'::user_status
+          ) AS student_count,
+          (SELECT STRING_AGG(su2.full_name, ', ' ORDER BY su2.full_name)
+           FROM enrollments e2
+           INNER JOIN student_profiles sp2 ON sp2.id = e2.student_id
+           INNER JOIN users su2 ON su2.id = sp2.user_id
+           WHERE e2.course_id = e.course_id
+             AND LOWER(e2.status) = 'active'
+             AND su2.status = 'active'::user_status
+          ) AS student_names
         FROM lecture_schedules ls
         INNER JOIN enrollments e ON e.id = ls.enrollment_id
         INNER JOIN courses c ON c.id = e.course_id
@@ -358,12 +424,9 @@ export async function GET(request) {
           ls.subject_id,
           ls.title,
           ls.description,
-          ls.status,
-          ${DISPLAY_STATUS_SQL},
           ls.rescheduled_from_id,
-          tu.full_name,
-          sub.name,
-          c.title
+          e.course_id,
+          ls.status
         ORDER BY MIN(ls.scheduled_start) ASC
         `,
         ...values
@@ -390,36 +453,113 @@ export async function POST(request) {
     const session = await requireRole(ALLOWED_ROLES);
     const body = await request.json();
     const courseId = normalizeText(body?.courseId || body?.course_id);
-    const studentIds = Array.isArray(body?.studentIds)
-      ? body.studentIds.map(normalizeText).filter(Boolean)
-      : Array.isArray(body?.student_ids)
-        ? body.student_ids.map(normalizeText).filter(Boolean)
-        : [];
+    const studentIds = [];
     const teacherId = normalizeText(body?.teacherId);
     const subjectId = normalizeText(body?.subjectId);
     const title = normalizeText(body?.title);
     const description = normalizeText(body?.description);
-    const scheduledStart = normalizeText(body?.scheduledStart || body?.scheduled_start);
-    const scheduledEnd = normalizeText(body?.scheduledEnd || body?.scheduled_end);
+    const startDate = normalizeText(body?.startDate || body?.start_date);
+    const endDate = normalizeText(body?.endDate || body?.end_date);
+    const startTime = normalizeText(body?.startTime || body?.start_time);
+    const endTime = normalizeText(body?.endTime || body?.end_time);
+    const selectedDays = Array.isArray(body?.days)
+      ? body.days.map(normalizeText).filter(Boolean)
+      : Array.isArray(body?.daysSelected)
+        ? body.daysSelected.map(normalizeText).filter(Boolean)
+        : [];
     const manualMeetLink = normalizeText(body?.googleMeetLink || body?.google_meet_link);
 
-    if (!courseId || !studentIds.length || !teacherId || !subjectId || !title || !scheduledStart || !scheduledEnd) {
-      return json("Class, students, teacher, subject, title, and schedule times are required.", 400);
+    if (!courseId || !teacherId || !subjectId || !title || !startDate || !endDate || !startTime || !endTime || !selectedDays.length) {
+      return json("Class, teacher, subject, title, date range, times, and lecture days are required.", 400);
     }
 
     if (!isValidGoogleMeetLink(manualMeetLink)) {
       return json("Google Meet link is required.", 400);
     }
 
-    const startDate = parseScheduleDate(scheduledStart);
-    const endDate = parseScheduleDate(scheduledEnd);
+    const startDateValue = parseScheduleDate(startDate);
+    const endDateValue = parseScheduleDate(endDate);
 
-    if (!startDate || !endDate) {
+    if (!startDateValue || !endDateValue) {
+      return json("Please provide valid lecture start and end dates.", 400);
+    }
+
+    if (endDateValue < startDateValue) {
+      return json("Lecture end date must be on or after the start date.", 400);
+    }
+
+    const [startHours, startMinutes] = startTime.split(":").map(Number);
+    const [endHours, endMinutes] = endTime.split(":").map(Number);
+    if (
+      Number.isNaN(startHours) ||
+      Number.isNaN(startMinutes) ||
+      Number.isNaN(endHours) ||
+      Number.isNaN(endMinutes) ||
+      startHours < 0 ||
+      startHours > 23 ||
+      endHours < 0 ||
+      endHours > 23 ||
+      startMinutes < 0 ||
+      startMinutes > 59 ||
+      endMinutes < 0 ||
+      endMinutes > 59
+    ) {
       return json("Please provide valid lecture start and end times.", 400);
     }
 
-    if (endDate <= startDate) {
+    if (startHours > endHours || (startHours === endHours && startMinutes >= endMinutes)) {
       return json("Lecture end time must be later than the start time.", 400);
+    }
+
+    const weekdayMap = {
+      sun: 0,
+      mon: 1,
+      tue: 2,
+      wed: 3,
+      thu: 4,
+      fri: 5,
+      sat: 6,
+    };
+    const selectedWeekdays = selectedDays
+      .map((day) => weekdayMap[day.toLowerCase()])
+      .filter((value) => typeof value === "number");
+
+    if (!selectedWeekdays.length) {
+      return json("Select at least one lecture day.", 400);
+    }
+
+    const occurrenceDates = [];
+    const currentDate = new Date(
+      startDateValue.getFullYear(),
+      startDateValue.getMonth(),
+      startDateValue.getDate()
+    );
+    const endLimit = new Date(
+      endDateValue.getFullYear(),
+      endDateValue.getMonth(),
+      endDateValue.getDate()
+    );
+
+    while (currentDate <= endLimit) {
+      if (selectedWeekdays.includes(currentDate.getDay())) {
+        occurrenceDates.push(new Date(currentDate));
+      }
+      currentDate.setDate(currentDate.getDate() + 1);
+    }
+
+    if (!occurrenceDates.length) {
+      return json("No lecture days fall within the selected date range.", 400);
+    }
+
+    function formatScheduleDate(date, hours, minutes) {
+      const scheduled = new Date(date);
+      scheduled.setHours(hours, minutes, 0, 0);
+      const year = scheduled.getFullYear();
+      const month = String(scheduled.getMonth() + 1).padStart(2, "0");
+      const day = String(scheduled.getDate()).padStart(2, "0");
+      const hour = String(scheduled.getHours()).padStart(2, "0");
+      const minute = String(scheduled.getMinutes()).padStart(2, "0");
+      return `${year}-${month}-${day} ${hour}:${minute}:00`;
     }
 
     const [course] = await prisma.$queryRaw`
@@ -496,7 +636,7 @@ export async function POST(request) {
         LEFT JOIN parent_profiles pp ON pp.id = spp.parent_id
         LEFT JOIN users pu ON pu.id = pp.user_id
         WHERE e.course_id = ${courseId}::uuid
-          AND e.student_id IN (${Prisma.join(selectedStudentSql)})
+          ${studentIds.length ? Prisma.sql`AND e.student_id IN (${Prisma.join(selectedStudentSql)})` : Prisma.sql``}
           AND LOWER(e.status) = 'active'
           AND COALESCE(sp.status, 'active'::user_status) = 'active'::user_status
           AND su.status = 'active'::user_status
@@ -504,70 +644,92 @@ export async function POST(request) {
       `
     );
 
-    if (enrollmentRows.length !== studentIds.length) {
+    if (studentIds.length && enrollmentRows.length !== studentIds.length) {
       return json("One or more selected students are not enrolled in this class.", 400);
+    }
+
+    if (!enrollmentRows.length) {
+      return json("No active students found for this class.", 400);
     }
 
     const calendarData = { eventId: "", meetSpaceId: "", meetLink: manualMeetLink };
     const resolvedMeetLink = manualMeetLink;
     const resolvedMeetSource = "manual";
 
-    const createdMeta = await prisma.$transaction(async (tx) => {
-      const createdRows = [];
+    const firstOccurrenceStart = formatScheduleDate(occurrenceDates[0], startHours, startMinutes);
+    const firstOccurrenceEnd = formatScheduleDate(occurrenceDates[0], endHours, endMinutes);
 
-      for (const enrollment of enrollmentRows) {
-        const rows = await tx.$queryRaw`
-        INSERT INTO lecture_schedules (
-          id,
-          enrollment_id,
-          student_id,
-          teacher_id,
-          subject_id,
-          scheduled_by,
-          title,
-          description,
-          scheduled_start,
-          scheduled_end,
-          google_calendar_event_id,
-          google_meet_link,
-          meet_link_source,
-          google_meet_space_id,
-          status,
-          created_at,
-          updated_at
-        )
-        VALUES (
-          ${crypto.randomUUID()}::uuid,
-          ${enrollment.enrollment_id}::uuid,
-          ${enrollment.student_id}::uuid,
-          ${teacherId}::uuid,
-          ${subjectId}::uuid,
-          ${session.user.id}::uuid,
-          ${title},
-          ${description || null},
-          ${scheduledStart}::timestamp,
-          ${scheduledEnd}::timestamp,
-          ${calendarData.eventId || null},
-          ${resolvedMeetLink || null},
-          ${resolvedMeetSource},
-          ${calendarData.meetSpaceId || null},
-          'scheduled'::lecture_status,
-          NOW(),
-          NOW()
-        )
-        RETURNING id::text AS id
-      `;
-        createdRows.push(rows[0]);
-      }
+    const representativeEnrollment = enrollmentRows[0];
+    const lectureInsertRows = [];
+    for (const date of occurrenceDates) {
+      const scheduledStart = formatScheduleDate(date, startHours, startMinutes);
+      const scheduledEnd = formatScheduleDate(date, endHours, endMinutes);
 
-      return { ids: createdRows.map((row) => row.id) };
-    });
+      lectureInsertRows.push(
+        Prisma.sql`
+          (
+            ${crypto.randomUUID()}::uuid,
+            ${representativeEnrollment.enrollment_id}::uuid,
+            ${representativeEnrollment.student_id}::uuid,
+            ${teacherId}::uuid,
+            ${subjectId}::uuid,
+            ${session.user.id}::uuid,
+            ${title},
+            ${description || null},
+            ${scheduledStart}::timestamp,
+            ${scheduledEnd}::timestamp,
+            ${calendarData.eventId || null},
+            ${resolvedMeetLink || null},
+            ${resolvedMeetSource},
+            ${calendarData.meetSpaceId || null},
+            'scheduled'::lecture_status,
+            NOW(),
+            NOW()
+          )
+        `
+      );
+    }
+
+    const createdMeta = await prisma.$transaction(
+      async (tx) => {
+        if (!lectureInsertRows.length) {
+          return { ids: [] };
+        }
+
+        const createdRows = await tx.$queryRaw`
+          INSERT INTO lecture_schedules (
+            id,
+            enrollment_id,
+            student_id,
+            teacher_id,
+            subject_id,
+            scheduled_by,
+            title,
+            description,
+            scheduled_start,
+            scheduled_end,
+            google_calendar_event_id,
+            google_meet_link,
+            meet_link_source,
+            google_meet_space_id,
+            status,
+            created_at,
+            updated_at
+          )
+          VALUES ${Prisma.join(lectureInsertRows)}
+          RETURNING id::text AS id
+        `;
+
+        return { ids: createdRows.map((row) => row.id) };
+      },
+      { timeout: 15000 }
+    );
 
     await sendLectureLinkEmails({
       teacher,
       enrollmentRows,
       title,
-      scheduledStart,
+      scheduledStart: firstOccurrenceStart,
       meetLink: resolvedMeetLink,
     });
 
@@ -581,8 +743,13 @@ export async function POST(request) {
         subjectId,
         courseId,
         studentIds,
-        scheduledStart,
-        scheduledEnd,
+        startDate,
+        endDate,
+        startTime,
+        endTime,
+        days: selectedDays,
+        scheduledStart: firstOccurrenceStart,
+        scheduledEnd: firstOccurrenceEnd,
       },
     });
 

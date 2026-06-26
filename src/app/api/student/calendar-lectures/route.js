@@ -48,7 +48,17 @@ export async function GET(request) {
     const subjectId = clean(searchParams.get("subjectId"));
     const status = clean(searchParams.get("status")).toLowerCase();
     const values = [studentId];
-    const conditions = ["(ls.student_id = $1::uuid OR e.student_id = $1::uuid)"];
+    const conditions = [
+      "(\n" +
+      "  ls.student_id = $1::uuid\n" +
+      "  OR e.student_id = $1::uuid\n" +
+      "  OR e.course_id IN (\n" +
+      "    SELECT course_id FROM enrollments\n" +
+      "    WHERE student_id = $1::uuid\n" +
+      "      AND LOWER(status) = 'active'\n" +
+      "  )\n" +
+      ")"
+    ];
 
     let rangeStart = null;
     let rangeEnd = null;
@@ -143,7 +153,15 @@ export async function GET(request) {
         SELECT DISTINCT TO_CHAR(ls.scheduled_start, 'YYYY-MM-DD') AS date
         FROM lecture_schedules ls
         INNER JOIN enrollments e ON e.id = ls.enrollment_id
-        WHERE (ls.student_id = ${studentId}::uuid OR e.student_id = ${studentId}::uuid)
+        WHERE (
+          ls.student_id = ${studentId}::uuid
+          OR e.student_id = ${studentId}::uuid
+          OR e.course_id IN (
+            SELECT course_id FROM enrollments
+            WHERE student_id = ${studentId}::uuid
+              AND LOWER(status) = 'active'
+          )
+        )
         ORDER BY date ASC
       `,
     ]);

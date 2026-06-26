@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { Prisma } from "@prisma/client";
 import { requireRole, roleGuardResponse } from "@/lib/roleGuard";
 import prisma from "@/lib/prisma";
 
@@ -92,21 +91,10 @@ export async function PATCH(_request, { params }) {
         `;
     if (!lecture?.id) return json("Lecture not found.", 404);
 
-    const lectureMatch = lecture.google_calendar_event_id
-      ? Prisma.sql`ls.google_calendar_event_id = ${lecture.google_calendar_event_id}`
-      : Prisma.sql`
-          ls.teacher_id = ${lecture.teacher_id}::uuid
-          AND ls.subject_id = ${lecture.subject_id}::uuid
-          AND ls.title = ${lecture.title}
-          AND ls.scheduled_start = ${lecture.scheduled_start}::timestamp
-          AND ls.scheduled_end = ${lecture.scheduled_end}::timestamp
-          AND COALESCE(ls.google_meet_link, '') = COALESCE(${lecture.google_meet_link || ""}, '')
-        `;
-
     await prisma.$executeRaw`
       UPDATE lecture_schedules ls
       SET status = 'completed_by_teacher'::lecture_status, updated_at = NOW()
-      WHERE ${lectureMatch}
+      WHERE ls.id = ${id}::uuid
     `;
     await prisma.$executeRaw`
       INSERT INTO audit_logs (id, actor_user_id, action, entity_type, entity_id, created_at)
