@@ -80,6 +80,7 @@ export async function GET(request) {
         COALESCE(course_stats.student_count, 0) AS student_count,
         COALESCE(course_stats.student_name, '') AS student_name,
         sub.name AS subject_name,
+        c.class_level AS class_level,
         c.title AS course_title,
         lcr.id::text AS report_id
       FROM lecture_schedules ls

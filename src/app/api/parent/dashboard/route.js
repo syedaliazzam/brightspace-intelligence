@@ -93,7 +93,12 @@ export async function GET(request) {
                AND LOWER(status) = 'active'
            )
          )
-         WHERE ls.status::text IN ('completed_by_teacher','verified_by_coordinator')) AS completed_classes,
+         WHERE ls.status::text IN ('completed_by_teacher','verified_by_coordinator')) AS attended_lectures,
+        (SELECT COUNT(*)::int
+         FROM lecture_attendance la
+         INNER JOIN student_profiles sp ON sp.user_id = la.user_id
+         INNER JOIN allowed_students a ON a.id = sp.id
+         WHERE LOWER(la.status::text) = 'present') AS present_lectures,
         (SELECT COUNT(*)::int FROM homework h INNER JOIN allowed_students a ON a.id = h.student_id WHERE COALESCE(h.status::text, 'pending') = 'pending') AS pending_homework,
         COALESCE((SELECT ROUND(100.0 * COUNT(*) FILTER (WHERE la.status::text = 'present') / NULLIF(COUNT(*), 0))::int FROM lecture_attendance la INNER JOIN student_profiles sp ON sp.user_id = la.user_id INNER JOIN allowed_students a ON a.id = sp.id), 0) AS attendance_percentage,
         COALESCE((
@@ -118,7 +123,7 @@ export async function GET(request) {
         ${String(session.user.role).toLowerCase() === "admin" ? "" : "INNER JOIN student_parents spp ON spp.student_id = sp.id INNER JOIN parent_profiles pp ON pp.id = spp.parent_id"}
         ${scope.where}
       )
-      SELECT DISTINCT
+      SELECT DISTINCT ON (ls.id)
         ls.id::text AS id,
         ls.title,
         ls.scheduled_start::text AS scheduled_start,
@@ -144,7 +149,7 @@ export async function GET(request) {
         )
       )
       WHERE ls.scheduled_end >= NOW()
-      ORDER BY ls.scheduled_start ASC
+      ORDER BY ls.id ASC, ls.scheduled_start ASC
       LIMIT 5
       `,
       ...scope.values

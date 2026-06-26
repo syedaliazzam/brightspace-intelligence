@@ -6,6 +6,7 @@ import StudentPortalNavbar from "@/components/student/StudentPortalNavbar";
 import StudentStatsCards from "@/components/student/StudentStatsCards";
 import HomeworkList from "@/components/student/HomeworkList";
 import AttendanceSummary from "@/components/student/AttendanceSummary";
+import NoteThreadsBoard from "@/components/shared/NoteThreadsBoard";
 import LMSCalendar from "@/components/calendar/LMSCalendar";
 import PaymentAccessGuard from "@/components/shared/PaymentAccessGuard";
 
@@ -170,7 +171,7 @@ export default function StudentDashboardPage() {
 
       <motion.section id="calendar" className="scroll-mt-28 rounded-[2rem] border border-white/70 bg-white/90 p-5 shadow-[0_20px_70px_-36px_rgba(15,23,42,0.25)]">
         <div className="mb-5">
-          <p className="text-sm font-semibold uppercase tracking-[0.22em] text-sky-700">Calendar</p>
+          <p className="text-sm font-semibold uppercase tracking-[0.22em] text-sky-700">Lecture Calendar</p>
           <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">Plan your study week</h2>
         </div>
         <LMSCalendar
@@ -194,6 +195,14 @@ export default function StudentDashboardPage() {
           <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">Conducted lecture attendance</h2>
         </div>
         <AttendanceSummary summary={state.attendance.summary} items={state.attendance.items} />
+      </motion.section>
+
+      <motion.section id="notes" className="scroll-mt-28 rounded-[2rem] border border-white/70 bg-white/90 p-5 shadow-[0_20px_70px_-36px_rgba(15,23,42,0.25)]">
+        <div className="mb-5">
+          <p className="text-sm font-semibold uppercase tracking-[0.22em] text-sky-700">Teacher notes</p>
+          <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">Latest feedback and updates</h2>
+        </div>
+        <NoteThreadsBoard mode="viewer" />
       </motion.section>
 
       <motion.section id="profile" className="scroll-mt-28 rounded-[2rem] border border-white/70 bg-white/90 p-5 shadow-[0_20px_70px_-36px_rgba(15,23,42,0.25)]">

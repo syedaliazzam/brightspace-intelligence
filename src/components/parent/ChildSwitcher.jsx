@@ -15,10 +15,13 @@ export default function ChildSwitcher({ childrenList = [], value = "", onChange 
         Viewing child
       </span>
       <select
-        value={value || childrenList[0]?.id || ""}
+        value={value || ""}
         onChange={(event) => onChange?.(event.target.value)}
         className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-950 outline-none transition focus:border-sky-400 focus:bg-white focus:ring-4 focus:ring-sky-100"
       >
+        <option value="" disabled>
+          Select a child
+        </option>
         {childrenList.map((child) => (
           <option key={child.id} value={child.id}>
             {child.full_name} {child.grade_level ? `- ${child.grade_level}` : ""}

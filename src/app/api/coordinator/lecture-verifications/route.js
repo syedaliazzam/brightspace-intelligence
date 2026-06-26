@@ -88,9 +88,6 @@ export async function GET(request) {
           ls.scheduled_start::text AS scheduled_start,
           ls.scheduled_end::text AS scheduled_end,
           ls.google_meet_link,
-          su.full_name AS student_name,
-          su.email AS student_email,
-          su.phone AS student_phone,
           tu.full_name AS teacher_name,
           tu.email AS teacher_email,
           sub.name AS subject_name,
@@ -102,35 +99,79 @@ export async function GET(request) {
           lv.decision::text AS decision,
           lv.remarks,
           lv.verified_at,
+          COALESCE(attendance_rows.rows, '[]'::jsonb) AS attendance_rows,
+          COALESCE(attendance_rows.total_students_count, 0) AS total_students_count,
+          COALESCE(attendance_rows.joined_students_count, 0) AS joined_students_count,
+          COALESCE(attendance_rows.absent_students_count, 0) AS absent_students_count,
           COALESCE(teacher_att.status::text, 'absent') AS teacher_attendance_status,
-          COALESCE(student_att.status::text, 'absent') AS student_attendance_status,
           COALESCE(teacher_att.duration_minutes, 0) AS teacher_duration_minutes,
-          COALESCE(student_att.duration_minutes, 0) AS student_duration_minutes,
           teacher_att.joined_at AS teacher_joined_at,
           teacher_att.left_at AS teacher_left_at,
-          student_att.joined_at AS student_joined_at,
-          student_att.left_at AS student_left_at,
           CASE WHEN teacher_att.joined_at IS NOT NULL THEN TRUE ELSE FALSE END AS teacher_joined,
-          CASE WHEN student_att.joined_at IS NOT NULL THEN TRUE ELSE FALSE END AS student_joined,
-          1::int AS total_students_count,
-          CASE WHEN student_att.joined_at IS NOT NULL THEN 1 ELSE 0 END AS joined_students_count,
-          CASE WHEN student_att.joined_at IS NOT NULL THEN 0 ELSE 1 END AS absent_students_count,
+          FALSE AS student_joined,
           GREATEST(
             COALESCE(teacher_att.updated_at, teacher_att.created_at),
-            COALESCE(student_att.updated_at, student_att.created_at)
+            COALESCE(attendance_rows.updated_at, attendance_rows.created_at)
           ) AS attendance_synced_at
         FROM lecture_schedules ls
         INNER JOIN enrollments e ON e.id = ls.enrollment_id
         INNER JOIN courses c ON c.id = e.course_id
-        INNER JOIN student_profiles sp ON sp.id = ls.student_id
-        INNER JOIN users su ON su.id = sp.user_id
         INNER JOIN teacher_profiles tp ON tp.id = ls.teacher_id
         INNER JOIN users tu ON tu.id = tp.user_id
         INNER JOIN subjects sub ON sub.id = ls.subject_id
-        LEFT JOIN lecture_completion_reports lcr ON lcr.lecture_id = ls.id
-        LEFT JOIN lecture_verifications lv ON lv.lecture_id = ls.id
-        LEFT JOIN lecture_attendance teacher_att ON teacher_att.lecture_id = ls.id AND teacher_att.user_id = tu.id
-        LEFT JOIN lecture_attendance student_att ON student_att.lecture_id = ls.id AND student_att.user_id = su.id
+          LEFT JOIN lecture_completion_reports lcr ON lcr.lecture_id = ls.id
+          LEFT JOIN lecture_verifications lv ON lv.lecture_id = ls.id
+          LEFT JOIN lecture_attendance teacher_att ON teacher_att.lecture_id = ls.id AND teacher_att.user_id = tu.id
+          LEFT JOIN LATERAL (
+            SELECT
+            jsonb_agg(
+              jsonb_build_object(
+                'id', roster.student_id,
+                'user_id', roster.user_id,
+                'student_name', roster.student_name,
+                'username', roster.username,
+                'student_email', roster.student_email,
+                'student_phone', roster.student_phone,
+                'status', roster.status,
+                'source', roster.source,
+                'joined_at', roster.joined_at,
+                'left_at', roster.left_at,
+                'duration_minutes', roster.duration_minutes
+              )
+              ORDER BY roster.student_sort_name ASC, roster.student_name ASC
+            ) AS rows,
+            COUNT(*)::int AS total_students_count,
+            COUNT(*) FILTER (WHERE roster.status IN ('present', 'partial'))::int AS joined_students_count,
+            COUNT(*) FILTER (WHERE roster.status = 'absent')::int AS absent_students_count,
+            MAX(roster.updated_at) AS updated_at,
+            MAX(roster.created_at) AS created_at
+          FROM (
+            SELECT
+              sp.id::text AS student_id,
+              su2.id::text AS user_id,
+              su2.full_name AS student_name,
+              su2.username,
+              su2.email AS student_email,
+              su2.phone AS student_phone,
+              COALESCE(la2.status::text, 'absent') AS status,
+              la2.source::text AS source,
+              la2.joined_at,
+              la2.left_at,
+              COALESCE(la2.duration_minutes, 0) AS duration_minutes,
+              COALESCE(NULLIF(LOWER(TRIM(su2.username)), ''), LOWER(TRIM(su2.full_name))) AS student_sort_name,
+              la2.updated_at,
+              la2.created_at
+            FROM enrollments e2
+            INNER JOIN student_profiles sp ON sp.id = e2.student_id
+            INNER JOIN users su2 ON su2.id = sp.user_id
+            LEFT JOIN lecture_attendance la2
+              ON la2.lecture_id = ls.id
+             AND la2.user_id = su2.id
+             AND la2.role_type = 'student'
+            WHERE e2.course_id = e.course_id
+              AND LOWER(e2.status::text) = 'active'
+          ) roster
+        ) attendance_rows ON TRUE
         ${whereClause}
         ${orderClause}
         `

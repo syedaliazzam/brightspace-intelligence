@@ -5,6 +5,7 @@ export const dashboardNavigation = {
     { label: "Subject Catalog", href: "/admin/subjects" },
     { label: "Class Management", href: "/admin/courses" },
     { label: "Fee Management", href: "/admin/fee-settings" },
+    { label: "Notes", href: "/admin/notes" },
     { label: "Audit History", href: "/admin/audit-logs" },
   ],
   coordinator: [
@@ -23,8 +24,10 @@ export const dashboardNavigation = {
   teacher: [
     { label: "Dashboard", href: "/teacher/dashboard" },
     { label: "Lectures", href: "/teacher/lectures" },
+    { label: "Attendance", href: "/teacher/attendance" },
     { label: "Students", href: "/teacher/students" },
     { label: "Homework", href: "/teacher/homework" },
+    { label: "Approve Homework", href: "/teacher/homework-approval" },
     { label: "Notes", href: "/teacher/notes" },
     { label: "Profile", href: "/teacher/profile" },
   ],
@@ -33,6 +36,7 @@ export const dashboardNavigation = {
     { label: "Lectures", href: "/parent/lectures" },
     { label: "Homework", href: "/parent/homework" },
     { label: "Attendance", href: "/parent/attendance" },
+    { label: "Notes", href: "/parent/notes" },
     { label: "Fees", href: "/parent/fees" },
     { label: "Timeline", href: "/parent/timeline" },
     { label: "Profile", href: "/parent/profile" },
@@ -43,6 +47,7 @@ export const dashboardNavigation = {
     { label: "Calendar", href: "/student/calendar" },
     { label: "Homework", href: "/student/homework" },
     { label: "Attendance", href: "/student/attendance" },
+    { label: "Notes", href: "/student/dashboard#notes" },
     { label: "Profile", href: "/student/profile" },
   ],
 };

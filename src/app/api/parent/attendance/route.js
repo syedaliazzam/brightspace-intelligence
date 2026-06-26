@@ -30,6 +30,7 @@ export async function GET(request) {
         la.duration_minutes,
         ls.title AS class_title,
         ls.scheduled_start,
+        ls.scheduled_end,
         sub.name AS subject_name,
         su.full_name AS student_name
       FROM lecture_attendance la

@@ -46,7 +46,7 @@ export default function LectureVerificationTable({ items = [], onRefresh }) {
               <div>
                 <p className="text-lg font-semibold text-slate-950">{item.title}</p>
                 <p className="mt-1 text-sm text-slate-500">
-                  {item.student_name} with {item.teacher_name} - {item.subject_name}
+                  Class roster: {item.course_title || item.class_level || "Class"} · {item.subject_name} · {item.teacher_name}
                 </p>
                 <p className="mt-1 text-sm text-slate-500">{formatDateTimeRange(item.scheduled_start, item.scheduled_end)}</p>
                 <p className="mt-2 text-xs font-semibold uppercase tracking-[0.18em] text-sky-700">{item.display_status || getLectureDisplayStatus(item)}</p>
@@ -105,11 +105,9 @@ export default function LectureVerificationTable({ items = [], onRefresh }) {
               </div>
               <div className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-600">
                 <p className="font-semibold text-slate-950">Student attendance</p>
-                <p className="mt-2">Joined: {item.student_joined ? "Yes" : "No"}</p>
-                <p className="mt-1 text-xs text-slate-500">Selected students: {item.total_students_count || 1}</p>
-                <p className="mt-1 text-xs text-slate-500">Joined count: {item.joined_students_count || 0}</p>
-                <p className="mt-1 text-xs text-slate-500">Absent count: {item.absent_students_count ?? 1}</p>
-                <p className="mt-1 text-xs text-slate-500">{item.student_duration_minutes || 0} minutes</p>
+                <p className="mt-2">Class roster: {item.total_students_count || 0}</p>
+                <p className="mt-1 text-xs text-slate-500">Present count: {item.joined_students_count || 0}</p>
+                <p className="mt-1 text-xs text-slate-500">Absent count: {item.absent_students_count ?? 0}</p>
               </div>
               <div className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-600">
                 <p className="font-semibold text-slate-950">Remarks</p>
@@ -118,20 +116,26 @@ export default function LectureVerificationTable({ items = [], onRefresh }) {
             </div>
 
             <div className="mt-4 overflow-hidden rounded-2xl border border-slate-200">
-              <div className="grid grid-cols-[1fr_1fr_1fr_1fr_1fr] bg-slate-50 px-4 py-3 text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+              <div className="grid grid-cols-[1fr_1fr_1fr] bg-slate-50 px-4 py-3 text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
                 <span>Student Name</span>
-                <span>Email / Phone</span>
-                <span>Join Time</span>
-                <span>Leave Time</span>
+                <span>Username / Phone</span>
                 <span>Status</span>
               </div>
-              <div className="grid grid-cols-[1fr_1fr_1fr_1fr_1fr] px-4 py-3 text-sm text-slate-600">
-                <span>{item.student_name}</span>
-                <span>{item.student_email || item.student_phone || "-"}</span>
-                <span>{item.student_joined_at ? formatDateTime(item.student_joined_at) : "-"}</span>
-                <span>{item.student_left_at ? formatDateTime(item.student_left_at) : "-"}</span>
-                <span>{item.student_attendance_status || getAttendanceStatus(item.student_duration_minutes)}</span>
-              </div>
+              {Array.isArray(item.attendance_rows) && item.attendance_rows.length ? (
+                item.attendance_rows.map((row) => (
+                  <div key={row.id || row.user_id} className="grid grid-cols-[1fr_1fr_1fr] px-4 py-3 text-sm text-slate-600">
+                    <span>{row.student_name}</span>
+                    <span>{row.username || row.student_phone || row.student_email || "-"}</span>
+                    <span>{row.status || getAttendanceStatus(row.duration_minutes)}</span>
+                  </div>
+                ))
+              ) : (
+                <div className="grid grid-cols-[1fr_1fr_1fr] px-4 py-3 text-sm text-slate-600">
+                  <span>{item.course_title || item.class_level || "Class roster"}</span>
+                  <span>{item.total_students_count || 0} students</span>
+                  <span>{item.student_attendance_status || getAttendanceStatus(item.student_duration_minutes)}</span>
+                </div>
+              )}
             </div>
             <p className="mt-3 rounded-2xl bg-amber-50 px-4 py-3 text-xs text-amber-800">
               Meet attendance may be available only after Google finishes processing the conference record.

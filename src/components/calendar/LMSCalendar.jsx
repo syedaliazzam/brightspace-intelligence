@@ -88,6 +88,7 @@ function canShowMeetLink(lecture) {
 export default function LMSCalendar({
   apiUrl,
   filters = {},
+  extraParams = {},
   onDateSelect,
   onEventClick,
   title = "Lecture calendar",
@@ -108,9 +109,12 @@ export default function LMSCalendar({
       classLevel: filters.classLevel || "",
       subjectId: filters.subjectId || "",
       status: filters.status || "",
+      ...Object.fromEntries(
+        Object.entries(extraParams || {}).filter(([, value]) => value !== undefined && value !== null && String(value).trim() !== "")
+      ),
     });
     return params.toString();
-  }, [activeDate, filters.classLevel, filters.subjectId, filters.status]);
+  }, [activeDate, extraParams, filters.classLevel, filters.subjectId, filters.status]);
 
   useEffect(() => {
     calendarRef.current?.getApi?.().gotoDate?.(activeDate);
@@ -262,7 +266,6 @@ export default function LMSCalendar({
     <div className="rounded-[1.75rem] border border-slate-200 bg-white p-4 shadow-[0_20px_70px_-36px_rgba(15,23,42,0.25)]">
       <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <p className="text-sm font-semibold uppercase tracking-[0.22em] text-sky-700">{title}</p>
           <h3 className="mt-1 text-xl font-semibold tracking-tight text-slate-950">
             Month, week and day view
           </h3>

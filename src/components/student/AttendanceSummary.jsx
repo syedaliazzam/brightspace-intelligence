@@ -3,7 +3,6 @@
 export default function AttendanceSummary({ summary = {}, items = [] }) {
   return (
     <section className="rounded-[1.75rem] border border-white/70 bg-white/90 p-5 shadow-[0_20px_70px_-36px_rgba(15,23,42,0.25)]">
-      <p className="text-sm font-semibold uppercase tracking-[0.22em] text-sky-700">Attendance</p>
       <p className="mt-3 text-4xl font-semibold text-slate-950">{summary.total_conducted ? `${summary.attendance_percentage || 0}%` : "0%"}</p>
       <p className="mt-2 text-sm text-slate-600">
         {summary.total_conducted ? `Conducted lectures: ${summary.total_conducted}` : "No conducted lectures yet."}
@@ -29,7 +28,7 @@ export default function AttendanceSummary({ summary = {}, items = [] }) {
             <p className="mt-1">{item.subject_name} · {item.teacher_name}</p>
             <p className="mt-1 text-xs text-slate-500">{item.scheduled_start}</p>
             <p className="mt-1 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
-              {item.attendance_status} · {item.duration_minutes || 0} min
+              {item.attendance_status}
             </p>
           </div>
         ))}

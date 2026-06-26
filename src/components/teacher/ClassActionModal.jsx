@@ -1,7 +1,6 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
-import AttendanceForm from "@/components/teacher/AttendanceForm";
 import CompletionReportForm from "@/components/teacher/CompletionReportForm";
 import { canShowJoinMeet, canShowMarkConducted, getLectureDisplayStatus } from "@/lib/lectureStatus";
 
@@ -29,12 +28,13 @@ export default function ClassActionModal({ lecture, open, onClose, onChanged }) 
       return;
     }
     onChanged?.();
+    onClose?.();
   }
 
   return (
     <AnimatePresence>
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 px-4 py-8">
-        <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 16 }} className="max-h-[90vh] w-full max-w-3xl overflow-y-auto rounded-[2rem] bg-white p-6 shadow-2xl">
+      <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-950/45 px-4 pt-24 pb-8">
+        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 12 }} className="max-h-[calc(100vh-7rem)] w-full max-w-3xl overflow-y-auto rounded-[2rem] bg-white p-6 shadow-2xl">
           <div className="flex items-start justify-between gap-4">
             <div>
               <p className="text-sm font-semibold uppercase tracking-[0.22em] text-sky-700">Class actions</p>
@@ -54,8 +54,13 @@ export default function ClassActionModal({ lecture, open, onClose, onChanged }) 
             {canShowMarkConducted(lecture) ? (
               <button onClick={markConducted} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-800">Mark conducted</button>
             ) : null}
-            <AttendanceForm lecture={lecture} onSaved={onChanged} />
-            <CompletionReportForm lecture={lecture} onSaved={onChanged} />
+            <CompletionReportForm
+              lecture={lecture}
+              onSaved={async () => {
+                await onChanged?.();
+                onClose?.();
+              }}
+            />
           </div>
         </motion.div>
       </div>

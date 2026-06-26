@@ -21,6 +21,7 @@ async function getLectureDetails(id) {
       ls.id::text AS id,
       ls.id::text AS lecture_id,
       ls.enrollment_id::text AS enrollment_id,
+      e.course_id::text AS course_id,
       ls.student_id::text AS student_id,
       ls.teacher_id::text AS teacher_id,
       ls.subject_id::text AS subject_id,
@@ -76,28 +77,69 @@ async function getLectureDetails(id) {
 
   if (!lecture?.id) return null;
 
+  const roster = await prisma.$queryRaw`
+    SELECT
+      sp.id::text AS student_id,
+      su.id::text AS user_id,
+      su.full_name AS student_name,
+      su.username,
+      su.email AS student_email,
+      su.phone AS student_phone,
+      COALESCE(la.status::text, 'absent') AS status,
+      la.source::text AS source,
+      la.joined_at,
+      la.left_at,
+      COALESCE(la.duration_minutes, 0) AS duration_minutes,
+      COALESCE(NULLIF(LOWER(TRIM(su.username)), ''), LOWER(TRIM(su.full_name))) AS student_sort_name,
+      la.updated_at,
+      la.created_at
+    FROM enrollments e2
+    INNER JOIN student_profiles sp ON sp.id = e2.student_id
+    INNER JOIN users su ON su.id = sp.user_id
+    LEFT JOIN lecture_attendance la
+      ON la.lecture_id = ${id}::uuid
+     AND la.user_id = su.id
+     AND la.role_type = 'student'
+    WHERE e2.course_id = ${lecture.course_id}::uuid
+      AND LOWER(e2.status::text) = 'active'
+    ORDER BY COALESCE(NULLIF(LOWER(TRIM(su.username)), ''), LOWER(TRIM(su.full_name))), su.full_name ASC
+  `;
+
+  const [teacherRows] = await Promise.all([
+    prisma.$queryRaw`
+      SELECT
+        la.id::text AS id,
+        la.user_id::text AS user_id,
+        su.full_name AS teacher_name,
+        su.username,
+        su.email AS teacher_email,
+        su.phone AS teacher_phone,
+        COALESCE(la.status::text, 'absent') AS status,
+        la.joined_at,
+        la.left_at,
+        COALESCE(la.duration_minutes, 0) AS duration_minutes
+      FROM lecture_attendance la
+      INNER JOIN users su ON su.id = la.user_id
+      WHERE la.lecture_id = ${id}::uuid
+        AND la.role_type = 'teacher'
+      ORDER BY la.updated_at DESC, la.id DESC
+      LIMIT 1
+    `,
+  ]);
+
   return {
     ...lecture,
     teacher_attendance: {
-      joined_at: lecture.teacher_joined_at,
-      left_at: lecture.teacher_left_at,
-      duration_minutes: lecture.teacher_duration_minutes,
-      status: lecture.teacher_attendance_status,
+      joined_at: teacherRows?.[0]?.joined_at || lecture.teacher_joined_at,
+      left_at: teacherRows?.[0]?.left_at || lecture.teacher_left_at,
+      duration_minutes: teacherRows?.[0]?.duration_minutes || lecture.teacher_duration_minutes,
+      status: teacherRows?.[0]?.status || lecture.teacher_attendance_status,
     },
-    student_attendance_rows: [
-      {
-        student_name: lecture.student_name,
-        email: lecture.student_email,
-        phone: lecture.student_phone,
-        joined_at: lecture.student_joined_at,
-        left_at: lecture.student_left_at,
-        duration_minutes: lecture.student_duration_minutes,
-        status: lecture.student_attendance_status || "absent",
-      },
-    ],
-    total_students_count: 1,
-    joined_students_count: lecture.student_joined ? 1 : 0,
-    absent_students_count: lecture.student_joined ? 0 : 1,
+    student_attendance_rows: roster || [],
+    total_students_count: roster.length || 0,
+    joined_students_count: roster.filter((row) => ["present", "partial"].includes(String(row.status || "").toLowerCase())).length,
+    absent_students_count: roster.filter((row) => String(row.status || "").toLowerCase() === "absent").length,
+    attendance_rows: roster || [],
     unmatched_participants: [],
   };
 }
