@@ -1,7 +1,14 @@
 export const dashboardNavigation = {
   admin: [
     { label: "Dashboard", href: "/admin/dashboard" },
-    { label: "User Management", href: "/admin/users" },
+    {
+      label: "User Management",
+      children: [
+        { label: "Staff Management", href: "/admin/users?view=staff" },
+        { label: "Students Management", href: "/admin/users?view=students" },
+        { label: "Parents Management", href: "/admin/users?view=parents" },
+      ],
+    },
     { label: "Subject Catalog", href: "/admin/subjects" },
     { label: "Class Management", href: "/admin/courses" },
     { label: "Fee Management", href: "/admin/fee-settings" },
@@ -38,7 +45,6 @@ export const dashboardNavigation = {
     { label: "Attendance", href: "/parent/attendance" },
     { label: "Notes", href: "/parent/notes" },
     { label: "Fees", href: "/parent/fees" },
-    { label: "Timeline", href: "/parent/timeline" },
     { label: "Profile", href: "/parent/profile" },
   ],
   student: [

@@ -104,6 +104,7 @@ export async function GET() {
               id::text AS id,
               student_name,
               parent_name,
+              class_level,
               email,
               phone,
               LOWER(status::text) AS status

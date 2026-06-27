@@ -1,8 +1,23 @@
 "use client";
 
+import { useEffect, useMemo, useState } from "react";
 import { formatDateTime } from "@/lib/dateTime";
+import PaginationControls from "@/components/parent/PaginationControls";
 
 export default function HomeworkList({ items = [] }) {
+  const pageSize = 7;
+  const [page, setPage] = useState(1);
+
+  useEffect(() => {
+    setPage(1);
+  }, [items]);
+
+  const totalPages = Math.max(1, Math.ceil(items.length / pageSize));
+  const visibleItems = useMemo(() => {
+    const startIndex = (page - 1) * pageSize;
+    return items.slice(startIndex, startIndex + pageSize);
+  }, [items, page]);
+
   return (
     <section className="rounded-[1.75rem] border border-white/70 bg-white/90 p-5 shadow-[0_20px_70px_-36px_rgba(15,23,42,0.25)]">
       <div className="overflow-x-auto">
@@ -20,7 +35,7 @@ export default function HomeworkList({ items = [] }) {
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {items.length ? items.map((item, index) => {
+            {visibleItems.length ? visibleItems.map((item, index) => {
               const submitted = String(item.status || "").toLowerCase() === "submitted";
               return (
                 <tr key={`${item.id || "homework"}-${index}`}>
@@ -55,6 +70,14 @@ export default function HomeworkList({ items = [] }) {
           </tbody>
         </table>
       </div>
+      {items.length > pageSize ? (
+        <PaginationControls
+          page={page}
+          pageSize={pageSize}
+          totalItems={items.length}
+          onPageChange={(nextPage) => setPage(Math.min(Math.max(1, nextPage), totalPages))}
+        />
+      ) : null}
     </section>
   );
 }

@@ -17,7 +17,9 @@ async function getChildren(session) {
         sp.id::text AS id,
         sp.user_id::text AS user_id,
         u.full_name,
+        u.username,
         u.email,
+        u.phone,
         sp.age,
         sp.grade_level,
         sp.status::text AS status
@@ -32,7 +34,9 @@ async function getChildren(session) {
       sp.id::text AS id,
       sp.user_id::text AS user_id,
       u.full_name,
+      u.username,
       u.email,
+      u.phone,
       sp.age,
       sp.grade_level,
       sp.status::text AS status

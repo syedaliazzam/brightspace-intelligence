@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 function groupLectureOptions(lectures) {
   const map = new Map();
@@ -15,8 +15,9 @@ function groupLectureOptions(lectures) {
   return Array.from(map.values());
 }
 
-function MessageBubble({ message }) {
-  const mine = ["teacher", "admin"].includes(String(message.sender_role || "").toLowerCase());
+function MessageBubble({ message, mode }) {
+  const senderRole = String(message.sender_role || "").toLowerCase();
+  const mine = mode === "admin" ? senderRole === "admin" : ["teacher", "admin"].includes(senderRole);
   return (
     <div className={`flex ${mine ? "justify-end" : "justify-start"}`}>
       <div className={`max-w-[78%] rounded-2xl px-4 py-3 text-sm shadow-sm ${mine ? "bg-slate-950 text-white" : "bg-slate-100 text-slate-800"}`}>
@@ -33,7 +34,7 @@ function MessageBubble({ message }) {
 
 function Modal({ title, subtitle, onClose, children, actions, showTopClose = true }) {
   return (
-    <div className="fixed inset-0 z-[60] flex items-start justify-center bg-slate-950/45 px-4 pt-24 pb-8">
+    <div className="fixed inset-0 z-[60] flex items-start justify-center bg-slate-950/45 px-4 pt-10 pb-8">
       <div className="w-full max-w-3xl rounded-[2rem] border border-white/70 bg-white shadow-[0_24px_80px_-36px_rgba(15,23,42,0.32)]">
         <div className="border-b border-slate-100 px-6 py-4">
           <div className="flex items-start justify-between gap-4">
@@ -60,15 +61,22 @@ export default function NoteThreadsBoard({ mode = "viewer", lectures = [] }) {
   const [error, setError] = useState("");
   const [selected, setSelected] = useState(null);
   const [messages, setMessages] = useState([]);
+  const [messagesLoading, setMessagesLoading] = useState(false);
   const [replyText, setReplyText] = useState("");
   const [replyPending, setReplyPending] = useState(false);
   const [compose, setCompose] = useState({ classLevel: "", subjectId: "", visibility: "parent", message: "" });
   const [editingThread, setEditingThread] = useState(null);
   const [editingText, setEditingText] = useState("");
   const [deletingThread, setDeletingThread] = useState(null);
+  const activeThreadIdRef = useRef("");
 
   const lectureOptions = useMemo(() => groupLectureOptions(lectures), [lectures]);
   const subjectOptions = useMemo(() => lectureOptions.filter((item) => item.classLevel === String(compose.classLevel || "").trim()), [lectureOptions, compose.classLevel]);
+  const selectedVisibility = String(selected?.visibility || "").toLowerCase();
+  const canReplyToSelected =
+    (mode === "teacher" && selectedVisibility === "parent") ||
+    (mode === "parent" && selectedVisibility === "parent") ||
+    (mode === "admin" && (selectedVisibility === "admin_only" || selectedVisibility === "admin"));
 
   async function loadThreads() {
     setLoading(true);
@@ -85,10 +93,16 @@ export default function NoteThreadsBoard({ mode = "viewer", lectures = [] }) {
   async function openThread(thread) {
     setSelected(thread);
     setReplyText("");
+    setMessages([]);
+    setMessagesLoading(true);
+    activeThreadIdRef.current = thread.id;
     const response = await fetch(`/api/notes/threads/${thread.id}/messages`, { cache: "no-store" });
     const data = await response.json();
     if (!response.ok) throw new Error(data?.message || "Unable to load messages.");
-    setMessages(data.items || []);
+    if (String(activeThreadIdRef.current) === String(thread.id)) {
+      setMessages(data.items || []);
+    }
+    setMessagesLoading(false);
   }
 
   async function sendReply() {
@@ -231,12 +245,12 @@ export default function NoteThreadsBoard({ mode = "viewer", lectures = [] }) {
           subtitle={`${selected.class_level || selected.course_title || "-"} · ${selected.subject_name || "-"}`}
           onClose={() => setSelected(null)}
           actions={
-            canReply && String(selected?.visibility || "").toLowerCase() === "parent" ? (
+            canReply && canReplyToSelected ? (
               <div className="space-y-3">
                 <textarea
                   value={replyText}
                   onChange={(e) => setReplyText(e.target.value)}
-                  rows={4}
+                  rows={1}
                   className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none"
                   placeholder="Write a reply..."
                 />
@@ -253,9 +267,13 @@ export default function NoteThreadsBoard({ mode = "viewer", lectures = [] }) {
           }
           showTopClose={false}
         >
-          <div className="max-h-[52vh] space-y-3 overflow-y-auto pr-1">
-            {messages.map((message) => <MessageBubble key={message.id} message={message} />)}
-          </div>
+          {messagesLoading ? (
+            <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-6 text-sm text-slate-500">Loading chat...</div>
+          ) : (
+            <div className="max-h-[52vh] space-y-3 overflow-y-auto pr-1">
+              {messages.map((message) => <MessageBubble key={message.id} message={message} mode={mode} />)}
+            </div>
+          )}
         </Modal>
       ) : null}
 

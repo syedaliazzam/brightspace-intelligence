@@ -1,9 +1,24 @@
 "use client";
 
+import { useEffect, useMemo, useState } from "react";
 import { formatDateTimeRange } from "@/lib/dateTime";
 import { canShowJoinMeet, getLectureDisplayStatus } from "@/lib/lectureStatus";
+import PaginationControls from "@/components/parent/PaginationControls";
 
 export default function ParentClassesTable({ items = [] }) {
+  const pageSize = 7;
+  const [page, setPage] = useState(1);
+
+  useEffect(() => {
+    setPage(1);
+  }, [items]);
+
+  const totalPages = Math.max(1, Math.ceil(items.length / pageSize));
+  const visibleItems = useMemo(() => {
+    const startIndex = (page - 1) * pageSize;
+    return items.slice(startIndex, startIndex + pageSize);
+  }, [items, page]);
+
   return (
     <section className="rounded-[1.75rem] border border-white/70 bg-white/90 p-5 shadow-[0_20px_70px_-36px_rgba(15,23,42,0.25)]">
       <div className="mb-4">
@@ -27,7 +42,7 @@ export default function ParentClassesTable({ items = [] }) {
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {items.length ? items.map((item) => (
+            {visibleItems.length ? visibleItems.map((item) => (
               <tr key={item.id}>
                 <td className="px-3 py-4 font-semibold text-slate-950">{item.title}</td>
                 <td className="px-3 py-4 text-slate-600">{item.subject_name}</td>
@@ -47,6 +62,14 @@ export default function ParentClassesTable({ items = [] }) {
           </tbody>
         </table>
       </div>
+      {items.length > pageSize ? (
+        <PaginationControls
+          page={page}
+          pageSize={pageSize}
+          totalItems={items.length}
+          onPageChange={(nextPage) => setPage(Math.min(Math.max(1, nextPage), totalPages))}
+        />
+      ) : null}
     </section>
   );
 }

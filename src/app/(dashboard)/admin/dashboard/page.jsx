@@ -142,20 +142,26 @@ export default function AdminDashboardPage() {
     },
     {
       key: "newLeads",
-      label: "New registration leads",
+      label: "New Admissions",
       value: Number(overview.newRegistrationLeads || 0),
       tone: "bg-sky-50 text-sky-800",
     },
     {
-      key: "feeSubmissions",
-      label: "Fee submissions",
-      value: Number(overview.totalFeeSubmissions || 0),
+      key: "classes",
+      label: "Classes",
+      value: Number(state.data?.system?.courseCount || 0),
+      tone: "bg-violet-50 text-violet-800",
+    },
+    {
+      key: "subjects",
+      label: "Subjects",
+      value: Number(state.data?.system?.subjectCount || 0),
       tone: "bg-amber-50 text-amber-800",
     },
   ];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 min-h-screen">
       <section className="rounded-[2rem] border border-white/70 bg-[linear-gradient(135deg,rgba(255,255,255,0.92),rgba(241,248,255,0.92))] p-6 shadow-[0_24px_80px_-36px_rgba(15,23,42,0.25)] sm:p-8">
         <div className="max-w-3xl">
           <p className="text-sm font-semibold uppercase tracking-[0.24em] text-sky-700">
@@ -187,9 +193,6 @@ export default function AdminDashboardPage() {
       <section className="grid gap-6 xl:grid-cols-2">
         <div className="space-y-4 rounded-[1.75rem] border border-white/70 bg-white/90 p-5 shadow-[0_20px_70px_-36px_rgba(15,23,42,0.25)]">
           <div>
-            <p className="text-sm font-semibold uppercase tracking-[0.22em] text-sky-700">
-              Role management
-            </p>
             <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">
               Active role coverage
             </h2>
@@ -212,56 +215,17 @@ export default function AdminDashboardPage() {
             emptyMessage="Role insights will appear here as account activity grows."
           />
         </div>
-
-        <div className="space-y-4 rounded-[1.75rem] border border-white/70 bg-white/90 p-5 shadow-[0_20px_70px_-36px_rgba(15,23,42,0.25)]">
-          <div>
-            <p className="text-sm font-semibold uppercase tracking-[0.22em] text-sky-700">
-              System settings
-            </p>
-            <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">
-              Operational readiness
-            </h2>
-          </div>
-          <div className="grid gap-4 sm:grid-cols-2">
-            {[
-              ["Subjects", state.data?.system?.subjectCount, state.data?.system?.subjectsEnabled],
-              ["Courses", state.data?.system?.courseCount, state.data?.system?.coursesEnabled],
-              ["Fee settings", state.data?.system?.feeSettingCount, state.data?.system?.feeSettingsEnabled],
-              ["Lecture schedules", state.data?.system?.lectureScheduleCount, state.data?.system?.schedulesEnabled],
-            ].map(([label, value, enabled]) => (
-              <article
-                key={label}
-                className="rounded-2xl border border-slate-200 bg-slate-50 p-4"
-              >
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-                  {label}
-                </p>
-                <p className="mt-3 text-2xl font-semibold tracking-tight text-slate-950">
-                  {state.loading ? "..." : Number(value || 0)}
-                </p>
-                <p className="mt-2 text-sm text-slate-600">
-                  {enabled ? "Connected to live records" : "Pending configuration"}
-                </p>
-              </article>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <section className="grid gap-6 xl:grid-cols-2">
         <div className="rounded-[1.75rem] border border-white/70 bg-white/90 p-5 shadow-[0_20px_70px_-36px_rgba(15,23,42,0.25)]">
           <div className="mb-4">
-            <p className="text-sm font-semibold uppercase tracking-[0.22em] text-sky-700">
-              Registration leads
-            </p>
             <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">
-              Recent intake
+              Admission Records
             </h2>
           </div>
           <AdminDataTable
             columns={[
               { key: "student_name", label: "Student" },
               { key: "parent_name", label: "Parent" },
+              { key: "class_level", label: "Class" },
               {
                 key: "status",
                 label: "Status",
@@ -270,30 +234,6 @@ export default function AdminDashboardPage() {
             ]}
             rows={state.data?.recent?.registrationLeads || []}
             emptyMessage="No recent registration activity to display."
-          />
-        </div>
-
-        <div className="rounded-[1.75rem] border border-white/70 bg-white/90 p-5 shadow-[0_20px_70px_-36px_rgba(15,23,42,0.25)]">
-          <div className="mb-4">
-            <p className="text-sm font-semibold uppercase tracking-[0.22em] text-sky-700">
-              Audit logs
-            </p>
-            <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">
-              Recent administrative activity
-            </h2>
-          </div>
-          <AdminDataTable
-            columns={[
-              {
-                key: "action",
-                label: "Action",
-                render: (row) => formatLabel(row.action),
-              },
-              { key: "entity_type", label: "Entity" },
-              { key: "description", label: "Description" },
-            ]}
-            rows={state.data?.recent?.auditLogs || []}
-            emptyMessage="No recent administrative activity to display."
           />
         </div>
       </section>

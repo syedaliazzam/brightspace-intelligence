@@ -8,6 +8,14 @@ const ROLE_OPTIONS = [
   { label: "Teacher", value: "teacher" },
 ];
 
+const ALL_ROLE_OPTIONS = [
+  { label: "Admin", value: "admin" },
+  { label: "Coordinator", value: "coordinator" },
+  { label: "Teacher", value: "teacher" },
+  { label: "Parent", value: "parent" },
+  { label: "Student", value: "student" },
+];
+
 const STATUS_OPTIONS = [
   { label: "Active", value: "active" },
   { label: "Suspended", value: "suspended" },
@@ -30,6 +38,7 @@ export default function StaffFormModal({
   record,
   onClose,
   onSuccess,
+  roleOptions = ROLE_OPTIONS,
 }) {
   const [form, setForm] = useState(getInitialState(record));
   const [pending, setPending] = useState(false);
@@ -169,7 +178,7 @@ export default function StaffFormModal({
                     onChange={(event) => updateField("role", event.target.value)}
                     className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-950 outline-none transition focus:border-sky-400 focus:bg-white focus:ring-4 focus:ring-sky-100"
                   >
-                    {ROLE_OPTIONS.map((option) => (
+                    {(mode === "edit" ? ALL_ROLE_OPTIONS : roleOptions).map((option) => (
                       <option key={option.value} value={option.value}>
                         {option.label}
                       </option>

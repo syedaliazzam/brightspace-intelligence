@@ -4,8 +4,6 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 
-const EDITABLE_ROLES = new Set(["coordinator", "teacher"]);
-
 function json(message, status = 200, extra = {}) {
   return NextResponse.json({ message, ...extra }, { status });
 }
@@ -229,10 +227,7 @@ export async function GET(_request, { params }) {
     }
 
     return json("Staff record fetched.", 200, {
-      item: {
-        ...item,
-        editable: EDITABLE_ROLES.has(item.role),
-      },
+      item,
     });
   } catch (error) {
     return json(
@@ -252,13 +247,10 @@ export async function PATCH(request, { params }) {
   try {
     const { id } = await params;
     const existing = await getUserById(id);
+    const sessionUserId = String(authState.session?.user?.id || "");
 
     if (!existing?.id) {
       return json("Staff record not found.", 404);
-    }
-
-    if (!EDITABLE_ROLES.has(existing.role)) {
-      return json("Only coordinator and teacher records can be updated here.", 400);
     }
 
     const body = await request.json();
@@ -268,12 +260,17 @@ export async function PATCH(request, { params }) {
     const nextRole = normalizeText(body?.role).toLowerCase() || existing.role;
     const nextStatus = normalizeText(body?.status).toLowerCase() || existing.status;
 
-    if (!EDITABLE_ROLES.has(nextRole)) {
-      return json("Only coordinator and teacher roles are supported here.", 400);
-    }
-
     if (!["active", "suspended"].includes(nextStatus)) {
       return json("Invalid staff status.", 400);
+    }
+
+    if (
+      nextStatus === "suspended" &&
+      String(existing.role || "").toLowerCase() === "admin" &&
+      sessionUserId &&
+      String(id) === sessionUserId
+    ) {
+      return json("You cannot suspend your own admin account.", 400);
     }
 
     const roleId = await getRoleId(nextRole);
@@ -292,15 +289,17 @@ export async function PATCH(request, { params }) {
         WHERE id = ${id}::uuid
       `;
 
-      const targetProfileTable =
-        nextRole === "coordinator" ? "coordinator_profiles" : "teacher_profiles";
+      if (nextRole === "coordinator" || nextRole === "teacher") {
+        const targetProfileTable =
+          nextRole === "coordinator" ? "coordinator_profiles" : "teacher_profiles";
 
-      if (await tableExists(targetProfileTable, tx)) {
-        await syncProfile(
-          targetProfileTable,
-          { userId: id, fullName, email, phone, status: nextStatus },
-          tx
-        );
+        if (await tableExists(targetProfileTable, tx)) {
+          await syncProfile(
+            targetProfileTable,
+            { userId: id, fullName, email, phone, status: nextStatus },
+            tx
+          );
+        }
       }
 
       await insertAuditLog(
@@ -318,12 +317,7 @@ export async function PATCH(request, { params }) {
     });
 
     const updated = await getUserById(id);
-    return json("Staff record updated.", 200, {
-      item: {
-        ...updated,
-        editable: EDITABLE_ROLES.has(updated.role),
-      },
-    });
+    return json("Staff record updated.", 200, { item: updated });
   } catch (error) {
     return json(
       error instanceof Error ? error.message : "Unable to update staff record.",

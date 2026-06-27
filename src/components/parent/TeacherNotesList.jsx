@@ -1,9 +1,25 @@
 "use client";
 
+import { useEffect, useMemo, useState } from "react";
+import PaginationControls from "@/components/parent/PaginationControls";
+
 export default function TeacherNotesList({ items = [] }) {
+  const pageSize = 7;
+  const [page, setPage] = useState(1);
+
+  useEffect(() => {
+    setPage(1);
+  }, [items]);
+
+  const totalPages = Math.max(1, Math.ceil(items.length / pageSize));
+  const visibleItems = useMemo(() => {
+    const startIndex = (page - 1) * pageSize;
+    return items.slice(startIndex, startIndex + pageSize);
+  }, [items, page]);
+
   return (
     <section className="grid gap-4">
-      {items.length ? items.map((item, index) => (
+      {visibleItems.length ? visibleItems.map((item, index) => (
         <article key={`${item.id || "note"}-${index}`} className="rounded-[1.5rem] border border-white/70 bg-white/90 p-5 shadow-[0_16px_55px_-34px_rgba(15,23,42,0.24)]">
           <p className="text-sm font-semibold uppercase tracking-[0.18em] text-sky-700">{item.teacher_name ? `Teacher: ${item.teacher_name}` : "Teacher note"}</p>
           <p className="mt-3 leading-7 text-slate-700">{item.note}</p>
@@ -13,6 +29,14 @@ export default function TeacherNotesList({ items = [] }) {
           No teacher notes are available yet.
         </div>
       )}
+      {items.length > pageSize ? (
+        <PaginationControls
+          page={page}
+          pageSize={pageSize}
+          totalItems={items.length}
+          onPageChange={(nextPage) => setPage(Math.min(Math.max(1, nextPage), totalPages))}
+        />
+      ) : null}
     </section>
   );
 }

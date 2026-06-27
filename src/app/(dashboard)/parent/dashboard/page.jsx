@@ -64,6 +64,12 @@ export default function ParentDashboardPage() {
         </p>
       </section>
 
+      <ParentStatsCards
+        items={[
+          { key: "children", label: "Total children", value: state.children.length || 0 },
+        ]}
+      />
+
       <ChildSwitcher
         childrenList={state.children}
         value={state.selectedChildId}
@@ -81,7 +87,6 @@ export default function ParentDashboardPage() {
       ) : (
         <ParentStatsCards
           items={[
-            { key: "children", label: "Total children", value: state.children.length || 0 },
             { key: "attended", label: "Attended lectures", value: state.stats.present_lectures || 0 },
             { key: "homework", label: "Pending homework", value: state.stats.pending_homework || 0 },
             { key: "attendance", label: "Attendance", value: `${state.stats.attendance_percentage || 0}%` },

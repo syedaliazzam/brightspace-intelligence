@@ -3,7 +3,8 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { signOut } from "next-auth/react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
+import { useState } from "react";
 import { getNavigationForRole } from "@/config/navigation";
 import {
   LayoutDashboard,
@@ -59,15 +60,6 @@ function getIconForLabel(label) {
   return Home;
 }
 
-function getInitials(value) {
-  return String(value || "U")
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase())
-    .join("");
-}
-
 export default function Sidebar({
   session,
   mobileOpen,
@@ -76,9 +68,14 @@ export default function Sidebar({
   onToggleCollapsed,
 }) {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const role = String(session?.user?.role || "student").toLowerCase();
   const items = getNavigationForRole(role);
-  const userName = session?.user?.full_name || session?.user?.email || "User";
+  const [openGroups, setOpenGroups] = useState({
+    userManagement: pathname.startsWith("/admin/users"),
+  });
+
+  const adminView = String(searchParams.get("view") || "").toLowerCase();
 
   const shell = (
     <aside
@@ -123,6 +120,59 @@ export default function Sidebar({
 
       <nav className="scrollbar-thin scrollbar-thumb-slate-200 flex-1 space-y-1 overflow-y-auto px-3 py-4">
         {items.map((item) => {
+          if (item.label === "User Management" && Array.isArray(item.children)) {
+            return (
+              <div key={item.label} className="space-y-2 rounded-2xl bg-slate-50/70 p-2">
+                <button
+                  type="button"
+                  onClick={() =>
+                    setOpenGroups((current) => ({
+                      ...current,
+                      userManagement: !current.userManagement,
+                    }))
+                  }
+                  className="flex w-full items-center justify-between rounded-2xl px-3 py-2 text-xs font-semibold uppercase tracking-[0.22em] text-slate-500 transition hover:bg-slate-100"
+                >
+                  <span className="flex items-center gap-2">
+                    <span className="flex h-7 w-7 items-center justify-center rounded-xl bg-sky-600 text-white">
+                      <Users className="h-3.5 w-3.5" strokeWidth={2} />
+                    </span>
+                    <span>{item.label}</span>
+                  </span>
+                  <span>{openGroups.userManagement ? "-" : "+"}</span>
+                </button>
+
+                {openGroups.userManagement ? (
+                  <div className="space-y-1 pl-2">
+                    {item.children.map((child) => {
+                      const childHref = child.href.split("?")[0];
+                      const childView = new URLSearchParams(child.href.split("?")[1] || "").get("view");
+                      const active =
+                        pathname === childHref &&
+                        (adminView ? adminView === childView : true);
+
+                      return (
+                        <Link
+                          key={child.href}
+                          href={child.href}
+                          aria-current={active ? "page" : undefined}
+                          className={`flex items-center justify-between rounded-2xl px-3 py-3 text-sm font-medium transition ${
+                            active
+                              ? "bg-sky-50 text-sky-700 ring-1 ring-inset ring-sky-200"
+                              : "text-slate-600 hover:bg-slate-100 hover:text-slate-950"
+                          }`}
+                          onClick={onMobileClose}
+                        >
+                          <span className="truncate">{child.label}</span>
+                        </Link>
+                      );
+                    })}
+                  </div>
+                ) : null}
+              </div>
+            );
+          }
+
           const active = isActive(pathname, item.href);
           const Icon = getIconForLabel(item.label);
           return (
@@ -144,7 +194,11 @@ export default function Sidebar({
               >
                 <Icon className="h-4 w-4" strokeWidth={2} />
               </span>
-              <span className={`truncate transition-all duration-200 ${collapsed ? "lg:max-w-0 lg:overflow-hidden lg:opacity-0 lg:pointer-events-none" : "lg:max-w-full opacity-100"}`}>
+              <span
+                className={`truncate transition-all duration-200 ${
+                  collapsed ? "lg:max-w-0 lg:overflow-hidden lg:opacity-0 lg:pointer-events-none" : "lg:max-w-full opacity-100"
+                }`}
+              >
                 {item.label}
               </span>
             </Link>
@@ -160,7 +214,11 @@ export default function Sidebar({
             collapsed ? "lg:px-2" : ""
           }`}
         >
-          <span className={`hidden h-9 w-9 items-center justify-center rounded-xl bg-slate-900 text-base font-semibold text-white ${collapsed ? "lg:flex" : "lg:hidden"}`}>
+          <span
+            className={`hidden h-9 w-9 items-center justify-center rounded-xl bg-slate-900 text-base font-semibold text-white ${
+              collapsed ? "lg:flex" : "lg:hidden"
+            }`}
+          >
             ↩
           </span>
           <span className={`transition-all duration-200 ${collapsed ? "lg:hidden" : "lg:inline"}`}>
@@ -173,9 +231,7 @@ export default function Sidebar({
 
   return (
     <>
-      <div className="hidden lg:fixed lg:inset-y-0 lg:left-0 lg:z-30 lg:block">
-        {shell}
-      </div>
+      <div className="hidden lg:fixed lg:inset-y-0 lg:left-0 lg:z-30 lg:block">{shell}</div>
 
       <AnimatePresence>
         {mobileOpen ? (
