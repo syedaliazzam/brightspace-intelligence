@@ -19,6 +19,7 @@ import {
   FileText,
   BookOpen,
   NotebookPen,
+  MessageSquareText,
   User,
   CalendarRange,
   Home,
@@ -28,6 +29,8 @@ import {
   BookText,
   Layers3,
   PanelTop,
+  ClipboardList,
+  Wallet,
 } from "lucide-react";
 
 function isActive(pathname, href) {
@@ -38,7 +41,8 @@ function getIconForLabel(label) {
   const key = String(label || "").toLowerCase();
   if (key.includes("dashboard")) return LayoutDashboard;
   if (key.includes("interested students")) return Users;
-  if (key.includes("registration")) return UserCog;
+  if (key.includes("admission records") || key.includes("registration")) return ClipboardList;
+  if (key.includes("fee management")) return Wallet;
   if (key.includes("fee vouchers") || key.includes("fees")) return ReceiptText;
   if (key.includes("payments")) return CreditCard;
   if (key === "students") return GraduationCap;
@@ -48,12 +52,14 @@ function getIconForLabel(label) {
   if (key.includes("lecture verification")) return ClipboardCheck;
   if (key.includes("reports")) return FileText;
   if (key.includes("lectures")) return BookOpen;
+  if (key.includes("notes")) return MessageSquareText;
   if (key.includes("homework")) return NotebookPen;
   if (key.includes("calendar")) return CalendarRange;
   if (key.includes("attendance")) return Activity;
   if (key.includes("profile")) return User;
   if (key.includes("class management")) return School;
   if (key.includes("subject")) return BookText;
+  if (key.includes("headline")) return PanelTop;
   if (key.includes("audit")) return ShieldCheck;
   if (key.includes("timeline")) return Layers3;
   if (key.includes("overview")) return PanelTop;
@@ -76,6 +82,8 @@ export default function Sidebar({
   });
 
   const adminView = String(searchParams.get("view") || "").toLowerCase();
+  const isUserManagementActive =
+    pathname.startsWith("/admin/users") || openGroups.userManagement;
 
   const shell = (
     <aside
@@ -131,10 +139,20 @@ export default function Sidebar({
                       userManagement: !current.userManagement,
                     }))
                   }
-                  className="flex w-full items-center justify-between rounded-2xl px-3 py-2 text-xs font-semibold uppercase tracking-[0.22em] text-slate-500 transition hover:bg-slate-100"
+                  className={`flex w-full items-center justify-between rounded-2xl px-3 py-2 text-xs font-semibold uppercase tracking-[0.22em] transition ${
+                    isUserManagementActive
+                      ? "bg-sky-50 text-sky-700 ring-1 ring-inset ring-sky-200"
+                      : "text-slate-500 hover:bg-slate-100"
+                  }`}
                 >
                   <span className="flex items-center gap-2">
-                    <span className="flex h-7 w-7 items-center justify-center rounded-xl bg-sky-600 text-white">
+                    <span
+                      className={`flex h-7 w-7 items-center justify-center rounded-xl transition ${
+                        isUserManagementActive
+                          ? "bg-sky-600 text-white"
+                          : "bg-slate-100 text-slate-600"
+                      }`}
+                    >
                       <Users className="h-3.5 w-3.5" strokeWidth={2} />
                     </span>
                     <span>{item.label}</span>

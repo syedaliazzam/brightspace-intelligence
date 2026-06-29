@@ -9,6 +9,7 @@ import AttendanceSummary from "@/components/student/AttendanceSummary";
 import NoteThreadsBoard from "@/components/shared/NoteThreadsBoard";
 import LMSCalendar from "@/components/calendar/LMSCalendar";
 import PaymentAccessGuard from "@/components/shared/PaymentAccessGuard";
+import ActiveHeadlinesBanner from "@/components/shared/ActiveHeadlinesBanner";
 
 function todayDate() {
   const date = new Date();
@@ -19,6 +20,7 @@ function todayDate() {
 export default function StudentDashboardPage() {
   const [state, setState] = useState({
     stats: {},
+    headlines: [],
     lectures: [],
     homework: [],
     attendance: { summary: {}, items: [] },
@@ -34,7 +36,12 @@ export default function StudentDashboardPage() {
     const response = await fetch("/api/student/dashboard", { cache: "no-store" });
     const data = await response.json();
     if (!response.ok) throw new Error(data?.message || "Unable to load dashboard.");
-    setState((current) => ({ ...current, stats: data.stats || {}, error: "" }));
+    setState((current) => ({
+      ...current,
+      stats: data.stats || {},
+      headlines: Array.isArray(data.headlines) ? data.headlines : [],
+      error: "",
+    }));
   }
 
   async function loadHomework() {
@@ -168,6 +175,8 @@ export default function StudentDashboardPage() {
           ]} />
         </div>
       </section>
+
+      <ActiveHeadlinesBanner items={state.headlines} />
 
       <motion.section id="calendar" className="scroll-mt-28 rounded-[2rem] border border-white/70 bg-white/90 p-5 shadow-[0_20px_70px_-36px_rgba(15,23,42,0.25)]">
         <div className="mb-5">

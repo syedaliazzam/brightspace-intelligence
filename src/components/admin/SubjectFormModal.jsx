@@ -6,15 +6,20 @@ import { useState } from "react";
 function getInitialState(record) {
   return {
     name: record?.name || "",
-    code: record?.code || "",
     description: record?.description || "",
     status: record?.status || "active",
+    courseIds: Array.isArray(record?.course_ids)
+      ? record.course_ids
+      : record?.course_id
+        ? [record.course_id]
+        : [],
   };
 }
 
 export default function SubjectFormModal({
   open,
   record,
+  classOptions = [],
   onClose,
   onSuccess,
 }) {
@@ -24,6 +29,18 @@ export default function SubjectFormModal({
 
   function updateField(name, value) {
     setForm((current) => ({ ...current, [name]: value }));
+  }
+
+  function toggleCourseId(courseId) {
+    setForm((current) => {
+      const exists = current.courseIds.includes(courseId);
+      return {
+        ...current,
+        courseIds: exists
+          ? current.courseIds.filter((item) => item !== courseId)
+          : [...current.courseIds, courseId],
+      };
+    });
   }
 
   async function handleSubmit(event) {
@@ -63,7 +80,7 @@ export default function SubjectFormModal({
   return (
     <AnimatePresence>
       {open ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 px-4 py-8">
+        <div className="fixed inset-0 z-50 flex items-start justify-center bg-slate-950/45 px-4 pb-8 pt-24 sm:pt-28">
           <motion.div
             initial={{ opacity: 0, y: 18 }}
             animate={{ opacity: 1, y: 0 }}
@@ -105,17 +122,39 @@ export default function SubjectFormModal({
                   />
                 </label>
 
-                <label className="block">
+                <div className="block sm:col-span-2">
                   <span className="mb-2 block text-sm font-medium text-slate-700">
-                    Code
+                    Available classes
                   </span>
-                  <input
-                    type="text"
-                    value={form.code}
-                    onChange={(event) => updateField("code", event.target.value)}
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-950 outline-none transition focus:border-sky-400 focus:bg-white focus:ring-4 focus:ring-sky-100"
-                  />
-                </label>
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      {classOptions.map((item) => {
+                        const checked = form.courseIds.includes(item.id);
+                        return (
+                          <label
+                            key={item.id}
+                            className={`flex items-center gap-3 rounded-2xl border px-4 py-3 text-sm transition ${
+                              checked
+                                ? "border-sky-200 bg-sky-50 text-sky-800"
+                                : "border-slate-200 bg-white text-slate-700"
+                            }`}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              onChange={() => toggleCourseId(item.id)}
+                              className="h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500"
+                            />
+                            <span>{item.class_level || item.title}</span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                    {!classOptions.length ? (
+                      <p className="text-sm text-slate-500">No active classes available.</p>
+                    ) : null}
+                  </div>
+                </div>
 
                 <label className="block">
                   <span className="mb-2 block text-sm font-medium text-slate-700">

@@ -87,6 +87,8 @@ export default function AdminAuditLogsPage() {
       loading: !cached,
       error: "",
       available: cached?.available !== false,
+      actions: cached?.actions || [],
+      entityTypes: cached?.entityTypes || [],
       items: cached?.items || [],
       summary: cached?.summary || { total: 0, recent: 0 },
     };
@@ -105,6 +107,8 @@ export default function AdminAuditLogsPage() {
           loading: false,
           error: "",
           available: cached.available !== false,
+          actions: cached.actions || [],
+          entityTypes: cached.entityTypes || [],
           items: cached.items || [],
           summary: cached.summary || { total: 0, recent: 0 },
         });
@@ -132,6 +136,8 @@ export default function AdminAuditLogsPage() {
         loading: false,
         error: "",
         available: data.available !== false,
+        actions: data.actions || [],
+        entityTypes: data.entityTypes || [],
         items: data.items || [],
         summary: data.summary || { total: 0, recent: 0 },
       });
@@ -141,6 +147,8 @@ export default function AdminAuditLogsPage() {
         error:
           error instanceof Error ? error.message : "Unable to load audit logs.",
         available: false,
+        actions: [],
+        entityTypes: [],
         items: [],
         summary: { total: 0, recent: 0 },
       });
@@ -159,9 +167,6 @@ export default function AdminAuditLogsPage() {
     <div className="space-y-6 min-h-screen">
       <section className="rounded-[2rem] border border-white/70 bg-[linear-gradient(135deg,rgba(255,255,255,0.92),rgba(241,248,255,0.92))] p-6 shadow-[0_24px_80px_-36px_rgba(15,23,42,0.25)] sm:p-8">
         <div className="max-w-3xl">
-          <p className="text-sm font-semibold uppercase tracking-[0.24em] text-sky-700">
-            Audit logs
-          </p>
           <h1 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">
             Review admin actions and change history
           </h1>
@@ -224,8 +229,7 @@ export default function AdminAuditLogsPage() {
             <span className="mb-2 block text-sm font-medium text-slate-700">
               Action
             </span>
-            <input
-              type="text"
+            <select
               value={filters.action}
               onChange={(event) => {
                 setState((current) => ({ ...current, loading: true }));
@@ -234,17 +238,22 @@ export default function AdminAuditLogsPage() {
                   action: event.target.value,
                 }));
               }}
-              placeholder="user_created"
               className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-950 outline-none transition focus:border-sky-400 focus:bg-white focus:ring-4 focus:ring-sky-100"
-            />
+            >
+              <option value="">All actions</option>
+              {state.actions.map((item) => (
+                <option key={item} value={item}>
+                  {formatLabel(item)}
+                </option>
+              ))}
+            </select>
           </label>
 
           <label className="block">
             <span className="mb-2 block text-sm font-medium text-slate-700">
               Entity type
             </span>
-            <input
-              type="text"
+            <select
               value={filters.entityType}
               onChange={(event) => {
                 setState((current) => ({ ...current, loading: true }));
@@ -253,9 +262,15 @@ export default function AdminAuditLogsPage() {
                   entityType: event.target.value,
                 }));
               }}
-              placeholder="users"
               className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-950 outline-none transition focus:border-sky-400 focus:bg-white focus:ring-4 focus:ring-sky-100"
-            />
+            >
+              <option value="">All entity types</option>
+              {state.entityTypes.map((item) => (
+                <option key={item} value={item}>
+                  {formatLabel(item)}
+                </option>
+              ))}
+            </select>
           </label>
 
           <button

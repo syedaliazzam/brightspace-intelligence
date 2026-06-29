@@ -83,8 +83,7 @@ export default function AdminCoursesPage() {
       available: cached?.available !== false,
       items: cached?.items || [],
       subjects: cached?.subjects || [],
-      schedules: cached?.schedules || [],
-      summary: cached?.summary || { total: 0, active: 0, draft: 0, schedules: 0 },
+      summary: cached?.summary || { total: 0, active: 0, draft: 0 },
     };
   });
   const [modal, setModal] = useState({ open: false, record: null });
@@ -104,8 +103,7 @@ export default function AdminCoursesPage() {
           available: cached.available !== false,
           items: cached.items || [],
           subjects: cached.subjects || [],
-          schedules: cached.schedules || [],
-          summary: cached.summary || { total: 0, active: 0, draft: 0, schedules: 0 },
+          summary: cached.summary || { total: 0, active: 0, draft: 0 },
         });
         return;
       }
@@ -133,8 +131,7 @@ export default function AdminCoursesPage() {
         available: data.available !== false,
         items: data.items || [],
         subjects: data.subjects || [],
-        schedules: data.schedules || [],
-        summary: data.summary || { total: 0, active: 0, draft: 0, schedules: 0 },
+        summary: data.summary || { total: 0, active: 0, draft: 0 },
       });
     } catch (error) {
       setState({
@@ -143,8 +140,7 @@ export default function AdminCoursesPage() {
         available: false,
         items: [],
         subjects: [],
-        schedules: [],
-        summary: { total: 0, active: 0, draft: 0, schedules: 0 },
+        summary: { total: 0, active: 0, draft: 0 },
       });
     }
   }, [filters]);
@@ -162,9 +158,6 @@ export default function AdminCoursesPage() {
       <section className="rounded-[2rem] border border-white/70 bg-[linear-gradient(135deg,rgba(255,255,255,0.92),rgba(241,248,255,0.92))] p-6 shadow-[0_24px_80px_-36px_rgba(15,23,42,0.25)] sm:p-8">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div className="max-w-3xl">
-            <p className="text-sm font-semibold uppercase tracking-[0.24em] text-sky-700">
-              Class Management
-            </p>
             <h1 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">
               Manage Academic Classes
             </h1>
@@ -204,12 +197,12 @@ export default function AdminCoursesPage() {
             tone: "bg-amber-50 text-amber-800",
           },
           {
-            key: "schedules",
-            label: "Lecture schedules",
-            value: state.summary.schedules,
+            key: "availability",
+            label: "Catalog status",
+            value: state.available ? "Ready" : "Pending",
             tone: "bg-sky-50 text-sky-800",
           },
-        ]}
+        ].filter(Boolean)}
       />
 
       <section className="rounded-[1.75rem] border border-white/70 bg-white/90 p-4 shadow-[0_20px_70px_-36px_rgba(15,23,42,0.25)] sm:p-5">
@@ -244,13 +237,12 @@ export default function AdminCoursesPage() {
             </span>
             <select
               value={filters.status}
-              onChange={(event) => {
-                setState((current) => ({ ...current, loading: true }));
+              onChange={(event) =>
                 setFilters((current) => ({
                   ...current,
                   status: event.target.value,
-                }));
-              }}
+                }))
+              }
               className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-950 outline-none transition focus:border-sky-400 focus:bg-white focus:ring-4 focus:ring-sky-100"
             >
               <option value="">All statuses</option>
@@ -267,13 +259,12 @@ export default function AdminCoursesPage() {
             </span>
             <select
               value={filters.subjectId}
-              onChange={(event) => {
-                setState((current) => ({ ...current, loading: true }));
+              onChange={(event) =>
                 setFilters((current) => ({
                   ...current,
                   subjectId: event.target.value,
-                }));
-              }}
+                }))
+              }
               className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-950 outline-none transition focus:border-sky-400 focus:bg-white focus:ring-4 focus:ring-sky-100"
             >
               <option value="">All subjects</option>
@@ -300,88 +291,61 @@ export default function AdminCoursesPage() {
         </section>
       ) : null}
 
-      <section className="grid gap-6 xl:grid-cols-[1.3fr_0.7fr]">
-        <div>
-          <AdminDataTable
-            columns={[
-              {
-                key: "name",
-                label: "Class Name",
-                render: (row) => (
-                  <div>
-                    <p className="font-semibold text-slate-950">{row.name}</p>
-                  </div>
-                ),
-              },
-              {
-                key: "class_mode",
-                label: "Class / Grade",
-                render: (row) => row.class_mode || row.name || "-",
-              },
-              {
-                key: "assigned_subjects",
-                label: "Assigned Subjects",
-                render: (row) => row.assigned_subjects || row.subject_name || "-",
-              },
-              {
-                key: "status",
-                label: "Status",
-                render: (row) => formatLabel(row.status),
-              },
-              {
-                key: "created_at",
-                label: "Created Date",
-                render: (row) => formatDate(row.created_at),
-              },
-            ]}
-            rows={state.loading ? [] : state.items}
-            emptyMessage={
-              state.loading
-                ? "Loading classes..."
-                : "No classes matched the current filters."
-            }
-            actions={(row) => (
-              <button
-                type="button"
-                onClick={() => setModal({ open: true, record: row })}
-                className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
-              >
-                Edit
-              </button>
-            )}
-          />
-        </div>
-
-        <div className="rounded-[1.75rem] border border-white/70 bg-white/90 p-5 shadow-[0_20px_70px_-36px_rgba(15,23,42,0.25)]">
-          <div className="mb-4">
-            <p className="text-sm font-semibold uppercase tracking-[0.22em] text-sky-700">
-              Lecture schedules
-            </p>
-            <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">
-              Recent schedule view
-            </h2>
-          </div>
-          <AdminDataTable
-            columns={[
-              { key: "title", label: "Title" },
-              { key: "schedule_time", label: "Scheduled time" },
-              {
-                key: "status",
-                label: "Status",
-                render: (row) => formatLabel(row.status),
-              },
-            ]}
-            rows={state.schedules}
-            emptyMessage="No lecture schedule activity is available at the moment."
-          />
-        </div>
-      </section>
+      <AdminDataTable
+        columns={[
+          {
+            key: "name",
+            label: "Class Name",
+            render: (row) => (
+              <div>
+                <p className="font-semibold text-slate-950">{row.name}</p>
+              </div>
+            ),
+          },
+          {
+            key: "class_mode",
+            label: "Class / Grade",
+            render: (row) => row.class_mode || row.name || "-",
+          },
+          {
+            key: "assigned_subjects",
+            label: "Assigned Subjects",
+            render: (row) => row.assigned_subjects || row.subject_name || "-",
+          },
+          {
+            key: "status",
+            label: "Status",
+            render: (row) => formatLabel(row.status),
+          },
+          {
+            key: "created_at",
+            label: "Created Date",
+            render: (row) => formatDate(row.created_at),
+          },
+        ]}
+        rows={state.loading ? [] : state.items}
+        emptyMessage={
+          state.loading
+            ? "Loading classes..."
+            : "No classes matched the current filters."
+        }
+        actions={(row) => (
+          <button
+            type="button"
+            onClick={() => setModal({ open: true, record: row })}
+            className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
+          >
+            Edit
+          </button>
+        )}
+      />
 
       {modal.open ? (
         <CourseFormModal
           key={modal.record?.id || "create-course"}
           open={modal.open}
           record={modal.record}
+          existingClasses={state.items}
           subjects={state.subjects}
           onClose={() => setModal({ open: false, record: null })}
           onSuccess={() => load({ force: true })}

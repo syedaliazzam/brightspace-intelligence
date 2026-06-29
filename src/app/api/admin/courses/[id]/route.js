@@ -134,13 +134,15 @@ export async function PATCH(request, { params }) {
 
     const { id } = await params;
     const body = await request.json();
-    const classLevel = normalizeClassLevel(body?.classMode || body?.name);
+    const classLevel =
+      normalizeClassLevel(body?.classMode || body?.name) ||
+      normalizeText(body?.classMode || body?.name);
     const description = normalizeText(body?.description);
     const status = normalizeCourseStatus(body?.status);
     const updates = [];
 
     if (!classLevel) {
-      return json("Please select a valid class level.", 400);
+      return json("Class name is required.", 400);
     }
 
     const [existing] = await prisma.$queryRaw`

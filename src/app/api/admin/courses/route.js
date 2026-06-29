@@ -3,13 +3,7 @@ import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import prisma from "@/lib/prisma";
-import {
-  ALLOWED_CLASS_LEVELS,
-  CLASS_SUBJECTS,
-  normalizeClassLevel,
-} from "@/lib/academicCatalog";
-
-const CLASS_LEVELS = [...ALLOWED_CLASS_LEVELS];
+import { CLASS_SUBJECTS, normalizeClassLevel } from "@/lib/academicCatalog";
 
 function json(message, status = 200, extra = {}) {
   return NextResponse.json({ message, ...extra }, { status });
@@ -160,25 +154,21 @@ export async function GET(request) {
     const status = normalizeText(searchParams.get("status")).toLowerCase();
     const subjectId = normalizeText(searchParams.get("subjectId"));
     const conditions = [];
-    const classLevelList = Prisma.join(CLASS_LEVELS.map((level) => Prisma.sql`${level}`));
-
-    if (columns.class_level) {
-      conditions.push(Prisma.sql`c.class_level IN (${classLevelList})`);
-    } else if (columns.title) {
-      conditions.push(Prisma.sql`c.title IN (${classLevelList})`);
-    }
+    const values = [];
 
     if (status && columns.status) {
-      conditions.push(Prisma.sql`LOWER(c.status::text) = ${status}`);
+      values.push(status);
+      conditions.push(`LOWER(c.status::text) = $${values.length}`);
     }
 
     if (subjectId && courseSubjectsExists) {
-      conditions.push(Prisma.sql`
+      values.push(subjectId);
+      conditions.push(`
         EXISTS (
           SELECT 1
           FROM course_subjects cs_filter
           WHERE cs_filter.course_id = c.id
-            AND cs_filter.subject_id = ${subjectId}::uuid
+            AND cs_filter.subject_id = $${values.length}::uuid
         )
       `);
     }
@@ -188,60 +178,77 @@ export async function GET(request) {
       const searchConditions = [];
 
       if (columns.name) {
-        searchConditions.push(Prisma.sql`c.name ILIKE ${term}`);
+        values.push(term);
+        searchConditions.push(`c.name ILIKE $${values.length}`);
       }
       if (columns.title) {
-        searchConditions.push(Prisma.sql`c.title ILIKE ${term}`);
+        values.push(term);
+        searchConditions.push(`c.title ILIKE $${values.length}`);
       }
       if (columns.code) {
-        searchConditions.push(Prisma.sql`c.code ILIKE ${term}`);
+        values.push(term);
+        searchConditions.push(`c.code ILIKE $${values.length}`);
       }
       if (columns.description) {
-        searchConditions.push(Prisma.sql`c.description ILIKE ${term}`);
+        values.push(term);
+        searchConditions.push(`c.description ILIKE $${values.length}`);
       }
 
       if (searchConditions.length) {
-        conditions.push(
-          Prisma.sql`(${Prisma.join(searchConditions, Prisma.sql` OR `)})`
-        );
+        conditions.push(`(${searchConditions.join(" OR ")})`);
       }
     }
 
     const whereClause = conditions.length
-      ? Prisma.sql`WHERE ${Prisma.join(conditions, Prisma.sql` AND `)}`
-      : Prisma.empty;
+      ? `WHERE ${conditions.join(" AND ")}`
+      : "";
 
-    const items = await prisma.$queryRaw(
-      Prisma.sql`
+    const nameSelect = columns.title ? "c.title AS name" : "NULL AS name";
+    const descriptionSelect = columns.description
+      ? "c.description"
+      : "NULL AS description";
+    const classModeSelect = columns.class_level
+      ? "c.class_level AS class_mode"
+      : "c.title AS class_mode";
+    const statusSelect = columns.status
+      ? "LOWER(c.status::text) AS status"
+      : "'pending' AS status";
+    const createdAtSelect = columns.created_at
+      ? "c.created_at::text AS created_at"
+      : "NULL AS created_at";
+    const subjectJoin =
+      subjectsExists && courseSubjectsExists
+        ? `
+            LEFT JOIN course_subjects cs ON cs.course_id = c.id
+            LEFT JOIN subjects s ON s.id = cs.subject_id
+          `
+        : "";
+    const assignedSubjectsSelect =
+      subjectsExists && courseSubjectsExists
+        ? "STRING_AGG(s.name, ', ' ORDER BY s.name) AS assigned_subjects"
+        : "NULL AS assigned_subjects";
+
+    const items = await prisma.$queryRawUnsafe(
+      `
         SELECT
           c.id::text AS id,
-          ${columns.title ? Prisma.sql`c.title AS name,` : Prisma.sql`NULL AS name,`}
+          ${nameSelect},
           NULL AS code,
-          ${columns.description ? Prisma.sql`c.description,` : Prisma.sql`NULL AS description,`}
-          ${columns.class_level ? Prisma.sql`c.class_level AS class_mode,` : Prisma.sql`c.title AS class_mode,`}
+          ${descriptionSelect},
+          ${classModeSelect},
           NULL AS capacity,
           NULL AS subject_id,
-          ${columns.status ? Prisma.sql`LOWER(c.status::text) AS status,` : Prisma.sql`'pending' AS status,`}
-          ${columns.created_at ? Prisma.sql`c.created_at::text AS created_at,` : Prisma.sql`NULL AS created_at,`}
-          ${
-            subjectsExists && courseSubjectsExists
-              ? Prisma.sql`STRING_AGG(s.name, ', ' ORDER BY s.name) AS assigned_subjects`
-              : Prisma.sql`NULL AS assigned_subjects`
-          },
+          ${statusSelect},
+          ${createdAtSelect},
+          ${assignedSubjectsSelect},
           NULL AS subject_name
         FROM courses c
-        ${
-          subjectsExists && courseSubjectsExists
-            ? Prisma.sql`
-                LEFT JOIN course_subjects cs ON cs.course_id = c.id
-                LEFT JOIN subjects s ON s.id = cs.subject_id
-              `
-            : Prisma.empty
-        }
+        ${subjectJoin}
         ${whereClause}
         GROUP BY c.id
-        ORDER BY ${columns.created_at ? Prisma.sql`c.created_at DESC NULLS LAST` : Prisma.sql`c.id DESC`}
-      `
+        ORDER BY ${columns.created_at ? "c.created_at DESC NULLS LAST" : "c.id DESC"}
+      `,
+      ...values
     );
 
     const subjects =
@@ -300,12 +307,14 @@ export async function POST(request) {
     }
 
     const body = await request.json();
-    const classLevel = normalizeClassLevel(body?.classMode || body?.name);
+    const classLevel =
+      normalizeClassLevel(body?.classMode || body?.name) ||
+      normalizeText(body?.classMode || body?.name);
     const description = normalizeText(body?.description);
     const status = normalizeCourseStatus(body?.status);
 
     if (!classLevel) {
-      return json("Please select a valid class level.", 400);
+      return json("Class name is required.", 400);
     }
 
     const [existing] = await prisma.$queryRaw`

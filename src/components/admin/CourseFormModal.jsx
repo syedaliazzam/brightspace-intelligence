@@ -2,9 +2,6 @@
 
 import { AnimatePresence, motion } from "framer-motion";
 import { useState } from "react";
-import { CLASS_SUBJECTS } from "@/lib/academicCatalog";
-
-const CLASS_LEVELS = Object.keys(CLASS_SUBJECTS);
 
 function getInitialState(record) {
   const classMode = record?.class_mode || record?.name || "";
@@ -13,7 +10,7 @@ function getInitialState(record) {
     name: classMode,
     description: record?.description || "",
     classMode,
-    status: record?.status || "pending",
+    status: record?.status || "active",
   };
 }
 
@@ -71,7 +68,7 @@ export default function CourseFormModal({
   return (
     <AnimatePresence>
       {open ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 px-4 py-8">
+        <div className="fixed inset-0 z-50 flex items-start justify-center bg-slate-950/45 px-4 pb-8 pt-24 sm:pt-28">
           <motion.div
             initial={{ opacity: 0, y: 18 }}
             animate={{ opacity: 1, y: 0 }}
@@ -104,44 +101,15 @@ export default function CourseFormModal({
                   <span className="mb-2 block text-sm font-medium text-slate-700">
                     Class / Grade
                   </span>
-                  <select
+                  <input
+                    type="text"
                     value={form.classMode}
-                    onChange={(event) => {
-                      updateField("classMode", event.target.value);
-                      updateField("name", event.target.value);
-                    }}
+                    onChange={(event) => updateField("classMode", event.target.value)}
+                    placeholder="Enter class name"
                     className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-950 outline-none transition focus:border-sky-400 focus:bg-white focus:ring-4 focus:ring-sky-100"
                     required
-                  >
-                    <option value="">Select class</option>
-                    {CLASS_LEVELS.map((classLevel) => (
-                      <option key={classLevel} value={classLevel}>
-                        {classLevel}
-                      </option>
-                    ))}
-                  </select>
+                  />
                 </label>
-
-                <div className="sm:col-span-2 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                  <p className="text-sm font-medium text-slate-700">
-                    Class Subjects
-                  </p>
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {(CLASS_SUBJECTS[form.classMode] || []).map((subject) => (
-                      <span
-                        key={subject}
-                        className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-700 ring-1 ring-slate-200"
-                      >
-                        {subject}
-                      </span>
-                    ))}
-                    {!CLASS_SUBJECTS[form.classMode]?.length ? (
-                      <span className="text-sm text-slate-500">
-                        Select a class to preview assigned subjects.
-                      </span>
-                    ) : null}
-                  </div>
-                </div>
 
                 <label className="block sm:col-span-2">
                   <span className="mb-2 block text-sm font-medium text-slate-700">
@@ -152,8 +120,8 @@ export default function CourseFormModal({
                     onChange={(event) => updateField("status", event.target.value)}
                     className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-950 outline-none transition focus:border-sky-400 focus:bg-white focus:ring-4 focus:ring-sky-100"
                   >
-                    <option value="pending">Draft</option>
                     <option value="active">Active</option>
+                    <option value="pending">Draft</option>
                     <option value="suspended">Suspended</option>
                     <option value="archived">Archived</option>
                   </select>

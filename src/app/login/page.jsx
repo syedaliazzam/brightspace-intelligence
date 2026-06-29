@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { signIn } from "next-auth/react";
+import { Eye, EyeOff } from "lucide-react";
 
 const initialErrors = {
   identifier: "",
@@ -29,6 +30,7 @@ export default function LoginPage() {
   const router = useRouter();
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [errors, setErrors] = useState(initialErrors);
   const [pending, setPending] = useState(false);
 
@@ -109,18 +111,18 @@ export default function LoginPage() {
                 Learning platform access
               </span>
               <h1 className="mt-6 text-4xl font-semibold tracking-tight text-slate-950 sm:text-5xl">
-                Sign in to continue your teaching and learning workflow.
+                Welcome back to your learning portal.
               </h1>
               <p className="mt-5 max-w-lg text-base leading-7 text-slate-600 sm:text-lg">
-                A focused login experience for admins, coordinators, teachers, parents, and students.
+                Sign in to access your account and continue with classes, updates, and daily school activities.
               </p>
             </div>
 
             <div className="mt-10 grid gap-4 sm:grid-cols-3">
               {[
-                "Role-aware access",
-                "Secure JWT sessions",
-                "Responsive workspace",
+                "Easy account access",
+                "Safe and secure sign in",
+                "Works smoothly on every screen",
               ].map((label) => (
                 <div
                   key={label}
@@ -132,9 +134,9 @@ export default function LoginPage() {
             </div>
 
             <div className="mt-10 rounded-3xl bg-slate-950 px-6 py-6 text-white shadow-lg">
-              <p className="text-sm uppercase tracking-[0.24em] text-sky-200">Built for clarity</p>
+              <p className="text-sm uppercase tracking-[0.24em] text-sky-200">Simple and clear</p>
               <p className="mt-3 max-w-md text-sm leading-6 text-slate-300">
-                Clean inputs, immediate validation, and automatic redirection to the correct dashboard after authentication.
+                A clean sign-in experience with clear fields, quick guidance, and direct access to the right dashboard after login.
               </p>
             </div>
           </motion.section>
@@ -151,7 +153,7 @@ export default function LoginPage() {
                 Sign in to your account
               </h2>
               <p className="mt-2 text-sm leading-6 text-slate-600">
-                Use your email,number with your password.
+                Use your email or phone number with your password.
               </p>
             </div>
 
@@ -198,20 +200,30 @@ export default function LoginPage() {
                 >
                   Password
                 </label>
-                <input
-                  id="password"
-                  name="password"
-                  type="password"
-                  autoComplete="current-password"
-                  value={password}
-                  onChange={(event) => setPassword(event.target.value)}
-                  className={`w-full rounded-2xl border px-4 py-3 text-slate-950 outline-none transition placeholder:text-slate-400 focus:ring-4 ${
-                    errors.password
-                      ? "border-rose-300 bg-rose-50 focus:border-rose-400 focus:ring-rose-100"
-                      : "border-slate-200 bg-slate-50 focus:border-sky-400 focus:ring-sky-100"
-                  }`}
-                  placeholder="Enter your password"
-                />
+                <div className="relative">
+                  <input
+                    id="password"
+                    name="password"
+                    type={showPassword ? "text" : "password"}
+                    autoComplete="current-password"
+                    value={password}
+                    onChange={(event) => setPassword(event.target.value)}
+                    className={`w-full rounded-2xl border px-4 py-3 pr-12 text-slate-950 outline-none transition placeholder:text-slate-400 focus:ring-4 ${
+                      errors.password
+                        ? "border-rose-300 bg-rose-50 focus:border-rose-400 focus:ring-rose-100"
+                        : "border-slate-200 bg-slate-50 focus:border-sky-400 focus:ring-sky-100"
+                    }`}
+                    placeholder="Enter your password"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((current) => !current)}
+                    className="absolute inset-y-0 right-3 flex items-center text-slate-500 transition hover:text-slate-700"
+                    aria-label={showPassword ? "Hide password" : "Show password"}
+                  >
+                    {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                  </button>
+                </div>
                 {errors.password ? (
                   <p className="mt-2 text-sm text-rose-600">{errors.password}</p>
                 ) : null}

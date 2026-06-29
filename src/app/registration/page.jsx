@@ -180,11 +180,11 @@ export default function RegistrationPage() {
 
       <div className="relative mx-auto flex min-h-screen max-w-7xl items-center px-4 py-10 sm:px-6 lg:px-8">
         <motion.div className="grid w-full items-stretch gap-8 lg:grid-cols-[1.02fr_0.98fr]" variants={container} initial="hidden" animate="show">
-          <motion.section variants={item} className="flex flex-col justify-between rounded-[2rem] border border-white/60 bg-white/80 p-8 shadow-[0_24px_80px_-32px_rgba(15,23,42,0.28)] backdrop-blur-xl sm:p-10 lg:p-12">
+          <motion.section variants={item} className="flex flex-col justify-start rounded-[2rem] border border-white/60 bg-white/80 p-8 shadow-[0_24px_80px_-32px_rgba(15,23,42,0.28)] backdrop-blur-xl sm:p-10 lg:p-12">
             <div className="max-w-xl">
               <span className="inline-flex rounded-full border border-sky-200 bg-sky-50 px-4 py-1 text-xs font-semibold uppercase tracking-[0.24em] text-sky-700">Student registration</span>
               <h1 className="mt-6 text-4xl font-semibold tracking-tight text-slate-950 sm:text-5xl">Start your child&apos;s LMS registration in one simple form.</h1>
-              <p className="mt-5 max-w-lg text-base leading-7 text-slate-600 sm:text-lg">Share the basic student and parent details. Our coordinator will review the request and contact you for the next steps.</p>
+              <p className="mt-5 max-w-lg text-base leading-7 text-slate-600 sm:text-lg">Share the basic student and parent details. Our coordinator will review the request and contact you with the next steps.</p>
             </div>
             <div className="mt-10 rounded-3xl bg-slate-950 px-6 py-6 text-white shadow-lg">
               <p className="text-sm uppercase tracking-[0.24em] text-sky-200">What happens next</p>
@@ -196,7 +196,7 @@ export default function RegistrationPage() {
             <div className="mb-8">
               <p className="text-sm font-semibold uppercase tracking-[0.24em] text-sky-700">Registration form</p>
               <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">Submit student details</h2>
-              <p className="mt-2 text-sm leading-6 text-slate-600">Complete the required fields and we&apos;ll route the request to the coordinator portal.</p>
+              <p className="mt-2 text-sm leading-6 text-slate-600">Complete the required details and submit the form for admission review.</p>
             </div>
 
             {errors.form ? <div className="mb-5 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{errors.form}</div> : null}

@@ -3,6 +3,7 @@ import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import prisma from "@/lib/prisma";
+import { headlinesTableExists } from "@/lib/headlines";
 
 function json(message, status = 200, extra = {}) {
   return NextResponse.json({ message, ...extra }, { status });
@@ -25,19 +26,6 @@ async function requireAdminSession() {
   }
 
   return { session };
-}
-
-async function tableExists(tableName) {
-  const [row] = await prisma.$queryRaw`
-    SELECT EXISTS (
-      SELECT 1
-      FROM information_schema.tables
-      WHERE table_schema = 'public'
-        AND table_name = ${tableName}
-    ) AS exists
-  `;
-
-  return Boolean(row?.exists);
 }
 
 async function getTableColumns(tableName, tx = prisma) {
@@ -95,50 +83,43 @@ async function insertAuditLog(actorUserId, targetId, action, description, metada
 
   pushColumn("id", crypto.randomUUID());
   pushColumn("actor_user_id", actorUserId);
-  pushColumn("entity_type", "subjects");
+  pushColumn("entity_type", "headlines");
   pushColumn("entity_id", targetId);
   pushColumn("action", action);
   pushColumn("description", description);
   pushColumn("metadata", JSON.stringify(metadata));
   pushColumn("meta", JSON.stringify(metadata));
 
-  if (insertColumns.length) {
-    await tx.$executeRaw(
-      Prisma.sql`
-        INSERT INTO audit_logs (${Prisma.join(insertColumns, ", ")})
-        VALUES (${Prisma.join(insertValues, ", ")})
-      `
-    );
-  }
-}
-
-async function syncSubjectCourses(tx, subjectId, courseIds) {
-  if (!(await tableExists("course_subjects"))) {
-    return;
-  }
-
-  await tx.$executeRaw`
-    DELETE FROM course_subjects
-    WHERE subject_id = ${subjectId}::uuid
-  `;
-
-  const uniqueCourseIds = Array.from(
-    new Set((Array.isArray(courseIds) ? courseIds : []).filter(Boolean))
-  );
-
-  if (!uniqueCourseIds.length) {
+  if (!insertColumns.length) {
     return;
   }
 
   await tx.$executeRaw(
     Prisma.sql`
-      INSERT INTO course_subjects (id, course_id, subject_id)
-      SELECT gen_random_uuid(), c.id::uuid, ${subjectId}::uuid
-      FROM courses c
-      WHERE c.id IN (${Prisma.join(uniqueCourseIds.map((item) => Prisma.sql`${item}::uuid`))})
-      ON CONFLICT (course_id, subject_id) DO NOTHING
+      INSERT INTO audit_logs (${Prisma.join(insertColumns, ", ")})
+      VALUES (${Prisma.join(insertValues, ", ")})
     `
   );
+}
+
+function validateHeadline({ headline, startDate, endDate }) {
+  if (!headline) {
+    return "Headline text is required.";
+  }
+
+  if (!startDate || !endDate) {
+    return "Start date and end date are required.";
+  }
+
+  if (Number.isNaN(Date.parse(startDate)) || Number.isNaN(Date.parse(endDate))) {
+    return "Please provide valid dates.";
+  }
+
+  if (endDate < startDate) {
+    return "End date must be on or after the start date.";
+  }
+
+  return "";
 }
 
 export async function PATCH(request, { params }) {
@@ -149,61 +130,94 @@ export async function PATCH(request, { params }) {
   }
 
   try {
-    if (!(await tableExists("subjects"))) {
-      return json("Subjects table is not available yet.", 400);
+    if (!(await headlinesTableExists())) {
+      return json("Headlines table is not available yet.", 400);
     }
 
     const { id } = await params;
     const body = await request.json();
-    const name = normalizeText(body?.name);
-    const description = normalizeText(body?.description);
-    const status = normalizeText(body?.status).toLowerCase();
-    const courseIds = Array.isArray(body?.courseIds)
-      ? body.courseIds.map((item) => normalizeText(item)).filter(Boolean)
-      : [];
-    const columns = await getTableColumns("subjects");
+    const headline = normalizeText(body?.headline);
+    const startDate = normalizeText(body?.startDate);
+    const endDate = normalizeText(body?.endDate);
+    const validationMessage = validateHeadline({ headline, startDate, endDate });
+
+    if (validationMessage) {
+      return json(validationMessage, 400);
+    }
+
+    const columns = await getTableColumns("headlines");
     const updates = [];
 
-    if (columns.name) {
-      updates.push(Prisma.sql`name = ${name}`);
+    if (columns.headline) {
+      updates.push(Prisma.sql`headline = ${headline}`);
     }
-    if (columns.description) {
-      updates.push(Prisma.sql`description = ${description || null}`);
+    if (columns.start_date) {
+      updates.push(Prisma.sql`start_date = ${startDate}::date`);
     }
-    if (columns.status && status) {
-      updates.push(Prisma.sql`status = ${getValueSql(columns.status, status)}`);
+    if (columns.end_date) {
+      updates.push(Prisma.sql`end_date = ${endDate}::date`);
+    }
+    if (columns.updated_at) {
+      updates.push(Prisma.sql`updated_at = ${new Date()}`);
     }
 
     await prisma.$transaction(async (tx) => {
-      if (updates.length) {
-        await tx.$executeRaw(
-          Prisma.sql`
-            UPDATE subjects
-            SET ${Prisma.join(updates, ", ")}
-            WHERE id = ${id}::uuid
-          `
-        );
-      }
-
-      await syncSubjectCourses(tx, id, courseIds);
+      await tx.$executeRaw(
+        Prisma.sql`
+          UPDATE headlines
+          SET ${Prisma.join(updates, ", ")}
+          WHERE id = ${id}::uuid
+        `
+      );
 
       await insertAuditLog(
         authState.session.user.id,
         id,
-        "subject_updated",
-        `Subject ${name || id} updated by admin.`,
-        { status, courseIds },
+        "headline_updated",
+        `Headline updated by admin.`,
+        { headline, startDate, endDate },
         tx
       );
     });
 
-    return json("Subject updated.", 200, {
-      item: { id, name, description, status, course_ids: courseIds },
-    });
+    return json("Headline updated.", 200);
   } catch (error) {
-    return json(
-      error instanceof Error ? error.message : "Unable to update subject.",
-      500
-    );
+    return json(error instanceof Error ? error.message : "Unable to update headline.", 500);
+  }
+}
+
+export async function DELETE(_request, { params }) {
+  const authState = await requireAdminSession();
+
+  if (authState.error) {
+    return authState.error;
+  }
+
+  try {
+    if (!(await headlinesTableExists())) {
+      return json("Headlines table is not available yet.", 400);
+    }
+
+    const { id } = await params;
+
+    await prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`
+        DELETE FROM headlines
+        WHERE id = ${id}::uuid
+      `;
+
+      await insertAuditLog(
+        authState.session.user.id,
+        id,
+        "headline_deleted",
+        `Headline deleted by admin.`,
+        {},
+        tx
+      );
+    });
+
+    return json("Headline deleted.", 200);
+  } catch (error) {
+    return json(error instanceof Error ? error.message : "Unable to delete headline.", 500);
   }
 }

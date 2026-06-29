@@ -49,3 +49,40 @@ export async function DELETE(_request, { params }) {
     );
   }
 }
+
+export async function PATCH(request, { params }) {
+  const authState = await requireAdminSession();
+
+  if (authState.error) {
+    return authState.error;
+  }
+
+  try {
+    const { id } = await params;
+    const body = await request.json().catch(() => ({}));
+    const nextStatus = String(body?.status || "active").toLowerCase();
+
+    if (!["active", "suspended", "archived"].includes(nextStatus)) {
+      return json("Invalid user status.", 400);
+    }
+
+    const [updated] = await prisma.$queryRaw`
+      UPDATE users
+      SET status = ${nextStatus}::user_status,
+          updated_at = NOW()
+      WHERE id = ${id}::uuid
+      RETURNING id::text AS id
+    `;
+
+    if (!updated?.id) {
+      return json("User not found.", 404);
+    }
+
+    return json("User updated.", 200, { item: updated });
+  } catch (error) {
+    return json(
+      error instanceof Error ? error.message : "Unable to update user.",
+      500
+    );
+  }
+}

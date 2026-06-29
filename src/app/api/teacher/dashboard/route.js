@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requireRole, roleGuardResponse } from "@/lib/roleGuard";
 import prisma from "@/lib/prisma";
 import { getCurrentWeekRange, getDayRange } from "@/lib/dateTime";
+import { getActiveHeadlines } from "@/lib/headlines";
 
 const ALLOWED_ROLES = ["teacher", "admin"];
 
@@ -60,7 +61,8 @@ export async function GET() {
       ...statsValues
     );
 
-    const today = await prisma.$queryRawUnsafe(
+    const [today, headlines] = await Promise.all([
+      prisma.$queryRawUnsafe(
       `
       WITH course_stats AS (
         SELECT
@@ -97,9 +99,11 @@ export async function GET() {
       ORDER BY ls.scheduled_start ASC, ls.id ASC
       `,
       ...todayValues
-    );
+      ),
+      getActiveHeadlines(),
+    ]);
 
-    return json("Teacher dashboard fetched.", 200, { stats, today });
+    return json("Teacher dashboard fetched.", 200, { stats, today, headlines });
   } catch (error) {
     const guard = roleGuardResponse(error);
     return guard || json(error instanceof Error ? error.message : "Unable to load teacher dashboard.", 500);

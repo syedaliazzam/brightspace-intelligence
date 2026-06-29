@@ -1,6 +1,8 @@
 "use client";
 
+import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
+import PaginationControls from "@/components/teacher/PaginationControls";
 
 function renderValue(column, row) {
   if (typeof column.render === "function") {
@@ -17,7 +19,17 @@ export default function AdminDataTable({
   keyField = "id",
   emptyMessage = "No records found.",
   actions,
+  pageSize = 7,
 }) {
+  const [page, setPage] = useState(1);
+
+  const totalPages = Math.max(1, Math.ceil(rows.length / pageSize));
+  const currentPage = Math.min(Math.max(1, page), totalPages);
+  const visibleRows = useMemo(() => {
+    const startIndex = (currentPage - 1) * pageSize;
+    return rows.slice(startIndex, startIndex + pageSize);
+  }, [currentPage, pageSize, rows]);
+
   if (!rows.length) {
     return (
       <section className="rounded-[1.75rem] border border-dashed border-slate-300 bg-white/85 p-10 text-center text-sm text-slate-500 shadow-[0_18px_60px_-36px_rgba(15,23,42,0.18)]">
@@ -42,7 +54,7 @@ export default function AdminDataTable({
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {rows.map((row, index) => (
+              {visibleRows.map((row, index) => (
                 <motion.tr
                   key={row[keyField] || index}
                   initial={{ opacity: 0, y: 10 }}
@@ -67,10 +79,18 @@ export default function AdminDataTable({
             </tbody>
           </table>
         </div>
+        {rows.length > pageSize ? (
+          <PaginationControls
+            page={currentPage}
+            pageSize={pageSize}
+            totalItems={rows.length}
+            onPageChange={(nextPage) => setPage(Math.min(Math.max(1, nextPage), totalPages))}
+          />
+        ) : null}
       </div>
 
       <div className="grid gap-4 lg:hidden">
-        {rows.map((row, index) => (
+        {visibleRows.map((row, index) => (
           <motion.article
             key={row[keyField] || index}
             initial={{ opacity: 0, y: 10 }}
@@ -96,6 +116,16 @@ export default function AdminDataTable({
             ) : null}
           </motion.article>
         ))}
+        {rows.length > pageSize ? (
+          <div className="rounded-[1.5rem] border border-white/70 bg-white/90 shadow-[0_18px_60px_-36px_rgba(15,23,42,0.22)]">
+            <PaginationControls
+              page={currentPage}
+              pageSize={pageSize}
+              totalItems={rows.length}
+              onPageChange={(nextPage) => setPage(Math.min(Math.max(1, nextPage), totalPages))}
+            />
+          </div>
+        ) : null}
       </div>
     </section>
   );

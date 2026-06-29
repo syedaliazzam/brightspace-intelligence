@@ -18,6 +18,7 @@ function getCacheKey(filters) {
   const params = new URLSearchParams();
   if (filters.search) params.set("search", filters.search);
   if (filters.status) params.set("status", filters.status);
+  if (filters.courseId) params.set("courseId", filters.courseId);
   return `admin-subjects:${params.toString()}`;
 }
 
@@ -57,14 +58,15 @@ function writeCache(key, payload) {
 }
 
 export default function AdminSubjectsPage() {
-  const [filters, setFilters] = useState({ search: "", status: "" });
+  const [filters, setFilters] = useState({ search: "", status: "", courseId: "" });
   const [state, setState] = useState(() => {
-    const cached = readCache(getCacheKey({ search: "", status: "" }));
+    const cached = readCache(getCacheKey({ search: "", status: "", courseId: "" }));
 
     return {
       loading: !cached,
       error: "",
       available: cached?.available !== false,
+      classOptions: cached?.classOptions || [],
       items: cached?.items || [],
       summary: cached?.summary || { total: 0, active: 0, inactive: 0 },
     };
@@ -84,6 +86,7 @@ export default function AdminSubjectsPage() {
           loading: false,
           error: "",
           available: cached.available !== false,
+          classOptions: cached.classOptions || [],
           items: cached.items || [],
           summary: cached.summary || { total: 0, active: 0, inactive: 0 },
         });
@@ -95,6 +98,7 @@ export default function AdminSubjectsPage() {
       const params = new URLSearchParams();
       if (filters.search) params.set("search", filters.search);
       if (filters.status) params.set("status", filters.status);
+      if (filters.courseId) params.set("courseId", filters.courseId);
 
       const response = await fetch(`/api/admin/subjects?${params.toString()}`, {
         cache: "no-store",
@@ -110,6 +114,7 @@ export default function AdminSubjectsPage() {
         loading: false,
         error: "",
         available: data.available !== false,
+        classOptions: data.classOptions || [],
         items: data.items || [],
         summary: data.summary || { total: 0, active: 0, inactive: 0 },
       });
@@ -118,6 +123,7 @@ export default function AdminSubjectsPage() {
         loading: false,
         error: error instanceof Error ? error.message : "Unable to load subjects.",
         available: false,
+        classOptions: [],
         items: [],
         summary: { total: 0, active: 0, inactive: 0 },
       });
@@ -137,9 +143,6 @@ export default function AdminSubjectsPage() {
       <section className="rounded-[2rem] border border-white/70 bg-[linear-gradient(135deg,rgba(255,255,255,0.92),rgba(241,248,255,0.92))] p-6 shadow-[0_24px_80px_-36px_rgba(15,23,42,0.25)] sm:p-8">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div className="max-w-3xl">
-            <p className="text-sm font-semibold uppercase tracking-[0.24em] text-sky-700">
-              Subject management
-            </p>
             <h1 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">
               Maintain the subject catalog
             </h1>
@@ -189,7 +192,7 @@ export default function AdminSubjectsPage() {
 
       <section className="rounded-[1.75rem] border border-white/70 bg-white/90 p-4 shadow-[0_20px_70px_-36px_rgba(15,23,42,0.25)] sm:p-5">
         <form
-          className="grid gap-3 lg:grid-cols-[minmax(0,1.2fr)_220px_auto]"
+          className="grid gap-3 lg:grid-cols-[minmax(0,1.2fr)_220px_220px_auto]"
           onSubmit={(event) => {
             event.preventDefault();
             load();
@@ -215,17 +218,39 @@ export default function AdminSubjectsPage() {
 
           <label className="block">
             <span className="mb-2 block text-sm font-medium text-slate-700">
+              Class
+            </span>
+            <select
+              value={filters.courseId}
+              onChange={(event) =>
+                setFilters((current) => ({
+                  ...current,
+                  courseId: event.target.value,
+                }))
+              }
+              className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-950 outline-none transition focus:border-sky-400 focus:bg-white focus:ring-4 focus:ring-sky-100"
+            >
+              <option value="">All classes</option>
+              {state.classOptions.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.class_level || item.title}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="block">
+            <span className="mb-2 block text-sm font-medium text-slate-700">
               Status
             </span>
             <select
               value={filters.status}
-              onChange={(event) => {
-                setState((current) => ({ ...current, loading: true }));
+              onChange={(event) =>
                 setFilters((current) => ({
                   ...current,
                   status: event.target.value,
-                }));
-              }}
+                }))
+              }
               className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-950 outline-none transition focus:border-sky-400 focus:bg-white focus:ring-4 focus:ring-sky-100"
             >
               <option value="">All statuses</option>
@@ -258,9 +283,13 @@ export default function AdminSubjectsPage() {
             render: (row) => (
               <div>
                 <p className="font-semibold text-slate-950">{row.name}</p>
-                <p className="mt-1 text-xs text-slate-500">{row.code || "No code"}</p>
               </div>
             ),
+          },
+          {
+            key: "class_level",
+            label: "Class",
+            render: (row) => row.class_level || "-",
           },
           { key: "description", label: "Description" },
           {
@@ -291,6 +320,7 @@ export default function AdminSubjectsPage() {
           key={modal.record?.id || "create-subject"}
           open={modal.open}
           record={modal.record}
+          classOptions={state.classOptions}
           onClose={() => setModal({ open: false, record: null })}
           onSuccess={() => load({ force: true })}
         />

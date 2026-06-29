@@ -11,8 +11,11 @@ export const dashboardNavigation = {
     },
     { label: "Subject Catalog", href: "/admin/subjects" },
     { label: "Class Management", href: "/admin/courses" },
+    { label: "Admission Records", href: "/admin/registration-leads" },
     { label: "Fee Management", href: "/admin/fee-settings" },
+    { label: "Payments", href: "/admin/payments" },
     { label: "Notes", href: "/admin/notes" },
+    { label: "Headlines", href: "/admin/headlines" },
     { label: "Audit History", href: "/admin/audit-logs" },
   ],
   coordinator: [

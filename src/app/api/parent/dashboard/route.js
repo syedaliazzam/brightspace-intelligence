@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireRole, roleGuardResponse } from "@/lib/roleGuard";
 import prisma from "@/lib/prisma";
+import { getActiveHeadlines } from "@/lib/headlines";
 
 const ALLOWED_ROLES = ["parent", "admin"];
 
@@ -57,7 +58,8 @@ export async function GET(request) {
     const selectedChildId = childId || children[0]?.id || "";
     const scope = childScopeSql(session, selectedChildId);
 
-    const [stats] = await prisma.$queryRawUnsafe(
+    const [stats, headlines] = await Promise.all([
+      prisma.$queryRawUnsafe(
       `
       WITH allowed_students AS (
         SELECT sp.id, u.full_name
@@ -112,7 +114,9 @@ export async function GET(request) {
         ), 'not_available') AS fee_status
       `,
       ...scope.values
-    );
+      ),
+      getActiveHeadlines(),
+    ]);
 
     const upcoming = await prisma.$queryRawUnsafe(
       `
@@ -158,8 +162,9 @@ export async function GET(request) {
     return json("Parent dashboard fetched.", 200, {
       children,
       selectedChildId,
+      headlines,
       stats: {
-        ...stats,
+        ...(stats?.[0] || {}),
         total_children: children.length,
       },
       upcoming,

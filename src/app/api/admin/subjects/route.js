@@ -85,6 +85,61 @@ function addColumn(columns, values, columnMap, name, value) {
   values.push(getValueSql(columnMap[name], value));
 }
 
+function subjectStatusSummary(items) {
+  return {
+    total: items.length,
+    active: items.filter((item) => item.status === "active").length,
+    inactive: items.filter((item) => item.status === "inactive").length,
+  };
+}
+
+async function getAvailableClasses(tx = prisma) {
+  if (!(await tableExists("courses"))) {
+    return [];
+  }
+
+  return tx.$queryRaw`
+    SELECT
+      id::text AS id,
+      title,
+      class_level
+    FROM courses
+    WHERE class_level IS NOT NULL
+      AND TRIM(class_level) <> ''
+      AND LOWER(status::text) = 'active'
+    ORDER BY class_level ASC
+  `;
+}
+
+async function syncSubjectCourses(tx, subjectId, courseIds) {
+  if (!(await tableExists("course_subjects"))) {
+    return;
+  }
+
+  await tx.$executeRaw`
+    DELETE FROM course_subjects
+    WHERE subject_id = ${subjectId}::uuid
+  `;
+
+  const uniqueCourseIds = Array.from(
+    new Set((Array.isArray(courseIds) ? courseIds : []).filter(Boolean))
+  );
+
+  if (!uniqueCourseIds.length) {
+    return;
+  }
+
+  await tx.$executeRaw(
+    Prisma.sql`
+      INSERT INTO course_subjects (id, course_id, subject_id)
+      SELECT gen_random_uuid(), c.id::uuid, ${subjectId}::uuid
+      FROM courses c
+      WHERE c.id IN (${Prisma.join(uniqueCourseIds.map((item) => Prisma.sql`${item}::uuid`))})
+      ON CONFLICT (course_id, subject_id) DO NOTHING
+    `
+  );
+}
+
 async function insertAuditLog(actorUserId, targetId, action, description, metadata = {}, tx = prisma) {
   const columns = await getTableColumns("audit_logs", tx);
 
@@ -154,13 +209,30 @@ export async function GET(request) {
     }
 
     const columns = await getTableColumns("subjects");
+    const courseSubjectsExists = await tableExists("course_subjects");
+    const coursesExists = await tableExists("courses");
     const { searchParams } = new URL(request.url);
     const search = normalizeText(searchParams.get("search"));
     const status = normalizeText(searchParams.get("status")).toLowerCase();
+    const courseId = normalizeText(searchParams.get("courseId"));
     const conditions = [];
+    const values = [];
 
     if (status && columns.status) {
-      conditions.push(Prisma.sql`LOWER(status::text) = ${status}`);
+      values.push(status);
+      conditions.push(`LOWER(subjects.status::text) = $${values.length}`);
+    }
+
+    if (courseId && courseSubjectsExists) {
+      values.push(courseId);
+      conditions.push(`
+        EXISTS (
+          SELECT 1
+          FROM course_subjects cs_filter
+          WHERE cs_filter.subject_id = subjects.id
+            AND cs_filter.course_id = $${values.length}::uuid
+        )
+      `);
     }
 
     if (search) {
@@ -168,48 +240,80 @@ export async function GET(request) {
       const searchConditions = [];
 
       if (columns.name) {
-        searchConditions.push(Prisma.sql`name ILIKE ${term}`);
+        values.push(term);
+        searchConditions.push(`subjects.name ILIKE $${values.length}`);
       }
       if (columns.code) {
-        searchConditions.push(Prisma.sql`code ILIKE ${term}`);
+        values.push(term);
+        searchConditions.push(`subjects.code ILIKE $${values.length}`);
       }
       if (columns.description) {
-        searchConditions.push(Prisma.sql`description ILIKE ${term}`);
+        values.push(term);
+        searchConditions.push(`subjects.description ILIKE $${values.length}`);
       }
 
       if (searchConditions.length) {
-        conditions.push(
-          Prisma.sql`(${Prisma.join(searchConditions, Prisma.sql` OR `)})`
-        );
+        conditions.push(`(${searchConditions.join(" OR ")})`);
       }
     }
 
     const whereClause = conditions.length
-      ? Prisma.sql`WHERE ${Prisma.join(conditions, Prisma.sql` AND `)}`
-      : Prisma.empty;
+      ? `WHERE ${conditions.join(" AND ")}`
+      : "";
 
-    const items = await prisma.$queryRaw(
-      Prisma.sql`
-        SELECT
-          id::text AS id,
-          ${columns.name ? Prisma.sql`name,` : Prisma.sql`NULL AS name,`}
-          ${columns.code ? Prisma.sql`code,` : Prisma.sql`NULL AS code,`}
-          ${columns.description ? Prisma.sql`description,` : Prisma.sql`NULL AS description,`}
-          ${columns.status ? Prisma.sql`LOWER(status::text) AS status` : Prisma.sql`'active' AS status`}
-        FROM subjects
-        ${whereClause}
-        ORDER BY ${columns.created_at ? Prisma.sql`created_at DESC NULLS LAST` : Prisma.sql`id DESC`}
+    const nameSelect = columns.name ? "subjects.name" : "NULL AS name";
+    const descriptionSelect = columns.description
+      ? "subjects.description"
+      : "NULL AS description";
+    const statusSelect = columns.status
+      ? "LOWER(subjects.status::text) AS status"
+      : "'active' AS status";
+    const classFields =
+      courseSubjectsExists && coursesExists
+        ? `
+            COALESCE(STRING_AGG(DISTINCT c.id::text, ','), '') AS course_ids_csv,
+            COALESCE(STRING_AGG(DISTINCT COALESCE(c.class_level, c.title, ''), ', '), '') AS class_level
+          `
+        : `'' AS course_ids_csv, '' AS class_level`;
+    const joins =
+      courseSubjectsExists && coursesExists
+        ? `
+            LEFT JOIN course_subjects cs ON cs.subject_id = subjects.id
+            LEFT JOIN courses c ON c.id = cs.course_id
+          `
+        : "";
+
+    const items = await prisma.$queryRawUnsafe(
       `
+        SELECT
+          subjects.id::text AS id,
+          ${nameSelect},
+          ${descriptionSelect},
+          ${statusSelect},
+          ${classFields}
+        FROM subjects
+        ${joins}
+        ${whereClause}
+        GROUP BY subjects.id
+        ORDER BY ${columns.created_at ? "subjects.created_at DESC NULLS LAST" : "subjects.id DESC"}
+      `,
+      ...values
     );
+
+    const classOptions = await getAvailableClasses();
+    const normalizedItems = items.map((item) => ({
+      ...item,
+      course_ids: String(item.course_ids_csv || "")
+        .split(",")
+        .map((value) => value.trim())
+        .filter(Boolean),
+    }));
 
     return json("Subjects fetched.", 200, {
       available: true,
-      items,
-      summary: {
-        total: items.length,
-        active: items.filter((item) => item.status === "active").length,
-        inactive: items.filter((item) => item.status === "inactive").length,
-      },
+      items: normalizedItems,
+      classOptions,
+      summary: subjectStatusSummary(normalizedItems),
     });
   } catch (error) {
     return json(
@@ -233,12 +337,17 @@ export async function POST(request) {
 
     const body = await request.json();
     const name = normalizeText(body?.name);
-    const code = normalizeText(body?.code);
     const description = normalizeText(body?.description);
     const status = normalizeText(body?.status).toLowerCase() || "active";
+    const courseIds = Array.isArray(body?.courseIds)
+      ? body.courseIds.map((item) => normalizeText(item)).filter(Boolean)
+      : [];
 
     if (!name) {
       return json("Subject name is required.", 400);
+    }
+    if (!courseIds.length) {
+      return json("At least one class is required.", 400);
     }
 
     const columns = await getTableColumns("subjects");
@@ -251,9 +360,6 @@ export async function POST(request) {
     }
     if (columns.name) {
       addColumn(insertColumns, insertValues, columns, "name", name);
-    }
-    if (columns.code) {
-      addColumn(insertColumns, insertValues, columns, "code", code || null);
     }
     if (columns.description) {
       addColumn(
@@ -276,18 +382,20 @@ export async function POST(request) {
         `
       );
 
+      await syncSubjectCourses(tx, id, courseIds);
+
       await insertAuditLog(
         authState.session.user.id,
         id,
         "subject_created",
         `Subject ${name} created by admin.`,
-        { code, status },
+        { status, courseIds },
         tx
       );
     });
 
     return json("Subject created.", 201, {
-      item: { id, name, code, description, status },
+      item: { id, name, description, status, course_ids: courseIds, class_level: "" },
     });
   } catch (error) {
     return json(

@@ -12,7 +12,12 @@ const ALLOWED_FILTER_ROLES = new Set([
   "parent",
   "student",
 ]);
-const ALLOWED_FILTER_STATUSES = new Set(["active", "suspended", "inactive"]);
+const ALLOWED_FILTER_STATUSES = new Set([
+  "active",
+  "suspended",
+  "inactive",
+  "archived",
+]);
 
 function json(message, status = 200, extra = {}) {
   return NextResponse.json({ message, ...extra }, { status });
@@ -101,7 +106,7 @@ function getSearchConditions(search, userColumns) {
   return [Prisma.sql`(${Prisma.join(conditions, ' OR ')})`];
 }
 
-async function getUsers(search, role, status) {
+async function getUsers(search, role, status, classLevel = "") {
   const userColumns = await getTableColumns("users");
   const displayNameSql = getDisplayNameSql(userColumns);
   const conditions = [];
@@ -112,6 +117,10 @@ async function getUsers(search, role, status) {
 
   if (status && ALLOWED_FILTER_STATUSES.has(status)) {
     conditions.push(Prisma.sql`LOWER(u.status::text) = ${status}`);
+  }
+
+  if (classLevel) {
+    conditions.push(Prisma.sql`LOWER(COALESCE(sp.grade_level, '')) = ${classLevel.toLowerCase()}`);
   }
 
   conditions.push(...getSearchConditions(search, userColumns));
@@ -130,10 +139,12 @@ async function getUsers(search, role, status) {
       ${displayNameSql} AS name,
       u.email,
       u.phone,
+      COALESCE(sp.grade_level, '') AS class_level,
       LOWER(u.status::text) AS status,
       LOWER(r.name) AS role
     FROM users u
     INNER JOIN roles r ON r.id = u.role_id
+    LEFT JOIN student_profiles sp ON sp.user_id = u.id
     ${whereClause}
     ${orderClause}
   `;
@@ -241,10 +252,21 @@ export async function GET(request) {
   const search = normalizeText(searchParams.get("search"));
   const role = normalizeText(searchParams.get("role")).toLowerCase();
   const status = normalizeText(searchParams.get("status")).toLowerCase();
+  const classLevel = normalizeText(searchParams.get("class_level"));
 
   try {
-    const users = await getUsers(search, role, status);
-    return json("Users fetched.", 200, { items: users });
+    const users = await getUsers(search, role, status, classLevel);
+    return json("Users fetched.", 200, {
+      items: users,
+      summary: {
+        total: users.length,
+        students: users.filter((item) => item.role === "student").length,
+        parents: users.filter((item) => item.role === "parent").length,
+        active: users.filter((item) => item.status === "active").length,
+        suspended: users.filter((item) => item.status === "suspended").length,
+        archived: users.filter((item) => item.status === "archived").length,
+      },
+    });
   } catch (error) {
     return json(
       error instanceof Error ? error.message : "Unable to fetch users.",

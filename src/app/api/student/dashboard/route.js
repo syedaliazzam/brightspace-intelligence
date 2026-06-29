@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireRole, roleGuardResponse } from "@/lib/roleGuard";
 import prisma from "@/lib/prisma";
+import { getActiveHeadlines } from "@/lib/headlines";
 
 function json(message, status = 200, extra = {}) {
   return NextResponse.json({ message, ...extra }, { status });
@@ -23,7 +24,7 @@ export async function GET() {
     const session = await requireRole(["student"]);
     const student = await getStudent(session);
 
-    const [stats] = await Promise.all([
+    const [stats, headlines] = await Promise.all([
       prisma.$queryRaw`
         SELECT
           (
@@ -184,10 +185,12 @@ export async function GET() {
             NULL
           ) AS fee_submission_status
       `,
+      getActiveHeadlines(),
     ]);
 
     return json("Student dashboard fetched.", 200, {
       stats: stats?.[0] || {},
+      headlines,
     });
   } catch (error) {
     const guard = roleGuardResponse(error);

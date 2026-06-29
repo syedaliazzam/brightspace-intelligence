@@ -4,10 +4,12 @@ import { useEffect, useState } from "react";
 import ChildSwitcher from "@/components/parent/ChildSwitcher";
 import ParentStatsCards from "@/components/parent/ParentStatsCards";
 import PaymentAccessGuard from "@/components/shared/PaymentAccessGuard";
+import ActiveHeadlinesBanner from "@/components/shared/ActiveHeadlinesBanner";
 
 export default function ParentDashboardPage() {
   const [state, setState] = useState({
     children: [],
+    headlines: [],
     selectedChildId: "",
     stats: {},
     error: "",
@@ -29,6 +31,20 @@ export default function ParentDashboardPage() {
     }));
   }
 
+  async function loadHeadlines() {
+    const response = await fetch("/api/headlines/active", { cache: "no-store" });
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data?.message || "Unable to load headlines.");
+    }
+
+    setState((current) => ({
+      ...current,
+      headlines: Array.isArray(data.headlines) ? data.headlines : [],
+    }));
+  }
+
   async function loadDashboard(childId = state.selectedChildId) {
     if (!childId) {
       setState((current) => ({ ...current, stats: {}, error: "" }));
@@ -44,13 +60,20 @@ export default function ParentDashboardPage() {
 
     setState((current) => ({
       ...current,
+      headlines: Array.isArray(data.headlines) ? data.headlines : current.headlines,
       stats: data.stats || {},
       error: "",
     }));
   }
 
   useEffect(() => {
-    loadChildren().catch((error) => setState((current) => ({ ...current, loading: false, error: error.message })));
+    const timer = window.setTimeout(() => {
+      Promise.all([loadChildren(), loadHeadlines()]).catch((error) =>
+        setState((current) => ({ ...current, loading: false, error: error.message }))
+      );
+    }, 0);
+
+    return () => window.clearTimeout(timer);
   }, []);
 
   return (
@@ -63,6 +86,8 @@ export default function ParentDashboardPage() {
           Monitor classes, homework, attendance, fee status, and upcoming Google Meet sessions in one place.
         </p>
       </section>
+
+      <ActiveHeadlinesBanner items={state.headlines} />
 
       <ParentStatsCards
         items={[

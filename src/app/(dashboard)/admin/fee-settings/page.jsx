@@ -60,7 +60,6 @@ function TabButton({ active, children, ...props }) {
 }
 
 export default function AdminFeeSettingsPage() {
-  const [mounted, setMounted] = useState(false);
   const [activeTab, setActiveTab] = useState("regular");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -90,23 +89,23 @@ export default function AdminFeeSettingsPage() {
       {
         key: "voucherCreated",
         label: "Vouchers created",
-        value: mounted && !loading ? finance.voucherCreated : 0,
+        value: !loading ? finance.voucherCreated : 0,
         tone: "bg-sky-50 text-sky-800",
       },
       {
         key: "submitted",
         label: "Vouchers submitted",
-        value: mounted && !loading ? finance.vouchersSubmitted : 0,
+        value: !loading ? finance.vouchersSubmitted : 0,
         tone: "bg-amber-50 text-amber-800",
       },
       {
         key: "verified",
         label: "Payments verified",
-        value: mounted && !loading ? finance.paymentsVerified : 0,
+        value: !loading ? finance.paymentsVerified : 0,
         tone: "bg-emerald-50 text-emerald-800",
       },
     ],
-    [finance, loading, mounted]
+    [finance, loading]
   );
 
   async function loadAll() {
@@ -175,8 +174,11 @@ export default function AdminFeeSettingsPage() {
   }
 
   useEffect(() => {
-    setMounted(true);
-    void loadAll();
+    const timer = window.setTimeout(() => {
+      void loadAll();
+    }, 0);
+
+    return () => window.clearTimeout(timer);
   }, []);
 
   function updateForm(section, name, value) {
@@ -297,7 +299,7 @@ export default function AdminFeeSettingsPage() {
     regular: (
       <div className="space-y-6">
         <form
-          className="grid gap-4 rounded-[1.75rem] border border-slate-200 bg-white p-5 shadow-sm md:grid-cols-2"
+          className="grid gap-4 rounded-[1.75rem] border border-slate-200 bg-white p-5 shadow-sm md:grid-cols-4"
           onSubmit={(event) => {
             event.preventDefault();
             void submitEntity("regular");
@@ -317,7 +319,7 @@ export default function AdminFeeSettingsPage() {
               ))}
             </select>
           ) : (
-            <p className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 md:col-span-2">
+            <p className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 md:col-span-4">
               No active class levels found. Please add courses first.
             </p>
           )}
@@ -327,7 +329,7 @@ export default function AdminFeeSettingsPage() {
             <option value="active">Active</option>
             <option value="inactive">Inactive</option>
           </select>
-          <div className="md:col-span-2 flex gap-3">
+          <div className="flex gap-3 md:col-span-4">
             <button disabled={saving || !forms.regular.class_level} className="rounded-2xl bg-slate-950 px-4 py-3 text-sm font-semibold text-white disabled:opacity-60">
               {editing.regular ? "Save regular fee" : "Add regular fee"}
             </button>
@@ -370,7 +372,7 @@ export default function AdminFeeSettingsPage() {
     other: (
       <div className="space-y-6">
         <form
-          className="grid gap-4 rounded-[1.75rem] border border-slate-200 bg-white p-5 shadow-sm md:grid-cols-2"
+          className="grid gap-4 rounded-[1.75rem] border border-slate-200 bg-white p-5 shadow-sm md:grid-cols-4"
           onSubmit={(event) => {
             event.preventDefault();
             void submitEntity("other");
@@ -380,12 +382,12 @@ export default function AdminFeeSettingsPage() {
           <input className="rounded-2xl border border-slate-200 px-4 py-3" placeholder="Fee type" value={forms.other.fee_type} onChange={(event) => updateForm("other", "fee_type", event.target.value)} />
           <input className="rounded-2xl border border-slate-200 px-4 py-3" placeholder="Class level (optional)" value={forms.other.class_level} onChange={(event) => updateForm("other", "class_level", event.target.value)} />
           <input type="number" min="0" step="0.01" className="rounded-2xl border border-slate-200 px-4 py-3" placeholder="Amount" value={forms.other.amount} onChange={(event) => updateForm("other", "amount", event.target.value)} />
-          <textarea rows={3} className="rounded-2xl border border-slate-200 px-4 py-3 md:col-span-2" placeholder="Description" value={forms.other.description} onChange={(event) => updateForm("other", "description", event.target.value)} />
-          <select className="rounded-2xl border border-slate-200 px-4 py-3" value={forms.other.status} onChange={(event) => updateForm("other", "status", event.target.value)}>
+          <textarea rows={3} className="rounded-2xl border border-slate-200 px-4 py-3 md:col-span-4" placeholder="Description" value={forms.other.description} onChange={(event) => updateForm("other", "description", event.target.value)} />
+          <select className="rounded-2xl border border-slate-200 px-4 py-3 md:col-span-1" value={forms.other.status} onChange={(event) => updateForm("other", "status", event.target.value)}>
             <option value="active">Active</option>
             <option value="inactive">Inactive</option>
           </select>
-          <div className="flex gap-3 md:col-span-2">
+          <div className="flex gap-3 md:col-span-3 md:justify-end">
             <button disabled={saving} className="rounded-2xl bg-slate-950 px-4 py-3 text-sm font-semibold text-white disabled:opacity-60">
               {editing.other ? "Save other fee" : "Add other fee"}
             </button>
@@ -430,7 +432,7 @@ export default function AdminFeeSettingsPage() {
     payment: (
       <div className="space-y-6">
         <form
-          className="grid gap-4 rounded-[1.75rem] border border-slate-200 bg-white p-5 shadow-sm md:grid-cols-2"
+          className="grid gap-4 rounded-[1.75rem] border border-slate-200 bg-white p-5 shadow-sm md:grid-cols-4"
           onSubmit={(event) => {
             event.preventDefault();
             void submitEntity("payment");
@@ -443,12 +445,12 @@ export default function AdminFeeSettingsPage() {
           <input className="rounded-2xl border border-slate-200 px-4 py-3" placeholder="IBAN" value={forms.payment.iban} onChange={(event) => updateForm("payment", "iban", event.target.value)} />
           <input className="rounded-2xl border border-slate-200 px-4 py-3" placeholder="Bank name" value={forms.payment.bank_name} onChange={(event) => updateForm("payment", "bank_name", event.target.value)} />
           <input className="rounded-2xl border border-slate-200 px-4 py-3" placeholder="Branch code" value={forms.payment.branch_code} onChange={(event) => updateForm("payment", "branch_code", event.target.value)} />
-          <textarea rows={3} className="rounded-2xl border border-slate-200 px-4 py-3 md:col-span-2" placeholder="Instructions" value={forms.payment.instructions} onChange={(event) => updateForm("payment", "instructions", event.target.value)} />
-          <select className="rounded-2xl border border-slate-200 px-4 py-3" value={forms.payment.status} onChange={(event) => updateForm("payment", "status", event.target.value)}>
+          <textarea rows={3} className="rounded-2xl border border-slate-200 px-4 py-3 md:col-span-4" placeholder="Instructions" value={forms.payment.instructions} onChange={(event) => updateForm("payment", "instructions", event.target.value)} />
+          <select className="rounded-2xl border border-slate-200 px-4 py-3 md:col-span-1" value={forms.payment.status} onChange={(event) => updateForm("payment", "status", event.target.value)}>
             <option value="active">Active</option>
             <option value="inactive">Inactive</option>
           </select>
-          <div className="flex gap-3 md:col-span-2">
+          <div className="flex gap-3 md:col-span-3 md:justify-end">
             <button disabled={saving} className="rounded-2xl bg-slate-950 px-4 py-3 text-sm font-semibold text-white disabled:opacity-60">
               {editing.payment ? "Save payment method" : "Add payment method"}
             </button>
@@ -580,9 +582,6 @@ export default function AdminFeeSettingsPage() {
     <div className="space-y-6">
       <section className="rounded-[2rem] border border-white/70 bg-[linear-gradient(135deg,rgba(255,255,255,0.92),rgba(241,248,255,0.92))] p-6 shadow-[0_24px_80px_-36px_rgba(15,23,42,0.25)] sm:p-8">
         <div className="max-w-3xl">
-          <p className="text-sm font-semibold uppercase tracking-[0.24em] text-sky-700">
-            Fee management
-          </p>
           <h1 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">
             Admin fee management and payment setup
           </h1>

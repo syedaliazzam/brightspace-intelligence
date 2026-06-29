@@ -6,11 +6,17 @@ import AdminConfirmDialog from "@/components/admin/AdminConfirmDialog";
 import AdminDashboardCards from "@/components/admin/AdminDashboardCards";
 import AdminDataTable from "@/components/admin/AdminDataTable";
 import StaffFormModal from "@/components/admin/StaffFormModal";
+import { useDashboardSession } from "@/components/layout/DashboardSessionContext";
 
 const ROLE_OPTIONS = ["", "admin", "coordinator", "teacher", "parent", "student"];
 const STAFF_ROLE_OPTIONS = ["", "admin", "coordinator", "teacher"];
-const STATUS_OPTIONS = ["", "active", "suspended"];
 const CACHE_TTL = 60 * 1000;
+const DEFAULT_FILTERS = {
+  search: "",
+  role: "",
+  status: "",
+  classLevel: "",
+};
 
 function formatLabel(value) {
   const text = String(value || "");
@@ -24,7 +30,20 @@ function getCacheKey(filters) {
   if (filters.search) params.set("search", filters.search);
   if (filters.role) params.set("role", filters.role);
   if (filters.status) params.set("status", filters.status);
+  if (filters.classLevel) params.set("class_level", filters.classLevel);
   return `admin-users:${params.toString()}`;
+}
+
+function getOverviewCacheKey(view) {
+  return `admin-users:overview:${view}`;
+}
+
+function getStatusOptions(view) {
+  if (view === "students" || view === "parents") {
+    return ["", "active", "archived"];
+  }
+
+  return ["", "active", "suspended"];
 }
 
 function readCache(key) {
@@ -63,6 +82,7 @@ function writeCache(key, payload) {
 }
 
 export default function AdminUsersPage() {
+  const session = useDashboardSession();
   const searchParams = useSearchParams();
   const view = String(searchParams.get("view") || "staff").toLowerCase();
   const rolePreset =
@@ -72,38 +92,132 @@ export default function AdminUsersPage() {
         ? "parent"
         : "";
   const isStaffView = view === "staff";
+  const currentUserId = String(session?.user?.id || "");
   const [filters, setFilters] = useState({
     search: "",
     role: rolePreset,
     status: "",
+    classLevel: "",
   });
   const [state, setState] = useState(() => {
-    const cached = readCache(getCacheKey({ search: "", role: "", status: "" }));
+    const cached = readCache(getCacheKey({ ...DEFAULT_FILTERS, role: rolePreset }));
+    const overviewCached = readCache(getOverviewCacheKey(view));
 
     return {
       loading: !cached,
+      overviewLoading: !overviewCached,
       error: "",
       items: cached?.items || [],
-      overviewItems: cached?.overviewItems || [],
-      summary: cached?.summary || null,
+      overviewItems: overviewCached?.items || [],
+      summary: overviewCached?.summary || null,
     };
   });
   const [modal, setModal] = useState({ open: false, record: null });
   const [confirmState, setConfirmState] = useState({
     open: false,
     record: null,
+    action: "",
     status: "",
     pending: false,
   });
 
   useEffect(() => {
     setFilters((current) => ({
-      ...current,
+      ...DEFAULT_FILTERS,
+      search: current.search,
       role: rolePreset,
     }));
-  }, [rolePreset]);
+  }, [rolePreset, view]);
 
-  const load = useCallback(async (options = {}) => {
+  const loadOverview = useCallback(async (options = {}) => {
+    const force = options.force === true;
+    const cacheKey = getOverviewCacheKey(view);
+
+    if (!force) {
+      const cached = readCache(cacheKey);
+      if (cached) {
+        setState((current) => ({
+          ...current,
+          overviewLoading: false,
+          overviewItems: cached.items || [],
+          summary: cached.summary || null,
+        }));
+        return cached;
+      }
+    }
+
+    setState((current) => ({ ...current, overviewLoading: true }));
+
+    try {
+      const params = new URLSearchParams();
+
+      if (view === "students") {
+        params.set("role", "student");
+      } else if (view === "parents") {
+        params.set("role", "parent");
+      }
+
+      if (view === "staff") {
+        const rolesToLoad = ["admin", "coordinator", "teacher"];
+        const responses = await Promise.all(
+          rolesToLoad.map((roleValue) => fetch(`/api/admin/users?role=${roleValue}`, { cache: "no-store" }))
+        );
+        const payloads = await Promise.all(responses.map((response) => response.json()));
+        const failed = responses.find((response) => !response.ok);
+
+        if (failed) {
+          const failPayload = payloads.find((payload, index) => !responses[index].ok);
+          throw new Error(failPayload?.message || "Unable to load users.");
+        }
+
+        const items = payloads.flatMap((payload) => payload.items || []);
+        const summary = {
+          total: items.length,
+          active: items.filter((item) => item.status === "active").length,
+          suspended: items.filter((item) => item.status === "suspended").length,
+          archived: items.filter((item) => item.status === "archived").length,
+        };
+
+        const payload = { items, summary };
+        writeCache(cacheKey, payload);
+        setState((current) => ({
+          ...current,
+          overviewLoading: false,
+          overviewItems: items,
+          summary,
+        }));
+        return payload;
+      }
+
+      const response = await fetch(
+        `/api/admin/users${params.toString() ? `?${params.toString()}` : ""}`,
+        { cache: "no-store" }
+      );
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data?.message || "Unable to load users.");
+      }
+
+      writeCache(cacheKey, data);
+      setState((current) => ({
+        ...current,
+        overviewLoading: false,
+        overviewItems: data.items || [],
+        summary: data.summary || null,
+      }));
+      return data;
+    } catch (error) {
+      setState((current) => ({
+        ...current,
+        overviewLoading: false,
+        error: error instanceof Error ? error.message : "Unable to load users.",
+      }));
+      return null;
+    }
+  }, [view]);
+
+  const loadTable = useCallback(async (options = {}) => {
     const force = options.force === true;
     const cacheKey = getCacheKey(filters);
     setState((current) => ({ ...current, loading: true, error: "" }));
@@ -111,13 +225,12 @@ export default function AdminUsersPage() {
     if (!force) {
       const cached = readCache(cacheKey);
       if (cached) {
-        setState({
+        setState((current) => ({
+          ...current,
           loading: false,
           error: "",
           items: cached.items || [],
-          overviewItems: cached.overviewItems || [],
-          summary: cached.summary || null,
-        });
+        }));
         return;
       }
     }
@@ -127,9 +240,9 @@ export default function AdminUsersPage() {
       if (filters.search) params.set("search", filters.search);
       if (filters.role) params.set("role", filters.role);
       if (filters.status) params.set("status", filters.status);
+      if (filters.classLevel) params.set("class_level", filters.classLevel);
 
       let items = [];
-      let overviewItems = [];
       let data = { items: [] };
 
       if (isStaffView) {
@@ -146,6 +259,7 @@ export default function AdminUsersPage() {
             roleParams.set("role", roleValue);
             if (filters.search) roleParams.set("search", filters.search);
             if (filters.status) roleParams.set("status", filters.status);
+            if (filters.classLevel) roleParams.set("class_level", filters.classLevel);
             return fetch(`/api/admin/users?${roleParams.toString()}`, { cache: "no-store" });
           })
         );
@@ -157,11 +271,11 @@ export default function AdminUsersPage() {
           throw new Error(failPayload?.message || "Unable to load users.");
         }
 
-        overviewItems = payloads.flatMap((payload) => payload.items || []);
+        const tableItems = payloads.flatMap((payload) => payload.items || []);
         items = filters.role
-          ? overviewItems.filter((item) => item.role === filters.role)
-          : overviewItems;
-        data = { items: overviewItems };
+          ? tableItems.filter((item) => item.role === filters.role)
+          : tableItems;
+        data = { items };
       } else {
         const response = await fetch(`/api/admin/users?${params.toString()}`, {
           cache: "no-store",
@@ -173,35 +287,33 @@ export default function AdminUsersPage() {
         }
 
         items = data.items || [];
-        overviewItems = items;
       }
 
-      writeCache(cacheKey, { ...data, items, overviewItems });
-      setState({
+      writeCache(cacheKey, { items });
+      setState((current) => ({
+        ...current,
         loading: false,
         error: "",
         items,
-        overviewItems,
-        summary: data.summary || null,
-      });
+      }));
     } catch (error) {
-      setState({
+      setState((current) => ({
+        ...current,
         loading: false,
         error: error instanceof Error ? error.message : "Unable to load users.",
         items: [],
-        overviewItems: [],
-        summary: null,
-      });
+      }));
     }
-  }, [filters, view]);
+  }, [filters, isStaffView]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
-      void load();
+      void loadOverview();
+      void loadTable();
     }, 0);
 
     return () => window.clearTimeout(timer);
-  }, [load]);
+  }, [loadOverview, loadTable]);
 
   const cards = useMemo(() => {
     if (isStaffView) {
@@ -247,6 +359,28 @@ export default function AdminUsersPage() {
       ];
     }
 
+    if (view === "students") {
+      return [
+        {
+          key: "students",
+          label: "Total students",
+          value: state.summary?.students ?? state.items.length ?? "...",
+          tone: "bg-sky-50 text-sky-800",
+        },
+      ];
+    }
+
+    if (view === "parents") {
+      return [
+        {
+          key: "parents",
+          label: "Total parents",
+          value: state.summary?.parents ?? state.items.length ?? "...",
+          tone: "bg-emerald-50 text-emerald-800",
+        },
+      ];
+    }
+
     return [
       {
         key: "coordinators",
@@ -261,11 +395,27 @@ export default function AdminUsersPage() {
         tone: "bg-amber-50 text-amber-800",
       },
     ];
-  }, [state.overviewItems, state.summary, isStaffView]);
+  }, [state.overviewItems, state.summary, isStaffView, state.items.length, view]);
+
+  const classOptions = useMemo(() => {
+    if (view !== "students") {
+      return [];
+    }
+
+    return Array.from(
+      new Set(
+        (state.overviewItems || [])
+          .map((item) => String(item.class_level || "").trim())
+          .filter(Boolean)
+      )
+    ).sort((left, right) => left.localeCompare(right));
+  }, [state.overviewItems, view]);
+
+  const statusOptions = useMemo(() => getStatusOptions(view), [view]);
 
   async function submitSearch(event) {
     event.preventDefault();
-    await load();
+    await loadTable();
   }
 
   async function resetPassword(record) {
@@ -298,62 +448,65 @@ export default function AdminUsersPage() {
   }
 
   async function deleteUser(record) {
-    const confirmed = window.confirm(
-      `Archive ${record.name || "this user"}?`
-    );
-
-    if (!confirmed) {
+    if (!record?.id) {
       return;
     }
 
-    try {
-      const response = await fetch(`/api/admin/users/${record.id}`, {
-        method: "DELETE",
-      });
-      const data = await response.json();
+    setConfirmState({
+      open: true,
+      record,
+      action: "archive",
+      status: "archived",
+      pending: false,
+    });
+  }
 
-      if (!response.ok) {
-        throw new Error(data?.message || "Unable to delete user.");
-      }
-
-      void load({ force: true });
-    } catch (error) {
-      window.alert(
-        error instanceof Error ? error.message : "Unable to delete user."
-      );
+  async function activateUser(record) {
+    if (!record?.id) {
+      return;
     }
+
+    setConfirmState({
+      open: true,
+      record,
+      action: "activate",
+      status: "active",
+      pending: false,
+    });
   }
 
   async function confirmStatusChange() {
-    if (!confirmState.record?.id || !confirmState.status) {
+    if (!confirmState.record?.id || !confirmState.action) {
       return;
     }
 
     setConfirmState((current) => ({ ...current, pending: true }));
 
     try {
-      const response = await fetch(`/api/admin/staff/${confirmState.record.id}`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          fullName: confirmState.record.name,
-          email: confirmState.record.email,
-          phone: confirmState.record.phone,
-          role: confirmState.record.role,
-          status: confirmState.status,
-        }),
+      const isArchiveAction = confirmState.action === "archive";
+      const endpoint = isArchiveAction
+        ? `/api/admin/users/${confirmState.record.id}`
+        : `/api/admin/users/${confirmState.record.id}`;
+      const response = await fetch(endpoint, {
+        method: isArchiveAction ? "DELETE" : "PATCH",
+        headers: isArchiveAction ? undefined : { "Content-Type": "application/json" },
+        body: isArchiveAction
+          ? undefined
+          : JSON.stringify({
+              status: "active",
+            }),
       });
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data?.message || "Unable to update user status.");
+        throw new Error(data?.message || "Unable to update user.");
       }
 
-      setConfirmState({ open: false, record: null, status: "", pending: false });
-      void load({ force: true });
+      setConfirmState({ open: false, record: null, action: "", status: "", pending: false });
+      await Promise.all([loadOverview({ force: true }), loadTable({ force: true })]);
     } catch (error) {
       window.alert(
-        error instanceof Error ? error.message : "Unable to update user status."
+        error instanceof Error ? error.message : "Unable to update user."
       );
       setConfirmState((current) => ({ ...current, pending: false }));
     }
@@ -364,9 +517,6 @@ export default function AdminUsersPage() {
       <section className="rounded-[2rem] border border-white/70 bg-[linear-gradient(135deg,rgba(255,255,255,0.92),rgba(241,248,255,0.92))] p-6 shadow-[0_24px_80px_-36px_rgba(15,23,42,0.25)] sm:p-8">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div className="max-w-3xl">
-            <p className="text-sm font-semibold uppercase tracking-[0.24em] text-sky-700">
-              User management
-            </p>
             <h1 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">
               {view === "students"
                 ? "Students management"
@@ -399,7 +549,13 @@ export default function AdminUsersPage() {
 
       <section className="rounded-[1.75rem] border border-white/70 bg-white/90 p-4 shadow-[0_20px_70px_-36px_rgba(15,23,42,0.25)] sm:p-5">
         <form
-          className={`grid gap-3 ${view === "staff" ? "lg:grid-cols-[minmax(0,1.2fr)_220px_220px_auto]" : "lg:grid-cols-[minmax(0,1.2fr)_220px_auto]"}`}
+          className={`grid gap-3 ${
+            view === "staff"
+              ? "lg:grid-cols-[minmax(0,1.2fr)_220px_220px_auto]"
+              : view === "students"
+                ? "lg:grid-cols-[minmax(0,1.2fr)_220px_220px_auto]"
+                : "lg:grid-cols-[minmax(0,1.2fr)_220px_auto]"
+          }`}
           onSubmit={submitSearch}
         >
           <label className="block">
@@ -420,6 +576,31 @@ export default function AdminUsersPage() {
             />
           </label>
 
+          {view === "students" ? (
+            <label className="block">
+              <span className="mb-2 block text-sm font-medium text-slate-700">
+                Class
+              </span>
+              <select
+                value={filters.classLevel}
+                onChange={(event) =>
+                  setFilters((current) => ({
+                    ...current,
+                    classLevel: event.target.value,
+                  }))
+                }
+                className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-950 outline-none transition focus:border-sky-400 focus:bg-white focus:ring-4 focus:ring-sky-100"
+              >
+                <option value="">All classes</option>
+                {classOptions.map((classLevel) => (
+                  <option key={classLevel} value={classLevel}>
+                    {classLevel}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : null}
+
           {view === "staff" ? (
             <label className="block">
               <span className="mb-2 block text-sm font-medium text-slate-700">
@@ -427,13 +608,12 @@ export default function AdminUsersPage() {
               </span>
               <select
                 value={filters.role}
-                onChange={(event) => {
-                  setState((current) => ({ ...current, loading: true }));
+                onChange={(event) =>
                   setFilters((current) => ({
                     ...current,
                     role: event.target.value,
-                  }));
-                }}
+                  }))
+                }
                 className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-950 outline-none transition focus:border-sky-400 focus:bg-white focus:ring-4 focus:ring-sky-100"
               >
                 {(isStaffView ? STAFF_ROLE_OPTIONS : ROLE_OPTIONS).map((option) => (
@@ -449,18 +629,17 @@ export default function AdminUsersPage() {
             <span className="mb-2 block text-sm font-medium text-slate-700">
               Status
             </span>
-            <select
-              value={filters.status}
-              onChange={(event) => {
-                setState((current) => ({ ...current, loading: true }));
-                setFilters((current) => ({
-                  ...current,
-                  status: event.target.value,
-                }));
-              }}
-              className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-950 outline-none transition focus:border-sky-400 focus:bg-white focus:ring-4 focus:ring-sky-100"
-            >
-              {STATUS_OPTIONS.map((option) => (
+              <select
+                value={filters.status}
+                onChange={(event) =>
+                  setFilters((current) => ({
+                    ...current,
+                    status: event.target.value,
+                  }))
+                }
+                className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-950 outline-none transition focus:border-sky-400 focus:bg-white focus:ring-4 focus:ring-sky-100"
+              >
+              {statusOptions.map((option) => (
                 <option key={option || "all"} value={option}>
                   {option ? formatLabel(option) : "All statuses"}
                 </option>
@@ -497,6 +676,15 @@ export default function AdminUsersPage() {
               </div>
             ),
           },
+          ...(view === "students"
+            ? [
+                {
+                  key: "class_level",
+                  label: "Class",
+                  render: (row) => row.class_level || "-",
+                },
+              ]
+            : []),
           {
             key: "phone",
             label: "Phone",
@@ -528,7 +716,7 @@ export default function AdminUsersPage() {
                 Edit
               </button>
             ) : null}
-            {view === "staff" && ["admin", "coordinator", "teacher"].includes(String(row.role || "").toLowerCase()) ? (
+            {view === "staff" && ["admin", "coordinator", "teacher"].includes(String(row.role || "").toLowerCase()) && String(row.id || "") !== currentUserId ? (
               <button
                 type="button"
                 onClick={() =>
@@ -553,7 +741,7 @@ export default function AdminUsersPage() {
                 Reset password
               </button>
             ) : null}
-            {view !== "staff" ? (
+          {view !== "staff" ? (
               <>
                 <button
                   type="button"
@@ -562,13 +750,23 @@ export default function AdminUsersPage() {
                 >
                   Edit
                 </button>
-                <button
-                  type="button"
-                  onClick={() => deleteUser(row)}
-                  className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700 transition hover:bg-rose-100"
-                >
-                  Delete
-                </button>
+                {String(row.status || "").toLowerCase() === "archived" ? (
+                  <button
+                    type="button"
+                    onClick={() => activateUser(row)}
+                    className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-100"
+                  >
+                    Activate
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => deleteUser(row)}
+                    className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700 transition hover:bg-rose-100"
+                  >
+                    Delete
+                  </button>
+                )}
               </>
             ) : null}
           </>
@@ -596,18 +794,24 @@ export default function AdminUsersPage() {
                 ]
           }
           onClose={() => setModal({ open: false, record: null })}
-          onSuccess={() => load({ force: true })}
+          onSuccess={() => Promise.all([loadOverview({ force: true }), loadTable({ force: true })])}
         />
       ) : null}
 
       <AdminConfirmDialog
         open={confirmState.open}
         pending={confirmState.pending}
-        title={`${formatLabel(confirmState.status)} ${confirmState.record?.name || "user"}?`}
-        description="This action updates the staff account status and writes an audit log entry."
-        confirmLabel={formatLabel(confirmState.status || "confirm")}
+        title={`${
+          confirmState.action === "archive" ? "Archive" : "Activate"
+        } ${confirmState.record?.name || "user"}?`}
+        description={
+          confirmState.action === "archive"
+            ? "This will move the record to archived status."
+            : "This will restore the record back to active status."
+        }
+        confirmLabel={confirmState.action === "archive" ? "Archive" : "Activate"}
         onClose={() =>
-          setConfirmState({ open: false, record: null, status: "", pending: false })
+          setConfirmState({ open: false, record: null, action: "", status: "", pending: false })
         }
         onConfirm={confirmStatusChange}
       />

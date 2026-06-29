@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import TeacherStatsCards from "@/components/teacher/TeacherStatsCards";
 import ClassActionModal from "@/components/teacher/ClassActionModal";
 import LMSCalendar from "@/components/calendar/LMSCalendar";
+import ActiveHeadlinesBanner from "@/components/shared/ActiveHeadlinesBanner";
 
 function todayDate() {
   const date = new Date();
@@ -14,6 +15,7 @@ function todayDate() {
 export default function TeacherDashboardPage() {
   const [state, setState] = useState({
     stats: {},
+    headlines: [],
     classes: [],
     selected: null,
     calendarRefreshKey: 0,
@@ -31,7 +33,22 @@ export default function TeacherDashboardPage() {
     const response = await fetch("/api/teacher/dashboard", { cache: "no-store" });
     const data = await response.json();
     if (!response.ok) throw new Error(data?.message || "Unable to load dashboard.");
-    setState((current) => ({ ...current, stats: data.stats || {}, error: "" }));
+    setState((current) => ({
+      ...current,
+      stats: data.stats || {},
+      headlines: Array.isArray(data.headlines) ? data.headlines : [],
+      error: "",
+    }));
+  }
+
+  async function loadHeadlines() {
+    const response = await fetch("/api/headlines/active", { cache: "no-store" });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data?.message || "Unable to load headlines.");
+    setState((current) => ({
+      ...current,
+      headlines: Array.isArray(data.headlines) ? data.headlines : [],
+    }));
   }
 
   async function loadLectures(filters = state.filters) {
@@ -79,6 +96,12 @@ export default function TeacherDashboardPage() {
       }
 
       try {
+        await loadHeadlines();
+      } catch (error) {
+        setState((current) => ({ ...current, error: error instanceof Error ? error.message : String(error) }));
+      }
+
+      try {
         await loadLectures({
           date: todayDate(),
           range: "today",
@@ -101,6 +124,7 @@ export default function TeacherDashboardPage() {
         <p className="text-sm font-semibold uppercase tracking-[0.24em] text-sky-700">Teacher dashboard</p>
         <h1 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">Teaching operations</h1>
       </section>
+      <ActiveHeadlinesBanner items={state.headlines} />
       {state.error ? <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">{state.error}</div> : null}
       <TeacherStatsCards items={[
         { key: "today", label: "Today lectures", value: state.stats.today_lectures || 0 },
