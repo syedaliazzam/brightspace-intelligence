@@ -120,11 +120,11 @@ export default function TeacherDashboardPage() {
 
   return (
     <div className="space-y-6 min-h-screen">
+      <ActiveHeadlinesBanner items={state.headlines} />
       <section className="rounded-[2rem] border border-white/70 bg-[linear-gradient(135deg,rgba(255,255,255,0.94),rgba(239,248,255,0.92))] p-6 shadow-[0_24px_80px_-36px_rgba(15,23,42,0.25)] sm:p-8">
         <p className="text-sm font-semibold uppercase tracking-[0.24em] text-sky-700">Teacher dashboard</p>
         <h1 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">Teaching operations</h1>
       </section>
-      <ActiveHeadlinesBanner items={state.headlines} />
       {state.error ? <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">{state.error}</div> : null}
       <TeacherStatsCards items={[
         { key: "today", label: "Today lectures", value: state.stats.today_lectures || 0 },

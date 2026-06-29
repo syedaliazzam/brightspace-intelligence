@@ -38,7 +38,15 @@ export async function GET(request) {
           u.full_name ILIKE $${values.length}
           OR u.email ILIKE $${values.length}
           OR u.phone ILIKE $${values.length}
-          OR pp.relation ILIKE $${values.length}
+          OR COALESCE(
+            CASE
+              WHEN LOWER(COALESCE(pp.relation, '')) IN ('', 'parent')
+                THEN NULLIF(latest_registration.parent_relation, '')
+              ELSE pp.relation
+            END,
+            pp.relation,
+            ''
+          ) ILIKE $${values.length}
         )`);
     }
 
@@ -57,15 +65,28 @@ export async function GET(request) {
         u.email,
         u.phone,
         u.status::text AS status,
-        pp.relation,
+        CASE
+          WHEN LOWER(COALESCE(pp.relation, '')) IN ('', 'parent')
+            THEN COALESCE(NULLIF(latest_registration.parent_relation, ''), COALESCE(pp.relation, ''))
+          ELSE COALESCE(pp.relation, '')
+        END AS relation,
         STRING_AGG(su.full_name, ', ' ORDER BY su.full_name) AS student_names
       FROM parent_profiles pp
       INNER JOIN users u ON u.id = pp.user_id
       LEFT JOIN student_parents spp ON spp.parent_id = pp.id
       LEFT JOIN student_profiles sp ON sp.id = spp.student_id
       LEFT JOIN users su ON su.id = sp.user_id
+      LEFT JOIN LATERAL (
+        SELECT rl.parent_relation
+        FROM student_parents spp_latest
+        INNER JOIN enrollments e ON e.student_id = spp_latest.student_id
+        INNER JOIN registration_leads rl ON rl.id = e.registration_id
+        WHERE spp_latest.parent_id = pp.id
+        ORDER BY e.updated_at DESC NULLS LAST, e.created_at DESC NULLS LAST, rl.created_at DESC NULLS LAST
+        LIMIT 1
+      ) latest_registration ON TRUE
       ${whereClause}
-      GROUP BY pp.id, u.id, u.full_name, u.email, u.phone, u.status, pp.relation
+      GROUP BY pp.id, u.id, u.full_name, u.email, u.phone, u.status, pp.relation, latest_registration.parent_relation
       ORDER BY u.full_name ASC
       `,
       ...values

@@ -37,6 +37,8 @@ async function getLeads(status, search) {
         OR rl.parent_name ILIKE $${values.length}
         OR rl.email ILIKE $${values.length}
         OR rl.phone ILIKE $${values.length}
+        OR COALESCE(rl.city_country, '') ILIKE $${values.length}
+        OR COALESCE(rl.current_school, '') ILIKE $${values.length}
       )`);
   }
 
@@ -48,14 +50,19 @@ async function getLeads(status, search) {
       rl.id::text AS id,
       rl.created_at AS submitted_at,
       rl.student_name,
+      COALESCE(rl.gender, '') AS gender,
+      rl.date_of_birth,
+      COALESCE(rl.current_school, '') AS current_school,
       rl.parent_name,
       rl.parent_relation,
       rl.email,
       rl.phone,
       rl.age AS student_age,
       rl.class_level,
-      rl.address,
-      rl.city,
+      COALESCE(rl.city_country, CONCAT_WS(', ', rl.city, '')) AS city_country,
+      COALESCE(rl.interest_reason, '') AS interest_reason,
+      COALESCE(rl.hear_about_source, '') AS hear_about_source,
+      COALESCE(rl.hear_about_other, '') AS hear_about_other,
       rl.notes,
       COALESCE(rl.source::text, 'website_registration') AS source,
       EXISTS (

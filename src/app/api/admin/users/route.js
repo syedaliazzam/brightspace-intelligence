@@ -140,12 +140,32 @@ async function getUsers(search, role, status, classLevel = "") {
       u.email,
       u.phone,
       COALESCE(sp.grade_level, '') AS class_level,
+      CASE
+        WHEN LOWER(COALESCE(pp.relation, '')) IN ('', 'parent')
+          THEN COALESCE(NULLIF(latest_registration.parent_relation, ''), COALESCE(pp.relation, ''))
+        ELSE COALESCE(pp.relation, '')
+      END AS relation,
+      COALESCE(STRING_AGG(DISTINCT su.full_name, ', ' ORDER BY su.full_name) FILTER (WHERE su.full_name IS NOT NULL), '') AS student_names,
       LOWER(u.status::text) AS status,
       LOWER(r.name) AS role
     FROM users u
     INNER JOIN roles r ON r.id = u.role_id
     LEFT JOIN student_profiles sp ON sp.user_id = u.id
+    LEFT JOIN parent_profiles pp ON pp.user_id = u.id
+    LEFT JOIN student_parents spp ON spp.parent_id = pp.id
+    LEFT JOIN student_profiles linked_sp ON linked_sp.id = spp.student_id
+    LEFT JOIN users su ON su.id = linked_sp.user_id
+    LEFT JOIN LATERAL (
+      SELECT rl.parent_relation
+      FROM student_parents spp_latest
+      INNER JOIN enrollments e ON e.student_id = spp_latest.student_id
+      INNER JOIN registration_leads rl ON rl.id = e.registration_id
+      WHERE spp_latest.parent_id = pp.id
+      ORDER BY e.updated_at DESC NULLS LAST, e.created_at DESC NULLS LAST, rl.created_at DESC NULLS LAST
+      LIMIT 1
+    ) latest_registration ON TRUE
     ${whereClause}
+    GROUP BY u.id, u.full_name, u.email, u.phone, sp.grade_level, pp.relation, latest_registration.parent_relation, u.status, r.name
     ${orderClause}
   `;
 }

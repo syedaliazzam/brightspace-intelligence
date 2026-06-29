@@ -21,11 +21,19 @@ const STATUS_OPTIONS = [
   { label: "Suspended", value: "suspended" },
 ];
 
+const PARENT_RELATION_OPTIONS = [
+  { label: "Mother", value: "mother" },
+  { label: "Father", value: "father" },
+  { label: "Guardian", value: "guardian" },
+];
+
 function getInitialState(record) {
   return {
     fullName: record?.name || "",
     email: record?.email || "",
     phone: record?.phone || "",
+    relation: record?.relation || "",
+    studentNames: record?.student_names || "",
     role: record?.role || "coordinator",
     status: record?.status || "active",
     password: "",
@@ -43,6 +51,7 @@ export default function StaffFormModal({
   const [form, setForm] = useState(getInitialState(record));
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
+  const isParentEdit = mode === "edit" && form.role === "parent";
 
   function updateField(name, value) {
     setForm((current) => ({ ...current, [name]: value }));
@@ -56,7 +65,9 @@ export default function StaffFormModal({
     try {
       const endpoint =
         mode === "edit" && record?.id
-          ? `/api/admin/staff/${record.id}`
+          ? form.role === "coordinator" || form.role === "teacher"
+            ? `/api/admin/staff/${record.id}`
+            : `/api/admin/users/${record.id}`
           : "/api/admin/staff";
       const method = mode === "edit" ? "PATCH" : "POST";
       const payload =
@@ -65,6 +76,7 @@ export default function StaffFormModal({
               fullName: form.fullName,
               email: form.email,
               phone: form.phone,
+              relation: form.relation,
               role: form.role,
               status: form.status,
             }
@@ -169,24 +181,46 @@ export default function StaffFormModal({
                   />
                 </label>
 
-                <label className="block">
-                  <span className="mb-2 block text-sm font-medium text-slate-700">
-                    Role
-                  </span>
-                  <select
-                    value={form.role}
-                    onChange={(event) => updateField("role", event.target.value)}
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-950 outline-none transition focus:border-sky-400 focus:bg-white focus:ring-4 focus:ring-sky-100"
-                  >
-                    {(mode === "edit" ? ALL_ROLE_OPTIONS : roleOptions).map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+                {isParentEdit ? (
+                  <label className="block">
+                    <span className="mb-2 block text-sm font-medium text-slate-700">
+                      Relation
+                    </span>
+                    <select
+                      value={form.relation}
+                      onChange={(event) => updateField("relation", event.target.value)}
+                      className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-950 outline-none transition focus:border-sky-400 focus:bg-white focus:ring-4 focus:ring-sky-100"
+                    >
+                      <option value="">Select relation</option>
+                      {PARENT_RELATION_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                ) : null}
 
-                {mode === "edit" ? (
+                {!isParentEdit ? (
+                  <label className="block">
+                    <span className="mb-2 block text-sm font-medium text-slate-700">
+                      Role
+                    </span>
+                    <select
+                      value={form.role}
+                      onChange={(event) => updateField("role", event.target.value)}
+                      className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-950 outline-none transition focus:border-sky-400 focus:bg-white focus:ring-4 focus:ring-sky-100"
+                    >
+                      {(mode === "edit" ? ALL_ROLE_OPTIONS : roleOptions).map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                ) : null}
+
+                {mode === "edit" && !isParentEdit ? (
                   <label className="block">
                     <span className="mb-2 block text-sm font-medium text-slate-700">
                       Status
@@ -203,7 +237,7 @@ export default function StaffFormModal({
                       ))}
                     </select>
                   </label>
-                ) : (
+                ) : mode !== "edit" ? (
                   <label className="block">
                     <span className="mb-2 block text-sm font-medium text-slate-700">
                       Temporary password
@@ -217,7 +251,7 @@ export default function StaffFormModal({
                       required
                     />
                   </label>
-                )}
+                ) : null}
               </div>
 
               {error ? (

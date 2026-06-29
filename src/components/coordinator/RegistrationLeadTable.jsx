@@ -20,7 +20,7 @@ function formatStatus(value) {
     .join(" ");
 }
 
-function formatDate(value) {
+function formatDateTime(value) {
   if (!value) {
     return "No date";
   }
@@ -33,6 +33,21 @@ function formatDate(value) {
   return new Intl.DateTimeFormat("en-US", {
     dateStyle: "medium",
     timeStyle: "short",
+  }).format(date);
+}
+
+function formatDate(value) {
+  if (!value) {
+    return "Not provided";
+  }
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "Not provided";
+  }
+
+  return new Intl.DateTimeFormat("en-US", {
+    dateStyle: "medium",
   }).format(date);
 }
 
@@ -56,7 +71,7 @@ export default function RegistrationLeadTable({ leads, onCreateVoucher }) {
           <table className="min-w-full divide-y divide-slate-200">
             <thead className="bg-slate-50/80">
               <tr className="text-left text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-                <th className="px-6 py-4">Student</th>
+                <th className="px-6 py-4">Child</th>
                 <th className="px-6 py-4">Parent</th>
                 <th className="px-6 py-4">Class</th>
                 <th className="px-6 py-4">Contact</th>
@@ -74,53 +89,59 @@ export default function RegistrationLeadTable({ leads, onCreateVoucher }) {
                   lead?.status === "new_lead";
 
                 return (
-                <motion.tr
-                  key={lead.id}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.2, delay: index * 0.02 }}
-                  className="align-top"
-                >
-                  <td className="px-6 py-5">
-                    <p className="font-semibold text-slate-950">{lead.student_name}</p>
-                    <p className="mt-1 text-sm text-slate-500">{lead.class_level || "Class not selected"}</p>
-                  </td>
-                  <td className="px-6 py-5">
-                    <p className="font-medium text-slate-800">{lead.parent_name || "Not provided"}</p>
-                    <p className="mt-1 text-sm text-slate-500">{lead.parent_relation || "Relation not set"}</p>
-                  </td>
-                  <td className="px-6 py-5">
-                    <p className="font-medium text-slate-800">{lead.class_level}</p>
-                    <p className="mt-1 text-sm text-slate-500">{lead.source || "website_registration"}</p>
-                  </td>
-                  <td className="px-6 py-5">
-                    <p className="text-sm text-slate-700">{lead.email || "No email"}</p>
-                    <p className="mt-1 text-sm text-slate-500">{lead.phone || "No phone"}</p>
-                  </td>
-                  <td className="px-6 py-5 text-sm text-slate-600">{formatDate(lead.submitted_at)}</td>
-                  <td className="px-6 py-5">
-                    <span
-                      className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${
-                        STATUS_STYLES[displayStatus] || "bg-slate-100 text-slate-700"
-                      }`}
-                    >
-                      {formatStatus(displayStatus)}
-                    </span>
-                  </td>
-                  <td className="px-6 py-5 text-right">
-                    <div className="flex flex-wrap justify-end gap-2">
-                      {canCreateVoucher ? (
-                        <button
-                          type="button"
-                          onClick={() => onCreateVoucher?.(lead)}
-                          className="rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800"
-                        >
-                          Create Voucher
-                        </button>
-                      ) : null}
-                    </div>
-                  </td>
-                </motion.tr>
+                  <motion.tr
+                    key={lead.id}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.2, delay: index * 0.02 }}
+                    className="align-top"
+                  >
+                    <td className="px-6 py-5">
+                      <p className="font-semibold text-slate-950">{lead.student_name}</p>
+                      <p className="mt-1 text-sm text-slate-500">
+                        {lead.gender || "Gender not provided"} · {formatDate(lead.date_of_birth)}
+                      </p>
+                      <p className="mt-1 text-sm text-slate-500">{lead.current_school || "Current school not provided"}</p>
+                    </td>
+                    <td className="px-6 py-5">
+                      <p className="font-medium text-slate-800">{lead.parent_name || "Not provided"}</p>
+                      <p className="mt-1 text-sm text-slate-500">{lead.parent_relation || "Relation not set"}</p>
+                      <p className="mt-1 text-sm text-slate-500">{lead.city_country || "Location not provided"}</p>
+                    </td>
+                    <td className="px-6 py-5">
+                      <p className="font-medium text-slate-800">{lead.class_level || "Class not selected"}</p>
+                      <p className="mt-1 text-sm text-slate-500">
+                        {lead.hear_about_source || lead.source || "website_registration"}
+                      </p>
+                    </td>
+                    <td className="px-6 py-5">
+                      <p className="text-sm text-slate-700">{lead.email || "No email"}</p>
+                      <p className="mt-1 text-sm text-slate-500">{lead.phone || "No phone"}</p>
+                    </td>
+                    <td className="px-6 py-5 text-sm text-slate-600">{formatDateTime(lead.submitted_at)}</td>
+                    <td className="px-6 py-5">
+                      <span
+                        className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${
+                          STATUS_STYLES[displayStatus] || "bg-slate-100 text-slate-700"
+                        }`}
+                      >
+                        {formatStatus(displayStatus)}
+                      </span>
+                    </td>
+                    <td className="px-6 py-5 text-right">
+                      <div className="flex flex-wrap justify-end gap-2">
+                        {canCreateVoucher ? (
+                          <button
+                            type="button"
+                            onClick={() => onCreateVoucher?.(lead)}
+                            className="rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800"
+                          >
+                            Create Voucher
+                          </button>
+                        ) : null}
+                      </div>
+                    </td>
+                  </motion.tr>
                 );
               })}
             </tbody>
@@ -133,57 +154,68 @@ export default function RegistrationLeadTable({ leads, onCreateVoucher }) {
           const displayStatus = getDisplayStatus(lead);
 
           return (
-          <motion.article
-            key={lead.id}
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.2, delay: index * 0.02 }}
-            className="rounded-[1.5rem] border border-white/70 bg-white/90 p-5 shadow-[0_18px_60px_-36px_rgba(15,23,42,0.22)]"
-          >
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <p className="text-lg font-semibold text-slate-950">{lead.student_name}</p>
-                <p className="mt-1 text-sm text-slate-500">{lead.class_level}</p>
-              </div>
-              <span
-                className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${
-                  STATUS_STYLES[displayStatus] || "bg-slate-100 text-slate-700"
-                }`}
-              >
-                {formatStatus(displayStatus)}
-              </span>
-            </div>
-
-            <dl className="mt-4 grid gap-3 text-sm text-slate-600 sm:grid-cols-2">
-              <div>
-                <dt className="font-medium text-slate-500">Parent</dt>
-                <dd className="mt-1 text-slate-800">{lead.parent_name || "Not provided"}</dd>
-              </div>
-              <div>
-                <dt className="font-medium text-slate-500">Contact</dt>
-                <dd className="mt-1 text-slate-800">{lead.email || lead.phone || "Not provided"}</dd>
-              </div>
-              <div>
-                <dt className="font-medium text-slate-500">Source</dt>
-                <dd className="mt-1 text-slate-800">{lead.source || "website_registration"}</dd>
-              </div>
-              <div>
-                <dt className="font-medium text-slate-500">Submitted</dt>
-                <dd className="mt-1 text-slate-800">{formatDate(lead.submitted_at)}</dd>
-              </div>
-            </dl>
-            <div className="mt-4 flex flex-wrap gap-2">
-              {(lead?.can_create_voucher === true || lead?.canCreateVoucher === true || lead?.status === "new_lead") ? (
-                <button
-                  type="button"
-                  onClick={() => onCreateVoucher?.(lead)}
-                  className="rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800"
+            <motion.article
+              key={lead.id}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.2, delay: index * 0.02 }}
+              className="rounded-[1.5rem] border border-white/70 bg-white/90 p-5 shadow-[0_18px_60px_-36px_rgba(15,23,42,0.22)]"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="text-lg font-semibold text-slate-950">{lead.student_name}</p>
+                  <p className="mt-1 text-sm text-slate-500">{lead.class_level}</p>
+                  <p className="mt-1 text-sm text-slate-500">
+                    {lead.gender || "Gender not provided"} · {formatDate(lead.date_of_birth)}
+                  </p>
+                </div>
+                <span
+                  className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${
+                    STATUS_STYLES[displayStatus] || "bg-slate-100 text-slate-700"
+                  }`}
                 >
-                  Create Voucher
-                </button>
-              ) : null}
-            </div>
-          </motion.article>
+                  {formatStatus(displayStatus)}
+                </span>
+              </div>
+
+              <dl className="mt-4 grid gap-3 text-sm text-slate-600 sm:grid-cols-2">
+                <div>
+                  <dt className="font-medium text-slate-500">Parent</dt>
+                  <dd className="mt-1 text-slate-800">{lead.parent_name || "Not provided"}</dd>
+                </div>
+                <div>
+                  <dt className="font-medium text-slate-500">Contact</dt>
+                  <dd className="mt-1 text-slate-800">{lead.email || lead.phone || "Not provided"}</dd>
+                </div>
+                <div>
+                  <dt className="font-medium text-slate-500">Location</dt>
+                  <dd className="mt-1 text-slate-800">{lead.city_country || "Not provided"}</dd>
+                </div>
+                <div>
+                  <dt className="font-medium text-slate-500">Current school</dt>
+                  <dd className="mt-1 text-slate-800">{lead.current_school || "Not provided"}</dd>
+                </div>
+                <div>
+                  <dt className="font-medium text-slate-500">Heard about us</dt>
+                  <dd className="mt-1 text-slate-800">{lead.hear_about_source || lead.source || "website_registration"}</dd>
+                </div>
+                <div>
+                  <dt className="font-medium text-slate-500">Submitted</dt>
+                  <dd className="mt-1 text-slate-800">{formatDateTime(lead.submitted_at)}</dd>
+                </div>
+              </dl>
+              <div className="mt-4 flex flex-wrap gap-2">
+                {(lead?.can_create_voucher === true || lead?.canCreateVoucher === true || lead?.status === "new_lead") ? (
+                  <button
+                    type="button"
+                    onClick={() => onCreateVoucher?.(lead)}
+                    className="rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800"
+                  >
+                    Create Voucher
+                  </button>
+                ) : null}
+              </div>
+            </motion.article>
           );
         })}
       </div>

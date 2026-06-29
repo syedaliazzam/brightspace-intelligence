@@ -159,6 +159,8 @@ export default function StudentDashboardPage() {
       <div className="space-y-6">
       <StudentPortalNavbar profile={profile} />
 
+      <ActiveHeadlinesBanner items={state.headlines} />
+
       <section id="dashboard" className="scroll-mt-28 rounded-[2rem] border border-white/70 bg-[linear-gradient(135deg,rgba(255,255,255,0.95),rgba(238,248,255,0.94))] p-6 shadow-[0_24px_80px_-36px_rgba(15,23,42,0.25)] sm:p-8">
         <p className="text-sm font-semibold uppercase tracking-[0.24em] text-sky-700">Student dashboard</p>
         <h1 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">Your learning command center</h1>
@@ -175,8 +177,6 @@ export default function StudentDashboardPage() {
           ]} />
         </div>
       </section>
-
-      <ActiveHeadlinesBanner items={state.headlines} />
 
       <motion.section id="calendar" className="scroll-mt-28 rounded-[2rem] border border-white/70 bg-white/90 p-5 shadow-[0_20px_70px_-36px_rgba(15,23,42,0.25)]">
         <div className="mb-5">

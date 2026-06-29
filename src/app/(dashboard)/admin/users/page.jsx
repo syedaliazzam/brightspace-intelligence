@@ -685,6 +685,20 @@ export default function AdminUsersPage() {
                 },
               ]
             : []),
+          ...(view === "parents"
+            ? [
+                {
+                  key: "relation",
+                  label: "Relation",
+                  render: (row) => row.relation || "-",
+                },
+                {
+                  key: "student_names",
+                  label: "Students",
+                  render: (row) => row.student_names || "-",
+                },
+              ]
+            : []),
           {
             key: "phone",
             label: "Phone",

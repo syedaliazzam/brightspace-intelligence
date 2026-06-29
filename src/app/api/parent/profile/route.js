@@ -19,9 +19,22 @@ export async function GET() {
         u.phone,
         u.status::text AS status,
         pp.id::text AS parent_profile_id,
-        pp.relation
+        CASE
+          WHEN LOWER(COALESCE(pp.relation, '')) IN ('', 'parent')
+            THEN COALESCE(NULLIF(latest_registration.parent_relation, ''), COALESCE(pp.relation, ''))
+          ELSE COALESCE(pp.relation, '')
+        END AS relation
       FROM users u
       LEFT JOIN parent_profiles pp ON pp.user_id = u.id
+      LEFT JOIN LATERAL (
+        SELECT rl.parent_relation
+        FROM student_parents spp
+        INNER JOIN enrollments e ON e.student_id = spp.student_id
+        INNER JOIN registration_leads rl ON rl.id = e.registration_id
+        WHERE spp.parent_id = pp.id
+        ORDER BY e.updated_at DESC NULLS LAST, e.created_at DESC NULLS LAST, rl.created_at DESC NULLS LAST
+        LIMIT 1
+      ) latest_registration ON TRUE
       WHERE u.id = ${session.user.id}::uuid
       LIMIT 1
     `;

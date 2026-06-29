@@ -530,6 +530,7 @@ async function getSubmissionRecord(id, tx = prisma) {
       rl.id::text AS registration_lead_id,
       rl.student_name,
       rl.parent_name,
+      rl.parent_relation,
       rl.email,
       rl.phone,
       rl.address,
@@ -709,6 +710,7 @@ export async function POST(request, { params }) {
           fullName: submission.parent_name || `${submission.student_name} Parent`,
           email: parentContactEmail,
           phone: parentContactPhone,
+          relation: submission.parent_relation,
           registrationLeadId: submission.registration_lead_id,
         }, tx);
 
@@ -782,8 +784,16 @@ export async function POST(request, { params }) {
             fullName: submission.parent_name || `${submission.student_name} Parent`,
             email: parentContactEmail,
             phone: parentContactPhone,
+            relation: submission.parent_relation,
             registrationLeadId: submission.registration_lead_id,
           }, tx);
+        } else if (submission.parent_relation) {
+          await tx.$executeRaw`
+            UPDATE parent_profiles
+            SET relation = ${submission.parent_relation}, updated_at = NOW()
+            WHERE id = ${parentProfileId}::uuid
+              AND LOWER(COALESCE(relation, '')) IN ('', 'parent')
+          `;
         }
       }
 
