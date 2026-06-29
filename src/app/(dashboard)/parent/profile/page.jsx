@@ -3,6 +3,15 @@
 import { useEffect, useState } from "react";
 import ChildSwitcher from "@/components/parent/ChildSwitcher";
 
+function DetailRow({ label, value }) {
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{label}</p>
+      <p className="mt-2 text-sm font-semibold text-slate-950">{value || "Not provided"}</p>
+    </div>
+  );
+}
+
 export default function ParentProfilePage() {
   const [state, setState] = useState({ profile: null, children: [], selectedChildId: "", error: "" });
 
@@ -23,7 +32,15 @@ export default function ParentProfilePage() {
   }
 
   useEffect(() => {
-    load().catch((error) => setState((current) => ({ ...current, error: error.message })));
+    async function initialize() {
+      try {
+        await load();
+      } catch (error) {
+        setState((current) => ({ ...current, error: error.message }));
+      }
+    }
+
+    initialize();
   }, []);
 
   const profile = state.profile || {};
@@ -36,19 +53,13 @@ export default function ParentProfilePage() {
       </section>
       {state.error ? <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">{state.error}</div> : null}
       <section className="rounded-[1.75rem] border border-white/70 bg-white/90 p-5 shadow-[0_20px_70px_-36px_rgba(15,23,42,0.25)]">
-        <div className="grid gap-4 sm:grid-cols-2">
-          {[
-            ["Full name", profile.full_name],
-            ["Email", profile.email],
-            ["Phone", profile.phone],
-            ["Relation", profile.relation],
-            ["Status", profile.status],
-          ].map(([label, value]) => (
-            <div key={label} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{label}</p>
-              <p className="mt-2 font-semibold text-slate-950">{value || "Not provided"}</p>
-            </div>
-          ))}
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <DetailRow label="Full name" value={profile.full_name} />
+          <DetailRow label="Email" value={profile.email} />
+          <DetailRow label="Phone" value={profile.phone} />
+          <DetailRow label="Relation" value={profile.relation} />
+          <DetailRow label="Status" value={profile.status} />
+          <DetailRow label="Children" value={profile.child_names} />
         </div>
       </section>
       <ChildSwitcher
@@ -62,20 +73,26 @@ export default function ParentProfilePage() {
         </div>
       ) : (
         <section className="rounded-[1.75rem] border border-white/70 bg-white/90 p-5 shadow-[0_20px_70px_-36px_rgba(15,23,42,0.25)]">
-          <div className="grid gap-4 sm:grid-cols-2">
-            {[
-              ["Full name", selectedChild.full_name],
-              ["Username", selectedChild.username],
-              ["Email", selectedChild.email],
-              ["Phone", selectedChild.phone],
-              ["Class", selectedChild.grade_level],
-              ["Status", selectedChild.status],
-            ].map(([label, value]) => (
-              <div key={label} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{label}</p>
-                <p className="mt-2 font-semibold text-slate-950">{value || "Not provided"}</p>
-              </div>
-            ))}
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <DetailRow label="Full name" value={selectedChild.full_name} />
+            <DetailRow label="Username" value={selectedChild.username} />
+            <DetailRow label="Email" value={selectedChild.email} />
+            <DetailRow label="Phone" value={selectedChild.phone} />
+            <DetailRow label="Class" value={selectedChild.grade_level} />
+            <DetailRow label="Status" value={selectedChild.status} />
+            <DetailRow label="Age" value={selectedChild.age ? String(selectedChild.age) : ""} />
+            <DetailRow label="Course" value={selectedChild.course_title} />
+            <DetailRow label="Lead relation" value={selectedChild.parent_relation} />
+            <DetailRow label="Programme" value={selectedChild.program_name} />
+            <DetailRow label="Current school" value={selectedChild.current_school} />
+            <DetailRow label="Gender" value={selectedChild.gender} />
+            <DetailRow label="Date of birth" value={selectedChild.date_of_birth} />
+            <DetailRow label="City / country" value={selectedChild.city_country} />
+            <DetailRow label="Nationality" value={selectedChild.nationality} />
+            <DetailRow label="Religion" value={selectedChild.religion} />
+            <DetailRow label="Preferred language" value={selectedChild.preferred_language} />
+            <DetailRow label="Support person" value={selectedChild.support_person_during_learning} />
+            <DetailRow label="Device available" value={selectedChild.device_available} />
           </div>
         </section>
       )}

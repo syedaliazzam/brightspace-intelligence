@@ -93,6 +93,7 @@ export default function AdminHeadlinesPage() {
   const [createForm, setCreateForm] = useState(emptyForm);
   const [editForm, setEditForm] = useState(emptyForm);
   const [editingId, setEditingId] = useState("");
+  const [deletingItem, setDeletingItem] = useState(null);
   const [submitting, setSubmitting] = useState(false);
 
   async function load() {
@@ -179,17 +180,13 @@ export default function AdminHeadlinesPage() {
     }
   }
 
-  async function handleDelete(id) {
-    const confirmed = window.confirm("Delete this headline?");
-
-    if (!confirmed) {
-      return;
-    }
-
+  async function confirmDelete() {
+    if (!deletingItem?.id) return;
     setError("");
+    setSubmitting(true);
 
     try {
-      const response = await fetch(`/api/admin/headlines/${id}`, {
+      const response = await fetch(`/api/admin/headlines/${deletingItem.id}`, {
         method: "DELETE",
       });
       const data = await response.json();
@@ -198,14 +195,17 @@ export default function AdminHeadlinesPage() {
         throw new Error(data?.message || "Unable to delete headline.");
       }
 
-      if (editingId === id) {
+      if (editingId === deletingItem.id) {
         setEditForm(emptyForm());
         setEditingId("");
       }
 
+      setDeletingItem(null);
       await load();
     } catch (deleteError) {
       setError(deleteError instanceof Error ? deleteError.message : "Unable to delete headline.");
+    } finally {
+      setSubmitting(false);
     }
   }
 
@@ -294,7 +294,7 @@ export default function AdminHeadlinesPage() {
             </button>
             <button
               type="button"
-              onClick={() => handleDelete(row.id)}
+              onClick={() => setDeletingItem(row)}
               className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700 transition hover:bg-rose-100"
             >
               Delete
@@ -341,6 +341,61 @@ export default function AdminHeadlinesPage() {
                   submitting={submitting}
                   submitLabel="Update headline"
                 />
+              </div>
+            </section>
+          </div>
+        </div>
+      ) : null}
+
+      {deletingItem ? (
+        <div className="fixed inset-0 z-[60] overflow-y-auto bg-slate-950/45 px-4 pb-8 pt-20 backdrop-blur-sm sm:pt-24">
+          <div className="mx-auto w-full max-w-2xl">
+            <section className="overflow-hidden rounded-[2rem] border border-rose-200 bg-white shadow-[0_32px_90px_-38px_rgba(15,23,42,0.42)]">
+              <div className="bg-[linear-gradient(135deg,rgba(127,29,29,0.98),rgba(185,28,28,0.95),rgba(254,226,226,0.92))] px-6 py-6 text-white sm:px-8">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="max-w-xl">
+                    <p className="text-sm font-semibold uppercase tracking-[0.24em] text-rose-100">Delete headline</p>
+                    <h2 className="mt-3 text-2xl font-semibold tracking-tight sm:text-3xl">Remove this dashboard headline?</h2>
+                    <p className="mt-3 text-sm leading-7 text-rose-50/90">
+                      This action will permanently remove the scheduled announcement from student, teacher, and parent dashboards.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setDeletingItem(null)}
+                    className="rounded-2xl border border-white/20 bg-white/10 px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/20"
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+
+              <div className="space-y-5 p-6 sm:p-8">
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
+                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Headline preview</p>
+                  <p className="mt-3 whitespace-pre-wrap text-base font-medium text-slate-950">{deletingItem.headline || "-"}</p>
+                  <p className="mt-3 text-sm text-slate-600">
+                    {formatDate(deletingItem.start_date)} to {formatDate(deletingItem.end_date)}
+                  </p>
+                </div>
+
+                <div className="flex flex-wrap justify-end gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setDeletingItem(null)}
+                    className="rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={confirmDelete}
+                    disabled={submitting}
+                    className="rounded-2xl bg-rose-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {submitting ? "Deleting..." : "Delete headline"}
+                  </button>
+                </div>
               </div>
             </section>
           </div>

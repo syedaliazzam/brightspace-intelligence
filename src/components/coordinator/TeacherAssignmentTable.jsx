@@ -10,8 +10,6 @@ function formatDateOnly(value) {
 }
 
 export default function TeacherAssignmentTable({ items = [], onRefresh }) {
-  const visibleItems = items.filter((item) => String(item?.status || "").toLowerCase() !== "suspended");
-
   async function updateStatus(id, status) {
     const response = await fetch(`/api/coordinator/teacher-assignments/${id}`, {
       method: "PATCH",
@@ -37,8 +35,8 @@ export default function TeacherAssignmentTable({ items = [], onRefresh }) {
         <span className="text-right">Action</span>
       </div>
       <div className="divide-y divide-slate-200">
-        {visibleItems.length ? (
-          visibleItems.map((item) => (
+        {items.length ? (
+          items.map((item) => (
             <div key={item.id} className="grid gap-3 px-5 py-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_120px] lg:items-center">
               <p className="text-sm font-semibold text-slate-950">{item.teacher_name}</p>
               <p className="text-sm text-slate-600">{item.course_title || "-"}</p>

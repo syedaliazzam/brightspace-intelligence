@@ -25,6 +25,15 @@ function formatLabel(value) {
     : "-";
 }
 
+function DetailBlock({ label, value }) {
+  return (
+    <div className="rounded-2xl border border-slate-200 bg-white p-4">
+      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{label}</p>
+      <p className="mt-2 text-sm font-semibold text-slate-950">{value || "Not provided"}</p>
+    </div>
+  );
+}
+
 function getCacheKey(filters) {
   const params = new URLSearchParams();
   if (filters.search) params.set("search", filters.search);
@@ -113,6 +122,7 @@ export default function AdminUsersPage() {
     };
   });
   const [modal, setModal] = useState({ open: false, record: null });
+  const [detailModal, setDetailModal] = useState({ open: false, record: null });
   const [confirmState, setConfirmState] = useState({
     open: false,
     record: null,
@@ -512,6 +522,14 @@ export default function AdminUsersPage() {
     }
   }
 
+  function openDetails(record) {
+    setDetailModal({ open: true, record });
+  }
+
+  function closeDetails() {
+    setDetailModal({ open: false, record: null });
+  }
+
   return (
     <div className="space-y-6 min-h-screen">
       <section className="rounded-[2rem] border border-white/70 bg-[linear-gradient(135deg,rgba(255,255,255,0.92),rgba(241,248,255,0.92))] p-6 shadow-[0_24px_80px_-36px_rgba(15,23,42,0.25)] sm:p-8">
@@ -683,6 +701,26 @@ export default function AdminUsersPage() {
                   label: "Class",
                   render: (row) => row.class_level || "-",
                 },
+                {
+                  key: "admission_no",
+                  label: "Admission No",
+                  render: (row) => row.admission_no || "-",
+                },
+                {
+                  key: "age",
+                  label: "Age",
+                  render: (row) => row.age || "-",
+                },
+                {
+                  key: "course_title",
+                  label: "Course",
+                  render: (row) => row.course_title || "-",
+                },
+                {
+                  key: "parent_name",
+                  label: "Parent",
+                  render: (row) => row.parent_name || "-",
+                },
               ]
             : []),
           ...(view === "parents"
@@ -696,6 +734,11 @@ export default function AdminUsersPage() {
                   key: "student_names",
                   label: "Students",
                   render: (row) => row.student_names || "-",
+                },
+                {
+                  key: "parent_status",
+                  label: "Status",
+                  render: (row) => formatLabel(row.status),
                 },
               ]
             : []),
@@ -755,8 +798,15 @@ export default function AdminUsersPage() {
                 Reset password
               </button>
             ) : null}
-          {view !== "staff" ? (
+            {view !== "staff" ? (
               <>
+                <button
+                  type="button"
+                  onClick={() => openDetails(row)}
+                  className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
+                >
+                  View
+                </button>
                 <button
                   type="button"
                   onClick={() => setModal({ open: true, record: row })}
@@ -810,6 +860,77 @@ export default function AdminUsersPage() {
           onClose={() => setModal({ open: false, record: null })}
           onSuccess={() => Promise.all([loadOverview({ force: true }), loadTable({ force: true })])}
         />
+      ) : null}
+
+      {detailModal.open && detailModal.record ? (
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-950/50 px-4 py-10 backdrop-blur-sm">
+          <div className="w-full max-w-5xl rounded-[2rem] border border-white/70 bg-white shadow-[0_30px_90px_-40px_rgba(15,23,42,0.4)]">
+            <div className="flex items-center justify-between border-b border-slate-200 px-6 py-5">
+              <div>
+                <h2 className="text-xl font-semibold text-slate-950">Parent Details</h2>
+                <p className="mt-1 text-sm text-slate-500">{detailModal.record.name || detailModal.record.full_name || "Selected user"}</p>
+              </div>
+              <button
+                type="button"
+                onClick={closeDetails}
+                className="rounded-full border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
+              >
+                Close
+              </button>
+            </div>
+            <div className="max-h-[calc(100vh-10rem)] overflow-y-auto px-6 py-6">
+              <div className="grid gap-6 lg:grid-cols-2">
+                <section className="rounded-[1.5rem] border border-slate-200 bg-slate-50/70 p-5">
+                  <h3 className="text-lg font-semibold text-slate-950">Account</h3>
+                  <div className="mt-4 grid gap-4 sm:grid-cols-2 break-words">
+                    {[
+                      ["Name", detailModal.record.name || detailModal.record.full_name],
+                      ["Email", detailModal.record.email],
+                      ["Phone", detailModal.record.phone],
+                      ["Role", formatLabel(detailModal.record.role)],
+                      ["Status", formatLabel(detailModal.record.status)],
+                    ].map(([label, value]) => (
+                      <div key={label} className="rounded-2xl border border-slate-200 bg-white p-4">
+                        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{label}</p>
+                        <p className="mt-2 text-sm font-semibold text-slate-950">{value || "Not provided"}</p>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+
+                <section className="rounded-[1.5rem] border border-slate-200 bg-slate-50/70 p-5">
+                  <h3 className="text-lg font-semibold text-slate-950">
+                    {detailModal.record.role === "parent" ? "Parent details" : "Student details"}
+                  </h3>
+                  <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                    {detailModal.record.role === "parent"
+                      ? [
+                          ["Relation", detailModal.record.relation],
+                          ["Children", detailModal.record.student_names],
+                        ].map(([label, value]) => (
+                        <DetailBlock key={label} label={label} value={value} />
+                      ))
+                      : [
+                          ["Admission no", detailModal.record.admission_no],
+                          ["Age", detailModal.record.age],
+                          ["Course", detailModal.record.course_title],
+                          ["Program", detailModal.record.program_name],
+                          ["Current school", detailModal.record.current_school],
+                          ["City / country", detailModal.record.city_country],
+                          ["Religion", detailModal.record.religion],
+                          ["Gender", detailModal.record.gender],
+                          ["Preferred language", detailModal.record.preferred_language],
+                          ["Support person", detailModal.record.support_person_during_learning],
+                          ["Device available", detailModal.record.device_available],
+                        ].map(([label, value]) => (
+                        <DetailBlock key={label} label={label} value={value} />
+                      ))}
+                  </div>
+                </section>
+              </div>
+            </div>
+          </div>
+        </div>
       ) : null}
 
       <AdminConfirmDialog

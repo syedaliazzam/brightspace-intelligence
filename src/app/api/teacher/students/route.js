@@ -21,7 +21,7 @@ export async function GET() {
     const where = `WHERE ${conditions.join(" AND ")}`;
     const items = await prisma.$queryRawUnsafe(
       `
-      SELECT DISTINCT
+      SELECT DISTINCT ON (sp.id, sub.id, c.id)
         sp.id::text AS id,
         su.full_name,
         su.username,
@@ -40,7 +40,7 @@ export async function GET() {
       INNER JOIN users su ON su.id = sp.user_id
       INNER JOIN subjects sub ON sub.id = ta.subject_id
       ${where}
-      ORDER BY su.full_name ASC, sub.name ASC, COALESCE(NULLIF(c.class_level, ''), c.title) ASC
+      ORDER BY sp.id ASC, sub.id ASC, c.id ASC, su.full_name ASC, sub.name ASC, COALESCE(NULLIF(c.class_level, ''), c.title) ASC
       `,
       ...values
     );

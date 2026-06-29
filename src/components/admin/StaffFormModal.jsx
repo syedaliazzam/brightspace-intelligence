@@ -34,6 +34,9 @@ function getInitialState(record) {
     phone: record?.phone || "",
     relation: record?.relation || "",
     studentNames: record?.student_names || "",
+    admissionNo: record?.admission_no || "",
+    gradeLevel: record?.class_level || "",
+    age: record?.age || "",
     role: record?.role || "coordinator",
     status: record?.status || "active",
     password: "",
@@ -52,6 +55,7 @@ export default function StaffFormModal({
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
   const isParentEdit = mode === "edit" && form.role === "parent";
+  const isStudentEdit = mode === "edit" && form.role === "student";
 
   function updateField(name, value) {
     setForm((current) => ({ ...current, [name]: value }));
@@ -77,6 +81,9 @@ export default function StaffFormModal({
               email: form.email,
               phone: form.phone,
               relation: form.relation,
+              admissionNo: form.admissionNo,
+              gradeLevel: form.gradeLevel,
+              age: form.age,
               role: form.role,
               status: form.status,
             }
@@ -199,6 +206,46 @@ export default function StaffFormModal({
                       ))}
                     </select>
                   </label>
+                ) : null}
+
+                {isStudentEdit ? (
+                  <>
+                    <label className="block">
+                      <span className="mb-2 block text-sm font-medium text-slate-700">
+                        Admission number
+                      </span>
+                      <input
+                        type="text"
+                        value={form.admissionNo}
+                        onChange={(event) => updateField("admissionNo", event.target.value)}
+                        className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-950 outline-none transition focus:border-sky-400 focus:bg-white focus:ring-4 focus:ring-sky-100"
+                      />
+                    </label>
+                    <label className="block">
+                      <span className="mb-2 block text-sm font-medium text-slate-700">
+                        Class
+                      </span>
+                      <input
+                        type="text"
+                        value={form.gradeLevel}
+                        onChange={(event) => updateField("gradeLevel", event.target.value)}
+                        className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-950 outline-none transition focus:border-sky-400 focus:bg-white focus:ring-4 focus:ring-sky-100"
+                      />
+                    </label>
+                    <label className="block">
+                      <span className="mb-2 block text-sm font-medium text-slate-700">
+                        Age
+                      </span>
+                      <input
+                        type="number"
+                        min="1"
+                        max="100"
+                        value={form.age}
+                        onChange={(event) => updateField("age", event.target.value)}
+                        className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-950 outline-none transition focus:border-sky-400 focus:bg-white focus:ring-4 focus:ring-sky-100"
+                      />
+                    </label>
+                  </>
                 ) : null}
 
                 {!isParentEdit ? (

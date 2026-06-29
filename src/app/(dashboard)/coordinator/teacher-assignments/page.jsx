@@ -26,8 +26,10 @@ export default function CoordinatorTeacherAssignmentsPage() {
       throw new Error(data?.message || "Unable to load teacher assignments.");
     }
 
+    const items = (data.items || []).filter((item) => String(item?.status || "").toLowerCase() !== "suspended");
+
     setState({
-      items: data.items || [],
+      items,
       teachers: data.teachers || [],
       students: data.students || [],
       courses: data.courses || [],
@@ -39,9 +41,15 @@ export default function CoordinatorTeacherAssignmentsPage() {
   }, []);
 
   useEffect(() => {
-    load().catch((error) =>
-      setState((current) => ({ ...current, loading: false, error: error.message }))
-    );
+    async function initialize() {
+      try {
+        await load();
+      } catch (error) {
+        setState((current) => ({ ...current, loading: false, error: error.message }));
+      }
+    }
+
+    initialize();
   }, [load]);
 
   return (
@@ -58,8 +66,8 @@ export default function CoordinatorTeacherAssignmentsPage() {
       {state.loading ? <div className="rounded-2xl bg-white p-5 text-sm text-slate-500">Loading assignments...</div> : null}
       <ShowMoreSection
         items={state.items}
-        initialCount={10}
-        step={10}
+        initialCount={7}
+        step={7}
         renderItems={(visibleItems) => <TeacherAssignmentTable items={visibleItems} onRefresh={load} />}
         emptyMessage="No teacher assignments available."
       />

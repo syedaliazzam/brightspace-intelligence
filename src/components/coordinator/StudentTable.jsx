@@ -193,7 +193,7 @@ export default function StudentTable({ items = [], onRefresh }) {
 
                 <section className="rounded-[1.5rem] border border-slate-200 bg-slate-50/70 p-5">
                   <h3 className="text-lg font-semibold text-slate-950">Parent link</h3>
-                  <dl className="mt-4 grid gap-4 sm:grid-cols-2">
+                  <dl className="mt-4 grid gap-4 sm:grid-cols-2 break-words">
                     <DetailRow label="Parent name" value={detailItem.parent_name} />
                     <DetailRow label="Relation" value={detailItem.parent_relation} />
                     <DetailRow label="Parent phone" value={detailItem.parent_phone} />
@@ -215,7 +215,7 @@ export default function StudentTable({ items = [], onRefresh }) {
                     <DetailRow label="Admission email" value={detailItem.lead_email} />
                     <DetailRow label="Admission phone" value={detailItem.lead_phone} />
                     <DetailRow label="Registration lead id" value={detailItem.registration_lead_id} />
-                  </dl>
+                  </dl> 
                 </section>
               </div>
             </div>

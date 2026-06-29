@@ -119,40 +119,6 @@ export default function StudentDashboardPage() {
   }, []);
 
   const profile = state.profile || {};
-  const [editProfileOpen, setEditProfileOpen] = useState(false);
-  const [editForm, setEditForm] = useState({
-    fullName: "",
-    phone: "",
-    password: "",
-  });
-  const [editError, setEditError] = useState("");
-  const [editPending, setEditPending] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
-
-  async function handleEditProfileSubmit(event) {
-    event.preventDefault();
-    setEditError("");
-    setEditPending(true);
-
-    try {
-      const response = await fetch("/api/student/profile", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(editForm),
-      });
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data?.message || "Unable to update profile.");
-      }
-      setState((current) => ({ ...current, profile: data.profile || current.profile }));
-      setEditProfileOpen(false);
-      setEditForm((current) => ({ ...current, password: "" }));
-    } catch (error) {
-      setEditError(error instanceof Error ? error.message : "Unable to update profile.");
-    } finally {
-      setEditPending(false);
-    }
-  }
 
   return (
     <PaymentAccessGuard>
@@ -215,126 +181,25 @@ export default function StudentDashboardPage() {
       </motion.section>
 
       <motion.section id="profile" className="scroll-mt-28 rounded-[2rem] border border-white/70 bg-white/90 p-5 shadow-[0_20px_70px_-36px_rgba(15,23,42,0.25)]">
-        <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-          <div>
-            <p className="text-sm font-semibold uppercase tracking-[0.22em] text-sky-700">Profile</p>
-            <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">Student details</h2>
-          </div>
-          <button
-            type="button"
-            onClick={() => {
-              setEditForm({
-                fullName: profile.full_name || "",
-                phone: profile.phone || "",
-                password: "",
-              });
-              setEditProfileOpen(true);
-            }}
-            className="inline-flex items-center rounded-full border border-slate-200 bg-slate-100 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-200"
-          >
-            Edit profile
-          </button>
+        <div className="mb-5">
+          <p className="text-sm font-semibold uppercase tracking-[0.22em] text-sky-700">Profile</p>
+          <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">Student details</h2>
         </div>
-        <div className="grid gap-3 text-sm text-slate-600 sm:grid-cols-2">
+        <div className="grid gap-3 text-sm text-slate-600 sm:grid-cols-2 lg:grid-cols-3">
           <p><strong>Name:</strong> {profile.full_name || "Not available"}</p>
           <p><strong>Username:</strong> {profile.username || "Not available"}</p>
+          <p><strong>Email:</strong> {profile.email || "Not available"}</p>
           <p><strong>Phone:</strong> {profile.phone || "Not available"}</p>
           <p><strong>Admission:</strong> {profile.admission_no || "Not assigned"}</p>
+          <p><strong>Age:</strong> {profile.age || "Not assigned"}</p>
           <p><strong>Class:</strong> {profile.grade_level || "Not assigned"}</p>
+          <p><strong>Course:</strong> {profile.course_title || "Not assigned"}</p>
+          <p><strong>Status:</strong> {profile.profile_status || profile.user_status || "Not available"}</p>
           <p><strong>Father name:</strong> {profile.father_name || "Not assigned"}</p>
           <p><strong>Father phone:</strong> {profile.father_phone || "Not assigned"}</p>
+          <p><strong>Father email:</strong> {profile.father_email || "Not assigned"}</p>
         </div>
       </motion.section>
-
-      {editProfileOpen ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 px-4 py-8">
-          <div className="w-full max-w-xl rounded-[2rem] border border-white/70 bg-white p-6 shadow-[0_24px_80px_-36px_rgba(15,23,42,0.32)] sm:p-8">
-            <div className="flex items-center justify-between gap-4">
-              <div>
-                <p className="text-sm font-semibold uppercase tracking-[0.24em] text-sky-700">Edit profile</p>
-                <h2 className="mt-3 text-2xl font-semibold tracking-tight text-slate-950">Update your student account</h2>
-              </div>
-              <button
-                type="button"
-                onClick={() => setEditProfileOpen(false)}
-                className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
-              >
-                Close
-              </button>
-            </div>
-
-            <form autoComplete="off" className="mt-6 grid gap-4" onSubmit={handleEditProfileSubmit}>
-              <label className="block">
-                <span className="mb-2 block text-sm font-medium text-slate-700">Full name</span>
-                <input
-                  type="text"
-                  name="fullName"
-                  autoComplete="name"
-                  value={editForm.fullName}
-                  onChange={(event) => setEditForm((current) => ({ ...current, fullName: event.target.value }))}
-                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-950 outline-none transition focus:border-sky-400 focus:bg-white focus:ring-4 focus:ring-sky-100"
-                  required
-                />
-              </label>
-
-              <label className="block">
-                <span className="mb-2 block text-sm font-medium text-slate-700">Phone</span>
-                <input
-                  type="text"
-                  name="phone"
-                  autoComplete="tel"
-                  value={editForm.phone}
-                  onChange={(event) => setEditForm((current) => ({ ...current, phone: event.target.value }))}
-                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-950 outline-none transition focus:border-sky-400 focus:bg-white focus:ring-4 focus:ring-sky-100"
-                />
-              </label>
-
-              <label className="block">
-                <span className="mb-2 block text-sm font-medium text-slate-700">New password</span>
-                <div className="relative">
-                  <input
-                    type={showPassword ? "text" : "password"}
-                    name="new-password"
-                    autoComplete="new-password"
-                    value={editForm.password}
-                    onChange={(event) => setEditForm((current) => ({ ...current, password: event.target.value }))}
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 pr-12 text-sm text-slate-950 outline-none transition focus:border-sky-400 focus:bg-white focus:ring-4 focus:ring-sky-100"
-                    minLength={6}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword((current) => !current)}
-                    className="absolute inset-y-0 right-3 flex items-center text-slate-500"
-                  >
-                    {showPassword ? "Hide" : "Show"}
-                  </button>
-                </div>
-              </label>
-
-              {editError ? (
-                <div className="rounded-2xl bg-rose-50 px-4 py-3 text-sm text-rose-700">{editError}</div>
-              ) : null}
-
-              <div className="flex flex-wrap justify-end gap-3">
-                <button
-                  type="button"
-                  onClick={() => setEditProfileOpen(false)}
-                  className="rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={editPending}
-                  className="rounded-2xl bg-slate-950 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  {editPending ? "Saving..." : "Save changes"}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      ) : null}
       </div>
     </PaymentAccessGuard>
   );

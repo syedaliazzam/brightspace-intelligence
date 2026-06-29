@@ -161,7 +161,7 @@ function LeadDetailsModal({ lead, onClose, onCreateVoucher }) {
 
             <section className="rounded-[1.5rem] border border-slate-200 bg-slate-50/70 p-5">
               <h3 className="text-lg font-semibold text-slate-950">Contact summary</h3>
-              <dl className="mt-4 grid gap-4 sm:grid-cols-2">
+              <dl className="mt-4 grid gap-4 sm:grid-cols-2 break-words">
                 <DetailRow label="Parent name" value={lead.parent_name} />
                 <DetailRow label="Relation" value={lead.parent_relation} />
                 <DetailRow label="Email" value={lead.email} />
@@ -175,7 +175,7 @@ function LeadDetailsModal({ lead, onClose, onCreateVoucher }) {
 
             <section className="rounded-[1.5rem] border border-slate-200 bg-slate-50/70 p-5">
               <h3 className="text-lg font-semibold text-slate-950">Father details</h3>
-              <dl className="mt-4 grid gap-4 sm:grid-cols-2">
+              <dl className="mt-4 grid gap-4 sm:grid-cols-2 break-words">
                 <DetailRow label="Name English" value={lead.father_name_english} />
                 <DetailRow label="Name Urdu" value={lead.father_name_urdu} />
                 <DetailRow label="CNIC" value={lead.father_cnic} />
@@ -193,7 +193,7 @@ function LeadDetailsModal({ lead, onClose, onCreateVoucher }) {
 
             <section className="rounded-[1.5rem] border border-slate-200 bg-slate-50/70 p-5">
               <h3 className="text-lg font-semibold text-slate-950">Mother details</h3>
-              <dl className="mt-4 grid gap-4 sm:grid-cols-2">
+              <dl className="mt-4 grid gap-4 sm:grid-cols-2 break-words">
                 <DetailRow label="Name English" value={lead.mother_name_english} />
                 <DetailRow label="Name Urdu" value={lead.mother_name_urdu} />
                 <DetailRow label="CNIC" value={lead.mother_cnic} />

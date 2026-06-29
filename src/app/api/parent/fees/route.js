@@ -39,8 +39,22 @@ export async function GET(request) {
       FROM student_profiles sp
       INNER JOIN users su ON su.id = sp.user_id
       ${joins}
-      LEFT JOIN registration_leads rl ON LOWER(rl.student_name) = LOWER(su.full_name)
-      LEFT JOIN fee_vouchers fv ON fv.student_id = sp.id OR (fv.student_id IS NULL AND fv.registration_id = rl.id)
+      LEFT JOIN LATERAL (
+        SELECT
+          fv_inner.id,
+          fv_inner.voucher_no,
+          fv_inner.amount,
+          fv_inner.due_date,
+          fv_inner.payment_method,
+          fv_inner.status,
+          fv_inner.created_at
+        FROM fee_vouchers fv_inner
+        LEFT JOIN registration_leads rl_inner ON LOWER(rl_inner.student_name) = LOWER(su.full_name)
+        WHERE fv_inner.student_id = sp.id
+           OR (fv_inner.student_id IS NULL AND fv_inner.registration_id = rl_inner.id)
+        ORDER BY fv_inner.created_at DESC NULLS LAST, fv_inner.id DESC
+        LIMIT 1
+      ) fv ON TRUE
       LEFT JOIN LATERAL (
         SELECT fs.status, fs.transaction_id, fs.paid_amount, fs.paid_at, fs.proof_file_path
         FROM fee_submissions fs

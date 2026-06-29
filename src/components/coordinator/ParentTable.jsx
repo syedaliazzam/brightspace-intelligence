@@ -156,7 +156,7 @@ export default function ParentTable({ items = [], onRefresh }) {
               <div className="grid gap-6 lg:grid-cols-2">
                 <section className="rounded-[1.5rem] border border-slate-200 bg-slate-50/70 p-5">
                   <h3 className="text-lg font-semibold text-slate-950">Parent profile</h3>
-                  <dl className="mt-4 grid gap-4 sm:grid-cols-2">
+                  <dl className="mt-4 grid gap-4 sm:grid-cols-2 break-words">
                     <DetailRow label="Parent name" value={detailItem.full_name} />
                     <DetailRow label="Relation" value={detailItem.relation} />
                     <DetailRow label="Email" value={detailItem.email} />

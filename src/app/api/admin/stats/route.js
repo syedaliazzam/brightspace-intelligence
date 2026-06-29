@@ -6,6 +6,53 @@ function json(message, status = 200, extra = {}) {
   return NextResponse.json({ message, ...extra }, { status });
 }
 
+function isDatabaseConnectionError(error) {
+  const message = error instanceof Error ? error.message : String(error || "");
+  return (
+    message.includes("Can't reach database server") ||
+    message.includes("pooler.supabase.com") ||
+    message.includes("ECONNREFUSED") ||
+    message.includes("ETIMEDOUT") ||
+    message.includes("P1001")
+  );
+}
+
+function emptyAdminStats() {
+  return {
+    overview: {
+      totalUsers: 0,
+      activeUsers: 0,
+      suspendedUsers: 0,
+      totalStudents: 0,
+      totalParents: 0,
+      totalTeachers: 0,
+      totalCoordinators: 0,
+      totalRegistrationLeads: 0,
+      newRegistrationLeads: 0,
+      totalFeeVouchers: 0,
+      totalFeeSubmissions: 0,
+    },
+    roles: [],
+    system: {
+      subjectsEnabled: false,
+      coursesEnabled: false,
+      feeSettingsEnabled: false,
+      schedulesEnabled: false,
+      auditLogsEnabled: false,
+      subjectCount: 0,
+      courseCount: 0,
+      feeSettingCount: 0,
+      lectureScheduleCount: 0,
+    },
+    recent: {
+      registrationLeads: [],
+      feeVouchers: [],
+      feeSubmissions: [],
+      auditLogs: [],
+    },
+  };
+}
+
 async function requireAdminSession() {
   const session = await auth();
   const role = String(session?.user?.role || "").toLowerCase();
@@ -58,6 +105,17 @@ export async function GET() {
   }
 
   try {
+    const runOrEmpty = async (fn, fallback) => {
+      try {
+        return await fn();
+      } catch (error) {
+        if (isDatabaseConnectionError(error)) {
+          return fallback;
+        }
+        throw error;
+      }
+    };
+
     const [
       usersTableExists,
       rolesTableExists,
@@ -70,21 +128,23 @@ export async function GET() {
       auditLogsExists,
       feeSettingsExists,
     ] = await Promise.all([
-      tableExists("users"),
-      tableExists("roles"),
-      tableExists("registration_leads"),
-      tableExists("fee_vouchers"),
-      tableExists("fee_submissions"),
-      tableExists("subjects"),
-      tableExists("courses"),
-      tableExists("lecture_schedules"),
-      tableExists("audit_logs"),
-      tableExists("fee_settings"),
+      runOrEmpty(() => tableExists("users"), false),
+      runOrEmpty(() => tableExists("roles"), false),
+      runOrEmpty(() => tableExists("registration_leads"), false),
+      runOrEmpty(() => tableExists("fee_vouchers"), false),
+      runOrEmpty(() => tableExists("fee_submissions"), false),
+      runOrEmpty(() => tableExists("subjects"), false),
+      runOrEmpty(() => tableExists("courses"), false),
+      runOrEmpty(() => tableExists("lecture_schedules"), false),
+      runOrEmpty(() => tableExists("audit_logs"), false),
+      runOrEmpty(() => tableExists("fee_settings"), false),
     ]);
 
     const roleBreakdown =
       usersTableExists && rolesTableExists
-        ? await prisma.$queryRaw`
+        ? await runOrEmpty(
+            () =>
+              prisma.$queryRaw`
             SELECT
               LOWER(r.name) AS role,
               COUNT(*)::int AS total,
@@ -93,13 +153,17 @@ export async function GET() {
             INNER JOIN roles r ON r.id = u.role_id
             GROUP BY LOWER(r.name)
             ORDER BY LOWER(r.name)
-          `
+          `,
+            []
+          )
         : [];
 
     // FIXED: database schema ke exact format ke sath sync kiya
     const recentLeads =
       registrationLeadsExists
-        ? await prisma.$queryRaw`
+        ? await runOrEmpty(
+            () =>
+              prisma.$queryRaw`
             SELECT
               id::text AS id,
               student_name,
@@ -111,13 +175,17 @@ export async function GET() {
             FROM registration_leads
             ORDER BY created_at DESC NULLS LAST, id DESC
             LIMIT 6
-          `
+          `,
+            []
+          )
         : [];
 
     // FIXED: registration_lead_id -> registration_id column match
     const recentVouchers =
       feeVouchersExists && registrationLeadsExists
-        ? await prisma.$queryRaw`
+        ? await runOrEmpty(
+            () =>
+              prisma.$queryRaw`
             SELECT
               fv.id::text AS id,
               fv.voucher_no,
@@ -128,13 +196,17 @@ export async function GET() {
             INNER JOIN registration_leads rl ON rl.id = fv.registration_id
             ORDER BY fv.created_at DESC NULLS LAST, fv.id DESC
             LIMIT 6
-          `
+          `,
+            []
+          )
         : [];
 
     // FIXED: fee_voucher_id -> voucher_id aur foreign relation map parameters correct kiya
     const recentSubmissions =
       feeSubmissionsExists && feeVouchersExists && registrationLeadsExists
-        ? await prisma.$queryRaw`
+        ? await runOrEmpty(
+            () =>
+              prisma.$queryRaw`
             SELECT
               fs.id::text AS id,
               fs.transaction_id,
@@ -147,12 +219,16 @@ export async function GET() {
             INNER JOIN registration_leads rl ON rl.id = fv.registration_id
             ORDER BY fs.created_at DESC NULLS LAST, fs.id DESC
             LIMIT 6
-          `
+          `,
+            []
+          )
         : [];
 
     const recentAuditLogs =
       auditLogsExists
-        ? await prisma.$queryRaw`
+        ? await runOrEmpty(
+            () =>
+              prisma.$queryRaw`
             SELECT
               id::text AS id,
               action,
@@ -161,7 +237,9 @@ export async function GET() {
             FROM audit_logs
             ORDER BY created_at DESC NULLS LAST, id DESC
             LIMIT 6
-          `
+          `,
+            []
+          )
         : [];
 
     const [
@@ -238,6 +316,9 @@ export async function GET() {
       },
     });
   } catch (error) {
+    if (isDatabaseConnectionError(error)) {
+      return json("Database is temporarily unavailable.", 503, emptyAdminStats());
+    }
     return json(
       error instanceof Error ? error.message : "Unable to fetch admin stats.",
       500
