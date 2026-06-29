@@ -65,17 +65,55 @@ export async function GET(request) {
         u.email,
         u.phone,
         u.status::text AS status,
+        pp.created_at,
         CASE
           WHEN LOWER(COALESCE(pp.relation, '')) IN ('', 'parent')
             THEN COALESCE(NULLIF(latest_registration.parent_relation, ''), COALESCE(pp.relation, ''))
           ELSE COALESCE(pp.relation, '')
         END AS relation,
-        STRING_AGG(su.full_name, ', ' ORDER BY su.full_name) AS student_names
+        STRING_AGG(su.full_name, ', ' ORDER BY su.full_name) AS student_names,
+        COALESCE(
+          STRING_AGG(DISTINCT NULLIF(c.title, ''), ', ' ORDER BY NULLIF(c.title, '')),
+          ''
+        ) AS course_titles,
+        COALESCE(
+          STRING_AGG(DISTINCT NULLIF(rl.class_level, ''), ', ' ORDER BY NULLIF(rl.class_level, '')),
+          ''
+        ) AS class_levels,
+        COALESCE(
+          STRING_AGG(
+            DISTINCT NULLIF(
+              CASE
+                WHEN LOWER(COALESCE(pp.relation, '')) IN ('', 'parent')
+                  THEN COALESCE(NULLIF(rl.parent_relation, ''), COALESCE(pp.relation, ''))
+                ELSE COALESCE(pp.relation, '')
+              END,
+              ''
+            ),
+            ', '
+            ORDER BY NULLIF(
+              CASE
+                WHEN LOWER(COALESCE(pp.relation, '')) IN ('', 'parent')
+                  THEN COALESCE(NULLIF(rl.parent_relation, ''), COALESCE(pp.relation, ''))
+                ELSE COALESCE(pp.relation, '')
+              END,
+              ''
+            )
+          ),
+          ''
+        ) AS student_relations,
+        COALESCE(MAX(rl.city_country), '') AS city_country,
+        COALESCE(MAX(rl.father_name_english), '') AS father_name_english,
+        COALESCE(MAX(rl.mother_name_english), '') AS mother_name_english,
+        COALESCE(MAX(rl.preferred_contact_person), '') AS preferred_contact_person
       FROM parent_profiles pp
       INNER JOIN users u ON u.id = pp.user_id
       LEFT JOIN student_parents spp ON spp.parent_id = pp.id
       LEFT JOIN student_profiles sp ON sp.id = spp.student_id
       LEFT JOIN users su ON su.id = sp.user_id
+      LEFT JOIN enrollments e ON e.student_id = sp.id AND LOWER(e.status) = 'active'
+      LEFT JOIN courses c ON c.id = e.course_id
+      LEFT JOIN registration_leads rl ON rl.id = e.registration_id
       LEFT JOIN LATERAL (
         SELECT rl.parent_relation
         FROM student_parents spp_latest

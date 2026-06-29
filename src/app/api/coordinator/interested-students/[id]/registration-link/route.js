@@ -36,7 +36,7 @@ export async function POST(request, { params }) {
       process.env.NEXT_PUBLIC_APP_URL ||
       process.env.APP_URL ||
       request.nextUrl.origin;
-    const registrationLink = `${appUrl.replace(/\/+$/, "")}/registration?leadToken=${encodeURIComponent(token)}`;
+    const registrationLink = `${appUrl.replace(/\/+$/, "")}/admission-form?leadToken=${encodeURIComponent(token)}`;
     const generatedAt = new Date();
     const generatedBy = session?.user?.id || null;
     const alreadyGenerated = Boolean(row.registration_token);

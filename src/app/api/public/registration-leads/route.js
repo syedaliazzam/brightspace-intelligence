@@ -1,14 +1,20 @@
+import crypto from "crypto";
 import { NextResponse } from "next/server";
 import { normalizeClassLevel } from "@/lib/academicCatalog";
 import { sendEmail } from "@/lib/email";
 import prisma from "@/lib/prisma";
+import { uploadAdmissionDocument } from "@/lib/supabaseStorage";
 
-function json(success, message, status) {
-  return NextResponse.json({ success, message }, { status });
+function json(success, message, status, extra = {}) {
+  return NextResponse.json({ success, message, ...extra }, { status });
 }
 
 function normalizeText(value) {
   return typeof value === "string" ? value.trim() : "";
+}
+
+function normalizeEmail(value) {
+  return normalizeText(value).toLowerCase();
 }
 
 function isValidEmail(value) {
@@ -16,63 +22,315 @@ function isValidEmail(value) {
 }
 
 function normalizeDate(value) {
-  return typeof value === "string" ? value.trim() : "";
+  const trimmed = normalizeText(value);
+  if (!trimmed) return "";
+
+  const date = new Date(trimmed);
+  if (Number.isNaN(date.getTime())) return "";
+
+  return trimmed;
+}
+
+function calculateAgeFromDate(dateValue) {
+  if (!dateValue) return null;
+
+  const dateOfBirth = new Date(dateValue);
+  if (Number.isNaN(dateOfBirth.getTime())) return null;
+
+  const today = new Date();
+  let age = today.getFullYear() - dateOfBirth.getFullYear();
+  const monthDifference = today.getMonth() - dateOfBirth.getMonth();
+
+  if (
+    monthDifference < 0 ||
+    (monthDifference === 0 && today.getDate() < dateOfBirth.getDate())
+  ) {
+    age -= 1;
+  }
+
+  return age >= 0 ? age : 0;
+}
+
+function normalizeBoolean(value) {
+  const normalized = normalizeText(value).toLowerCase();
+  if (["yes", "true", "1"].includes(normalized)) return true;
+  if (["no", "false", "0"].includes(normalized)) return false;
+  return null;
+}
+
+function getOptionalFile(formData, key) {
+  const file = formData.get(key);
+  return file instanceof File && file.size > 0 ? file : null;
+}
+
+function buildParentSummary({
+  preferredContactPerson,
+  fatherNameEnglish,
+  fatherEmail,
+  fatherWhatsapp,
+  fatherEmergency,
+  fatherOffice,
+  fatherHome,
+  motherNameEnglish,
+  motherEmail,
+  motherWhatsapp,
+  motherEmergency,
+  motherOffice,
+  motherHome,
+}) {
+  const normalizedContact = normalizeText(preferredContactPerson).toLowerCase();
+  const useMother = normalizedContact === "mother";
+
+  const parentName = useMother
+    ? motherNameEnglish || fatherNameEnglish
+    : fatherNameEnglish || motherNameEnglish;
+  const parentRelation = useMother ? "Mother" : "Father";
+  const parentEmail = useMother
+    ? motherEmail || fatherEmail
+    : fatherEmail || motherEmail;
+  const parentPhone = useMother
+    ? motherWhatsapp || motherEmergency || motherOffice || motherHome || fatherWhatsapp || fatherEmergency
+    : fatherWhatsapp || fatherEmergency || fatherOffice || fatherHome || motherWhatsapp || motherEmergency;
+
+  return {
+    parentName,
+    parentRelation,
+    parentEmail,
+    parentPhone,
+  };
+}
+
+async function fetchInterestedStudentByToken(leadToken) {
+  if (!leadToken) {
+    return null;
+  }
+
+  const [linkedLead] = await prisma.$queryRaw`
+    SELECT
+      id::text AS id,
+      student_name,
+      parent_name,
+      email,
+      phone,
+      LOWER(status::text) AS status,
+      registration_lead_id::text AS registration_lead_id
+    FROM interested_students
+    WHERE registration_token = ${leadToken}
+    LIMIT 1
+  `;
+
+  return linkedLead || null;
+}
+
+async function uploadAdmissionFiles(applicationId, files) {
+  const uploads = {};
+
+  if (files.birthCertificateFile) {
+    const upload = await uploadAdmissionDocument({
+      applicationId,
+      documentType: "birth_certificate",
+      file: files.birthCertificateFile,
+    });
+    uploads.birthCertificatePath = upload.storedPath;
+  }
+
+  if (files.parentCnicFile) {
+    const upload = await uploadAdmissionDocument({
+      applicationId,
+      documentType: "parent_cnic",
+      file: files.parentCnicFile,
+    });
+    uploads.parentCnicPath = upload.storedPath;
+  }
+
+  if (files.childPhotographFile) {
+    const upload = await uploadAdmissionDocument({
+      applicationId,
+      documentType: "child_photograph",
+      file: files.childPhotographFile,
+    });
+    uploads.childPhotographPath = upload.storedPath;
+  }
+
+  if (files.previousSchoolReportFile) {
+    const upload = await uploadAdmissionDocument({
+      applicationId,
+      documentType: "previous_school_report",
+      file: files.previousSchoolReportFile,
+    });
+    uploads.previousSchoolReportPath = upload.storedPath;
+  }
+
+  if (files.medicalReportFile) {
+    const upload = await uploadAdmissionDocument({
+      applicationId,
+      documentType: "medical_report",
+      file: files.medicalReportFile,
+    });
+    uploads.medicalReportPath = upload.storedPath;
+  }
+
+  return uploads;
 }
 
 export async function POST(request) {
   try {
-    const body = await request.json();
-    const studentName = normalizeText(body?.student_name);
-    const parentName = normalizeText(body?.parent_name);
-    const parentRelation = normalizeText(body?.parent_relation);
-    const email = normalizeText(body?.email).toLowerCase();
-    const phone = normalizeText(body?.phone);
-    const cityCountry = normalizeText(body?.city_country);
-    const gender = normalizeText(body?.gender);
-    const dateOfBirth = normalizeDate(body?.date_of_birth);
-    const currentSchool = normalizeText(body?.current_school);
-    const age = Number(normalizeText(body?.age));
-    const requestedClassLevel = normalizeText(body?.class_level);
-    const normalizedClassLevel = normalizeClassLevel(body?.class_level);
-    const classLevel = normalizedClassLevel || requestedClassLevel;
-    const applyingForOther = normalizeText(body?.applying_for_other);
-    const interestReason = normalizeText(body?.interest_reason);
-    const hearAboutSource = normalizeText(body?.hear_about_source);
-    const hearAboutOther = normalizeText(body?.hear_about_other);
-    const notes = normalizeText(body?.notes);
-    const leadToken = normalizeText(body?.leadToken);
+    const formData = await request.formData();
+    const applicationId = crypto.randomUUID();
+    const leadToken = normalizeText(formData.get("leadToken"));
+    const programName = normalizeText(formData.get("program_name")) || "Early Childhood Education (Parent Partnership Model)";
+    const requestedClassLevel = normalizeText(formData.get("class_level"));
+    const classLevel = normalizeClassLevel(requestedClassLevel) || requestedClassLevel;
+    const preferredStartingMonth = normalizeText(formData.get("preferred_starting_month"));
+    const preferredStartingMonthOther = normalizeText(formData.get("preferred_starting_month_other"));
+    const studentName = normalizeText(formData.get("student_name"));
+    const studentNameUrdu = normalizeText(formData.get("student_name_urdu"));
+    const gender = normalizeText(formData.get("gender"));
+    const dateOfBirth = normalizeDate(formData.get("date_of_birth"));
+    const age = calculateAgeFromDate(dateOfBirth);
+    const country = normalizeText(formData.get("country"));
+    const city = normalizeText(formData.get("city"));
+    const nationality = normalizeText(formData.get("nationality"));
+    const religion = normalizeText(formData.get("religion"));
+    const preferredLanguage = normalizeText(formData.get("preferred_language"));
+    const currentSchool = normalizeText(formData.get("current_school"));
+    const currentGrade = normalizeText(formData.get("current_grade"));
+    const shiftReason = normalizeText(formData.get("shift_reason"));
+    const attendedOnlineClasses = normalizeBoolean(formData.get("attended_online_classes"));
+    const childProfile = normalizeText(formData.get("child_profile"));
+    const childStrengths = normalizeText(formData.get("child_strengths"));
+    const childSupportNeeds = normalizeText(formData.get("child_support_needs"));
+    const childSpecialInterests = normalizeText(formData.get("child_special_interests"));
+    const developmentalConcern = normalizeBoolean(formData.get("developmental_concern"));
+    const developmentalConcernDetails = normalizeText(formData.get("developmental_concern_details"));
+    const medicalConditions = normalizeText(formData.get("medical_conditions"));
+    const fatherNameEnglish = normalizeText(formData.get("father_name_english"));
+    const fatherNameUrdu = normalizeText(formData.get("father_name_urdu"));
+    const fatherCnic = normalizeText(formData.get("father_cnic"));
+    const fatherQualification = normalizeText(formData.get("father_qualification"));
+    const fatherOccupation = normalizeText(formData.get("father_occupation"));
+    const fatherMotherTongue = normalizeText(formData.get("father_mother_tongue"));
+    const fatherContactHome = normalizeText(formData.get("father_contact_home"));
+    const fatherContactOffice = normalizeText(formData.get("father_contact_office"));
+    const fatherContactWhatsapp = normalizeText(formData.get("father_contact_whatsapp"));
+    const fatherEmergencyContact = normalizeText(formData.get("father_emergency_contact"));
+    const fatherEmail = normalizeEmail(formData.get("father_email"));
+    const fatherResidentialAddress = normalizeText(formData.get("father_residential_address"));
+    const motherNameEnglish = normalizeText(formData.get("mother_name_english"));
+    const motherNameUrdu = normalizeText(formData.get("mother_name_urdu"));
+    const motherCnic = normalizeText(formData.get("mother_cnic"));
+    const motherQualification = normalizeText(formData.get("mother_qualification"));
+    const motherOccupation = normalizeText(formData.get("mother_occupation"));
+    const motherMotherTongue = normalizeText(formData.get("mother_mother_tongue"));
+    const motherContactHome = normalizeText(formData.get("mother_contact_home"));
+    const motherContactOffice = normalizeText(formData.get("mother_contact_office"));
+    const motherContactWhatsapp = normalizeText(formData.get("mother_contact_whatsapp"));
+    const motherEmergencyContact = normalizeText(formData.get("mother_emergency_contact"));
+    const motherEmail = normalizeEmail(formData.get("mother_email"));
+    const motherResidentialAddress = normalizeText(formData.get("mother_residential_address"));
+    const preferredContactPerson = normalizeText(formData.get("preferred_contact_person"));
+    const deviceAvailable = normalizeText(formData.get("device_available"));
+    const supportPersonDuringLearning = normalizeText(formData.get("support_person_during_learning"));
+    const whyJoinSchool = normalizeText(formData.get("why_join_school"));
+    const schoolExpectations = normalizeText(formData.get("school_expectations"));
+    const declarationAccepted = normalizeBoolean(formData.get("declaration_accepted")) === true;
 
-    if (!studentName) return json(false, "Student name is required.", 400);
-    if (!parentName) return json(false, "Parent name is required.", 400);
-    if (!parentRelation) return json(false, "Parent relation is required.", 400);
-    if (email && !isValidEmail(email)) return json(false, "Please enter a valid email address.", 400);
-    if (!phone) return json(false, "Phone is required.", 400);
-    if (!cityCountry) return json(false, "City and country are required.", 400);
+    const files = {
+      birthCertificateFile: getOptionalFile(formData, "birth_certificate_file"),
+      parentCnicFile: getOptionalFile(formData, "parent_cnic_file"),
+      childPhotographFile: getOptionalFile(formData, "child_photograph_file"),
+      previousSchoolReportFile: getOptionalFile(formData, "previous_school_report_file"),
+      medicalReportFile: getOptionalFile(formData, "medical_report_file"),
+    };
+
+    if (!programName) return json(false, "Programme is required.", 400);
+    if (!classLevel) return json(false, "Applying class is required.", 400);
+    if (!preferredStartingMonth) return json(false, "Preferred starting month is required.", 400);
+    if (preferredStartingMonth === "Other" && !preferredStartingMonthOther) {
+      return json(false, "Please specify the preferred starting month.", 400);
+    }
+    if (!studentName) return json(false, "Student full name is required.", 400);
     if (!gender) return json(false, "Gender is required.", 400);
     if (!dateOfBirth) return json(false, "Date of birth is required.", 400);
-    if (!Number.isFinite(age) || age < 0) return json(false, "Student age must be a valid number.", 400);
-    if (!classLevel) return json(false, "Class level is required.", 400);
-    if (!interestReason) return json(false, "Please share why you are interested in Ash-Shajarah.", 400);
-    if (!hearAboutSource) return json(false, "Please share how you heard about Ash-Shajarah.", 400);
-
-    if (leadToken) {
-      const [linkedLead] = await prisma.$queryRaw`
-        SELECT
-          id::text AS id,
-          status::text AS status,
-          registration_lead_id::text AS registration_lead_id
-        FROM interested_students
-        WHERE registration_token = ${leadToken}
-        LIMIT 1
-      `;
-
-      if (linkedLead?.status === "registered" && linkedLead?.registration_lead_id) {
-        return json(true, "Registration already completed.", 200);
-      }
+    if (!Number.isFinite(age) || age < 0) return json(false, "Student age must be valid.", 400);
+    if (!country) return json(false, "Country is required.", 400);
+    if (!city) return json(false, "City is required.", 400);
+    if (!nationality) return json(false, "Nationality is required.", 400);
+    if (!religion) return json(false, "Religion is required.", 400);
+    if (!preferredLanguage) return json(false, "Preferred language of instruction is required.", 400);
+    if (!fatherNameEnglish && !motherNameEnglish) {
+      return json(false, "At least one parent name is required.", 400);
     }
+    if (!preferredContactPerson) {
+      return json(false, "Preferred contact person is required.", 400);
+    }
+    if (!deviceAvailable) {
+      return json(false, "Device availability is required.", 400);
+    }
+    if (!supportPersonDuringLearning) {
+      return json(false, "Please select who will support the child during learning.", 400);
+    }
+    if (!whyJoinSchool) {
+      return json(false, "Please share why you wish your child to join Ash-Shajarah.", 400);
+    }
+    if (!schoolExpectations) {
+      return json(false, "Please share your expectations from the school.", 400);
+    }
+    if (!declarationAccepted) {
+      return json(false, "You must accept the declaration before submitting the admission form.", 400);
+    }
+    if (!files.birthCertificateFile) {
+      return json(false, "Child B-Form / Birth Certificate is required.", 400);
+    }
+    if (!files.parentCnicFile) {
+      return json(false, "Parent CNIC document is required.", 400);
+    }
+    if (!files.childPhotographFile) {
+      return json(false, "Recent child photograph is required.", 400);
+    }
+
+    if (fatherEmail && !isValidEmail(fatherEmail)) {
+      return json(false, "Please enter a valid father email address.", 400);
+    }
+    if (motherEmail && !isValidEmail(motherEmail)) {
+      return json(false, "Please enter a valid mother email address.", 400);
+    }
+
+    const parentSummary = buildParentSummary({
+      preferredContactPerson,
+      fatherNameEnglish,
+      fatherEmail,
+      fatherWhatsapp: fatherContactWhatsapp,
+      fatherEmergency: fatherEmergencyContact,
+      fatherOffice: fatherContactOffice,
+      fatherHome: fatherContactHome,
+      motherNameEnglish,
+      motherEmail,
+      motherWhatsapp: motherContactWhatsapp,
+      motherEmergency: motherEmergencyContact,
+      motherOffice: motherContactOffice,
+      motherHome: motherContactHome,
+    });
+
+    if (!parentSummary.parentName) {
+      return json(false, "A primary parent name is required.", 400);
+    }
+
+    if (!parentSummary.parentPhone) {
+      return json(false, "A primary parent contact number is required.", 400);
+    }
+
+    const linkedLead = await fetchInterestedStudentByToken(leadToken);
+    if (linkedLead?.status === "registered" && linkedLead?.registration_lead_id) {
+      return json(true, "Admission form already completed.", 200);
+    }
+
+    const uploads = await uploadAdmissionFiles(applicationId, files);
+    const cityCountry = [city, country].filter(Boolean).join(", ");
 
     const [createdLead] = await prisma.$queryRaw`
       INSERT INTO registration_leads (
+        id,
         student_name,
         parent_name,
         parent_relation,
@@ -80,173 +338,268 @@ export async function POST(request) {
         phone,
         age,
         class_level,
+        city,
         city_country,
         gender,
         date_of_birth,
         current_school,
-        applying_for_other,
         interest_reason,
-        hear_about_source,
-        hear_about_other,
         notes,
         source,
         status,
+        program_name,
+        preferred_starting_month,
+        preferred_starting_month_other,
+        student_name_urdu,
+        country,
+        nationality,
+        religion,
+        preferred_language,
+        current_grade,
+        shift_reason,
+        attended_online_classes,
+        child_profile,
+        child_strengths,
+        child_support_needs,
+        child_special_interests,
+        developmental_concern,
+        developmental_concern_details,
+        medical_conditions,
+        father_name_english,
+        father_name_urdu,
+        father_cnic,
+        father_qualification,
+        father_occupation,
+        father_mother_tongue,
+        father_contact_home,
+        father_contact_office,
+        father_contact_whatsapp,
+        father_emergency_contact,
+        father_email,
+        father_residential_address,
+        mother_name_english,
+        mother_name_urdu,
+        mother_cnic,
+        mother_qualification,
+        mother_occupation,
+        mother_mother_tongue,
+        mother_contact_home,
+        mother_contact_office,
+        mother_contact_whatsapp,
+        mother_emergency_contact,
+        mother_email,
+        mother_residential_address,
+        preferred_contact_person,
+        support_person_during_learning,
+        device_available,
+        school_expectations,
+        declaration_accepted,
+        birth_certificate_file_path,
+        parent_cnic_file_path,
+        child_photograph_file_path,
+        previous_school_report_file_path,
+        medical_report_file_path,
         created_at,
         updated_at
       )
       VALUES (
+        ${applicationId}::uuid,
         ${studentName},
-        ${parentName},
-        ${parentRelation},
-        ${email || null},
-        ${phone},
+        ${parentSummary.parentName},
+        ${parentSummary.parentRelation},
+        ${parentSummary.parentEmail || linkedLead?.email || null},
+        ${parentSummary.parentPhone},
         ${age},
         ${classLevel},
-        ${cityCountry},
+        ${city || null},
+        ${cityCountry || null},
         ${gender},
         ${dateOfBirth}::date,
         ${currentSchool || null},
-        ${applyingForOther || null},
-        ${interestReason},
-        ${hearAboutSource},
-        ${hearAboutOther || null},
-        ${notes || null},
-        ${"website_registration"},
+        ${whyJoinSchool},
+        ${schoolExpectations || null},
+        ${"admission_form"},
         CAST(${"new_lead"} AS registration_status),
+        ${programName},
+        ${preferredStartingMonth},
+        ${preferredStartingMonthOther || null},
+        ${studentNameUrdu || null},
+        ${country},
+        ${nationality},
+        ${religion},
+        ${preferredLanguage},
+        ${currentGrade || null},
+        ${shiftReason || null},
+        ${attendedOnlineClasses},
+        ${childProfile || null},
+        ${childStrengths || null},
+        ${childSupportNeeds || null},
+        ${childSpecialInterests || null},
+        ${developmentalConcern},
+        ${developmentalConcernDetails || null},
+        ${medicalConditions || null},
+        ${fatherNameEnglish || null},
+        ${fatherNameUrdu || null},
+        ${fatherCnic || null},
+        ${fatherQualification || null},
+        ${fatherOccupation || null},
+        ${fatherMotherTongue || null},
+        ${fatherContactHome || null},
+        ${fatherContactOffice || null},
+        ${fatherContactWhatsapp || null},
+        ${fatherEmergencyContact || null},
+        ${fatherEmail || null},
+        ${fatherResidentialAddress || null},
+        ${motherNameEnglish || null},
+        ${motherNameUrdu || null},
+        ${motherCnic || null},
+        ${motherQualification || null},
+        ${motherOccupation || null},
+        ${motherMotherTongue || null},
+        ${motherContactHome || null},
+        ${motherContactOffice || null},
+        ${motherContactWhatsapp || null},
+        ${motherEmergencyContact || null},
+        ${motherEmail || null},
+        ${motherResidentialAddress || null},
+        ${preferredContactPerson},
+        ${supportPersonDuringLearning},
+        ${deviceAvailable},
+        ${schoolExpectations},
+        ${declarationAccepted},
+        ${uploads.birthCertificatePath || null},
+        ${uploads.parentCnicPath || null},
+        ${uploads.childPhotographPath || null},
+        ${uploads.previousSchoolReportPath || null},
+        ${uploads.medicalReportPath || null},
         NOW(),
         NOW()
       )
       RETURNING id::text AS id
     `;
 
-    if (createdLead?.id) {
-      const interestedStudent = leadToken
-        ? (await prisma.$queryRaw`
-            SELECT
-              student_name,
-              parent_name,
-              email,
-              phone
-            FROM interested_students
-            WHERE registration_token = ${leadToken}
-            LIMIT 1
-          `)[0]
-        : {
-            student_name: studentName,
-            parent_name: parentName,
-            email,
-            phone,
-          };
+    const [coordinator] = await prisma.$queryRaw`
+      SELECT
+        u.email,
+        u.full_name
+      FROM users u
+      INNER JOIN roles r ON r.id = u.role_id
+      WHERE LOWER(r.name) = 'coordinator'
+        AND LOWER(u.status::text) = 'active'
+        AND COALESCE(NULLIF(TRIM(u.email), ''), '') <> ''
+      ORDER BY u.created_at ASC NULLS LAST, u.id ASC
+      LIMIT 1
+    `;
 
-      const [coordinator] = await prisma.$queryRaw`
-        SELECT
-          u.email,
-          u.full_name
-        FROM users u
-        INNER JOIN roles r ON r.id = u.role_id
-        WHERE LOWER(r.name) = 'coordinator'
-          AND LOWER(u.status::text) = 'active'
-          AND COALESCE(NULLIF(TRIM(u.email), ''), '') <> ''
-        ORDER BY u.created_at ASC NULLS LAST, u.id ASC
-        LIMIT 1
+    if (leadToken && linkedLead?.id && createdLead?.id) {
+      await prisma.$executeRaw`
+        UPDATE interested_students
+        SET
+          status = ${"registered"},
+          registration_lead_id = ${createdLead.id}::uuid,
+          updated_at = NOW()
+        WHERE id = ${linkedLead.id}::uuid
       `;
-
-      if (leadToken) {
-        await prisma.$executeRaw`
-          DELETE FROM interested_students
-          WHERE registration_token = ${leadToken}
-        `;
-      }
-
-      if (interestedStudent?.email) {
-        const parentSubject = `Registration form submitted for ${studentName}`;
-        const parentText = `Assalamualaikum ${parentName},
-
-Your child has been successfully submitted the registration form.
-
-Student: ${studentName}
-Parent: ${parentName}
-Email: ${email || "Not provided"}
-Phone: ${phone}
-Class Level: ${classLevel}
-Status: submitted
-
-Our team will contact you regarding admissions, parent orientation sessions, and future updates, In Sha Allah.`;
-        const parentHtml = `
-          <div style="font-family:Arial,sans-serif;background:#f8fafc;padding:24px;color:#0f172a;">
-            <div style="max-width:640px;margin:0 auto;background:#fff;border:1px solid #e2e8f0;border-radius:20px;padding:24px;">
-              <p style="margin:0 0 12px;font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:#0284c7;font-weight:700;">Registration form submitted</p>
-              <p style="margin:0 0 16px;font-size:15px;line-height:1.7;">Assalamualaikum <strong>${parentName}</strong>,</p>
-              <p style="margin:0 0 16px;font-size:15px;line-height:1.7;">Thank you for your interest in Ash-Shajarah - The Learning Hub.</p>
-              <div style="border:1px solid #e2e8f0;border-radius:16px;padding:16px;background:#f8fafc;font-size:14px;line-height:1.8;">
-                <div><strong>Student:</strong> ${studentName}</div>
-                <div><strong>Parent:</strong> ${parentName}</div>
-                <div><strong>Email:</strong> ${email || "Not provided"}</div>
-                <div><strong>Phone:</strong> ${phone}</div>
-                <div><strong>Class Level:</strong> ${classLevel}</div>
-                <div><strong>Status:</strong> submitted</div>
-              </div>
-              <p style="margin:20px 0 0;font-size:13px;line-height:1.7;color:#64748b;">Our team will contact you regarding admissions, parent orientation sessions, and future updates, In Sha Allah.</p>
-            </div>
-          </div>
-        `;
-
-        await sendEmail({
-          to: interestedStudent.email,
-          subject: parentSubject,
-          html: parentHtml,
-          text: parentText,
-        });
-      }
-
-      if (coordinator?.email) {
-        const coordinatorSubject = `Student submitted a registration form: ${studentName}`;
-        const coordinatorText = `Assalamualaikum ${coordinator?.full_name || "Coordinator"},
-
-A student has been successfully submitted the registration form.
-
-Student: ${studentName}
-Parent: ${parentName}
-Email: ${email || "Not provided"}
-Phone: ${phone}
-Class Level: ${classLevel}
-Gender: ${gender}
-City & Country: ${cityCountry}
-Status: submitted
-
-Lead token: ${leadToken}`;
-        const coordinatorHtml = `
-          <div style="font-family:Arial,sans-serif;background:#f8fafc;padding:24px;color:#0f172a;">
-            <div style="max-width:640px;margin:0 auto;background:#fff;border:1px solid #e2e8f0;border-radius:20px;padding:24px;">
-              <p style="margin:0 0 12px;font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:#0284c7;font-weight:700;">Student submitted a registration form</p>
-              <p style="margin:0 0 16px;font-size:15px;line-height:1.7;">Assalamualaikum <strong>${coordinator?.full_name || "Coordinator"}</strong>,</p>
-              <p style="margin:0 0 16px;font-size:15px;line-height:1.7;">A student has been successfully submitted the registration form.</p>
-              <div style="border:1px solid #e2e8f0;border-radius:16px;padding:16px;background:#f8fafc;font-size:14px;line-height:1.8;">
-                <div><strong>Student:</strong> ${studentName}</div>
-                <div><strong>Parent:</strong> ${parentName}</div>
-                <div><strong>Email:</strong> ${email || "Not provided"}</div>
-                <div><strong>Phone:</strong> ${phone}</div>
-                <div><strong>Class Level:</strong> ${classLevel}</div>
-                <div><strong>Gender:</strong> ${gender}</div>
-                <div><strong>City & Country:</strong> ${cityCountry}</div>
-                <div><strong>Status:</strong> submitted</div>
-              </div>
-              <p style="margin:20px 0 0;font-size:13px;line-height:1.7;color:#64748b;">Lead token: ${leadToken || "N/A"}</p>
-            </div>
-          </div>
-        `;
-
-        await sendEmail({
-          to: coordinator.email,
-          subject: coordinatorSubject,
-          html: coordinatorHtml,
-          text: coordinatorText,
-        });
-      }
     }
 
-    return json(true, "Thank you for your interest in Ash-Shajarah - The Learning Hub. Our team will contact you regarding admissions, parent orientation sessions, and future updates, In Sha Allah.", 201);
+    const parentEmail = parentSummary.parentEmail || linkedLead?.email || "";
+    if (parentEmail) {
+      const parentSubject = `Admission form submitted for ${studentName}`;
+      const parentText = `Assalamualaikum ${parentSummary.parentName},
+
+Your child's admission form has been submitted successfully.
+
+Student: ${studentName}
+Programme: ${programName}
+Class: ${classLevel}
+Preferred Starting Month: ${preferredStartingMonth}${preferredStartingMonthOther ? ` (${preferredStartingMonthOther})` : ""}
+Primary Contact: ${parentSummary.parentName}
+Phone: ${parentSummary.parentPhone}
+
+Our admissions team will review the application and contact you with the next steps, In Sha Allah.`;
+      const parentHtml = `
+        <div style="font-family:Arial,sans-serif;background:#f8fafc;padding:24px;color:#0f172a;">
+          <div style="max-width:640px;margin:0 auto;background:#fff;border:1px solid #e2e8f0;border-radius:20px;padding:24px;">
+            <p style="margin:0 0 12px;font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:#0284c7;font-weight:700;">Admission form submitted</p>
+            <p style="margin:0 0 16px;font-size:15px;line-height:1.7;">Assalamualaikum <strong>${parentSummary.parentName}</strong>,</p>
+            <p style="margin:0 0 16px;font-size:15px;line-height:1.7;">Your child's admission form has been submitted successfully.</p>
+            <div style="border:1px solid #e2e8f0;border-radius:16px;padding:16px;background:#f8fafc;font-size:14px;line-height:1.8;">
+              <div><strong>Student:</strong> ${studentName}</div>
+              <div><strong>Programme:</strong> ${programName}</div>
+              <div><strong>Class:</strong> ${classLevel}</div>
+              <div><strong>Preferred Starting Month:</strong> ${preferredStartingMonth}${preferredStartingMonthOther ? ` (${preferredStartingMonthOther})` : ""}</div>
+              <div><strong>Primary Contact:</strong> ${parentSummary.parentName}</div>
+              <div><strong>Phone:</strong> ${parentSummary.parentPhone}</div>
+            </div>
+            <p style="margin:20px 0 0;font-size:13px;line-height:1.7;color:#64748b;">Our admissions team will review the application and contact you with the next steps, In Sha Allah.</p>
+          </div>
+        </div>
+      `;
+
+      await sendEmail({
+        to: parentEmail,
+        subject: parentSubject,
+        html: parentHtml,
+        text: parentText,
+      });
+    }
+
+    if (coordinator?.email) {
+      const coordinatorSubject = `New admission form submitted: ${studentName}`;
+      const coordinatorText = `Assalamualaikum ${coordinator.full_name || "Coordinator"},
+
+A new admission form has been submitted.
+
+Student: ${studentName}
+Programme: ${programName}
+Class: ${classLevel}
+Preferred Starting Month: ${preferredStartingMonth}${preferredStartingMonthOther ? ` (${preferredStartingMonthOther})` : ""}
+Primary Parent: ${parentSummary.parentName}
+Email: ${parentSummary.parentEmail || linkedLead?.email || "Not provided"}
+Phone: ${parentSummary.parentPhone}
+City & Country: ${cityCountry}
+Preferred Language: ${preferredLanguage}
+Interested Lead Token: ${leadToken || "N/A"}`;
+      const coordinatorHtml = `
+        <div style="font-family:Arial,sans-serif;background:#f8fafc;padding:24px;color:#0f172a;">
+          <div style="max-width:640px;margin:0 auto;background:#fff;border:1px solid #e2e8f0;border-radius:20px;padding:24px;">
+            <p style="margin:0 0 12px;font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:#0284c7;font-weight:700;">New admission form submitted</p>
+            <p style="margin:0 0 16px;font-size:15px;line-height:1.7;">Assalamualaikum <strong>${coordinator.full_name || "Coordinator"}</strong>,</p>
+            <p style="margin:0 0 16px;font-size:15px;line-height:1.7;">A new admission form has been submitted.</p>
+            <div style="border:1px solid #e2e8f0;border-radius:16px;padding:16px;background:#f8fafc;font-size:14px;line-height:1.8;">
+              <div><strong>Student:</strong> ${studentName}</div>
+              <div><strong>Programme:</strong> ${programName}</div>
+              <div><strong>Class:</strong> ${classLevel}</div>
+              <div><strong>Preferred Starting Month:</strong> ${preferredStartingMonth}${preferredStartingMonthOther ? ` (${preferredStartingMonthOther})` : ""}</div>
+              <div><strong>Primary Parent:</strong> ${parentSummary.parentName}</div>
+              <div><strong>Email:</strong> ${parentSummary.parentEmail || linkedLead?.email || "Not provided"}</div>
+              <div><strong>Phone:</strong> ${parentSummary.parentPhone}</div>
+              <div><strong>City & Country:</strong> ${cityCountry}</div>
+              <div><strong>Preferred Language:</strong> ${preferredLanguage}</div>
+            </div>
+            <p style="margin:20px 0 0;font-size:13px;line-height:1.7;color:#64748b;">Interested lead token: ${leadToken || "N/A"}</p>
+          </div>
+        </div>
+      `;
+
+      await sendEmail({
+        to: coordinator.email,
+        subject: coordinatorSubject,
+        html: coordinatorHtml,
+        text: coordinatorText,
+      });
+    }
+
+    return json(
+      true,
+      "Admission form submitted successfully. Our admissions team will review the application and contact you with the next steps, In Sha Allah.",
+      201
+    );
   } catch (error) {
-    return json(false, error instanceof Error ? error.message : "Unable to submit registration.", 500);
+    return json(
+      false,
+      error instanceof Error ? error.message : "Unable to submit admission form.",
+      500
+    );
   }
 }

@@ -70,10 +70,24 @@ export async function GET(request) {
         u.phone,
         sp.admission_no,
         sp.age,
+        sp.created_at,
         sp.grade_level,
         sp.grade_level AS class_level,
         COALESCE(sp.status::text, u.status::text) AS status,
         c.title AS course_title,
+        rl.id::text AS registration_lead_id,
+        rl.student_name AS lead_student_name,
+        rl.parent_name,
+        rl.parent_relation,
+        rl.phone AS lead_phone,
+        rl.email AS lead_email,
+        rl.city_country,
+        rl.current_school,
+        rl.gender,
+        rl.date_of_birth,
+        rl.program_name,
+        rl.preferred_language,
+        rl.nationality,
         p.full_name AS parent_name,
         pu.phone AS parent_phone,
         pu.email AS parent_email
@@ -81,6 +95,7 @@ export async function GET(request) {
       INNER JOIN users u ON u.id = sp.user_id
       LEFT JOIN enrollments e ON e.student_id = sp.id AND LOWER(e.status) = 'active'
       LEFT JOIN courses c ON c.id = e.course_id
+      LEFT JOIN registration_leads rl ON rl.id = e.registration_id
       LEFT JOIN student_parents spp ON spp.student_id = sp.id AND spp.is_primary = TRUE
       LEFT JOIN parent_profiles pp ON pp.id = spp.parent_id
       LEFT JOIN users p ON p.id = pp.user_id
