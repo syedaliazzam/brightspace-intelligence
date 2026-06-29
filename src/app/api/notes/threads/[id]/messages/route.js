@@ -40,6 +40,7 @@ async function canAccessThread(session, threadId) {
       SELECT nt.id::text AS id
       FROM note_threads nt
       WHERE nt.id = ${threadId}::uuid
+        AND LOWER(COALESCE(nt.visibility, 'student')) = 'student'
         AND EXISTS (
           SELECT 1
           FROM enrollments e
@@ -56,6 +57,7 @@ async function canAccessThread(session, threadId) {
     SELECT nt.id::text AS id
     FROM note_threads nt
     WHERE nt.id = ${threadId}::uuid
+      AND LOWER(COALESCE(nt.visibility, 'parent')) IN ('parent', 'student')
       AND EXISTS (
         SELECT 1
         FROM student_parents spp

@@ -256,6 +256,7 @@ export async function GET(request) {
             AND e.course_id = nt.course_id
             AND LOWER(COALESCE(e.status::text, 'active')) = 'active'
         )
+          AND LOWER(COALESCE(nt.visibility, 'student')) = 'student'
         ORDER BY nt.created_at DESC
       `;
       return json("Threads fetched.", 200, { items });
@@ -306,6 +307,7 @@ export async function GET(request) {
             AND e.course_id = nt.course_id
             AND LOWER(COALESCE(e.status::text, 'active')) = 'active'
         )
+          AND LOWER(COALESCE(nt.visibility, 'parent')) IN ('parent', 'student')
         ORDER BY nt.created_at DESC
       `;
       return json("Threads fetched.", 200, { items });

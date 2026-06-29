@@ -74,8 +74,8 @@ export default function NoteThreadsBoard({ mode = "viewer", lectures = [] }) {
   const subjectOptions = useMemo(() => lectureOptions.filter((item) => item.classLevel === String(compose.classLevel || "").trim()), [lectureOptions, compose.classLevel]);
   const selectedVisibility = String(selected?.visibility || "").toLowerCase();
   const canReplyToSelected =
-    (mode === "teacher" && selectedVisibility === "parent") ||
     (mode === "parent" && selectedVisibility === "parent") ||
+    (mode === "teacher" && ["parent", "student", "admin_only", "admin"].includes(selectedVisibility)) ||
     (mode === "admin" && (selectedVisibility === "admin_only" || selectedVisibility === "admin"));
 
   async function loadThreads() {
@@ -166,7 +166,11 @@ export default function NoteThreadsBoard({ mode = "viewer", lectures = [] }) {
   }
 
   useEffect(() => {
-    loadThreads().catch((err) => setError(err.message));
+    const timer = window.setTimeout(() => {
+      loadThreads().catch((err) => setError(err.message));
+    }, 0);
+
+    return () => window.clearTimeout(timer);
   }, []);
 
   return (

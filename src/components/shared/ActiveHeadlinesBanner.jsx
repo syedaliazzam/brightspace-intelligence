@@ -6,43 +6,43 @@ export default function ActiveHeadlinesBanner({ items = [] }) {
   }
 
   const featured = items[0];
-  const secondary = items.slice(1);
+  const secondary = items.slice(1, 4);
 
   return (
-    <section className="relative overflow-hidden rounded-[2rem] border border-sky-100 bg-[linear-gradient(135deg,rgba(8,47,73,0.98),rgba(14,116,144,0.96),rgba(240,249,255,0.94))] p-6 text-white shadow-[0_24px_80px_-36px_rgba(8,47,73,0.55)] sm:p-4">
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.28),transparent_34%),radial-gradient(circle_at_bottom_left,rgba(186,230,253,0.22),transparent_32%)]" />
+    <section className="relative overflow-hidden rounded-2xl border border-emerald-900/10 bg-white/85 px-4 py-3 shadow-[0_12px_36px_-24px_rgba(13,59,46,0.35)] backdrop-blur-md">
+      <div className="pointer-events-none absolute inset-y-0 left-0 w-1 bg-gradient-to-b from-[#C9A227] via-[#2D8A6A] to-[#C9A227]" />
 
-      <div className="relative">
-        <div className="flex flex-wrap items-center gap-3">
-          <span className="inline-flex items-center rounded-full border border-white/20 bg-white/10 px-4 py-1.5 text-xs font-semibold uppercase tracking-[0.24em] text-sky-100">
-            Important Headlines
-          </span>
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div className="min-w-0 flex-1">
+          <div className="mb-1 flex items-center gap-2">
+            <span className="inline-flex h-2 w-2 rounded-full bg-[#C9A227]" />
+            <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#0D5C48]">
+              Important Headline
+            </p>
+          </div>
+
+          <h2 className="line-clamp-2 text-sm font-semibold leading-6 text-[#063F32] sm:text-base">
+            {featured.headline}
+          </h2>
         </div>
 
-        <div className="mt-4 grid gap-1 lg:grid-cols-[minmax(0,1.5fr)_minmax(280px,0.9fr)]">
-          <article className="rounded-[1.75rem] border border-white/14 bg-white/10 p-3 backdrop-blur-md">
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-sky-100/80">Featured Announcement</p>
-            <h2 className="mt-1 text-2xl font-semibold leading-tight tracking-tight text-white sm:text-3xl">
-              {featured.headline}
-            </h2>
-          </article>
-
-          {secondary.length ? (
-            <div className="space-y-3">
-              {secondary.map((item, index) => (
-                <article
-                  key={item.id}
-                  className="rounded-[1.5rem] border border-white/14 bg-slate-950/16 p-4 backdrop-blur-md"
-                >
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-sky-100/75">
-                    Update {index + 2}
-                  </p>
-                  <p className="mt-2 text-sm leading-6 text-white/92">{item.headline}</p>
-                </article>
-              ))}
-            </div>
-          ) : null}
-        </div>
+        {secondary.length ? (
+          <div className="grid min-w-0 gap-2 lg:w-[42%]">
+            {secondary.map((item, index) => (
+              <article
+                key={item.id}
+                className="rounded-xl border border-emerald-900/10 bg-[#FAF7F0]/80 px-3 py-2"
+              >
+                <p className="line-clamp-1 text-xs font-medium leading-5 text-[#245C4F]">
+                  <span className="mr-1 font-bold text-[#C9A227]">
+                    {index + 2}.
+                  </span>
+                  {item.headline}
+                </p>
+              </article>
+            ))}
+          </div>
+        ) : null}
       </div>
     </section>
   );
