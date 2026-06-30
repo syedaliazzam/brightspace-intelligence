@@ -33,6 +33,7 @@ export async function GET() {
         created_at,
         updated_at
       FROM interested_students
+      WHERE COALESCE(LOWER(status::text), '') <> 'registered'
       ORDER BY created_at DESC NULLS LAST, id DESC
     `;
 

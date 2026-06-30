@@ -1097,7 +1097,7 @@ export async function POST(request) {
       emailSendStatus = "failed";
       emailErrorMessage =
         emailError instanceof Error ? emailError.message : "Voucher email dispatch failed.";
-      console.error("SENDGRID_VOUCHER_EMAIL_ERROR", {
+      console.error("VOUCHER_EMAIL_ERROR", {
         message: emailError?.message,
         response: emailError?.response?.body,
       });
@@ -1142,7 +1142,7 @@ export async function POST(request) {
           : null,
         ...(emailSendStatus === "sent"
           ? {}
-          : { sendgrid_error: emailErrorMessage || "SendGrid email failed." }),
+          : { email_error: emailErrorMessage || "Email failed." }),
       }
     );
   } catch (error) {

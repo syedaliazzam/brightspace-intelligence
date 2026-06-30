@@ -1,3 +1,6 @@
+import net from "node:net";
+import tls from "node:tls";
+
 function getBaseUrl() {
   return process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL || "";
 }
@@ -93,49 +96,187 @@ function stripHtml(value) {
     .trim();
 }
 
+function normalizeLineEndings(value) {
+  return String(value || "").replace(/\r?\n/g, "\r\n");
+}
+
+function encodeBase64(value) {
+  return Buffer.from(String(value || ""), "utf8").toString("base64");
+}
+
+function readSmtpResponse(socket) {
+  return new Promise((resolve, reject) => {
+    let buffer = "";
+
+    const onData = (chunk) => {
+      buffer += chunk.toString("utf8");
+      const lines = buffer.split("\r\n");
+      const lastLine = lines[lines.length - 1];
+      const completeLines = lines.slice(0, -1).filter(Boolean);
+      const pendingLine = completeLines.at(-1) || lastLine || "";
+      const match = pendingLine.match(/^(\d{3})([ -])/);
+
+      if (!match) return;
+
+      const code = Number(match[1]);
+      const isFinal = match[2] === " ";
+      if (!isFinal) return;
+
+      socket.off("data", onData);
+      socket.off("error", onError);
+      resolve({ code, message: buffer.trim() });
+    };
+
+    const onError = (error) => {
+      socket.off("data", onData);
+      socket.off("error", onError);
+      reject(error);
+    };
+
+    socket.on("data", onData);
+    socket.on("error", onError);
+  });
+}
+
+async function writeCommand(socket, command) {
+  socket.write(`${command}\r\n`);
+  return readSmtpResponse(socket);
+}
+
+function awaitSocketReady(socket, eventName) {
+  return new Promise((resolve, reject) => {
+    socket.once("error", reject);
+    socket.once(eventName, resolve);
+  });
+}
+
+async function sendViaSmtp({ to, subject, html, text }) {
+  const host = process.env.SMTP_HOST;
+  const port = Number(process.env.SMTP_PORT || 587);
+  const user = process.env.SMTP_USER;
+  const pass = process.env.SMTP_PASS;
+  const fromAddress = process.env.SMTP_FROM || user;
+  const fromName = process.env.SMTP_FROM_NAME || "LMS Platform";
+
+  if (!host || !user || !pass || !fromAddress) {
+    throw new Error("SMTP is not configured. Set SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, and SMTP_FROM.");
+  }
+
+  const destination = String(to || "").trim();
+  const sender = `"${fromName.replace(/"/g, '\\"')}" <${fromAddress}>`;
+  const subjectLine = String(subject || "").replace(/\r?\n/g, " ").trim();
+  const bodyText = text || stripHtml(html);
+  const boundary = `boundary_${Date.now()}`;
+  const message = [
+    `From: ${sender}`,
+    `To: ${destination}`,
+    `Subject: ${subjectLine}`,
+    "MIME-Version: 1.0",
+    `Content-Type: multipart/alternative; boundary="${boundary}"`,
+    "",
+    `--${boundary}`,
+    "Content-Type: text/plain; charset=utf-8",
+    "",
+    bodyText,
+    "",
+    `--${boundary}`,
+    "Content-Type: text/html; charset=utf-8",
+    "",
+    html,
+    "",
+    `--${boundary}--`,
+    "",
+  ].join("\r\n");
+
+  const useTls = port === 465;
+  let socket = useTls ? tls.connect({ host, port, servername: host }) : net.connect({ host, port });
+
+  await awaitSocketReady(socket, useTls ? "secureConnect" : "connect");
+
+  let response = await readSmtpResponse(socket);
+  if (response.code !== 220) {
+    socket.end();
+    throw new Error(`SMTP connection failed: ${response.message}`);
+  }
+
+  response = await writeCommand(socket, `EHLO ${host}`);
+  if (response.code !== 250) {
+    socket.end();
+    throw new Error(`SMTP EHLO failed: ${response.message}`);
+  }
+
+  if (!useTls) {
+    response = await writeCommand(socket, "STARTTLS");
+    if (response.code !== 220) {
+      socket.end();
+      throw new Error(`SMTP STARTTLS failed: ${response.message}`);
+    }
+
+    socket = tls.connect({ socket, servername: host });
+    await awaitSocketReady(socket, "secureConnect");
+
+    response = await writeCommand(socket, `EHLO ${host}`);
+    if (response.code !== 250) {
+      socket.end();
+      throw new Error(`SMTP EHLO after STARTTLS failed: ${response.message}`);
+    }
+  }
+
+  response = await writeCommand(socket, `AUTH LOGIN`);
+  if (response.code !== 334) {
+    socket.end();
+    throw new Error(`SMTP AUTH LOGIN failed: ${response.message}`);
+  }
+
+  response = await writeCommand(socket, encodeBase64(user));
+  if (response.code !== 334) {
+    socket.end();
+    throw new Error(`SMTP username rejected: ${response.message}`);
+  }
+
+  response = await writeCommand(socket, encodeBase64(pass));
+  if (response.code !== 235) {
+    socket.end();
+    throw new Error(`SMTP password rejected: ${response.message}`);
+  }
+
+  response = await writeCommand(socket, `MAIL FROM:<${fromAddress}>`);
+  if (response.code !== 250) {
+    socket.end();
+    throw new Error(`SMTP MAIL FROM failed: ${response.message}`);
+  }
+
+  response = await writeCommand(socket, `RCPT TO:<${destination}>`);
+  if (response.code !== 250 && response.code !== 251) {
+    socket.end();
+    throw new Error(`SMTP RCPT TO failed: ${response.message}`);
+  }
+
+  response = await writeCommand(socket, "DATA");
+  if (response.code !== 354) {
+    socket.end();
+    throw new Error(`SMTP DATA failed: ${response.message}`);
+  }
+
+  socket.write(`${normalizeLineEndings(message).replace(/^\./gm, "..")}\r\n.\r\n`);
+  response = await readSmtpResponse(socket);
+  if (response.code !== 250) {
+    socket.end();
+    throw new Error(`SMTP message send failed: ${response.message}`);
+  }
+
+  await writeCommand(socket, "QUIT").catch(() => null);
+  socket.end();
+  return true;
+}
+
 export async function sendEmail({ to, subject, html, text }) {
   const destination = String(to || "").trim();
   if (!destination) {
     throw new Error("Recipient email is required.");
   }
 
-  const apiKey = process.env.SENDGRID_API_KEY;
-  const fromAddress =
-    process.env.SENDGRID_FROM_EMAIL ||
-    process.env.SENDGRID_FROM ||
-    process.env.EMAIL_FROM;
-  const fromName = process.env.SENDGRID_FROM_NAME || "LMS Platform";
-
-  if (!apiKey || !fromAddress) {
-    throw new Error(
-      "SendGrid is not configured. Set SENDGRID_API_KEY and SENDGRID_FROM_EMAIL."
-    );
-  }
-
-  const response = await fetch("https://api.sendgrid.com/v3/mail/send", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      personalizations: [{ to: [{ email: destination }] }],
-      from: { email: fromAddress, name: fromName },
-      subject,
-      content: [
-        { type: "text/plain", value: text || stripHtml(html) },
-        { type: "text/html", value: html },
-      ],
-    }),
-    cache: "no-store",
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`SendGrid email failed: ${errorText}`);
-  }
-
-  return true;
+  return sendViaSmtp({ to: destination, subject, html, text });
 }
 
 export function buildCredentialsEmailHtml({

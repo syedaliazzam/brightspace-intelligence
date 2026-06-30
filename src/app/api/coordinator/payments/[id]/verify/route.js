@@ -620,7 +620,7 @@ export async function POST(request, { params }) {
             html: `<div style="font-family:Arial,sans-serif;color:#0f172a;"><h2>Payment Rejected</h2><p>Your payment submission for voucher <strong>${submission.voucher_no}</strong> was rejected.</p><p><strong>Reason:</strong> ${rejectionReason}</p><p>Please contact support if you need help.</p><p><a href="${portalUrl}">Open LMS</a></p></div>`,
           });
         } catch (emailError) {
-          console.error("SendGrid payment rejection email failed:", emailError);
+          console.error("Payment rejection email failed:", emailError);
         }
       }
       return json("Payment rejected.", 200);
@@ -895,16 +895,16 @@ export async function POST(request, { params }) {
 
       await insertCredentialDispatchLog({
         userId: parentUserId,
-        channel: parentContactEmail ? "sendgrid_email" : "whatsapp_placeholder",
+        channel: parentContactEmail ? "email" : "whatsapp_placeholder",
         recipient: parentContactEmail || parentContactPhone || null,
         status: "pending_manual_dispatch",
-        message: "Parent credentials queued for SendGrid dispatch.",
+        message: "Parent credentials queued for email dispatch.",
         metadata: { registrationLeadId: submission.registration_lead_id, voucherNo: submission.voucher_no },
       }, tx);
 
       await insertCredentialDispatchLog({
         userId: studentUserId,
-        channel: parentContactEmail ? "sendgrid_email_parent_delivery" : "parent_delivery_placeholder",
+        channel: parentContactEmail ? "email_parent_delivery" : "parent_delivery_placeholder",
         recipient: parentContactEmail || parentContactPhone || null,
         status: "pending_manual_dispatch",
         message: "Student credentials queued for parent delivery.",
@@ -998,7 +998,7 @@ export async function POST(request, { params }) {
           `;
         }
       } catch (emailError) {
-        console.error("SendGrid credential email failed:", emailError);
+        console.error("Credential email failed:", emailError);
         credentialsSendError =
           emailError instanceof Error ? emailError.message : "Credentials email failed to send.";
         credentialsEmail = {

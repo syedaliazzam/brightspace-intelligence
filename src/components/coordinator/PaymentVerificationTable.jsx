@@ -49,7 +49,14 @@ export default function PaymentVerificationTable({ items, onRefresh }) {
   const [rejectingItem, setRejectingItem] = useState(null);
   const [rejectionReason, setRejectionReason] = useState("");
   const [rejecting, setRejecting] = useState(false);
-  const [refreshAfterCredentialsClose, setRefreshAfterCredentialsClose] = useState(false);
+  const [refreshOnCredentialsClose, setRefreshOnCredentialsClose] = useState(false);
+
+  function refreshNow() {
+    requestAnimationFrame(() => {
+      if (onRefresh) onRefresh();
+      else router.refresh();
+    });
+  }
   function openProofPreview(item) {
     const previewItem = {
       ...item,
@@ -88,14 +95,11 @@ export default function PaymentVerificationTable({ items, onRefresh }) {
         return;
       }
 
-      requestAnimationFrame(() => {
-        if (onRefresh) onRefresh();
-        else router.refresh();
-      });
-
       if (data?.credentials_email) {
         setCredentialsEmail(data.credentials_email);
-        setRefreshAfterCredentialsClose(true);
+        setRefreshOnCredentialsClose(true);
+      } else {
+        refreshNow();
       }
     } catch (error) {
       window.alert(error instanceof Error ? error.message : "Payment verification failed.");
@@ -132,10 +136,7 @@ export default function PaymentVerificationTable({ items, onRefresh }) {
       }
 
       setRejectingItem(null);
-      requestAnimationFrame(() => {
-        if (onRefresh) onRefresh();
-        else router.refresh();
-      });
+      refreshNow();
     } catch (error) {
       window.alert(error instanceof Error ? error.message : "Payment verification failed.");
     } finally {
@@ -368,12 +369,9 @@ export default function PaymentVerificationTable({ items, onRefresh }) {
                 type="button"
                 onClick={() => {
                   setCredentialsEmail(null);
-                  if (refreshAfterCredentialsClose) {
-                    setRefreshAfterCredentialsClose(false);
-                    requestAnimationFrame(() => {
-                      if (onRefresh) onRefresh();
-                      else router.refresh();
-                    });
+                  if (refreshOnCredentialsClose) {
+                    setRefreshOnCredentialsClose(false);
+                    window.location.reload();
                   }
                 }}
                 className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
