@@ -9,6 +9,7 @@ const STATUS_STYLES = {
   submitted: "bg-amber-50 text-amber-700",
   verified: "bg-emerald-50 text-emerald-700",
   rejected: "bg-rose-50 text-rose-700",
+  monthly: "bg-sky-50 text-sky-700",
 };
 
 function formatStatus(value) {
@@ -18,6 +19,10 @@ function formatStatus(value) {
 
 function normalizeStatus(value) {
   return String(value || "").trim().toLowerCase();
+}
+
+function isMonthlyVoucher(item) {
+  return Boolean(item?.is_monthly_voucher || !item?.registration_lead_id);
 }
 
 function formatDate(value) {
@@ -82,6 +87,11 @@ export default function PaymentVerificationTable({ items, onRefresh }) {
         alert(data.message || "Payment verification failed");
         return;
       }
+
+      requestAnimationFrame(() => {
+        if (onRefresh) onRefresh();
+        else router.refresh();
+      });
 
       if (data?.credentials_email) {
         setCredentialsEmail(data.credentials_email);
@@ -178,6 +188,11 @@ export default function PaymentVerificationTable({ items, onRefresh }) {
                       <p className="mt-1 text-sm text-slate-500">
                         Voucher amount: PKR {item.voucher_amount}
                       </p>
+                      {isMonthlyVoucher(item) ? (
+                        <span className="mt-2 inline-flex rounded-full bg-sky-50 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-sky-700">
+                          Monthly
+                        </span>
+                      ) : null}
                     </td>
                     <td className="px-6 py-5">
                       <p className="font-semibold text-slate-950">PKR {item.paid_amount}</p>
@@ -248,6 +263,11 @@ export default function PaymentVerificationTable({ items, onRefresh }) {
                 <div>
                   <p className="text-lg font-semibold text-slate-950">{item.student_name}</p>
                   <p className="mt-1 text-sm text-slate-600">{item.voucher_no}</p>
+                  {isMonthlyVoucher(item) ? (
+                    <span className="mt-2 inline-flex rounded-full bg-sky-50 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-sky-700">
+                      Monthly
+                    </span>
+                  ) : null}
                   <p className="mt-1 text-sm text-slate-500">
                     {item.parent_name || "Parent pending"}
                   </p>

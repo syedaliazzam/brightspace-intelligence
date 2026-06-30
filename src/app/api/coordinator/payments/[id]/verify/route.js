@@ -536,10 +536,11 @@ async function getSubmissionRecord(id, tx = prisma) {
       rl.address,
       rl.city,
       rl.class_level,
-      rl.age AS student_age
+      rl.age AS student_age,
+      CASE WHEN rl.id IS NULL THEN true ELSE false END AS is_monthly_voucher
     FROM fee_submissions fs
     INNER JOIN fee_vouchers fv ON fv.id = fs.voucher_id
-    INNER JOIN registration_leads rl ON rl.id = fv.registration_id
+    LEFT JOIN registration_leads rl ON rl.id = fv.registration_id
     WHERE fs.id = ${id}::uuid
     LIMIT 1;
   `;
@@ -626,6 +627,50 @@ export async function POST(request, { params }) {
     }
 
     // APPROVE FLOW
+    const parentContactEmail =
+      submission.email || submission.parent_email || submission.parentEmail || "";
+    const parentContactPhone =
+      submission.phone || submission.parent_phone || submission.parentPhone || "";
+
+    if (submission.is_monthly_voucher) {
+      await prisma.$transaction(async (tx) => {
+        await tx.$executeRaw`
+          UPDATE fee_submissions
+          SET status = 'verified'::fee_submission_status
+          WHERE id = ${submission.id}::uuid;
+        `;
+        await tx.$executeRaw`
+          UPDATE fee_vouchers
+          SET status = 'verified'::voucher_status
+          WHERE id = ${submission.fee_voucher_id || submission.voucher_id}::uuid;
+        `;
+        await insertFeeVerification({
+          feeSubmissionId: submission.id,
+          feeVoucherId: submission.fee_voucher_id || submission.voucher_id,
+          registrationLeadId: submission.registration_lead_id,
+          verifiedByUserId: session.user.id,
+          status: "verified",
+          rejectionReason: null,
+          notes: "Monthly fee payment approved.",
+        }, tx);
+
+        await insertAuditLog(
+          session.user.id,
+          submission.fee_voucher_id || submission.voucher_id,
+          "monthly_payment_verified",
+          `Monthly fee payment ${submission.id} verified.`,
+          { feeSubmissionId: submission.id, voucherNo: submission.voucher_no },
+          tx,
+          { entityType: "fee_vouchers", entityId: submission.fee_voucher_id || submission.voucher_id }
+        );
+      }, TRANSACTION_OPTIONS);
+
+      return json("Monthly payment verified. LMS access restored.", 200, {
+        success: true,
+        credentials_email: null,
+      });
+    }
+
     const studentRollNo = await generateNextRollNo(submission.class_level, prisma);
     const parentTemporaryPassword = buildParentPassword(
       submission.parent_name || `${submission.student_name} Parent`,
@@ -639,10 +684,6 @@ export async function POST(request, { params }) {
       parentTemporaryPassword,
       studentTemporaryPassword
     ]);
-    const parentContactEmail =
-      submission.email || submission.parent_email || submission.parentEmail || "";
-    const parentContactPhone =
-      submission.phone || submission.parent_phone || submission.parentPhone || "";
     let studentLoginUsername = "";
     let parentLogin = parentContactEmail || parentContactPhone || "";
 
@@ -657,6 +698,7 @@ export async function POST(request, { params }) {
         SET status = 'verified'::voucher_status
         WHERE id = ${submission.fee_voucher_id || submission.voucher_id}::uuid;
       `;
+
       await tx.$executeRaw`
         UPDATE registration_leads
         SET status = 'fee_verified'::registration_status

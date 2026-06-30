@@ -78,14 +78,21 @@ async function getItems(status) {
       fv."voucher_no",
       fv."amount" AS voucher_amount,
       fv."status"::text AS voucher_status,
+      CASE WHEN fv.registration_id IS NULL THEN true ELSE false END AS is_monthly_voucher,
       rl."id"::text AS registration_lead_id,
-      rl."student_name",
+      CASE
+        WHEN fv.registration_id IS NULL THEN COALESCE(su.full_name, '')
+        ELSE COALESCE(rl."student_name", item.student_name, '')
+      END AS student_name,
       rl."parent_name",
       rl."email",
       rl."phone"
     FROM "fee_submissions" fs
     INNER JOIN "fee_vouchers" fv ON fv."id" = fs."voucher_id"
-    INNER JOIN "registration_leads" rl ON rl."id" = fv."registration_id"
+    LEFT JOIN "registration_leads" rl ON rl."id" = fv."registration_id"
+    LEFT JOIN "regular_monthly_fee_voucher_items" item ON item.voucher_id = fv.id
+    LEFT JOIN "student_profiles" sp ON sp.id = item.student_id
+    LEFT JOIN "users" su ON su.id = sp.user_id
     ${whereClause}
     ORDER BY fs."created_at" DESC NULLS LAST, fs."paid_at" DESC NULLS LAST, fs."id" DESC
     `,
@@ -95,6 +102,7 @@ async function getItems(status) {
   return Promise.all(
     rows.map(async (item) => ({
       ...item,
+      is_monthly_voucher: Boolean(item.is_monthly_voucher),
       status: normalizeStatus(item.status),
       // 🟢 FIXED: Convert Decimal object to plain JavaScript Number/String
       paid_amount: item.paid_amount ? Number(item.paid_amount) : 0,

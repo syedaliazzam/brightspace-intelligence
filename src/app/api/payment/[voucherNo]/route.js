@@ -19,12 +19,18 @@ export async function GET(_request, { params }) {
         LOWER(fv.status::text) AS status,
         fv.payment_method,
         fv.payment_instructions,
-        rl.student_name,
-        rl.parent_name,
-        rl.email,
-        rl.phone
+        COALESCE(su.full_name, rl.student_name, item.student_name, '') AS student_name,
+        COALESCE(rl.parent_name, item.parent_name, '') AS parent_name,
+        COALESCE(rl.email, item.student_email, item.parent_email, '') AS email,
+        COALESCE(rl.phone, item.student_phone, item.parent_phone, '') AS phone,
+        COALESCE(rl.class_level, c.class_level, c.title, '') AS class_level
       FROM fee_vouchers fv
-      INNER JOIN registration_leads rl ON rl.id = fv.registration_id
+      LEFT JOIN registration_leads rl ON rl.id = fv.registration_id
+      LEFT JOIN regular_monthly_fee_voucher_items item ON item.voucher_id = fv.id
+      LEFT JOIN student_profiles sp ON sp.id = item.student_id
+      LEFT JOIN users su ON su.id = sp.user_id
+      LEFT JOIN regular_monthly_fee_batches b ON b.id = item.batch_id
+      LEFT JOIN courses c ON c.id = b.class_id
       WHERE fv.voucher_no = ${voucherNo}
       LIMIT 1
     `;

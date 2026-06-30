@@ -29,6 +29,7 @@ export default function StudentDashboardPage() {
     markedDates: [],
     loading: true,
     error: "",
+    monthlyFee: null,
     filters: { date: todayDate(), range: "today", subjectId: "", status: "" },
   });
 
@@ -42,6 +43,13 @@ export default function StudentDashboardPage() {
       headlines: Array.isArray(data.headlines) ? data.headlines : [],
       error: "",
     }));
+  }
+
+  async function loadMonthlyFee() {
+    const response = await fetch("/api/monthly-fee-status", { cache: "no-store" });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data?.message || "Unable to load monthly fee status.");
+    setState((current) => ({ ...current, monthlyFee: data.available ? data : null }));
   }
 
   async function loadHomework() {
@@ -107,6 +115,12 @@ export default function StudentDashboardPage() {
       }
 
       try {
+        await loadMonthlyFee();
+      } catch (error) {
+        setState((current) => ({ ...current, error: error instanceof Error ? error.message : String(error) }));
+      }
+
+      try {
         const initialFilters = { date: todayDate(), range: "today", subjectId: "", status: "" };
         await loadLectures(initialFilters);
       } catch (error) {
@@ -124,6 +138,31 @@ export default function StudentDashboardPage() {
     <PaymentAccessGuard>
       <div className="space-y-6">
       <StudentPortalNavbar profile={profile} />
+
+      {state.monthlyFee && !state.monthlyFee.is_paid ? (
+        <section className={`w-full rounded-2xl border px-4 py-3 text-sm shadow-sm ${
+          state.monthlyFee.overdue
+            ? "border-rose-200 bg-rose-50 text-rose-700"
+            : state.monthlyFee.due_soon
+              ? "border-amber-200 bg-amber-50 text-amber-800"
+              : "border-sky-200 bg-sky-50 text-sky-700"
+        }`}>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div className="font-medium">
+              <p>
+                {state.monthlyFee.message || "Monthly fee voucher is not submitted yet. Please submit to continue LMS access."}
+              </p>
+              {typeof state.monthlyFee.days_left === "number" ? (
+                <p className="mt-1 text-xs font-semibold uppercase tracking-[0.18em]">
+                  {state.monthlyFee.days_left >= 0
+                    ? `${state.monthlyFee.days_left} day${state.monthlyFee.days_left === 1 ? "" : "s"} remaining`
+                    : `${Math.abs(state.monthlyFee.days_left)} day${Math.abs(state.monthlyFee.days_left) === 1 ? "" : "s"} overdue`}
+                </p>
+              ) : null}
+            </div>
+          </div>
+        </section>
+      ) : null}
 
       <ActiveHeadlinesBanner items={state.headlines} />
 
@@ -177,7 +216,7 @@ export default function StudentDashboardPage() {
           <p className="text-sm font-semibold uppercase tracking-[0.22em] text-sky-700">Teacher notes</p>
           <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">Latest feedback and updates</h2>
         </div>
-        <NoteThreadsBoard mode="viewer" />
+        <NoteThreadsBoard mode="student" />
       </motion.section>
 
       <motion.section id="profile" className="scroll-mt-28 rounded-[2rem] border border-white/70 bg-white/90 p-5 shadow-[0_20px_70px_-36px_rgba(15,23,42,0.25)]">

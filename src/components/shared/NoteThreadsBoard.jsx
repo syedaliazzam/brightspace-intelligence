@@ -17,7 +17,12 @@ function groupLectureOptions(lectures) {
 
 function MessageBubble({ message, mode }) {
   const senderRole = String(message.sender_role || "").toLowerCase();
-  const mine = mode === "admin" ? senderRole === "admin" : ["teacher", "admin"].includes(senderRole);
+  const mine =
+    mode === "admin"
+      ? senderRole === "admin"
+      : mode === "student"
+        ? senderRole === "student"
+        : ["teacher", "admin"].includes(senderRole);
   return (
     <div className={`flex ${mine ? "justify-end" : "justify-start"}`}>
       <div className={`max-w-[78%] rounded-2xl px-4 py-3 text-sm shadow-sm ${mine ? "bg-slate-950 text-white" : "bg-slate-100 text-slate-800"}`}>
@@ -55,7 +60,7 @@ function Modal({ title, subtitle, onClose, children, actions, showTopClose = tru
 }
 
 export default function NoteThreadsBoard({ mode = "viewer", lectures = [] }) {
-  const canReply = mode === "teacher" || mode === "admin" || mode === "parent";
+  const canReply = mode === "teacher" || mode === "admin" || mode === "parent" || mode === "student";
   const [threads, setThreads] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -73,8 +78,11 @@ export default function NoteThreadsBoard({ mode = "viewer", lectures = [] }) {
   const lectureOptions = useMemo(() => groupLectureOptions(lectures), [lectures]);
   const subjectOptions = useMemo(() => lectureOptions.filter((item) => item.classLevel === String(compose.classLevel || "").trim()), [lectureOptions, compose.classLevel]);
   const selectedVisibility = String(selected?.visibility || "").toLowerCase();
+  const isParentThread = ["parent", "parent_only"].includes(selectedVisibility);
+  const isStudentThread = selectedVisibility === "student";
   const canReplyToSelected =
-    (mode === "parent" && selectedVisibility === "parent") ||
+    (mode === "student" && isStudentThread) ||
+    (mode === "parent" && isParentThread) ||
     (mode === "teacher" && ["parent", "student", "admin_only", "admin"].includes(selectedVisibility)) ||
     (mode === "admin" && (selectedVisibility === "admin_only" || selectedVisibility === "admin"));
 

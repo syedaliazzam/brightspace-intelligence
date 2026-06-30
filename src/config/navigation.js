@@ -23,6 +23,7 @@ export const dashboardNavigation = {
     { label: "Interested Students", href: "/coordinator/interested-students" },
     { label: "Admission Records", href: "/coordinator/registration-leads" },
     { label: "Fee Vouchers", href: "/coordinator/fee-vouchers" },
+    { label: "Regular Fee Vouchers", href: "/coordinator/regular-fee-vouchers" },
     { label: "Payments", href: "/coordinator/payments" },
     { label: "Students", href: "/coordinator/students" },
     { label: "Parents", href: "/coordinator/parents" },

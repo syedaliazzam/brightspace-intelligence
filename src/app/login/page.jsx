@@ -240,15 +240,6 @@ export default function LoginPage() {
               </motion.button>
             </form>
 
-            <div className="mt-5 text-center text-sm text-slate-600">
-              New student?{" "}
-              <a
-                href="/admission-form"
-                className="font-semibold text-sky-700 transition hover:text-sky-800"
-              >
-                Register here
-              </a>
-            </div>
           </motion.section>
         </motion.div>
       </div>

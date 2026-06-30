@@ -23,47 +23,65 @@ export async function GET(request) {
 
     const items = await prisma.$queryRawUnsafe(
       `
+      WITH child_vouchers AS (
+        SELECT
+          fv.id,
+          fv.voucher_no,
+          fv.amount,
+          fv.due_date,
+          fv.payment_method,
+          fv.status,
+          fv.created_at,
+          su.full_name AS student_name,
+          false AS is_monthly_voucher
+        FROM student_profiles sp
+        INNER JOIN users su ON su.id = sp.user_id
+        ${joins}
+        INNER JOIN fee_vouchers fv ON fv.student_id = sp.id
+        ${where}
+
+        UNION ALL
+
+        SELECT
+          fv.id,
+          fv.voucher_no,
+          fv.amount,
+          fv.due_date,
+          fv.payment_method,
+          fv.status,
+          fv.created_at,
+          su.full_name AS student_name,
+          true AS is_monthly_voucher
+        FROM student_profiles sp
+        INNER JOIN users su ON su.id = sp.user_id
+        ${joins}
+        INNER JOIN regular_monthly_fee_voucher_items item ON item.student_id = sp.id
+        INNER JOIN fee_vouchers fv ON fv.id = item.voucher_id
+        ${where}
+      )
       SELECT
-        fv.id::text AS id,
-        fv.voucher_no,
-        fv.amount::text AS amount,
-        fv.due_date,
-        fv.payment_method::text AS payment_method,
-        fv.status::text AS voucher_status,
+        cv.id::text AS id,
+        cv.voucher_no,
+        cv.amount::text AS amount,
+        cv.due_date,
+        cv.payment_method::text AS payment_method,
+        cv.status::text AS voucher_status,
+        cv.is_monthly_voucher,
         fs.status::text AS submission_status,
         fs.transaction_id,
         fs.paid_amount::text AS paid_amount,
         fs.paid_at,
         fs.proof_file_path,
-        su.full_name AS student_name
-      FROM student_profiles sp
-      INNER JOIN users su ON su.id = sp.user_id
-      ${joins}
-      LEFT JOIN LATERAL (
-        SELECT
-          fv_inner.id,
-          fv_inner.voucher_no,
-          fv_inner.amount,
-          fv_inner.due_date,
-          fv_inner.payment_method,
-          fv_inner.status,
-          fv_inner.created_at
-        FROM fee_vouchers fv_inner
-        LEFT JOIN registration_leads rl_inner ON LOWER(rl_inner.student_name) = LOWER(su.full_name)
-        WHERE fv_inner.student_id = sp.id
-           OR (fv_inner.student_id IS NULL AND fv_inner.registration_id = rl_inner.id)
-        ORDER BY fv_inner.created_at DESC NULLS LAST, fv_inner.id DESC
-        LIMIT 1
-      ) fv ON TRUE
+        cv.student_name
+      FROM child_vouchers cv
       LEFT JOIN LATERAL (
         SELECT fs.status, fs.transaction_id, fs.paid_amount, fs.paid_at, fs.proof_file_path
         FROM fee_submissions fs
-        WHERE fs.voucher_id = fv.id
+        WHERE fs.voucher_id = cv.id
         ORDER BY fs.created_at DESC
         LIMIT 1
       ) fs ON TRUE
-      ${where}
-      ORDER BY fv.created_at DESC NULLS LAST
+      ORDER BY cv.created_at DESC NULLS LAST, cv.id DESC
       `,
       ...values
     );

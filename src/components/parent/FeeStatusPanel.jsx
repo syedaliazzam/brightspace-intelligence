@@ -1,21 +1,18 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import PaginationControls from "@/components/parent/PaginationControls";
 
 export default function FeeStatusPanel({ items = [] }) {
   const pageSize = 7;
   const [page, setPage] = useState(1);
 
-  useEffect(() => {
-    setPage(1);
-  }, [items]);
-
   const totalPages = Math.max(1, Math.ceil(items.length / pageSize));
   const visibleItems = useMemo(() => {
-    const startIndex = (page - 1) * pageSize;
+    const currentPage = Math.min(Math.max(1, page), totalPages);
+    const startIndex = (currentPage - 1) * pageSize;
     return items.slice(startIndex, startIndex + pageSize);
-  }, [items, page]);
+  }, [items, page, totalPages]);
 
   return (
     <section className="rounded-[1.75rem] border border-white/70 bg-white/90 p-5 shadow-[0_20px_70px_-36px_rgba(15,23,42,0.25)]">
@@ -28,7 +25,14 @@ export default function FeeStatusPanel({ items = [] }) {
           <article key={`${item.id || "fee"}-${item.transaction_id || "voucher"}-${index}`} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
             <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
               <div>
-                <p className="font-semibold text-slate-950">{item.voucher_no || "No voucher number"}</p>
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="font-semibold text-slate-950">{item.voucher_no || "No voucher number"}</p>
+                  {item.is_monthly_voucher ? (
+                    <span className="inline-flex rounded-full bg-sky-50 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-sky-700">
+                      Monthly
+                    </span>
+                  ) : null}
+                </div>
                 <p className="mt-1 text-sm text-slate-600">Student: {item.student_name || "-"}</p>
                 <p className="mt-1 text-sm text-slate-600">Amount: PKR {item.amount || item.paid_amount || "0"}</p>
                 <p className="mt-1 text-sm text-slate-500">Transaction: {item.transaction_id || "Not submitted"}</p>

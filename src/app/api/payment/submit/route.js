@@ -64,9 +64,19 @@ export async function POST(request) {
         fv.id::text AS id,
         fv.voucher_no,
         LOWER(fv.status::text) AS status,
-        rl.id::text AS registration_lead_id
+        rl.id::text AS registration_lead_id,
+        COALESCE(su.full_name, rl.student_name, item.student_name, '') AS student_name,
+        COALESCE(rl.parent_name, item.parent_name, '') AS parent_name,
+        COALESCE(rl.email, item.student_email, item.parent_email, '') AS email,
+        COALESCE(rl.phone, item.student_phone, item.parent_phone, '') AS phone,
+        COALESCE(rl.class_level, c.class_level, c.title, '') AS class_level
       FROM fee_vouchers fv
-      INNER JOIN registration_leads rl ON rl.id = fv.registration_id
+      LEFT JOIN registration_leads rl ON rl.id = fv.registration_id
+      LEFT JOIN regular_monthly_fee_voucher_items item ON item.voucher_id = fv.id
+      LEFT JOIN student_profiles sp ON sp.id = item.student_id
+      LEFT JOIN users su ON su.id = sp.user_id
+      LEFT JOIN regular_monthly_fee_batches b ON b.id = item.batch_id
+      LEFT JOIN courses c ON c.id = b.class_id
       WHERE fv.voucher_no = ${voucherNo}
       LIMIT 1
     `;
@@ -116,11 +126,13 @@ export async function POST(request) {
         WHERE id = ${voucher.id}::uuid
       `;
 
-      await tx.$executeRaw`
-        UPDATE registration_leads
-        SET status = ${"fee_submitted"}::registration_status
-        WHERE id = ${voucher.registration_lead_id}::uuid
-      `;
+      if (voucher.registration_lead_id) {
+        await tx.$executeRaw`
+          UPDATE registration_leads
+          SET status = ${"fee_submitted"}::registration_status
+          WHERE id = ${voucher.registration_lead_id}::uuid
+        `;
+      }
 
       const [created] = await tx.$queryRaw`
         SELECT
@@ -153,13 +165,18 @@ export async function POST(request) {
 
     const [lead] = await prisma.$queryRaw`
       SELECT
-        rl.student_name,
-        rl.parent_name,
-        rl.email,
-        rl.phone,
-        rl.class_level
+        COALESCE(su.full_name, rl.student_name, item.student_name, '') AS student_name,
+        COALESCE(rl.parent_name, item.parent_name, '') AS parent_name,
+        COALESCE(rl.email, item.student_email, item.parent_email, '') AS email,
+        COALESCE(rl.phone, item.student_phone, item.parent_phone, '') AS phone,
+        COALESCE(rl.class_level, c.class_level, c.title, '') AS class_level
       FROM fee_vouchers fv
-      INNER JOIN registration_leads rl ON rl.id = fv.registration_id
+      LEFT JOIN registration_leads rl ON rl.id = fv.registration_id
+      LEFT JOIN regular_monthly_fee_voucher_items item ON item.voucher_id = fv.id
+      LEFT JOIN student_profiles sp ON sp.id = item.student_id
+      LEFT JOIN users su ON su.id = sp.user_id
+      LEFT JOIN regular_monthly_fee_batches b ON b.id = item.batch_id
+      LEFT JOIN courses c ON c.id = b.class_id
       WHERE fv.voucher_no = ${voucherNo}
       LIMIT 1
     `;

@@ -783,24 +783,24 @@ export default function AdmissionFormPage() {
       <div className="absolute bottom-10 right-0 h-72 w-72 rounded-full bg-blue-500/10 blur-3xl" />
 
       <div className="relative mx-auto flex min-h-screen max-w-7xl items-center px-4 py-10 sm:px-6 lg:px-8">
-        <motion.div className="grid w-full items-stretch gap-8 lg:grid-cols-[0.96fr_1.04fr]" variants={container} initial="hidden" animate="show">
-          <motion.section variants={item} className="flex flex-col justify-start rounded-[2rem] border border-white/60 bg-white/80 p-8 shadow-[0_24px_80px_-32px_rgba(15,23,42,0.28)] backdrop-blur-xl sm:p-10 lg:p-12">
-            <div className="max-w-xl">
+        <motion.div className="grid w-full items-stretch gap-8 lg:grid-cols-[0.8fr_1.2fr]" variants={container} initial="hidden" animate="show">
+          <motion.section variants={item} className="flex md-w-[550px] flex-col justify-start rounded-[2rem] border border-white/60 bg-white/80 p-6 shadow-[0_24px_80px_-32px_rgba(15,23,42,0.28)] backdrop-blur-xl sm:p-7 lg:p-8">
+            <div className="max-w-sm">
               <span className="inline-flex rounded-full border border-sky-200 bg-sky-50 px-4 py-1 text-xs font-semibold uppercase tracking-[0.24em] text-sky-700">
                 Admission form
               </span>
-              <h1 className="mt-6 text-4xl font-semibold tracking-tight text-slate-950 sm:text-5xl">
+              <h1 className="mt-6 text-2xl font-semibold tracking-tight text-slate-950 sm:text-4xl">
                 Apply for your child&apos;s admission to Ash-Shajarah Learning Hub.
               </h1>
-              <p className="mt-5 max-w-lg text-base leading-7 text-slate-600 sm:text-lg">
+              <p className="mt-5 max-w-lg text-base leading-7 text-slate-600 sm:text-mg">
                 Complete the admission form step by step. Our admissions team will review the application and guide you through the next stage.
               </p>
             </div>
 
-            <div className="mt-10 grid gap-4">
+            <div className="mt-8 grid gap-3">
               {STEP_TITLES.map((label, index) => (
-                <div key={label} className={`flex items-center gap-4 rounded-2xl border px-4 py-4 text-sm ${index === step ? "border-sky-300 bg-sky-50 text-sky-800" : index < step ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-slate-200 bg-slate-50/90 text-slate-700"}`}>
-                  <span className={`flex h-9 w-9 items-center justify-center rounded-full text-sm font-semibold ${index === step ? "bg-sky-700 text-white" : index < step ? "bg-emerald-600 text-white" : "bg-white text-slate-700"}`}>
+                <div key={label} className={`flex items-center gap-3 rounded-2xl border px-3 py-3 text-sm ${index === step ? "border-sky-300 bg-sky-50 text-sky-800" : index < step ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-slate-200 bg-slate-50/90 text-slate-700"}`}>
+                  <span className={`flex h-8 w-8 items-center justify-center rounded-full text-sm font-semibold ${index === step ? "bg-sky-700 text-white" : index < step ? "bg-emerald-600 text-white" : "bg-white text-slate-700"}`}>
                     {index + 1}
                   </span>
                   <div>
@@ -813,9 +813,9 @@ export default function AdmissionFormPage() {
               ))}
             </div>
 
-            <div className="mt-10 rounded-3xl bg-slate-950 px-6 py-6 text-white shadow-lg">
+            <div className="mt-8 rounded-3xl bg-slate-950 px-5 py-5 text-white shadow-lg">
               <p className="text-sm uppercase tracking-[0.24em] text-sky-200">Healthy digital learning</p>
-              <p className="mt-3 max-w-md text-sm leading-6 text-slate-300">
+              <p className="mt-3 max-w-md md:text-sm leading-6 text-slate-300">
                 Ash-Shajarah follows a parent partnership model with age-appropriate online sessions, guided home activities, and a strong focus on healthy device use.
               </p>
             </div>
@@ -869,13 +869,6 @@ export default function AdmissionFormPage() {
                     </motion.button>
                   )}
                 </div>
-              </div>
-
-              <div className="text-center text-sm text-slate-600">
-                Already registered?{" "}
-                <a href="/login" className="font-semibold text-sky-700 transition hover:text-sky-800">
-                  Sign in here
-                </a>
               </div>
             </form>
           </motion.section>
