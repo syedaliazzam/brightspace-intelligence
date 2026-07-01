@@ -90,71 +90,31 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="relative min-h-screen overflow-hidden bg-[#f5f7fb] text-slate-900">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(37,99,235,0.18),_transparent_32%),radial-gradient(circle_at_bottom_right,_rgba(14,165,233,0.14),_transparent_30%),linear-gradient(180deg,_#f8fbff_0%,_#eef4ff_100%)]" />
-      <div className="absolute left-[-6rem] top-24 h-56 w-56 rounded-full bg-sky-400/20 blur-3xl" />
-      <div className="absolute bottom-10 right-0 h-72 w-72 rounded-full bg-blue-500/10 blur-3xl" />
+    <main className="relative min-h-screen overflow-hidden bg-[#FAF7F0] text-[#063F32]">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(45,138,106,0.16),_transparent_34%),radial-gradient(circle_at_bottom_right,_rgba(201,162,39,0.12),_transparent_30%),radial-gradient(circle_at_center,_rgba(101,184,145,0.08),_transparent_42%)]" />
+      <div className="absolute left-[-6rem] top-20 h-72 w-72 rounded-full bg-[#2D8A6A]/10 blur-3xl" />
+      <div className="absolute bottom-[-5rem] right-[-4rem] h-80 w-80 rounded-full bg-[#C9A227]/10 blur-3xl" />
 
-      <div className="relative mx-auto flex min-h-screen max-w-7xl items-center px-4 py-10 sm:px-6 lg:px-8">
-        <motion.div
-          className="grid w-full items-stretch gap-8 lg:grid-cols-[1.1fr_0.9fr]"
+      <div className="relative mx-auto flex min-h-screen max-w-7xl items-center justify-center px-4 py-10 sm:px-6 lg:px-8">
+        <motion.section
           variants={container}
           initial="hidden"
           animate="show"
+          className="w-full max-w-[460px]"
         >
-          <motion.section
+          <motion.div
             variants={item}
-            className="flex flex-col justify-between rounded-[2rem] border border-white/60 bg-white/80 p-8 shadow-[0_24px_80px_-32px_rgba(15,23,42,0.28)] backdrop-blur-xl sm:p-10 lg:p-12"
+            className="relative overflow-hidden rounded-[2rem] border border-[rgba(13,59,46,0.12)] bg-white/85 p-6 shadow-[0_18px_48px_rgba(13,59,46,0.12)] backdrop-blur-xl sm:p-8"
           >
-            <div className="max-w-xl">
-              <span className="inline-flex rounded-full border border-sky-200 bg-sky-50 px-4 py-1 text-xs font-semibold uppercase tracking-[0.24em] text-sky-700">
-                Learning platform access
-              </span>
-              <h1 className="mt-6 text-4xl font-semibold tracking-tight text-slate-950 sm:text-5xl">
-                Welcome back to your learning portal.
-              </h1>
-              <p className="mt-5 max-w-lg text-base leading-7 text-slate-600 sm:text-lg">
-                Sign in to access your account and continue with classes, updates, and daily school activities.
-              </p>
-            </div>
+            <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-[#C9A227] via-[#E4C766] to-[#2D8A6A]" />
 
-            <div className="mt-10 grid gap-4 sm:grid-cols-3">
-              {[
-                "Easy account access",
-                "Safe and secure sign in",
-                "Works smoothly on every screen",
-              ].map((label) => (
-                <div
-                  key={label}
-                  className="rounded-2xl border border-slate-200 bg-slate-50/90 px-4 py-4 text-sm font-medium text-slate-700"
-                >
-                  {label}
-                </div>
-              ))}
-            </div>
-
-            <div className="mt-10 rounded-3xl bg-slate-950 px-6 py-6 text-white shadow-lg">
-              <p className="text-sm uppercase tracking-[0.24em] text-sky-200">Simple and clear</p>
-              <p className="mt-3 max-w-md text-sm leading-6 text-slate-300">
-                A clean sign-in experience with clear fields, quick guidance, and direct access to the right dashboard after login.
-              </p>
-            </div>
-          </motion.section>
-
-          <motion.section
-            variants={item}
-            className="rounded-[2rem] border border-slate-200/80 bg-white p-6 shadow-[0_24px_80px_-32px_rgba(15,23,42,0.22)] sm:p-8 lg:p-10"
-          >
             <div className="mb-8">
-              <p className="text-sm font-semibold uppercase tracking-[0.24em] text-sky-700">
-                Welcome back
+              <p className="text-xs font-bold uppercase tracking-[0.26em] text-[#0D5C48]">
+                Ash-Shajrah Learning Hub
               </p>
-              <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">
+              <h1 className="mt-3 font-serif text-[2rem] font-semibold leading-tight text-[#063F32] sm:text-[2.2rem]">
                 Sign in to your account
-              </h2>
-              <p className="mt-2 text-sm leading-6 text-slate-600">
-                Use your email or phone number with your password.
-              </p>
+              </h1>
             </div>
 
             {errors.form ? (
@@ -170,7 +130,7 @@ export default function LoginPage() {
               <div>
                 <label
                   htmlFor="identifier"
-                  className="mb-2 block text-sm font-medium text-slate-700"
+                  className="mb-2 block text-[11px] font-bold uppercase tracking-[0.18em] text-[#0D5C48]"
                 >
                   Email or Phone Number
                 </label>
@@ -181,10 +141,10 @@ export default function LoginPage() {
                   autoComplete="username"
                   value={identifier}
                   onChange={(event) => setIdentifier(event.target.value)}
-                  className={`w-full rounded-2xl border px-4 py-3 text-slate-950 outline-none transition placeholder:text-slate-400 focus:ring-4 ${
+                  className={`w-full rounded-[14px] border bg-[#FAF7F0] px-4 py-3 text-[#063F32] outline-none transition placeholder:text-[#245C4F]/60 focus:border-[#2D8A6A] focus:ring-4 focus:ring-[#2D8A6A]/10 ${
                     errors.identifier
-                      ? "border-rose-300 bg-rose-50 focus:border-rose-400 focus:ring-rose-100"
-                      : "border-slate-200 bg-slate-50 focus:border-sky-400 focus:ring-sky-100"
+                      ? "border-rose-300 bg-rose-50 focus:ring-rose-100"
+                      : "border-[rgba(13,59,46,0.12)]"
                   }`}
                   placeholder="name@example.com or +92..."
                 />
@@ -196,7 +156,7 @@ export default function LoginPage() {
               <div>
                 <label
                   htmlFor="password"
-                  className="mb-2 block text-sm font-medium text-slate-700"
+                  className="mb-2 block text-[11px] font-bold uppercase tracking-[0.18em] text-[#0D5C48]"
                 >
                   Password
                 </label>
@@ -208,17 +168,17 @@ export default function LoginPage() {
                     autoComplete="current-password"
                     value={password}
                     onChange={(event) => setPassword(event.target.value)}
-                    className={`w-full rounded-2xl border px-4 py-3 pr-12 text-slate-950 outline-none transition placeholder:text-slate-400 focus:ring-4 ${
+                    className={`w-full rounded-[14px] border bg-[#FAF7F0] px-4 py-3 pr-12 text-[#063F32] outline-none transition placeholder:text-[#245C4F]/60 focus:border-[#2D8A6A] focus:ring-4 focus:ring-[#2D8A6A]/10 ${
                       errors.password
-                        ? "border-rose-300 bg-rose-50 focus:border-rose-400 focus:ring-rose-100"
-                        : "border-slate-200 bg-slate-50 focus:border-sky-400 focus:ring-sky-100"
+                        ? "border-rose-300 bg-rose-50 focus:ring-rose-100"
+                        : "border-[rgba(13,59,46,0.12)]"
                     }`}
                     placeholder="Enter your password"
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword((current) => !current)}
-                    className="absolute inset-y-0 right-3 flex items-center text-slate-500 transition hover:text-slate-700"
+                    className="absolute inset-y-0 right-3 flex items-center text-[#245C4F] transition hover:text-[#063F32]"
                     aria-label={showPassword ? "Hide password" : "Show password"}
                   >
                     {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
@@ -234,14 +194,13 @@ export default function LoginPage() {
                 whileHover={{ y: -1 }}
                 whileTap={{ scale: 0.99 }}
                 disabled={pending}
-                className="inline-flex w-full items-center justify-center rounded-2xl bg-slate-950 px-4 py-3.5 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-70"
+                className="inline-flex w-full items-center justify-center rounded-full bg-[#2D8A6A] px-4 py-3.5 text-sm font-semibold text-[#FAF7F0] shadow-[0_12px_28px_rgba(45,138,106,0.25)] transition hover:bg-[#65B891] disabled:cursor-not-allowed disabled:opacity-70"
               >
                 {pending ? "Signing in..." : "Sign in"}
               </motion.button>
             </form>
-
-          </motion.section>
-        </motion.div>
+          </motion.div>
+        </motion.section>
       </div>
     </main>
   );
