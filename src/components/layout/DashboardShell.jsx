@@ -53,13 +53,13 @@ export default function DashboardShell({ session, children }) {
         ) : null}
 
         <main className={`transition-[padding] duration-200 ${isStudent ? "pt-0" : `pt-24 ${collapsed ? "lg:pl-20" : "lg:pl-72"}`}`}>
-          <div className="px-4 pb-10 sm:px-6 lg:px-8">
+          <div className="px-4 pb-4 sm:px-4 lg:px-4">
             {isStudent ? children : (
               <motion.section
                 initial={{ opacity: 0, y: 14 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.35 }}
-                className="rounded-[2rem] border border-white/70 bg-white/85 p-5 shadow-[0_24px_80px_-36px_rgba(15,23,42,0.25)] backdrop-blur-xl sm:p-8"
+                className="rounded-[2rem] border border-black/10 bg-white/85 p-0 shadow-[0_24px_80px_-36px_rgba(15,23,42,0.25)] backdrop-blur-xl sm:p-0"
               >
                 {children ?? (
                   <div className="grid gap-4 md:grid-cols-3">

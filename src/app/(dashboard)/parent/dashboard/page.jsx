@@ -99,19 +99,21 @@ export default function ParentDashboardPage() {
 
   return (
     <PaymentAccessGuard>
-      <div className="space-y-6 min-h-screen">
+      <div className="relative rounded-[2rem] min-h-screen overflow-hidden bg-[#FAF7F0]">
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(201,162,39,0.12),transparent_35%),radial-gradient(circle_at_top_right,rgba(45,138,106,0.12),transparent_32%),linear-gradient(180deg,#FAF7F0_0%,#F7F1E3_100%)]" />
+        <div className="relative mx-auto max-w-7xl space-y-6 overflow-hidden rounded-[2rem] px-4 py-4 sm:px-6 lg:px-8">
       {state.monthlyFee && hasUnpaidMonthlyChildren ? (
-        <section className={`w-full rounded-2xl border px-4 py-3 text-sm shadow-sm ${
+        <section className={`w-full rounded-[1.75rem] border px-4 py-3 text-sm shadow-[0_14px_40px_-26px_rgba(13,59,46,0.22)] ${
           state.monthlyFee.overdue
             ? "border-rose-200 bg-rose-50 text-rose-700"
             : state.monthlyFee.due_soon
-              ? "border-amber-200 bg-amber-50 text-amber-800"
-              : "border-sky-200 bg-sky-50 text-sky-700"
+              ? "border-[#E4C766]/70 bg-[#FFF5D6] text-[#8A6B00]"
+              : "border-[#2D8A6A]/20 bg-white/85 text-[#0D5C48]"
         }`}>
           <div className="flex flex-col gap-4">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <div className="font-medium">
-                <p>
+                <p className="text-[#BF2106] font-bold">
                   {state.monthlyFee.message || "Monthly fee voucher is not submitted yet. Please submit to continue LMS access."}
                 </p>
                 {typeof state.monthlyFee.days_left === "number" ? (
@@ -181,9 +183,10 @@ export default function ParentDashboardPage() {
       ) : null}
 
       <ActiveHeadlinesBanner items={state.headlines} />
-      <section className="rounded-[2rem] border border-white/70 bg-[linear-gradient(135deg,rgba(255,255,255,0.94),rgba(239,248,255,0.92))] p-6 shadow-[0_24px_80px_-36px_rgba(15,23,42,0.25)] sm:p-8">
-        <h1 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">Child learning overview</h1>
-        <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-600 sm:text-base">
+      <section className="rounded-[2rem] border border-[#2D8A6A]/15 bg-[linear-gradient(135deg,rgba(255,255,255,0.95),rgba(250,247,240,0.96))] p-6 shadow-[0_24px_80px_-36px_rgba(13,59,46,0.22)] sm:p-8">
+        <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-[#0D5C48]">Parent dashboard</p>
+        <h1 className="mt-3 font-serif text-3xl font-semibold tracking-tight text-[#063F32] sm:text-4xl">Child learning overview</h1>
+        <p className="mt-3 max-w-3xl text-sm leading-7 text-[#245C4F] sm:text-base">
           Monitor classes, homework, attendance, fee status, and upcoming Google Meet sessions in one place.
         </p>
       </section>
@@ -205,7 +208,7 @@ export default function ParentDashboardPage() {
       {state.error ? <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">{state.error}</div> : null}
 
       {!state.selectedChildId ? (
-        <div className="rounded-[1.75rem] border border-dashed border-slate-300 bg-white/85 p-8 text-center text-sm text-slate-600 shadow-[0_18px_60px_-36px_rgba(15,23,42,0.18)]">
+        <div className="rounded-[1.75rem] border border-dashed border-[#2D8A6A]/20 bg-[#FAF7F0] p-8 text-center text-sm text-[#245C4F] shadow-[0_18px_60px_-36px_rgba(13,59,46,0.16)]">
           Please select a child first.
         </div>
       ) : (
@@ -218,6 +221,7 @@ export default function ParentDashboardPage() {
           ]}
         />
       )}
+        </div>
       </div>
     </PaymentAccessGuard>
   );

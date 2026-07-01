@@ -102,14 +102,14 @@ export default function StudentDashboardPage() {
     <PaymentAccessGuard>
       <div className="relative bg-[#FAF7F0]">
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(201,162,39,0.12),transparent_35%),radial-gradient(circle_at_top_right,rgba(45,138,106,0.12),transparent_32%),linear-gradient(180deg,#FAF7F0_0%,#F7F1E3_100%)]" />
-        <div className="relative mx-auto max-w-7xl space-y-6 px-4 py-4 sm:px-6 lg:px-8">
+        <div className="rounded-[2rem] relative mx-auto max-w-7xl space-y-6 px-4 py-4 sm:px-6 lg:px-8">
           <StudentPortalNavbar profile={profile} />
 
           {state.monthlyFee && !state.monthlyFee.is_paid ? (
             <section className={`w-full rounded-[1.75rem] border px-4 py-3 text-sm shadow-[0_14px_40px_-26px_rgba(13,59,46,0.22)] ${state.monthlyFee.overdue ? "border-rose-200 bg-rose-50 text-rose-700" : state.monthlyFee.due_soon ? "border-[#E4C766]/70 bg-[#FFF5D6] text-[#8A6B00]" : "border-[#2D8A6A]/20 bg-white/85 text-[#0D5C48]"}`}>
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <div className="font-medium">
-                  <p>{state.monthlyFee.message || "Monthly fee voucher is not submitted yet. Please submit to continue LMS access."}</p>
+                  <p className="text-[#BF2106] font-bold">{state.monthlyFee.message || "Monthly fee voucher is not submitted yet. Please submit to continue LMS access."}</p>
                   {typeof state.monthlyFee.days_left === "number" ? (
                     <p className="mt-1 text-xs font-semibold uppercase tracking-[0.18em]">
                       {state.monthlyFee.days_left >= 0 ? `${state.monthlyFee.days_left} day${state.monthlyFee.days_left === 1 ? "" : "s"} remaining` : `${Math.abs(state.monthlyFee.days_left)} day${Math.abs(state.monthlyFee.days_left) === 1 ? "" : "s"} overdue`}
@@ -171,7 +171,7 @@ export default function StudentDashboardPage() {
             <NoteThreadsBoard mode="student" />
           </motion.section>
 
-          <motion.section id="profile" className="scroll-mt-28 rounded-[2rem] border border-[#2D8A6A]/15 bg-white/90 p-5 shadow-[0_20px_70px_-36px_rgba(13,59,46,0.18)]">
+          <motion.section id="profile" className="scroll-mt-28 rounded-[2rem] border border-[#2D8A6A]/15 bg-white/90 mb-4 p-5 shadow-[0_20px_70px_-36px_rgba(13,59,46,0.18)]">
             <div className="mb-5">
               <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-[#0D5C48]">Profile</p>
               <h2 className="mt-2 font-serif text-2xl font-semibold tracking-tight text-[#063F32]">Student details</h2>
