@@ -37,12 +37,7 @@ export default function StudentDashboardPage() {
     const response = await fetch("/api/student/dashboard", { cache: "no-store" });
     const data = await response.json();
     if (!response.ok) throw new Error(data?.message || "Unable to load dashboard.");
-    setState((current) => ({
-      ...current,
-      stats: data.stats || {},
-      headlines: Array.isArray(data.headlines) ? data.headlines : [],
-      error: "",
-    }));
+    setState((current) => ({ ...current, stats: data.stats || {}, headlines: Array.isArray(data.headlines) ? data.headlines : [], error: "" }));
   }
 
   async function loadMonthlyFee() {
@@ -90,44 +85,13 @@ export default function StudentDashboardPage() {
 
   useEffect(() => {
     async function initialize() {
-      try {
-        await loadDashboard();
-      } catch (error) {
-        setState((current) => ({ ...current, error: error instanceof Error ? error.message : String(error) }));
-      }
-
-      try {
-        await loadHomework();
-      } catch (error) {
-        setState((current) => ({ ...current, error: error instanceof Error ? error.message : String(error) }));
-      }
-
-      try {
-        await loadAttendance();
-      } catch (error) {
-        setState((current) => ({ ...current, error: error instanceof Error ? error.message : String(error) }));
-      }
-
-      try {
-        await loadProfile();
-      } catch (error) {
-        setState((current) => ({ ...current, error: error instanceof Error ? error.message : String(error) }));
-      }
-
-      try {
-        await loadMonthlyFee();
-      } catch (error) {
-        setState((current) => ({ ...current, error: error instanceof Error ? error.message : String(error) }));
-      }
-
-      try {
-        const initialFilters = { date: todayDate(), range: "today", subjectId: "", status: "" };
-        await loadLectures(initialFilters);
-      } catch (error) {
-        setState((current) => ({ ...current, loading: false, error: error instanceof Error ? error.message : String(error) }));
-      }
+      try { await loadDashboard(); } catch (error) { setState((current) => ({ ...current, error: error instanceof Error ? error.message : String(error) })); }
+      try { await loadHomework(); } catch (error) { setState((current) => ({ ...current, error: error instanceof Error ? error.message : String(error) })); }
+      try { await loadAttendance(); } catch (error) { setState((current) => ({ ...current, error: error instanceof Error ? error.message : String(error) })); }
+      try { await loadProfile(); } catch (error) { setState((current) => ({ ...current, error: error instanceof Error ? error.message : String(error) })); }
+      try { await loadMonthlyFee(); } catch (error) { setState((current) => ({ ...current, error: error instanceof Error ? error.message : String(error) })); }
+      try { await loadLectures({ date: todayDate(), range: "today", subjectId: "", status: "" }); } catch (error) { setState((current) => ({ ...current, loading: false, error: error instanceof Error ? error.message : String(error) })); }
     }
-
     initialize();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -136,109 +100,98 @@ export default function StudentDashboardPage() {
 
   return (
     <PaymentAccessGuard>
-      <div className="space-y-6">
-      <StudentPortalNavbar profile={profile} />
+      <div className="relative bg-[#FAF7F0]">
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(201,162,39,0.12),transparent_35%),radial-gradient(circle_at_top_right,rgba(45,138,106,0.12),transparent_32%),linear-gradient(180deg,#FAF7F0_0%,#F7F1E3_100%)]" />
+        <div className="relative mx-auto max-w-7xl space-y-6 px-4 py-4 sm:px-6 lg:px-8">
+          <StudentPortalNavbar profile={profile} />
 
-      {state.monthlyFee && !state.monthlyFee.is_paid ? (
-        <section className={`w-full rounded-2xl border px-4 py-3 text-sm shadow-sm ${
-          state.monthlyFee.overdue
-            ? "border-rose-200 bg-rose-50 text-rose-700"
-            : state.monthlyFee.due_soon
-              ? "border-amber-200 bg-amber-50 text-amber-800"
-              : "border-sky-200 bg-sky-50 text-sky-700"
-        }`}>
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <div className="font-medium">
-              <p>
-                {state.monthlyFee.message || "Monthly fee voucher is not submitted yet. Please submit to continue LMS access."}
-              </p>
-              {typeof state.monthlyFee.days_left === "number" ? (
-                <p className="mt-1 text-xs font-semibold uppercase tracking-[0.18em]">
-                  {state.monthlyFee.days_left >= 0
-                    ? `${state.monthlyFee.days_left} day${state.monthlyFee.days_left === 1 ? "" : "s"} remaining`
-                    : `${Math.abs(state.monthlyFee.days_left)} day${Math.abs(state.monthlyFee.days_left) === 1 ? "" : "s"} overdue`}
-                </p>
-              ) : null}
+          {state.monthlyFee && !state.monthlyFee.is_paid ? (
+            <section className={`w-full rounded-[1.75rem] border px-4 py-3 text-sm shadow-[0_14px_40px_-26px_rgba(13,59,46,0.22)] ${state.monthlyFee.overdue ? "border-rose-200 bg-rose-50 text-rose-700" : state.monthlyFee.due_soon ? "border-[#E4C766]/70 bg-[#FFF5D6] text-[#8A6B00]" : "border-[#2D8A6A]/20 bg-white/85 text-[#0D5C48]"}`}>
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <div className="font-medium">
+                  <p>{state.monthlyFee.message || "Monthly fee voucher is not submitted yet. Please submit to continue LMS access."}</p>
+                  {typeof state.monthlyFee.days_left === "number" ? (
+                    <p className="mt-1 text-xs font-semibold uppercase tracking-[0.18em]">
+                      {state.monthlyFee.days_left >= 0 ? `${state.monthlyFee.days_left} day${state.monthlyFee.days_left === 1 ? "" : "s"} remaining` : `${Math.abs(state.monthlyFee.days_left)} day${Math.abs(state.monthlyFee.days_left) === 1 ? "" : "s"} overdue`}
+                    </p>
+                  ) : null}
+                </div>
+              </div>
+            </section>
+          ) : null}
+
+          <ActiveHeadlinesBanner items={state.headlines} />
+
+          <section id="dashboard" className="scroll-mt-28 rounded-[2rem] border border-[#2D8A6A]/15 bg-[linear-gradient(135deg,rgba(255,255,255,0.95),rgba(250,247,240,0.96))] p-6 shadow-[0_24px_80px_-36px_rgba(13,59,46,0.22)] sm:p-8">
+            <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-[#0D5C48]">Student dashboard</p>
+            <h1 className="mt-3 font-serif text-3xl font-semibold tracking-tight text-[#063F32] sm:text-4xl">Your learning command center</h1>
+            {state.error ? <div className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">{state.error}</div> : null}
+            <div className="mt-6">
+              <StudentStatsCards items={[
+                { key: "subjects", label: "Total Subjects", value: state.stats.total_subjects || 0 },
+                { key: "homework", label: "Pending Homeworks", value: state.stats.pending_homeworks || 0 },
+                { key: "lectures", label: "Total Lectures", value: state.stats.total_lectures || 0 },
+                { key: "conducted", label: "Conducted Lectures", value: state.stats.conducted_lectures || 0 },
+                { key: "present", label: "Lectures Present", value: state.stats.lectures_present || 0 },
+                { key: "attendance", label: "Attendance Percentage", value: `${state.stats.attendance_percentage || 0}%` },
+                { key: "fee", label: "Fee Status", value: state.stats.fee_status_label || "Not Paid" },
+              ]} />
             </div>
-          </div>
-        </section>
-      ) : null}
+          </section>
 
-      <ActiveHeadlinesBanner items={state.headlines} />
+          <motion.section id="calendar" className="scroll-mt-28 rounded-[2rem] border border-[#2D8A6A]/15 bg-white/90 p-5 shadow-[0_20px_70px_-36px_rgba(13,59,46,0.18)]">
+            <div className="mb-5">
+              <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-[#0D5C48]">Lecture Calendar</p>
+              <h2 className="mt-2 font-serif text-2xl font-semibold tracking-tight text-[#063F32]">Plan your study week</h2>
+            </div>
+            <LMSCalendar apiUrl="/api/student/calendar-lectures" filters={state.filters} onDateSelect={(date) => updateFilters({ ...state.filters, date, range: "selected_date" })} />
+          </motion.section>
 
-      <section id="dashboard" className="scroll-mt-28 rounded-[2rem] border border-white/70 bg-[linear-gradient(135deg,rgba(255,255,255,0.95),rgba(238,248,255,0.94))] p-6 shadow-[0_24px_80px_-36px_rgba(15,23,42,0.25)] sm:p-8">
-        <p className="text-sm font-semibold uppercase tracking-[0.24em] text-sky-700">Student dashboard</p>
-        <h1 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">Your learning command center</h1>
-        {state.error ? <div className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">{state.error}</div> : null}
-        <div className="mt-6">
-          <StudentStatsCards items={[
-            { key: "subjects", label: "Total Subjects", value: state.stats.total_subjects || 0 },
-            { key: "homework", label: "Pending Homeworks", value: state.stats.pending_homeworks || 0 },
-            { key: "lectures", label: "Total Lectures", value: state.stats.total_lectures || 0 },
-            { key: "conducted", label: "Conducted Lectures", value: state.stats.conducted_lectures || 0 },
-            { key: "present", label: "Lectures Present", value: state.stats.lectures_present || 0 },
-            { key: "attendance", label: "Attendance Percentage", value: `${state.stats.attendance_percentage || 0}%` },
-            { key: "fee", label: "Fee Status", value: state.stats.fee_status_label || "Not Paid" },
-          ]} />
-        </div>
-      </section>
+          <motion.section id="homework" className="scroll-mt-28 rounded-[2rem] border border-[#2D8A6A]/15 bg-white/90 p-5 shadow-[0_20px_70px_-36px_rgba(13,59,46,0.18)]">
+            <div className="mb-5">
+              <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-[#0D5C48]">Homework</p>
+              <h2 className="mt-2 font-serif text-2xl font-semibold tracking-tight text-[#063F32]">Assigned work</h2>
+            </div>
+            <HomeworkList items={state.homework} onRefresh={() => loadHomework().catch((error) => setState((current) => ({ ...current, error: error.message })))} />
+          </motion.section>
 
-      <motion.section id="calendar" className="scroll-mt-28 rounded-[2rem] border border-white/70 bg-white/90 p-5 shadow-[0_20px_70px_-36px_rgba(15,23,42,0.25)]">
-        <div className="mb-5">
-          <p className="text-sm font-semibold uppercase tracking-[0.22em] text-sky-700">Lecture Calendar</p>
-          <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">Plan your study week</h2>
-        </div>
-        <LMSCalendar
-          apiUrl="/api/student/calendar-lectures"
-          filters={state.filters}
-          onDateSelect={(date) => updateFilters({ ...state.filters, date, range: "selected_date" })}
-        />
-      </motion.section>
+          <motion.section id="attendance" className="scroll-mt-28 rounded-[2rem] border border-[#2D8A6A]/15 bg-white/90 p-5 shadow-[0_20px_70px_-36px_rgba(13,59,46,0.18)]">
+            <div className="mb-5">
+              <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-[#0D5C48]">Attendance</p>
+              <h2 className="mt-2 font-serif text-2xl font-semibold tracking-tight text-[#063F32]">Conducted lecture attendance</h2>
+            </div>
+            <AttendanceSummary summary={state.attendance.summary} items={state.attendance.items} />
+          </motion.section>
 
-      <motion.section id="homework" className="scroll-mt-28 rounded-[2rem] border border-white/70 bg-white/90 p-5 shadow-[0_20px_70px_-36px_rgba(15,23,42,0.25)]">
-        <div className="mb-5">
-          <p className="text-sm font-semibold uppercase tracking-[0.22em] text-sky-700">Homework</p>
-          <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">Assigned work</h2>
-        </div>
-        <HomeworkList items={state.homework} onRefresh={() => loadHomework().catch((error) => setState((current) => ({ ...current, error: error.message })))} />
-      </motion.section>
+          <motion.section id="notes" className="scroll-mt-28 rounded-[2rem] border border-[#2D8A6A]/15 bg-white/90 p-5 shadow-[0_20px_70px_-36px_rgba(13,59,46,0.18)]">
+            <div className="mb-5">
+              <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-[#0D5C48]">Teacher notes</p>
+              <h2 className="mt-2 font-serif text-2xl font-semibold tracking-tight text-[#063F32]">Latest feedback and updates</h2>
+            </div>
+            <NoteThreadsBoard mode="student" />
+          </motion.section>
 
-      <motion.section id="attendance" className="scroll-mt-28 rounded-[2rem] border border-white/70 bg-white/90 p-5 shadow-[0_20px_70px_-36px_rgba(15,23,42,0.25)]">
-        <div className="mb-5">
-          <p className="text-sm font-semibold uppercase tracking-[0.22em] text-sky-700">Attendance</p>
-          <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">Conducted lecture attendance</h2>
+          <motion.section id="profile" className="scroll-mt-28 rounded-[2rem] border border-[#2D8A6A]/15 bg-white/90 p-5 shadow-[0_20px_70px_-36px_rgba(13,59,46,0.18)]">
+            <div className="mb-5">
+              <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-[#0D5C48]">Profile</p>
+              <h2 className="mt-2 font-serif text-2xl font-semibold tracking-tight text-[#063F32]">Student details</h2>
+            </div>
+            <div className="grid gap-3 text-sm text-[#245C4F] sm:grid-cols-2 lg:grid-cols-3">
+              <p className="rounded-2xl bg-[#FAF7F0] px-4 py-3"><strong className="text-[#063F32]">Name:</strong> {profile.full_name || "Not available"}</p>
+              <p className="rounded-2xl bg-[#FAF7F0] px-4 py-3"><strong className="text-[#063F32]">Username:</strong> {profile.username || "Not available"}</p>
+              <p className="rounded-2xl bg-[#FAF7F0] px-4 py-3"><strong className="text-[#063F32]">Email:</strong> {profile.email || "Not available"}</p>
+              <p className="rounded-2xl bg-[#FAF7F0] px-4 py-3"><strong className="text-[#063F32]">Phone:</strong> {profile.phone || "Not available"}</p>
+              <p className="rounded-2xl bg-[#FAF7F0] px-4 py-3"><strong className="text-[#063F32]">Admission:</strong> {profile.admission_no || "Not assigned"}</p>
+              <p className="rounded-2xl bg-[#FAF7F0] px-4 py-3"><strong className="text-[#063F32]">Age:</strong> {profile.age || "Not assigned"}</p>
+              <p className="rounded-2xl bg-[#FAF7F0] px-4 py-3"><strong className="text-[#063F32]">Class:</strong> {profile.grade_level || "Not assigned"}</p>
+              <p className="rounded-2xl bg-[#FAF7F0] px-4 py-3"><strong className="text-[#063F32]">Course:</strong> {profile.course_title || "Not assigned"}</p>
+              <p className="rounded-2xl bg-[#FAF7F0] px-4 py-3"><strong className="text-[#063F32]">Status:</strong> {profile.profile_status || profile.user_status || "Not available"}</p>
+              <p className="rounded-2xl bg-[#FAF7F0] px-4 py-3"><strong className="text-[#063F32]">Father name:</strong> {profile.father_name || "Not assigned"}</p>
+              <p className="rounded-2xl bg-[#FAF7F0] px-4 py-3"><strong className="text-[#063F32]">Father phone:</strong> {profile.father_phone || "Not assigned"}</p>
+              <p className="rounded-2xl bg-[#FAF7F0] px-4 py-3"><strong className="text-[#063F32]">Father email:</strong> {profile.father_email || "Not assigned"}</p>
+            </div>
+          </motion.section>
         </div>
-        <AttendanceSummary summary={state.attendance.summary} items={state.attendance.items} />
-      </motion.section>
-
-      <motion.section id="notes" className="scroll-mt-28 rounded-[2rem] border border-white/70 bg-white/90 p-5 shadow-[0_20px_70px_-36px_rgba(15,23,42,0.25)]">
-        <div className="mb-5">
-          <p className="text-sm font-semibold uppercase tracking-[0.22em] text-sky-700">Teacher notes</p>
-          <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">Latest feedback and updates</h2>
-        </div>
-        <NoteThreadsBoard mode="student" />
-      </motion.section>
-
-      <motion.section id="profile" className="scroll-mt-28 rounded-[2rem] border border-white/70 bg-white/90 p-5 shadow-[0_20px_70px_-36px_rgba(15,23,42,0.25)]">
-        <div className="mb-5">
-          <p className="text-sm font-semibold uppercase tracking-[0.22em] text-sky-700">Profile</p>
-          <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">Student details</h2>
-        </div>
-        <div className="grid gap-3 text-sm text-slate-600 sm:grid-cols-2 lg:grid-cols-3">
-          <p><strong>Name:</strong> {profile.full_name || "Not available"}</p>
-          <p><strong>Username:</strong> {profile.username || "Not available"}</p>
-          <p><strong>Email:</strong> {profile.email || "Not available"}</p>
-          <p><strong>Phone:</strong> {profile.phone || "Not available"}</p>
-          <p><strong>Admission:</strong> {profile.admission_no || "Not assigned"}</p>
-          <p><strong>Age:</strong> {profile.age || "Not assigned"}</p>
-          <p><strong>Class:</strong> {profile.grade_level || "Not assigned"}</p>
-          <p><strong>Course:</strong> {profile.course_title || "Not assigned"}</p>
-          <p><strong>Status:</strong> {profile.profile_status || profile.user_status || "Not available"}</p>
-          <p><strong>Father name:</strong> {profile.father_name || "Not assigned"}</p>
-          <p><strong>Father phone:</strong> {profile.father_phone || "Not assigned"}</p>
-          <p><strong>Father email:</strong> {profile.father_email || "Not assigned"}</p>
-        </div>
-      </motion.section>
       </div>
     </PaymentAccessGuard>
   );

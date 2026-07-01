@@ -15,7 +15,7 @@ const statuses = [
 
 export default function StatusFilter({ value = "", onChange }) {
   return (
-    <select value={value} onChange={(event) => onChange?.(event.target.value)} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 outline-none focus:border-sky-400">
+    <select value={value} onChange={(event) => onChange?.(event.target.value)} className="rounded-2xl border border-[#2D8A6A]/20 bg-white px-4 py-3 text-sm font-medium text-[#245C4F] outline-none focus:border-[#C9A227] focus:ring-4 focus:ring-[#FFF5D6]">
       <option value="">All statuses</option>
       {statuses.map((item) => <option key={item.value || "all"} value={item.value}>{item.label}</option>)}
     </select>
