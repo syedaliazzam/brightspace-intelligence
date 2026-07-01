@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { signOut } from "next-auth/react";
 import { useEffect, useMemo, useState } from "react";
 
@@ -80,8 +81,8 @@ export default function StudentPortalNavbar({ profile = {} }) {
         <div className="mx-auto max-w-7xl px-4 py-3 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between gap-3">
             <button type="button" onClick={scrollToTop} className="flex min-w-0 items-center gap-3 text-left">
-              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[linear-gradient(135deg,#0D3B2E,#0D5C48)] text-base font-bold text-[#FFF5D6] shadow-[0_12px_24px_-12px_rgba(13,59,46,0.5)]">
-                LMS
+              <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-2xl bg-transparent transition-all duration-200 ease-in-out hover:scale-110">
+                <Image src="/ash-shajrah-logo.webp" alt="Ash-Shajrah Learning Hub" width={48} height={48} className="h-full w-full object-contain" priority />
               </div>
               <div className="min-w-0">
                 <p className="text-sm font-semibold text-[#063F32]">Learning Portal</p>

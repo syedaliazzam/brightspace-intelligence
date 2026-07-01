@@ -123,7 +123,7 @@ export default function LMSCalendar({ apiUrl, filters = {}, extraParams = {}, on
             const endDate = parseDate(activeEndValue);
             const startText = startDate ? new Date(startDate).toLocaleTimeString("en-PK", { timeZone: APP_TIMEZONE, hour: "2-digit", minute: "2-digit" }) : "";
             const endText = endDate ? new Date(endDate).toLocaleTimeString("en-PK", { timeZone: APP_TIMEZONE, hour: "2-digit", minute: "2-digit" }) : "";
-            const palette = displayStatus === "live" ? ["#C9A227", "#8A6B00"] : displayStatus === "completed" ? ["#0D5C48", "#0D3B2E"] : displayStatus === "verified" ? ["#2D8A6A", "#0D5C48"] : ["#E4C766", "#C9A227"];
+            const palette = displayStatus === "live" ? ["#2563eb", "#1d4ed8"] : ["#75797D", "#666A6E"];
             return {
               id: lecture.id,
               title: `${startText}${endText ? ` - ${endText}` : ""}${lecture.subject_name ? ` ${lecture.subject_name}` : ""}`,
@@ -131,7 +131,7 @@ export default function LMSCalendar({ apiUrl, filters = {}, extraParams = {}, on
               end: endDate,
               backgroundColor: palette[0],
               borderColor: palette[1],
-              textColor: "#063F32",
+              textColor: displayStatus === "live" ? "#ffffff" : "#063F32",
               extendedProps: {
                 lecture_id: lecture.id,
                 title: lecture.title,
@@ -235,7 +235,7 @@ export default function LMSCalendar({ apiUrl, filters = {}, extraParams = {}, on
             slotMaxTime="24:00:00"
             eventClassNames={() => ["cursor-pointer"]}
             eventContent={(arg) => (
-              <div className="overflow-hidden px-1 text-[11px] leading-tight">
+              <div className="overflow-hidden px-1 text-[11px] leading-tight text-white">
                 <div className="truncate font-semibold">{arg.event.title}</div>
               </div>
             )}

@@ -2,6 +2,7 @@
 
 import { AnimatePresence, motion } from "framer-motion";
 import { signOut } from "next-auth/react";
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useState } from "react";
@@ -87,25 +88,34 @@ export default function Sidebar({
 
   const shell = (
     <aside
-      className={`flex h-full w-72 flex-col border-r border-white/10 bg-[linear-gradient(180deg,#0D3B2E_0%,#063F32_100%)] shadow-[0_18px_60px_-40px_rgba(6,63,50,0.68)] backdrop-blur-xl transition-[width] duration-200 ${
-        collapsed ? "lg:w-20" : "lg:w-72"
-      }`}
+      className={`flex h-full w-72 flex-col border-r border-[#2D8A6A]/15 bg-[linear-gradient(180deg,#0D3B2E_0%,#063F32_100%)] shadow-[0_18px_60px_-40px_rgba(13,59,46,0.18)] backdrop-blur-xl transition-[width] duration-200 ${collapsed ? "lg:w-20" : "lg:w-72"
+        }`}
     >
       <div
-        className={`relative flex items-center gap-3 border-b border-white/10 px-5 py-4 ${
-          collapsed ? "lg:justify-center" : ""
-        }`}
+        className={`relative flex items-center gap-3 border-b border-white/10 px-5 py-4 ${collapsed ? "lg:justify-center" : ""
+          }`}
       >
         <div className="flex min-w-0 items-center gap-3">
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-[#FFF5D6] text-sm font-semibold text-[#063F32] shadow-[0_10px_24px_rgba(201,162,39,0.2)]">
-            <span className={collapsed ? "opacity-0" : "opacity-100"}>{collapsed ? "" : "LMS"}</span>
+          <div
+            className={`h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-white p-1 transition-all duration-200 ${collapsed
+                ? "lg:pointer-events-none bg-[linear-gradient(180deg,#0D3B2E_0%,#063F32_100%)]"
+                : "flex"
+              }`}
+          >
+            <Image
+              src="/ash-shajrah-logo.webp"
+              alt="Ash-Shajrah Learning Hub"
+              width={44}
+              height={44}
+              className={`h-full w-full object-contain ${collapsed?  "hidden":"flex"}`}
+              priority
+            />
           </div>
           <div
-            className={`min-w-0 transition-all duration-200 ${
-              collapsed
+            className={`min-w-0 transition-all duration-200 ${collapsed
                 ? "lg:hidden lg:max-w-0 lg:overflow-hidden lg:opacity-0 lg:pointer-events-none"
                 : "lg:max-w-full opacity-100"
-            }`}
+              }`}
           >
             <p className="truncate text-sm font-semibold text-[#FAF7F0]">Learning Platform</p>
             <p className="truncate text-xs text-[#F1EADC]/60">{role}</p>
@@ -115,14 +125,13 @@ export default function Sidebar({
         <button
           type="button"
           onClick={onToggleCollapsed}
-          className={`hidden h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/10 text-[#FAF7F0] transition hover:bg-white/15 lg:inline-flex ${
-            collapsed
-              ? "lg:absolute lg:left-1/2 lg:top-1/2 lg:z-10 lg:-translate-x-1/2 lg:-translate-y-1/2"
-              : "lg:absolute lg:right-4 lg:top-1/2 lg:-translate-y-1/2"
-          }`}
+          className={`hidden h-10 w-10 items-center justify-center rounded-full border border-white/10 text-[#FAF7F0] transition lg:inline-flex ${collapsed
+              ? "lg:absolute lg:left-1/2 lg:top-1/2 lg:z-10 lg:-translate-x-1/2 lg:-translate-y-1/2 bg-[rgb(255,245,214)] transition-all ease-in-out duration-200 hover:scale-110"
+              : "lg:absolute lg:right-4 lg:top-1/2 lg:-translate-y-1/2 bg-white/10 hover:bg-white/15"
+            }`}
           aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
         >
-          <span className={`text-sm leading-none ${collapsed ? "text-[#063F32] font-bold ml-1" : "text-white"}`}>{collapsed ? ">" : "<"}</span>
+          <span className={`text-sm leading-none font-bold ${collapsed ? "text-[#063F32]" : "text-white"}`}>{collapsed ? ">" : "<"}</span>
         </button>
       </div>
 
@@ -139,19 +148,17 @@ export default function Sidebar({
                       userManagement: !current.userManagement,
                     }))
                   }
-                  className={`flex w-full items-center justify-between rounded-[18px] px-3 py-2 text-xs font-semibold uppercase tracking-[0.22em] transition ${
-                    isUserManagementActive
+                  className={`flex w-full items-center justify-between rounded-[18px] px-3 py-2 text-xs font-semibold uppercase tracking-[0.22em] transition ${isUserManagementActive
                       ? "bg-[linear-gradient(135deg,#C9A227_0%,#E4C766_100%)] text-[#063F32] shadow-[0_10px_24px_rgba(201,162,39,0.22)]"
                       : "text-[#F1EADC]/75 hover:bg-white/10 hover:text-[#FAF7F0]"
-                  }`}
+                    }`}
                 >
                   <span className="flex items-center gap-2">
                     <span
-                      className={`flex h-7 w-7 items-center justify-center rounded-xl transition ${
-                        isUserManagementActive
+                      className={`flex h-7 w-7 items-center justify-center rounded-xl transition ${isUserManagementActive
                           ? "bg-[#FFF5D6] text-[#063F32]"
                           : "bg-white/10 text-[#FAF7F0]"
-                      }`}
+                        }`}
                     >
                       <Users className="h-3.5 w-3.5" strokeWidth={2} />
                     </span>
@@ -174,11 +181,10 @@ export default function Sidebar({
                           key={child.href}
                           href={child.href}
                           aria-current={active ? "page" : undefined}
-                          className={`flex items-center justify-between rounded-[18px] px-3 py-3 text-sm font-medium transition ${
-                            active
+                          className={`flex items-center justify-between rounded-[18px] px-3 py-3 text-sm font-medium transition ${active
                               ? "bg-[linear-gradient(135deg,#C9A227_0%,#E4C766_100%)] text-[#063F32] shadow-[0_10px_24px_rgba(201,162,39,0.22)]"
                               : "text-[#F1EADC]/75 hover:bg-white/10 hover:text-[#FAF7F0]"
-                          }`}
+                            }`}
                           onClick={onMobileClose}
                         >
                           <span className="truncate">{child.label}</span>
@@ -198,24 +204,21 @@ export default function Sidebar({
               key={item.href}
               href={item.href}
               aria-current={active ? "page" : undefined}
-              className={`group gap-3 flex items-center rounded-[18px] px-3 py-3 text-sm font-medium transition ${
-                active
+              className={`group gap-3 flex items-center rounded-[18px] px-3 py-3 text-sm font-medium transition ${active
                   ? "bg-[linear-gradient(135deg,#C9A227_0%,#E4C766_100%)] text-[#063F32] shadow-[0_10px_24px_rgba(201,162,39,0.22)]"
                   : "text-[#F1EADC]/75 hover:bg-white/10 hover:text-[#FAF7F0]"
-              } ${collapsed ? "justify-center" : ""}`}
+                } ${collapsed ? "justify-center" : ""}`}
               onClick={onMobileClose}
             >
               <span
-                className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-[11px] font-semibold transition ${
-                  active ? "bg-[#FFF5D6] text-[#063F32]" : "bg-white/10 text-[#FAF7F0] group-hover:bg-white/15"
-                } ${collapsed ? "mx-auto" : ""}`}
+                className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-[11px] font-semibold transition ${active ? "bg-[#FFF5D6] text-[#063F32]" : "bg-white/10 text-[#FAF7F0] group-hover:bg-white/15"
+                  } ${collapsed ? "mx-auto" : ""}`}
               >
                 <Icon className="h-4 w-4" strokeWidth={2} />
               </span>
               <span
-                className={`truncate transition-all duration-200 ${
-                  collapsed ? "lg:hidden lg:max-w-0 lg:overflow-hidden lg:opacity-0 lg:pointer-events-none" : "lg:max-w-full opacity-100"
-                }`}
+                className={`truncate transition-all duration-200 ${collapsed ? "lg:hidden lg:max-w-0 lg:overflow-hidden lg:opacity-0 lg:pointer-events-none" : "lg:max-w-full opacity-100"
+                  }`}
               >
                 {item.label}
               </span>
@@ -228,14 +231,12 @@ export default function Sidebar({
         <button
           type="button"
           onClick={() => signOut({ redirectTo: "/login" })}
-          className={`flex w-full items-center justify-center gap-2 rounded-[16px] bg-[linear-gradient(135deg,#0D5C48_0%,#2D8A6A_55%,#C9A227_160%)] px-4 py-3 text-sm font-semibold text-[#FAF7F0] shadow-[0_12px_28px_rgba(201,162,39,0.16)] transition hover:brightness-110 ${
-            collapsed ? "lg:px-2" : ""
-          }`}
+          className={`flex w-full items-center justify-center gap-2 rounded-[16px] bg-[linear-gradient(135deg,#0D5C48_0%,#2D8A6A_55%,#C9A227_160%)] px-4 py-3 text-sm font-semibold text-[#FAF7F0] shadow-[0_12px_28px_rgba(201,162,39,0.16)] transition hover:brightness-110 ${collapsed ? "lg:px-2" : ""
+            }`}
         >
           <span
-            className={`hidden h-9 w-9 items-center justify-center rounded-xl bg-[#FFF5D6] text-base font-semibold text-[#063F32] ${
-              collapsed ? "lg:flex" : "lg:hidden"
-            }`}
+            className={`hidden h-9 w-9 items-center justify-center rounded-xl bg-[#FFF5D6] text-base font-semibold text-[#063F32] ${collapsed ? "lg:flex" : "lg:hidden"
+              }`}
           >
             ↩
           </span>

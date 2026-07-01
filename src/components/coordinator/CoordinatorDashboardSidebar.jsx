@@ -3,6 +3,7 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { signOut } from "next-auth/react";
 import { useEffect, useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -70,8 +71,8 @@ export default function CoordinatorDashboardSidebar({ profile }) {
     <aside className="flex h-full w-72 flex-col border-r border-slate-200 bg-white/95 shadow-[0_18px_60px_-40px_rgba(15,23,42,0.45)] backdrop-blur-xl">
       <div className="border-b border-slate-200 px-5 py-4">
         <div className="flex items-center gap-3">
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-slate-950 text-sm font-semibold text-white">
-            {getInitials(profile?.name || profile?.full_name || "Coordinator")}
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-transparent">
+            <Image src="/ash-shajrah-logo.webp" alt="Ash-Shajrah Learning Hub" width={44} height={44} className="h-full w-full object-contain" priority />
           </div>
           <div className="min-w-0">
             <p className="truncate text-sm font-semibold text-slate-950">Coordinator Portal</p>
@@ -130,8 +131,8 @@ export default function CoordinatorDashboardSidebar({ profile }) {
             onClick={() => setMobileOpen(false)}
             className="flex items-center gap-3 text-left"
           >
-            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-slate-950 text-sm font-semibold text-white">
-              LMS
+            <div className="flex h-11 w-11 items-center justify-center overflow-hidden rounded-2xl bg-transparent">
+              <Image src="/ash-shajrah-logo.webp" alt="Ash-Shajrah Learning Hub" width={44} height={44} className="h-full w-full object-contain" priority />
             </div>
             <div>
               <p className="text-sm font-semibold text-slate-950">Coordinator Portal</p>
