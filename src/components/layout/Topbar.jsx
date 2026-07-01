@@ -25,7 +25,7 @@ export default function Topbar({ session, onMenuClick, onToggleCollapsed, collap
 
   return (
     <header
-      className={`fixed right-0 top-0 z-20 border-b border-slate-200 bg-white/90 backdrop-blur-xl ${
+      className={`fixed right-0 top-0 z-20 border-b border-white/10 bg-[linear-gradient(180deg,rgba(250,247,240,0.92)_0%,rgba(255,255,255,0.84)_100%)] backdrop-blur-xl shadow-[0_10px_30px_rgba(6,63,50,0.08)] ${
         collapsed ? "lg:left-20" : "lg:left-72"
       } left-0`}
     >
@@ -34,7 +34,7 @@ export default function Topbar({ session, onMenuClick, onToggleCollapsed, collap
           <button
             type="button"
             onClick={onMenuClick}
-            className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-700 shadow-sm transition hover:bg-slate-50 lg:hidden"
+            className="inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-[rgba(13,59,46,0.12)] bg-white/90 text-[#063F32] shadow-sm transition hover:bg-[#FAF7F0] lg:hidden"
             aria-label="Open navigation menu"
           >
             <span className="flex h-4 w-4 flex-col justify-between">
@@ -45,30 +45,30 @@ export default function Topbar({ session, onMenuClick, onToggleCollapsed, collap
           </button>
 
           <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-sky-700">
+            <p className="text-xs font-bold uppercase tracking-[0.24em] text-[#0D5C48]">
               Dashboard
             </p>
-            <h1 className="text-lg font-semibold text-slate-950 sm:text-xl">
+            <h1 className="font-serif text-lg font-semibold text-[#063F32] sm:text-xl">
               Welcome back, {userName}
             </h1>
           </div>
         </div>
 
         <div className="flex items-center gap-3">
-          <div className="hidden items-center gap-3 rounded-full border border-slate-200 bg-slate-50 px-4 py-2 lg:flex">
-            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-950 text-xs font-semibold text-white">
+          <div className="hidden items-center gap-3 rounded-full border border-[rgba(13,59,46,0.12)] bg-white/80 px-4 py-2 shadow-[0_8px_24px_rgba(13,59,46,0.06)] lg:flex">
+            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#063F32] text-xs font-semibold text-[#FAF7F0]">
               {getInitials(userName)}
             </div>
             <div className="leading-tight">
-              <p className="text-sm font-semibold text-slate-950">{session?.user?.email}</p>
-              <p className="text-xs text-slate-500">{role}</p>
+              <p className="text-sm font-semibold text-[#063F32]">{session?.user?.email}</p>
+              <p className="text-xs text-[#245C4F]">{role}</p>
             </div>
           </div>
 
           <button
             type="button"
             onClick={onToggleCollapsed}
-            className="hidden rounded-2xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 lg:inline-flex"
+            className="hidden rounded-2xl border border-[rgba(13,59,46,0.12)] bg-white/90 px-3 py-2 text-sm font-semibold text-[#0D5C48] transition hover:bg-[#FAF7F0] lg:inline-flex"
           >
             {collapsed ? "Expand" : "Collapse"}
           </button>
