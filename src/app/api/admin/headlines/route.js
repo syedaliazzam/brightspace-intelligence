@@ -5,6 +5,8 @@ import { auth } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 import { headlinesTableExists } from "@/lib/headlines";
 
+const LOCAL_DATE_SQL = Prisma.raw("(CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Karachi')::date");
+
 function json(message, status = 200, extra = {}) {
   return NextResponse.json({ message, ...extra }, { status });
 }
@@ -150,8 +152,8 @@ export async function GET() {
         h.created_at::text AS created_at,
         h.updated_at::text AS updated_at,
         CASE
-          WHEN CURRENT_DATE BETWEEN h.start_date AND h.end_date THEN 'active'
-          WHEN CURRENT_DATE < h.start_date THEN 'scheduled'
+          WHEN ${LOCAL_DATE_SQL} BETWEEN h.start_date AND h.end_date THEN 'active'
+          WHEN ${LOCAL_DATE_SQL} < h.start_date THEN 'scheduled'
           ELSE 'expired'
         END AS display_status,
         COALESCE(u.full_name, u.username, 'Admin') AS created_by_name

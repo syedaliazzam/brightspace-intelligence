@@ -10,8 +10,8 @@ export default function ActiveHeadlinesBanner({ items = [] }) {
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div className="min-w-0 flex-1">
           <div className="mb-1 flex items-center gap-2">
-            <span className="inline-flex h-2 w-2 rounded-full bg-[#C9A227]" />
-            <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#0D5C48]">Important Headline</p>
+            <span className="inline-flex h-2 w-2 rounded-full bg-[#B32C12]" />
+            <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#B32C12]">Important Headline</p>
           </div>
           <h2 className="line-clamp-2 text-sm font-semibold leading-6 text-[#063F32] sm:text-base">{featured.headline}</h2>
         </div>
