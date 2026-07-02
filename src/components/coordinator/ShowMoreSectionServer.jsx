@@ -19,20 +19,20 @@ function PaginationControls({ page, pageSize, totalItems, hrefBase }) {
   }
 
   return (
-    <div className="flex flex-col gap-3 border-t border-slate-200 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
-      <p className="text-sm text-slate-600">
-        Showing <span className="font-semibold text-slate-950">{start}-{end}</span> of{" "}
-        <span className="font-semibold text-slate-950">{totalItems}</span>
+    <div className="flex flex-col gap-3 border-t border-[#2D8A6A]/15 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
+      <p className="text-sm text-[#245C4F]">
+        Showing <span className="font-semibold text-[#063F32]">{start}-{end}</span> of{" "}
+        <span className="font-semibold text-[#063F32]">{totalItems}</span>
       </p>
 
       <div className="flex flex-wrap items-center gap-2">
         <Link
           href={hrefFor(currentPage - 1)}
           aria-disabled={currentPage <= 1}
-          className={`rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold transition ${
+          className={`rounded-full border border-[#2D8A6A]/20 bg-white px-4 py-2 text-sm font-semibold transition ${
             currentPage <= 1
               ? "pointer-events-none cursor-not-allowed opacity-50"
-              : "text-slate-700 hover:bg-slate-100"
+              : "text-[#063F32] hover:bg-[#F1EADC]"
           }`}
         >
           Previous
@@ -40,25 +40,25 @@ function PaginationControls({ page, pageSize, totalItems, hrefBase }) {
 
         {pages.map((number) => (
           <Link
-            key={number}
-            href={hrefFor(number)}
-            className={`min-w-10 rounded-full px-4 py-2 text-sm font-semibold transition ${
-              number === currentPage
-                ? "bg-slate-950 text-white"
-                : "border border-slate-200 bg-white text-slate-700 hover:bg-slate-100"
-            }`}
-          >
-            {number}
+          key={number}
+          href={hrefFor(number)}
+          className={`min-w-10 rounded-full px-4 py-2 text-sm font-semibold transition ${
+            number === currentPage
+              ? "bg-[linear-gradient(135deg,#C9A227,#E4C766)] text-[#063F32]"
+              : "border border-[#2D8A6A]/20 bg-white text-[#063F32] hover:bg-[#F1EADC]"
+          }`}
+        >
+          {number}
           </Link>
         ))}
 
         <Link
           href={hrefFor(currentPage + 1)}
           aria-disabled={currentPage >= totalPages}
-          className={`rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold transition ${
+          className={`rounded-full border border-[#2D8A6A]/20 bg-white px-4 py-2 text-sm font-semibold transition ${
             currentPage >= totalPages
               ? "pointer-events-none cursor-not-allowed opacity-50"
-              : "text-slate-700 hover:bg-slate-100"
+              : "text-[#063F32] hover:bg-[#F1EADC]"
           }`}
         >
           Next
@@ -96,7 +96,7 @@ export default function ShowMoreSectionServer({
           ) : null}
         </>
       ) : (
-        <section className="rounded-[1.75rem] border border-dashed border-slate-300 bg-white/85 p-10 text-center text-sm text-slate-500 shadow-[0_18px_60px_-36px_rgba(15,23,42,0.18)]">
+        <section className="rounded-[1.75rem] border border-dashed border-[#2D8A6A]/25 bg-white/85 p-10 text-center text-sm text-[#245C4F] shadow-[0_18px_60px_-36px_rgba(13,59,46,0.18)]">
           {emptyMessage}
         </section>
       )}

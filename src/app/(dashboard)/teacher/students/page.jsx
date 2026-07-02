@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { ChevronDown } from "lucide-react";
 import AssignedStudentsTable from "@/components/teacher/AssignedStudentsTable";
 
 export default function TeacherStudentsPage() {
   const [state, setState] = useState({ items: [], subject: "", error: "" });
+  const [subjectOpen, setSubjectOpen] = useState(false);
 
   const subjects = Array.from(
     new Map(
@@ -25,27 +27,44 @@ export default function TeacherStudentsPage() {
     })).catch((error) => setState((current) => ({ ...current, error: error.message })));
   }, []);
   return (
-    <div className="space-y-6 min-h-screen">
-      <section className="rounded-[2rem] border border-white/70 bg-white/90 p-6 shadow-[0_24px_80px_-36px_rgba(15,23,42,0.25)] sm:p-8"><p className="text-sm font-semibold uppercase tracking-[0.24em] text-sky-700">Students</p><h1 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">Assigned learners</h1></section>
-      <div className="rounded-[1.75rem] border border-white/70 bg-white/90 p-5 shadow-[0_20px_70px_-36px_rgba(15,23,42,0.25)]">
-        <label className="block max-w-sm">
-          <span className="mb-2 block text-sm font-medium text-slate-700">Subject</span>
-          <select
-            value={state.subject}
-            onChange={(event) => setState((current) => ({ ...current, subject: event.target.value }))}
-            className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 outline-none transition focus:border-sky-400"
-          >
-            <option value="">All subjects</option>
-            {subjects.map((item) => (
-              <option key={item.value} value={item.value}>
-                {item.label}
-              </option>
-            ))}
-          </select>
-        </label>
+    <div className="min-h-screen rounded-[2rem] border-0 space-y-6 bg-[#FAF7F0]">
+      <div className="pointer-events-none rounded-[2rem] border-0 absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(201,162,39,0.12),transparent_35%),radial-gradient(circle_at_top_right,rgba(45,138,106,0.12),transparent_32%),linear-gradient(180deg,#FAF7F0_0%,#F7F1E3_100%)]" />
+      <div className="relative rounded-[2rem] border-0 mx-auto max-w-7xl space-y-6 px-4 py-4 sm:px-6 lg:px-8">
+        <section className="rounded-[2rem] border border-[#2D8A6A]/15 bg-[linear-gradient(135deg,rgba(13,59,46,0.98),rgba(13,92,72,0.94))] p-6 text-[#FAF7F0] shadow-[0_24px_80px_-36px_rgba(13,59,46,0.32)] sm:p-8">
+          <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-[#E4C766]">Students</p>
+          <h1 className="mt-3 font-serif text-3xl font-semibold tracking-tight text-[#FAF7F0] sm:text-4xl">Assigned learners</h1>
+        </section>
+        <div className="rounded-[1.75rem] border border-[#2D8A6A]/15 bg-white/90 p-5 shadow-[0_20px_70px_-36px_rgba(13,59,46,0.18)]">
+          <label className="block max-w-sm">
+            <span className="mb-2 block text-sm font-medium text-[#245C4F]">Subject</span>
+            <div className="relative">
+              <select
+                value={state.subject}
+                onMouseDown={() => setSubjectOpen((current) => !current)}
+                onChange={(event) => {
+                  setSubjectOpen(false);
+                  setState((current) => ({ ...current, subject: event.target.value }));
+                }}
+                onFocus={() => setSubjectOpen(true)}
+                onBlur={() => setSubjectOpen(false)}
+                className="w-full appearance-none rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 pr-11 text-sm font-medium text-[#063F32] outline-none transition focus:border-[#2D8A6A] focus:ring-2 focus:ring-[#2D8A6A]/20"
+              >
+                <option value="">All subjects</option>
+                {subjects.map((item) => (
+                  <option key={item.value} value={item.value}>
+                    {item.label}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown
+                className={`pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#0D5C48] transition-transform duration-200 ${subjectOpen ? "rotate-180" : "rotate-0"}`}
+              />
+            </div>
+          </label>
+        </div>
+        {state.error ? <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">{state.error}</div> : null}
+        <AssignedStudentsTable items={visibleItems} />
       </div>
-      {state.error ? <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">{state.error}</div> : null}
-      <AssignedStudentsTable items={visibleItems} />
     </div>
   );
 }

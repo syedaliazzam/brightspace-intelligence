@@ -181,12 +181,12 @@ export default async function AdminRegistrationLeadsPage({ searchParams }) {
   );
 
   return (
-    <div className="space-y-6 min-h-screen">
-      <section className="rounded-[2rem] border border-white/70 bg-[linear-gradient(135deg,rgba(255,255,255,0.92),rgba(241,248,255,0.92))] p-6 shadow-[0_24px_80px_-36px_rgba(15,23,42,0.25)] sm:p-8">
-        <h1 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">
+    <div className="mx-auto min-h-screen max-w-7xl space-y-6 overflow-hidden rounded-[2.25rem] bg-[radial-gradient(circle_at_top_left,rgba(101,184,145,0.14),transparent_28%),radial-gradient(circle_at_top_right,rgba(201,162,39,0.12),transparent_24%),#FAF7F0] px-4 py-4 sm:px-6 lg:px-8 lg:py-6">
+      <section className="rounded-[2rem] border border-[#2D8A6A]/15 bg-[linear-gradient(135deg,rgba(13,59,46,0.98),rgba(13,92,72,0.94))] p-6 text-[#FAF7F0] shadow-[0_24px_80px_-36px_rgba(13,59,46,0.32)] sm:p-8">
+        <h1 className="mt-3 font-serif text-3xl font-semibold tracking-tight text-[#FAF7F0] sm:text-4xl">
           Admission records of new students
         </h1>
-        <p className="mt-3 text-sm leading-7 text-slate-600 sm:text-base">
+        <p className="mt-3 text-sm leading-7 text-[#EAF6EF] sm:text-base">
           Review submitted registration leads and track admission progress from the admin portal.
         </p>
       </section>

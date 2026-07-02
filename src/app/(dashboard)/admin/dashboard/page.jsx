@@ -132,7 +132,7 @@ export default function AdminDashboardPage() {
       key: "totalUsers",
       label: "Total users",
       value: Number(overview.totalUsers || 0),
-      tone: "bg-slate-950 text-white",
+      tone: "bg-[#0D5C48] text-[#FAF7F0]",
     },
     {
       key: "activeUsers",
@@ -144,30 +144,32 @@ export default function AdminDashboardPage() {
       key: "newLeads",
       label: "New Admissions",
       value: Number(overview.newRegistrationLeads || 0),
-      tone: "bg-sky-50 text-sky-800",
+      tone: "bg-[#EAF6EF] text-[#0D5C48]",
     },
     {
       key: "classes",
       label: "Classes",
       value: Number(state.data?.system?.courseCount || 0),
-      tone: "bg-violet-50 text-violet-800",
+      tone: "bg-[#FFF5D6] text-[#8A6B00]",
     },
     {
       key: "subjects",
       label: "Subjects",
       value: Number(state.data?.system?.subjectCount || 0),
-      tone: "bg-amber-50 text-amber-800",
+      tone: "bg-[#FFF5D6] text-[#8A6B00]",
     },
   ];
 
   return (
-    <div className="space-y-6 min-h-screen">
-      <section className="rounded-[2rem] border border-white/70 bg-[linear-gradient(135deg,rgba(255,255,255,0.92),rgba(241,248,255,0.92))] p-6 shadow-[0_24px_80px_-36px_rgba(15,23,42,0.25)] sm:p-8">
+    <div className="rounded-[2rem] border-0 min-h-screen space-y-6 bg-[#FAF7F0]">
+      <div className="pointer-events-none border-0 rounded-[2rem] absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(201,162,39,0.12),transparent_35%),radial-gradient(circle_at_top_right,rgba(45,138,106,0.12),transparent_32%),linear-gradient(180deg,#FAF7F0_0%,#F7F1E3_100%)]" />
+      <div className="relative border-0 rounded-[2rem] mx-auto max-w-7xl space-y-6 px-4 py-4 sm:px-6 lg:px-8">
+      <section className="rounded-[2rem] border border-[#2D8A6A]/15 bg-[linear-gradient(135deg,rgba(13,59,46,0.98),rgba(13,92,72,0.94))] p-6 text-[#FAF7F0] shadow-[0_24px_80px_-36px_rgba(13,59,46,0.32)] sm:p-8">
         <div className="max-w-3xl">
-          <h1 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">
+          <h1 className="mt-3 font-serif text-3xl font-semibold tracking-tight text-[#FAF7F0] sm:text-4xl">
             Platform command center
           </h1>
-          <p className="mt-3 text-sm leading-7 text-slate-600 sm:text-base">
+          <p className="mt-3 text-sm leading-7 text-[#EAF6EF] sm:text-base">
             Review account growth, intake activity, finance progress, and operational readiness from one concise admin view.
           </p>
         </div>
@@ -188,9 +190,9 @@ export default function AdminDashboardPage() {
       />
 
       <section className="grid gap-6 xl:grid-cols-2">
-        <div className="space-y-4 rounded-[1.75rem] border border-white/70 bg-white/90 p-5 shadow-[0_20px_70px_-36px_rgba(15,23,42,0.25)]">
+        <div className="space-y-4 rounded-[2rem] border border-[#2D8A6A]/15 bg-white/90 p-5 shadow-[0_20px_70px_-36px_rgba(13,59,46,0.18)]">
           <div>
-            <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">
+            <h2 className="mt-2 text-2xl font-semibold tracking-tight text-[#063F32]">
               Active role coverage
             </h2>
           </div>
@@ -200,7 +202,7 @@ export default function AdminDashboardPage() {
                 key: "role",
                 label: "Role",
                 render: (row) => (
-                  <span className="font-semibold text-slate-950">
+                  <span className="font-semibold text-[#063F32]">
                     {formatLabel(row.role)}
                   </span>
                 ),
@@ -212,9 +214,9 @@ export default function AdminDashboardPage() {
             emptyMessage="Role insights will appear here as account activity grows."
           />
         </div>
-        <div className="rounded-[1.75rem] border border-white/70 bg-white/90 p-5 shadow-[0_20px_70px_-36px_rgba(15,23,42,0.25)]">
+        <div className="rounded-[2rem] border border-[#2D8A6A]/15 bg-white/90 p-5 shadow-[0_20px_70px_-36px_rgba(13,59,46,0.18)]">
           <div className="mb-4">
-            <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">
+            <h2 className="mt-2 text-2xl font-semibold tracking-tight text-[#063F32]">
               Admission Records
             </h2>
           </div>
@@ -234,6 +236,7 @@ export default function AdminDashboardPage() {
           />
         </div>
       </section>
+      </div>
     </div>
   );
 }

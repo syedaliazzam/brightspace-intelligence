@@ -16,33 +16,33 @@ export default function AdminConfirmDialog({
   const toneClass =
     tone === "danger"
       ? "bg-rose-600 hover:bg-rose-700"
-      : "bg-slate-950 hover:bg-slate-800";
+      : "bg-[#0D5C48] hover:bg-[#063F32]";
 
   return (
     <AnimatePresence>
       {open ? (
-        <div className="fixed inset-0 z-50 flex items-start justify-center bg-slate-950/45 px-4 py-8 pt-24">
+        <div className="fixed inset-0 z-50 flex items-start justify-center bg-[#063F32]/45 px-4 py-8 pt-24">
           <motion.div
             initial={{ opacity: 0, y: 18 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 18 }}
             transition={{ duration: 0.2 }}
-            className="max-h-[calc(100vh-7rem)] w-full max-w-lg overflow-y-auto rounded-[2rem] border border-white/70 bg-white p-6 shadow-[0_24px_80px_-36px_rgba(15,23,42,0.32)] sm:p-8"
+            className="max-h-[calc(100vh-7rem)] w-full max-w-lg overflow-y-auto rounded-[2rem] border border-[#2D8A6A]/15 bg-white p-6 shadow-[0_24px_80px_-36px_rgba(13,59,46,0.22)] sm:p-8"
           >
-            <p className="text-sm font-semibold uppercase tracking-[0.24em] text-sky-700">
+            <p className="text-sm font-semibold uppercase tracking-[0.24em] text-[#0D5C48]">
               Admin confirmation
             </p>
-            <h2 className="mt-3 text-2xl font-semibold tracking-tight text-slate-950">
+            <h2 className="mt-3 text-2xl font-semibold tracking-tight text-[#063F32]">
               {title}
             </h2>
-            <p className="mt-3 text-sm leading-7 text-slate-600">{description}</p>
+            <p className="mt-3 text-sm leading-7 text-[#245C4F]">{description}</p>
 
             <div className="mt-6 flex flex-wrap justify-end gap-3">
               <button
                 type="button"
                 onClick={onClose}
                 disabled={pending}
-                className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-60"
+                className="rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 text-sm font-semibold text-[#063F32] transition hover:bg-[#F1EADC] disabled:opacity-60"
               >
                 {cancelLabel}
               </button>

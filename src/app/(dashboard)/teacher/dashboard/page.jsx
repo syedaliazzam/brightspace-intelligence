@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { ChevronDown } from "lucide-react";
 import TeacherStatsCards from "@/components/teacher/TeacherStatsCards";
 import ClassActionModal from "@/components/teacher/ClassActionModal";
 import LMSCalendar from "@/components/calendar/LMSCalendar";
@@ -28,6 +29,7 @@ export default function TeacherDashboardPage() {
     },
     error: "",
   });
+  const [classOpen, setClassOpen] = useState(false);
 
   async function load() {
     const response = await fetch("/api/teacher/dashboard", { cache: "no-store" });
@@ -119,47 +121,59 @@ export default function TeacherDashboardPage() {
   }, []);
 
   return (
-    <div className="space-y-6 min-h-screen">
-      <ActiveHeadlinesBanner items={state.headlines} />
-      <section className="rounded-[2rem] border border-white/70 bg-[linear-gradient(135deg,rgba(255,255,255,0.94),rgba(239,248,255,0.92))] p-6 shadow-[0_24px_80px_-36px_rgba(15,23,42,0.25)] sm:p-8">
-        <p className="text-sm font-semibold uppercase tracking-[0.24em] text-sky-700">Teacher dashboard</p>
-        <h1 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">Teaching operations</h1>
-      </section>
-      {state.error ? <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">{state.error}</div> : null}
-      <TeacherStatsCards items={[
-        { key: "today", label: "Today lectures", value: state.stats.today_lectures || 0 },
-        { key: "upcoming", label: "Upcoming lectures", value: state.stats.upcoming_lectures || 0 },
-        { key: "students", label: "Assigned students", value: state.stats.assigned_students || 0 },
-        { key: "subjects", label: "Assigned subjects", value: state.stats.assigned_subjects || 0 },
-      ]} />
-      <section className="rounded-[2rem] border border-white/70 bg-white/90 p-5 shadow-[0_20px_70px_-36px_rgba(15,23,42,0.25)]">
-        <div className="mb-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-          <label className="block">
-            <span className="mb-2 block text-sm font-medium text-slate-700">Class</span>
-            <select
-              value={state.filters.classLevel}
-              onChange={(event) => updateFilters({ ...state.filters, classLevel: event.target.value })}
-              className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 outline-none transition focus:border-sky-400"
-            >
-              <option value="">All classes</option>
-              {state.classes.map((item) => (
-                <option key={item.class_level} value={item.class_level}>
-                  {item.class_level}
-                  {item.title ? ` - ${item.title}` : ""}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
-        <LMSCalendar
-          key={state.calendarRefreshKey}
-          apiUrl="/api/teacher/calendar-lectures"
-          filters={state.filters}
-          onDateSelect={(date) => updateFilters({ ...state.filters, date, range: "selected_date" })}
-          onEventClick={(item) => setState((current) => ({ ...current, selected: item }))}
-        />
-      </section>
-      <ClassActionModal lecture={state.selected} open={Boolean(state.selected)} onClose={() => setState((current) => ({ ...current, selected: null }))} onChanged={() => load()} />
+    <div className="rounded-[2rem] border-0 min-h-screen space-y-6 bg-[#FAF7F0]">
+      <div className="pointer-events-none border-0 rounded-[2rem] absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(201,162,39,0.12),transparent_35%),radial-gradient(circle_at_top_right,rgba(45,138,106,0.12),transparent_32%),linear-gradient(180deg,#FAF7F0_0%,#F7F1E3_100%)]" />
+      <div className="relative border-0 rounded-[2rem] mx-auto max-w-7xl space-y-6 px-4 py-4 sm:px-6 lg:px-8">
+        <ActiveHeadlinesBanner items={state.headlines} />
+        <section className="rounded-[2rem] border border-[#2D8A6A]/15 bg-[linear-gradient(135deg,rgba(13,59,46,0.98),rgba(13,92,72,0.94))] p-6 text-[#FAF7F0] shadow-[0_24px_80px_-36px_rgba(13,59,46,0.32)] sm:p-8">
+          <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-[#E4C766]">Teacher dashboard</p>
+          <h1 className="mt-3 font-serif text-3xl font-semibold tracking-tight text-[#FAF7F0] sm:text-4xl">Teaching operations</h1>
+        </section>
+        {state.error ? <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">{state.error}</div> : null}
+        <TeacherStatsCards items={[
+          { key: "today", label: "Today lectures", value: state.stats.today_lectures || 0 },
+          { key: "upcoming", label: "Upcoming lectures", value: state.stats.upcoming_lectures || 0 },
+          { key: "students", label: "Assigned students", value: state.stats.assigned_students || 0 },
+          { key: "subjects", label: "Assigned subjects", value: state.stats.assigned_subjects || 0 },
+        ]} />
+        <section className="rounded-[2rem] border border-[#2D8A6A]/15 bg-white/90 p-5 shadow-[0_20px_70px_-36px_rgba(13,59,46,0.18)]">
+          <div className="mb-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            <label className="block">
+              <span className="mb-2 block text-sm font-medium text-[#245C4F]">Class</span>
+              <div className="relative">
+                <select
+                  value={state.filters.classLevel}
+                  onMouseDown={() => setClassOpen((current) => !current)}
+                  onChange={(event) => {
+                    setClassOpen(false);
+                    updateFilters({ ...state.filters, classLevel: event.target.value });
+                  }}
+                  onFocus={() => setClassOpen(true)}
+                  onBlur={() => setClassOpen(false)}
+                  className="w-full appearance-none rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 pr-11 text-sm font-medium text-[#063F32] outline-none transition focus:border-[#2D8A6A] focus:ring-2 focus:ring-[#2D8A6A]/20"
+                >
+                  <option value="">All classes</option>
+                  {state.classes.map((item) => (
+                    <option key={item.class_level} value={item.class_level}>
+                      {item.class_level}
+                      {item.title ? ` - ${item.title}` : ""}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown className={`pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#0D5C48] transition-transform duration-200 ${classOpen ? "rotate-180" : "rotate-0"}`} />
+              </div>
+            </label>
+          </div>
+          <LMSCalendar
+            key={state.calendarRefreshKey}
+            apiUrl="/api/teacher/calendar-lectures"
+            filters={state.filters}
+            onDateSelect={(date) => updateFilters({ ...state.filters, date, range: "selected_date" })}
+            onEventClick={(item) => setState((current) => ({ ...current, selected: item }))}
+          />
+        </section>
+        <ClassActionModal lecture={state.selected} open={Boolean(state.selected)} onClose={() => setState((current) => ({ ...current, selected: null }))} onChanged={() => load()} />
+      </div>
     </div>
   );
 }

@@ -36,7 +36,7 @@ export default function CompletionReportForm({ lecture, onSaved }) {
       <textarea value={form.summary} onChange={(event) => setForm((current) => ({ ...current, summary: event.target.value }))} placeholder="Class summary" className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm" />
       <input value={form.homeworkGiven} onChange={(event) => setForm((current) => ({ ...current, homeworkGiven: event.target.value }))} placeholder="Homework given" className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm" />
       <textarea value={form.studentPerformance} onChange={(event) => setForm((current) => ({ ...current, studentPerformance: event.target.value }))} placeholder="Student performance note" className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm" />
-      <button disabled={pending} className="rounded-2xl bg-slate-950 px-4 py-3 text-sm font-semibold text-white">{pending ? "Saving..." : "Submit completion report"}</button>
+      <button disabled={pending} className="rounded-2xl bg-[#0D5C48] px-4 py-3 text-sm font-semibold text-white">{pending ? "Saving..." : "Submit completion report"}</button>
     </form>
   );
 }

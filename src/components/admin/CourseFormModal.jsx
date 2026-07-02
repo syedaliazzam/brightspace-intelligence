@@ -65,23 +65,26 @@ export default function CourseFormModal({
     }
   }
 
+  const inputClass =
+    "w-full rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 text-sm text-[#063F32] outline-none transition focus:border-[#2D8A6A] focus:bg-white focus:ring-4 focus:ring-[#65B891]/20";
+
   return (
     <AnimatePresence>
       {open ? (
-        <div className="fixed inset-0 z-50 flex items-start justify-center bg-slate-950/45 px-4 pb-8 pt-24 sm:pt-28">
+        <div className="fixed inset-0 z-50 flex items-start justify-center bg-[#063F32]/45 px-4 pb-8 pt-24 sm:pt-28">
           <motion.div
             initial={{ opacity: 0, y: 18 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 18 }}
             transition={{ duration: 0.2 }}
-            className="w-full max-w-3xl rounded-[2rem] border border-white/70 bg-white p-6 shadow-[0_24px_80px_-36px_rgba(15,23,42,0.32)] sm:p-8"
+            className="w-full max-w-3xl rounded-[2rem] border border-[#2D8A6A]/15 bg-white p-6 shadow-[0_24px_80px_-36px_rgba(13,59,46,0.22)] sm:p-8"
           >
             <div className="flex items-start justify-between gap-4">
               <div>
-                <p className="text-sm font-semibold uppercase tracking-[0.24em] text-sky-700">
+                <p className="text-sm font-semibold uppercase tracking-[0.24em] text-[#0D5C48]">
                   Class Management
                 </p>
-                <h2 className="mt-3 text-2xl font-semibold tracking-tight text-slate-950">
+                <h2 className="mt-3 text-2xl font-semibold tracking-tight text-[#063F32]">
                   {record?.id ? "Edit Class" : "Create Class"}
                 </h2>
               </div>
@@ -89,7 +92,7 @@ export default function CourseFormModal({
               <button
                 type="button"
                 onClick={onClose}
-                className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
+                className="rounded-xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-3 py-2 text-sm font-semibold text-[#063F32] transition hover:bg-[#F1EADC]"
               >
                 Close
               </button>
@@ -98,7 +101,7 @@ export default function CourseFormModal({
             <form className="mt-6 grid gap-4" onSubmit={handleSubmit}>
               <div className="grid gap-4 sm:grid-cols-2">
                 <label className="block sm:col-span-2">
-                  <span className="mb-2 block text-sm font-medium text-slate-700">
+                  <span className="mb-2 block text-sm font-medium text-[#245C4F]">
                     Class / Grade
                   </span>
                   <input
@@ -106,19 +109,19 @@ export default function CourseFormModal({
                     value={form.classMode}
                     onChange={(event) => updateField("classMode", event.target.value)}
                     placeholder="Enter class name"
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-950 outline-none transition focus:border-sky-400 focus:bg-white focus:ring-4 focus:ring-sky-100"
+                    className={inputClass}
                     required
                   />
                 </label>
 
                 <label className="block sm:col-span-2">
-                  <span className="mb-2 block text-sm font-medium text-slate-700">
+                  <span className="mb-2 block text-sm font-medium text-[#245C4F]">
                     Status
                   </span>
                   <select
                     value={form.status}
                     onChange={(event) => updateField("status", event.target.value)}
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-950 outline-none transition focus:border-sky-400 focus:bg-white focus:ring-4 focus:ring-sky-100"
+                    className={inputClass}
                   >
                     <option value="active">Active</option>
                     <option value="pending">Draft</option>
@@ -128,7 +131,7 @@ export default function CourseFormModal({
                 </label>
 
                 <label className="block sm:col-span-2">
-                  <span className="mb-2 block text-sm font-medium text-slate-700">
+                  <span className="mb-2 block text-sm font-medium text-[#245C4F]">
                     Description
                   </span>
                   <textarea
@@ -137,7 +140,7 @@ export default function CourseFormModal({
                     onChange={(event) =>
                       updateField("description", event.target.value)
                     }
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-950 outline-none transition focus:border-sky-400 focus:bg-white focus:ring-4 focus:ring-sky-100"
+                    className={inputClass}
                   />
                 </label>
               </div>
@@ -153,14 +156,14 @@ export default function CourseFormModal({
                   type="button"
                   onClick={onClose}
                   disabled={pending}
-                  className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-60"
+                  className="rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 text-sm font-semibold text-[#063F32] transition hover:bg-[#F1EADC] disabled:opacity-60"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={pending}
-                  className="rounded-2xl bg-slate-950 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:opacity-60"
+                  className="rounded-2xl bg-[#0D5C48] px-4 py-3 text-sm font-semibold text-[#FAF7F0] transition hover:bg-[#063F32] disabled:opacity-60"
                 >
                   {pending ? "Saving..." : "Save Class"}
                 </button>

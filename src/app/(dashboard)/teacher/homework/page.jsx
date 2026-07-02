@@ -1,11 +1,13 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { ChevronDown } from "lucide-react";
 import HomeworkForm from "@/components/teacher/HomeworkForm";
 import HomeworkTable from "@/components/teacher/HomeworkTable";
 
 export default function TeacherHomeworkPage() {
   const [state, setState] = useState({ lectures: [], items: [], selected: null, error: "" });
+  const [lectureOpen, setLectureOpen] = useState(false);
 
   async function load() {
     const [classesResponse, homeworkResponse] = await Promise.all([
@@ -38,28 +40,31 @@ export default function TeacherHomeworkPage() {
   );
 
   return (
-    <div className="space-y-6 min-h-screen">
-      <section className="rounded-[2rem] border border-white/70 bg-white/90 p-6 shadow-[0_24px_80px_-36px_rgba(15,23,42,0.25)] sm:p-8">
-        <p className="text-sm font-semibold uppercase tracking-[0.24em] text-sky-700">Homework</p>
-        <h1 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">Create and review homework</h1>
-      </section>
+    <div className="min-h-screen rounded-[2rem] border-0 space-y-6 bg-[#FAF7F0]">
+      <div className="pointer-events-none rounded-[2rem] border-0 absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(201,162,39,0.12),transparent_35%),radial-gradient(circle_at_top_right,rgba(45,138,106,0.12),transparent_32%),linear-gradient(180deg,#FAF7F0_0%,#F7F1E3_100%)]" />
+      <div className="relative mx-auto max-w-7xl rounded-[2rem] border-0 space-y-6 px-4 py-4 sm:px-6 lg:px-8">
+        <section className="rounded-[2rem] border border-[#2D8A6A]/15 bg-[linear-gradient(135deg,rgba(13,59,46,0.98),rgba(13,92,72,0.94))] p-6 text-[#FAF7F0] shadow-[0_24px_80px_-36px_rgba(13,59,46,0.32)] sm:p-8">
+          <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-[#E4C766]">Homework</p>
+          <h1 className="mt-3 font-serif text-3xl font-semibold tracking-tight text-[#FAF7F0] sm:text-4xl">Create and review homework</h1>
+        </section>
 
-      {state.error ? <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">{state.error}</div> : null}
+        {state.error ? <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">{state.error}</div> : null}
 
-      <HomeworkForm
-        lectures={state.lectures}
-        excludeLectureIds={usedLectureIds}
-        initialValue={editingItem}
-        onSaved={() => {
-          setState((current) => ({ ...current, selected: null }));
-          load();
-        }}
-      />
+        <HomeworkForm
+          lectures={state.lectures}
+          excludeLectureIds={usedLectureIds}
+          initialValue={editingItem}
+          onSaved={() => {
+            setState((current) => ({ ...current, selected: null }));
+            load();
+          }}
+        />
 
-      <HomeworkTable
-        items={state.items}
-        onEdit={(item) => setState((current) => ({ ...current, selected: item }))}
-      />
+        <HomeworkTable
+          items={state.items}
+          onEdit={(item) => setState((current) => ({ ...current, selected: item }))}
+        />
+      </div>
     </div>
   );
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { ChevronDown } from "lucide-react";
 
 function groupLectureOptions(lectures) {
   const map = new Map();
@@ -58,6 +59,36 @@ function Modal({ title, subtitle, onClose, children, actions, showTopClose = tru
         <div className="space-y-4 p-6">{children}</div>
         {actions ? <div className="border-t border-[#F1EADC] px-6 py-4">{actions}</div> : null}
       </div>
+    </div>
+  );
+}
+
+function SelectField({ value, onChange, onFocus, onBlur, className = "", children, ...props }) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <div className="relative w-full">
+      <select
+        {...props}
+        value={value}
+        onMouseDown={() => setOpen((current) => !current)}
+        onChange={(event) => {
+          setOpen(false);
+          onChange?.(event);
+        }}
+        onFocus={(event) => {
+          setOpen(true);
+          onFocus?.(event);
+        }}
+        onBlur={(event) => {
+          setOpen(false);
+          onBlur?.(event);
+        }}
+        className={`block w-full appearance-none pr-11 ${className}`}
+      >
+        {children}
+      </select>
+      <ChevronDown className={`pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#0D5C48] transition-transform duration-200 ${open ? "rotate-180" : "rotate-0"}`} />
     </div>
   );
 }
@@ -184,19 +215,19 @@ export default function NoteThreadsBoard({ mode = "viewer", lectures = [] }) {
       {mode === "teacher" ? (
         <form onSubmit={submitCompose} className={`grid gap-4 p-5 ${panel}`}>
           <div className="grid gap-3 md:grid-cols-3">
-            <select value={compose.classLevel} onChange={(e) => setCompose((c) => ({ ...c, classLevel: e.target.value, subjectId: "" }))} className="rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 text-sm text-[#245C4F] outline-none focus:border-[#C9A227] focus:ring-4 focus:ring-[#FFF5D6]" required>
+            <SelectField value={compose.classLevel} onChange={(e) => setCompose((c) => ({ ...c, classLevel: e.target.value, subjectId: "" }))} className="rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 text-sm text-[#245C4F] outline-none focus:border-[#C9A227] focus:ring-4 focus:ring-[#FFF5D6]" required>
               <option value="">Select class</option>
               {Array.from(new Map(lectureOptions.map((item) => [item.classLevel, item])).values()).map((item) => <option key={item.classLevel} value={item.classLevel}>{item.classLevel}</option>)}
-            </select>
-            <select value={compose.subjectId} onChange={(e) => setCompose((c) => ({ ...c, subjectId: e.target.value }))} className="rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 text-sm text-[#245C4F] outline-none focus:border-[#C9A227] focus:ring-4 focus:ring-[#FFF5D6]" required disabled={!compose.classLevel}>
+            </SelectField>
+            <SelectField value={compose.subjectId} onChange={(e) => setCompose((c) => ({ ...c, subjectId: e.target.value }))} className="rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 text-sm text-[#245C4F] outline-none focus:border-[#C9A227] focus:ring-4 focus:ring-[#FFF5D6]" required disabled={!compose.classLevel}>
               <option value="">Select subject</option>
               {subjectOptions.map((item) => <option key={item.subjectId} value={item.subjectId}>{item.subjectName}</option>)}
-            </select>
-            <select value={compose.visibility} onChange={(e) => setCompose((c) => ({ ...c, visibility: e.target.value }))} className="rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 text-sm text-[#245C4F] outline-none focus:border-[#C9A227] focus:ring-4 focus:ring-[#FFF5D6]">
+            </SelectField>
+            <SelectField value={compose.visibility} onChange={(e) => setCompose((c) => ({ ...c, visibility: e.target.value }))} className="rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 text-sm text-[#245C4F] outline-none focus:border-[#C9A227] focus:ring-4 focus:ring-[#FFF5D6]">
               <option value="parent">Parent</option>
               <option value="student">Student</option>
               <option value="admin_only">Admin only</option>
-            </select>
+            </SelectField>
           </div>
           <textarea value={compose.message} onChange={(e) => setCompose((c) => ({ ...c, message: e.target.value }))} placeholder="Add note or message" className="min-h-[120px] rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 text-sm text-[#063F32] outline-none focus:border-[#C9A227] focus:ring-4 focus:ring-[#FFF5D6]" required />
           <div className="flex items-center justify-between gap-3">
@@ -231,10 +262,10 @@ export default function NoteThreadsBoard({ mode = "viewer", lectures = [] }) {
                   <td className="px-4 py-4 text-[#245C4F]">{thread.last_message_at ? new Date(thread.last_message_at).toLocaleString("en-PK", { timeZone: "Asia/Karachi" }) : "-"}</td>
                   <td className="px-4 py-4">
                     <div className="flex flex-wrap gap-2">
-                      <button type="button" onClick={() => openThread(thread).catch((err) => setError(err.message))} className={`${buttonBase} border-[#2D8A6A]/20 bg-[#FAF7F0] text-[#0D5C48] hover:bg-[#F1EADC]`}>View</button>
+                      <button type="button" onClick={() => openThread(thread).catch((err) => setError(err.message))} className={`${buttonBase} border-[#2D8A6A]/20 bg-[#FAF7F0] text-black hover:bg-[#F1EADC]`}>View</button>
                       {mode === "teacher" ? (
                         <>
-                          <button type="button" onClick={() => { setEditingThread(thread); setEditingText(thread.last_message || ""); }} className={`${buttonBase} border-[#2D8A6A]/20 bg-[#FFF5D6] text-[#8A6B00] hover:bg-[#E4C766]`}>Edit</button>
+                          <button type="button" onClick={() => { setEditingThread(thread); setEditingText(thread.last_message || ""); }} className={`${buttonBase} border-[#2D8A6A]/20 bg-[#0D5C48] text-[#FAF7F0] hover:bg-[#063F32]`}>Edit</button>
                           <button type="button" onClick={() => setDeletingThread(thread)} className={`${buttonBase} border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100`}>Delete</button>
                         </>
                       ) : null}

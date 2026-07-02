@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { ChevronDown } from "lucide-react";
 import AdminDashboardCards from "@/components/admin/AdminDashboardCards";
 import AdminDataTable from "@/components/admin/AdminDataTable";
 import CourseFormModal from "@/components/admin/CourseFormModal";
@@ -87,6 +88,12 @@ export default function AdminCoursesPage() {
     };
   });
   const [modal, setModal] = useState({ open: false, record: null });
+  const [statusOpen, setStatusOpen] = useState(false);
+  const [subjectOpen, setSubjectOpen] = useState(false);
+
+  function closeSelectState(setter) {
+    window.setTimeout(() => setter(false), 0);
+  }
 
   const load = useCallback(async (options = {}) => {
     const force = options.force === true;
@@ -154,14 +161,16 @@ export default function AdminCoursesPage() {
   }, [load]);
 
   return (
-    <div className="space-y-6 min-h-screen">
-      <section className="rounded-[2rem] border border-white/70 bg-[linear-gradient(135deg,rgba(255,255,255,0.92),rgba(241,248,255,0.92))] p-6 shadow-[0_24px_80px_-36px_rgba(15,23,42,0.25)] sm:p-8">
+    <div className="min-h-screen rounded-[2rem] bg-[#FAF7F0]">
+      <div className="pointer-events-none absolute inset-0 rounded-[2rem] bg-[radial-gradient(circle_at_top_left,rgba(201,162,39,0.12),transparent_35%),radial-gradient(circle_at_top_right,rgba(45,138,106,0.12),transparent_32%),linear-gradient(180deg,#FAF7F0_0%,#F7F1E3_100%)]" />
+      <div className="relative mx-auto max-w-7xl space-y-6 px-4 py-4 sm:px-6 lg:px-8">
+      <section className="rounded-[2rem] border border-[#2D8A6A]/15 bg-[linear-gradient(135deg,rgba(13,59,46,0.98),rgba(13,92,72,0.94))] p-6 text-[#FAF7F0] shadow-[0_24px_80px_-36px_rgba(13,59,46,0.32)] sm:p-8">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div className="max-w-3xl">
-            <h1 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">
+          <h1 className="mt-3 font-serif text-3xl font-semibold tracking-tight text-[#FAF7F0] sm:text-4xl">
               Manage Academic Classes
             </h1>
-            <p className="mt-3 text-sm leading-7 text-slate-600 sm:text-base">
+          <p className="mt-3 text-sm leading-7 text-[#EAF6EF] sm:text-base">
               View approved class levels, assigned subjects, and related lecture activity from one admin page.
             </p>
           </div>
@@ -169,7 +178,7 @@ export default function AdminCoursesPage() {
           <button
             type="button"
             onClick={() => setModal({ open: true, record: null })}
-            className="inline-flex items-center justify-center rounded-2xl bg-slate-950 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800"
+            className="inline-flex items-center justify-center rounded-2xl bg-[#FAF7F0] px-5 py-3 text-sm font-semibold text-[#245C4F] transition hover:bg-[#DBD8D5]"
           >
             Create Class
           </button>
@@ -182,30 +191,30 @@ export default function AdminCoursesPage() {
             key: "total",
             label: "Total Classes",
             value: state.summary.total,
-            tone: "bg-slate-950 text-white",
+            tone: "bg-[#0D5C48] text-[#FAF7F0]",
           },
           {
             key: "active",
             label: "Active Classes",
             value: state.summary.active,
-            tone: "bg-emerald-50 text-emerald-800",
+            tone: "bg-[#EAF6EF] text-[#0D5C48]",
           },
           {
             key: "draft",
             label: "Draft Classes",
             value: state.summary.draft,
-            tone: "bg-amber-50 text-amber-800",
+            tone: "bg-[#FFF5D6] text-[#8A6B00]",
           },
           {
             key: "availability",
             label: "Catalog status",
             value: state.available ? "Ready" : "Pending",
-            tone: "bg-sky-50 text-sky-800",
+            tone: "bg-[#EAF6EF] text-[#0D5C48]",
           },
         ].filter(Boolean)}
       />
 
-      <section className="rounded-[1.75rem] border border-white/70 bg-white/90 p-4 shadow-[0_20px_70px_-36px_rgba(15,23,42,0.25)] sm:p-5">
+      <section className="rounded-[2rem] border border-[#2D8A6A]/15 bg-white/90 p-4 shadow-[0_20px_70px_-36px_rgba(13,59,46,0.18)] sm:p-5">
         <form
           className="grid gap-3 lg:grid-cols-[minmax(0,1.2fr)_220px_220px_auto]"
           onSubmit={(event) => {
@@ -214,7 +223,7 @@ export default function AdminCoursesPage() {
           }}
         >
           <label className="block">
-            <span className="mb-2 block text-sm font-medium text-slate-700">
+            <span className="mb-2 block text-sm font-medium text-[#245C4F]">
               Search Classes
             </span>
             <input
@@ -227,58 +236,70 @@ export default function AdminCoursesPage() {
                 }))
               }
               placeholder="Class name or description"
-              className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-950 outline-none transition focus:border-sky-400 focus:bg-white focus:ring-4 focus:ring-sky-100"
+              className="w-full rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 text-sm text-[#063F32] outline-none transition focus:border-[#2D8A6A] focus:bg-white focus:ring-4 focus:ring-[#FFF5D6]"
             />
           </label>
 
           <label className="block">
-            <span className="mb-2 block text-sm font-medium text-slate-700">
+            <span className="mb-2 block text-sm font-medium text-[#245C4F]">
               Status
             </span>
-            <select
-              value={filters.status}
-              onChange={(event) =>
-                setFilters((current) => ({
-                  ...current,
-                  status: event.target.value,
-                }))
-              }
-              className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-950 outline-none transition focus:border-sky-400 focus:bg-white focus:ring-4 focus:ring-sky-100"
-            >
-              <option value="">All statuses</option>
-              <option value="pending">Draft</option>
-              <option value="active">Active</option>
-              <option value="suspended">Suspended</option>
-              <option value="archived">Archived</option>
-            </select>
+            <div className="relative">
+              <select
+                value={filters.status}
+                onMouseDown={() => setStatusOpen((current) => !current)}
+                onFocus={() => setStatusOpen(true)}
+                onBlur={() => closeSelectState(setStatusOpen)}
+                onChange={(event) =>
+                  setFilters((current) => ({
+                    ...current,
+                    status: event.target.value,
+                  }))
+                }
+                className="w-full appearance-none rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 pr-11 text-sm text-[#063F32] outline-none transition focus:border-[#2D8A6A] focus:bg-white focus:ring-4 focus:ring-[#FFF5D6]"
+              >
+                <option value="">All statuses</option>
+                <option value="pending">Draft</option>
+                <option value="active">Active</option>
+                <option value="suspended">Suspended</option>
+                <option value="archived">Archived</option>
+              </select>
+              <ChevronDown className={`pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#0D5C48] transition-transform duration-200 ${statusOpen ? "rotate-180" : "rotate-0"}`} />
+            </div>
           </label>
 
           <label className="block">
-            <span className="mb-2 block text-sm font-medium text-slate-700">
+            <span className="mb-2 block text-sm font-medium text-[#245C4F]">
               Subject
             </span>
-            <select
-              value={filters.subjectId}
-              onChange={(event) =>
-                setFilters((current) => ({
-                  ...current,
-                  subjectId: event.target.value,
-                }))
-              }
-              className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-950 outline-none transition focus:border-sky-400 focus:bg-white focus:ring-4 focus:ring-sky-100"
-            >
-              <option value="">All subjects</option>
-              {state.subjects.map((subject) => (
-                <option key={subject.id} value={subject.id}>
-                  {subject.name}
-                </option>
-              ))}
-            </select>
+            <div className="relative">
+              <select
+                value={filters.subjectId}
+                onMouseDown={() => setSubjectOpen((current) => !current)}
+                onFocus={() => setSubjectOpen(true)}
+                onBlur={() => closeSelectState(setSubjectOpen)}
+                onChange={(event) =>
+                  setFilters((current) => ({
+                    ...current,
+                    subjectId: event.target.value,
+                  }))
+                }
+                className="w-full appearance-none rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 pr-11 text-sm text-[#063F32] outline-none transition focus:border-[#2D8A6A] focus:bg-white focus:ring-4 focus:ring-[#FFF5D6]"
+              >
+                <option value="">All subjects</option>
+                {state.subjects.map((subject) => (
+                  <option key={subject.id} value={subject.id}>
+                    {subject.name}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown className={`pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#0D5C48] transition-transform duration-200 ${subjectOpen ? "rotate-180" : "rotate-0"}`} />
+            </div>
           </label>
 
           <button
             type="submit"
-            className="mt-7 inline-flex h-12 items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+            className="mt-7 inline-flex h-12 items-center justify-center rounded-2xl border border-[#2D8A6A]/20 bg-[#0D5C48] px-4 text-sm font-semibold text-white transition hover:bg-[#063F32]"
           >
             Apply
           </button>
@@ -298,7 +319,7 @@ export default function AdminCoursesPage() {
             label: "Class Name",
             render: (row) => (
               <div>
-                <p className="font-semibold text-slate-950">{row.name}</p>
+                <p className="font-semibold text-[#063F32]">{row.name}</p>
               </div>
             ),
           },
@@ -333,7 +354,7 @@ export default function AdminCoursesPage() {
           <button
             type="button"
             onClick={() => setModal({ open: true, record: row })}
-            className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
+            className="rounded-xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-3 py-2 text-xs font-semibold text-[#063F32] transition hover:bg-[#F1EADC]"
           >
             Edit
           </button>
@@ -351,6 +372,7 @@ export default function AdminCoursesPage() {
           onSuccess={() => load({ force: true })}
         />
       ) : null}
+      </div>
     </div>
   );
 }

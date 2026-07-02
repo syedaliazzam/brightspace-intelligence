@@ -28,36 +28,36 @@ function HeadlineForm({ form, onChange, onSubmit, onCancel, submitting, submitLa
   return (
     <form className="grid gap-4" onSubmit={onSubmit}>
       <label className="block">
-        <span className="mb-2 block text-sm font-medium text-slate-700">Headline text</span>
+        <span className="mb-2 block text-sm font-medium text-[#245C4F]">Headline text</span>
         <textarea
           value={form.headline}
           onChange={(event) => onChange((current) => ({ ...current, headline: event.target.value }))}
           rows={4}
           placeholder="Enter the announcement students, teachers, and parents should see"
-          className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-950 outline-none transition focus:border-sky-400 focus:bg-white focus:ring-4 focus:ring-sky-100"
+          className="w-full rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 text-sm text-[#063F32] outline-none transition focus:border-[#2D8A6A] focus:bg-white focus:ring-4 focus:ring-[#FFF5D6]"
           required
         />
       </label>
 
       <div className="grid gap-4 md:grid-cols-2">
         <label className="block">
-          <span className="mb-2 block text-sm font-medium text-slate-700">Start date</span>
+          <span className="mb-2 block text-sm font-medium text-[#245C4F]">Start date</span>
           <input
             type="date"
             value={form.startDate}
             onChange={(event) => onChange((current) => ({ ...current, startDate: event.target.value }))}
-            className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-950 outline-none transition focus:border-sky-400 focus:bg-white focus:ring-4 focus:ring-sky-100"
+            className="w-full rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 text-sm text-[#063F32] outline-none transition focus:border-[#2D8A6A] focus:bg-white focus:ring-4 focus:ring-[#FFF5D6]"
             required
           />
         </label>
 
         <label className="block">
-          <span className="mb-2 block text-sm font-medium text-slate-700">End date</span>
+          <span className="mb-2 block text-sm font-medium text-[#245C4F]">End date</span>
           <input
             type="date"
             value={form.endDate}
             onChange={(event) => onChange((current) => ({ ...current, endDate: event.target.value }))}
-            className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-950 outline-none transition focus:border-sky-400 focus:bg-white focus:ring-4 focus:ring-sky-100"
+            className="w-full rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 text-sm text-[#063F32] outline-none transition focus:border-[#2D8A6A] focus:bg-white focus:ring-4 focus:ring-[#FFF5D6]"
             required
           />
         </label>
@@ -68,7 +68,7 @@ function HeadlineForm({ form, onChange, onSubmit, onCancel, submitting, submitLa
           <button
             type="button"
             onClick={onCancel}
-            className="rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+            className="rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-5 py-3 text-sm font-semibold text-[#063F32] transition hover:bg-[#F1EADC]"
           >
             Cancel
           </button>
@@ -76,7 +76,7 @@ function HeadlineForm({ form, onChange, onSubmit, onCancel, submitting, submitLa
         <button
           type="submit"
           disabled={submitting}
-          className="rounded-2xl bg-slate-950 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+          className="rounded-2xl bg-[#0D5C48] px-5 py-3 text-sm font-semibold text-[#FAF7F0] transition hover:bg-[#063F32] disabled:cursor-not-allowed disabled:opacity-60"
         >
           {submitting ? "Saving..." : submitLabel}
         </button>
@@ -219,21 +219,23 @@ export default function AdminHeadlinesPage() {
   }
 
   return (
-    <div className="space-y-6 min-h-screen">
-      <section className="rounded-[2rem] border border-white/70 bg-[linear-gradient(135deg,rgba(255,255,255,0.92),rgba(241,248,255,0.92))] p-6 shadow-[0_24px_80px_-36px_rgba(15,23,42,0.25)] sm:p-8">
+    <div className="min-h-screen rounded-[2rem] bg-[#FAF7F0]">
+      <div className="pointer-events-none absolute inset-0 rounded-[2rem] bg-[radial-gradient(circle_at_top_left,rgba(201,162,39,0.12),transparent_35%),radial-gradient(circle_at_top_right,rgba(45,138,106,0.12),transparent_32%),linear-gradient(180deg,#FAF7F0_0%,#F7F1E3_100%)]" />
+      <div className="relative mx-auto max-w-7xl space-y-6 px-4 py-4 sm:px-6 lg:px-8">
+      <section className="rounded-[2rem] border border-[#2D8A6A]/15 bg-[linear-gradient(135deg,rgba(13,59,46,0.98),rgba(13,92,72,0.94))] p-6 text-[#FAF7F0] shadow-[0_24px_80px_-36px_rgba(13,59,46,0.32)] sm:p-8">
         <div className="max-w-3xl">
-          <h1 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">Schedule dashboard announcements</h1>
-          <p className="mt-3 text-sm leading-7 text-slate-600 sm:text-base">
+          <h1 className="mt-3 font-serif text-3xl font-semibold tracking-tight text-[#FAF7F0] sm:text-4xl">Schedule dashboard announcements</h1>
+          <p className="mt-3 text-sm leading-7 text-[#EAF6EF] sm:text-base">
             Create time-based headlines that appear at the top of student, teacher, and parent dashboards while their date range is active.
           </p>
         </div>
       </section>
 
-      <section className="rounded-[1.75rem] border border-white/70 bg-white/90 p-5 shadow-[0_20px_70px_-36px_rgba(15,23,42,0.25)] sm:p-6">
+      <section className="rounded-[2rem] border border-[#2D8A6A]/15 bg-white/90 p-5 shadow-[0_20px_70px_-36px_rgba(13,59,46,0.18)] sm:p-6">
         <div className="mb-5 flex items-center justify-between gap-3">
           <div>
-            <p className="text-sm font-semibold uppercase tracking-[0.22em] text-sky-700">Create headline</p>
-            <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">New dashboard headline</h2>
+            <p className="text-sm font-semibold uppercase tracking-[0.22em] text-[#0D5C48]">Create headline</p>
+            <h2 className="mt-2 text-2xl font-semibold tracking-tight text-[#063F32]">New dashboard headline</h2>
           </div>
         </div>
 
@@ -253,7 +255,7 @@ export default function AdminHeadlinesPage() {
       ) : null}
 
       {!available ? (
-        <section className="rounded-[1.75rem] border border-dashed border-amber-300 bg-amber-50 p-5 text-sm text-amber-800">
+        <section className="rounded-[1.75rem] border border-dashed border-[#C9A227]/35 bg-[#FFF5D6] p-5 text-sm text-[#8A6B00]">
           Headlines table is not available yet. Run the SQL script first, then refresh this page.
         </section>
       ) : null}
@@ -263,7 +265,7 @@ export default function AdminHeadlinesPage() {
           {
             key: "headline",
             label: "Headline",
-            render: (row) => <p className="max-w-xl whitespace-pre-wrap font-medium text-slate-950">{row.headline}</p>,
+            render: (row) => <p className="max-w-xl whitespace-pre-wrap font-medium text-[#063F32]">{row.headline}</p>,
           },
           {
             key: "date_range",
@@ -288,7 +290,7 @@ export default function AdminHeadlinesPage() {
             <button
               type="button"
               onClick={() => startEdit(row)}
-              className="rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 text-xs font-semibold text-sky-700 transition hover:bg-sky-100"
+              className="rounded-xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-3 py-2 text-xs font-semibold text-black transition hover:bg-[#F1EADC]"
             >
               Edit
             </button>
@@ -304,15 +306,15 @@ export default function AdminHeadlinesPage() {
       />
 
       {editingId ? (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/35 px-4 pb-8 pt-24 backdrop-blur-sm sm:pt-28">
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-[#063F32]/45 px-4 pb-8 pt-24 backdrop-blur-sm sm:pt-28">
           <div className="mx-auto w-full max-w-3xl">
-            <section className="overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-[0_32px_90px_-38px_rgba(15,23,42,0.4)]">
-              <div className="bg-[linear-gradient(135deg,rgba(8,47,73,0.98),rgba(14,116,144,0.96),rgba(224,242,254,0.94))] px-6 py-6 text-white sm:px-8">
+            <section className="overflow-hidden rounded-[2rem] border border-[#2D8A6A]/15 bg-white shadow-[0_32px_90px_-38px_rgba(13,59,46,0.24)]">
+              <div className="bg-[linear-gradient(135deg,rgba(13,59,46,0.98),rgba(13,92,72,0.94))] px-6 py-6 text-[#FAF7F0] sm:px-8">
                 <div className="flex items-start justify-between gap-4">
                   <div className="max-w-2xl">
-                    <p className="text-sm font-semibold uppercase tracking-[0.24em] text-sky-100">Edit headline</p>
+                    <p className="text-sm font-semibold uppercase tracking-[0.24em] text-[#EAF6EF]">Edit headline</p>
                     <h2 className="mt-3 text-2xl font-semibold tracking-tight sm:text-3xl">Update the scheduled announcement</h2>
-                    <p className="mt-3 text-sm leading-7 text-sky-50/90">
+                    <p className="mt-3 text-sm leading-7 text-[#EAF6EF]">
                       Refine the message and schedule window here. This popup stays near the top so it feels connected to the admin header.
                     </p>
                   </div>
@@ -348,9 +350,9 @@ export default function AdminHeadlinesPage() {
       ) : null}
 
       {deletingItem ? (
-        <div className="fixed inset-0 z-[60] overflow-y-auto bg-slate-950/45 px-4 pb-8 pt-20 backdrop-blur-sm sm:pt-24">
+        <div className="fixed inset-0 z-[60] overflow-y-auto bg-[#063F32]/45 px-4 pb-8 pt-20 backdrop-blur-sm sm:pt-24">
           <div className="mx-auto w-full max-w-2xl">
-            <section className="overflow-hidden rounded-[2rem] border border-rose-200 bg-white shadow-[0_32px_90px_-38px_rgba(15,23,42,0.42)]">
+            <section className="overflow-hidden rounded-[2rem] border border-rose-200 bg-white shadow-[0_32px_90px_-38px_rgba(13,59,46,0.24)]">
               <div className="bg-[linear-gradient(135deg,rgba(127,29,29,0.98),rgba(185,28,28,0.95),rgba(254,226,226,0.92))] px-6 py-6 text-white sm:px-8">
                 <div className="flex items-start justify-between gap-4">
                   <div className="max-w-xl">
@@ -371,10 +373,10 @@ export default function AdminHeadlinesPage() {
               </div>
 
               <div className="space-y-5 p-6 sm:p-8">
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
-                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Headline preview</p>
-                  <p className="mt-3 whitespace-pre-wrap text-base font-medium text-slate-950">{deletingItem.headline || "-"}</p>
-                  <p className="mt-3 text-sm text-slate-600">
+                <div className="rounded-2xl border border-[#2D8A6A]/15 bg-[#FAF7F0] p-5">
+                  <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#245C4F]">Headline preview</p>
+                  <p className="mt-3 whitespace-pre-wrap text-base font-medium text-[#063F32]">{deletingItem.headline || "-"}</p>
+                  <p className="mt-3 text-sm text-[#245C4F]">
                     {formatDate(deletingItem.start_date)} to {formatDate(deletingItem.end_date)}
                   </p>
                 </div>
@@ -383,7 +385,7 @@ export default function AdminHeadlinesPage() {
                   <button
                     type="button"
                     onClick={() => setDeletingItem(null)}
-                    className="rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                    className="rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-5 py-3 text-sm font-semibold text-[#063F32] transition hover:bg-[#F1EADC]"
                   >
                     Cancel
                   </button>
@@ -401,6 +403,7 @@ export default function AdminHeadlinesPage() {
           </div>
         </div>
       ) : null}
+      </div>
     </div>
   );
 }

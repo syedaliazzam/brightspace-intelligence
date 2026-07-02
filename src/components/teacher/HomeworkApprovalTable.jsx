@@ -7,20 +7,20 @@ function HomeworkSubmissionModal({ item, onClose, onAction }) {
   if (!item) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center bg-slate-950/45 px-4 pt-28 pb-8">
-      <div className="w-full max-w-3xl overflow-hidden rounded-[2rem] border border-white/70 bg-white shadow-[0_24px_80px_-36px_rgba(15,23,42,0.32)]">
-        <div className="flex items-start justify-between gap-4 border-b border-slate-100 px-6 py-4">
+    <div className="fixed inset-0 z-50 flex items-start justify-center bg-[#063F32]/45 px-4 pt-28 pb-8">
+      <div className="w-full max-w-3xl overflow-hidden rounded-[2rem] border border-[#2D8A6A]/15 bg-white shadow-[0_24px_80px_-36px_rgba(13,59,46,0.32)]">
+        <div className="flex items-start justify-between gap-4 border-b border-[#2D8A6A]/10 px-6 py-4">
           <div>
-            <p className="text-sm font-semibold uppercase tracking-[0.24em] text-sky-700">Approve homework</p>
-            <h3 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">{item.title}</h3>
-            <p className="mt-1 text-sm text-slate-600">
-              {item.student_name} · {item.subject_name} · {item.class_level}
+            <p className="text-sm font-semibold uppercase tracking-[0.24em] text-[#0D5C48]">Approve homework</p>
+            <h3 className="mt-2 text-2xl font-semibold tracking-tight text-[#063F32]">{item.title}</h3>
+            <p className="mt-1 text-sm text-[#245C4F]">
+              {item.student_name} Â· {item.subject_name} Â· {item.class_level}
             </p>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-100"
+            className="rounded-xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-2 text-sm font-semibold text-[#063F32] hover:bg-[#F1EADC]"
           >
             Close
           </button>
@@ -28,15 +28,15 @@ function HomeworkSubmissionModal({ item, onClose, onAction }) {
 
         <div className="space-y-4 p-6">
           <div className="grid gap-4 md:grid-cols-2">
-            <div className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-600">
-              <p className="font-semibold text-slate-950">Submission info</p>
+            <div className="rounded-2xl bg-[#FAF7F0] p-4 text-sm text-[#245C4F]">
+              <p className="font-semibold text-[#063F32]">Submission info</p>
               <p className="mt-2"><strong>Teacher:</strong> {item.teacher_name || "-"}</p>
               <p className="mt-1"><strong>Due date:</strong> {item.due_date ? new Date(item.due_date).toLocaleDateString("en-PK", { timeZone: "Asia/Karachi", dateStyle: "medium" }) : "-"}</p>
               <p className="mt-1"><strong>Status:</strong> {item.status || "-"}</p>
               <p className="mt-1"><strong>Submitted text:</strong> {item.submission_note || "No text submitted."}</p>
             </div>
-            <div className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-600">
-              <p className="font-semibold text-slate-950">Homework text</p>
+            <div className="rounded-2xl bg-[#FAF7F0] p-4 text-sm text-[#245C4F]">
+              <p className="font-semibold text-[#063F32]">Homework text</p>
               <p className="mt-2 whitespace-pre-line">{item.description || "No description."}</p>
             </div>
           </div>
@@ -52,7 +52,7 @@ function HomeworkSubmissionModal({ item, onClose, onAction }) {
             <button
               type="button"
               onClick={() => onAction("approve")}
-              className="rounded-2xl bg-slate-950 px-4 py-3 text-sm font-semibold text-white"
+              className="rounded-2xl bg-[#0D5C48] px-4 py-3 text-sm font-semibold text-[#FAF7F0]"
             >
               Approve
             </button>
@@ -67,12 +67,12 @@ function RejectHomeworkModal({ onClose, onSubmit }) {
   const [remarks, setRemarks] = useState("");
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-start justify-center bg-slate-950/45 px-4 pt-28 pb-8">
-      <div className="w-full max-w-xl rounded-[2rem] border border-white/70 bg-white shadow-[0_24px_80px_-36px_rgba(15,23,42,0.32)]">
-        <div className="border-b border-slate-100 px-6 py-4">
+    <div className="fixed inset-0 z-[60] flex items-start justify-center bg-[#063F32]/45 px-4 pt-28 pb-8">
+      <div className="w-full max-w-xl rounded-[2rem] border border-[#2D8A6A]/15 bg-white shadow-[0_24px_80px_-36px_rgba(13,59,46,0.32)]">
+        <div className="border-b border-[#2D8A6A]/10 px-6 py-4">
           <p className="text-sm font-semibold uppercase tracking-[0.24em] text-rose-700">Reject homework</p>
-          <h3 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">Add rejection reason</h3>
-          <p className="mt-1 text-sm text-slate-600">This will keep the homework in pending state so the student can resubmit.</p>
+          <h3 className="mt-2 text-2xl font-semibold tracking-tight text-[#063F32]">Add rejection reason</h3>
+          <p className="mt-1 text-sm text-[#245C4F]">This will keep the homework in pending state so the student can resubmit.</p>
         </div>
 
         <div className="space-y-4 p-6">
@@ -80,7 +80,7 @@ function RejectHomeworkModal({ onClose, onSubmit }) {
             value={remarks}
             onChange={(event) => setRemarks(event.target.value)}
             rows={5}
-            className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none ring-0 placeholder:text-slate-400 focus:border-slate-400"
+            className="w-full rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 text-sm text-[#063F32] outline-none ring-0 placeholder:text-[#6A8C82] focus:border-[#2D8A6A]"
             placeholder="Write rejection reason..."
           />
 
@@ -88,7 +88,7 @@ function RejectHomeworkModal({ onClose, onSubmit }) {
             <button
               type="button"
               onClick={onClose}
-              className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-100"
+              className="rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 text-sm font-semibold text-[#063F32] hover:bg-[#F1EADC]"
             >
               Cancel
             </button>
@@ -140,10 +140,10 @@ export default function HomeworkApprovalTable({ items = [], onRefresh }) {
 
   return (
     <>
-      <section className="overflow-hidden rounded-[1.75rem] border border-white/70 bg-white/90 shadow-[0_20px_70px_-36px_rgba(15,23,42,0.25)]">
+      <section className="overflow-hidden rounded-[1.75rem] border border-[#2D8A6A]/15 bg-white/90 shadow-[0_20px_70px_-36px_rgba(13,59,46,0.18)]">
         <div className="overflow-x-auto">
           <table className="min-w-full text-left text-sm">
-            <thead className="bg-slate-50 text-xs uppercase tracking-[0.18em] text-slate-500">
+            <thead className="bg-[#FAF7F0] text-xs uppercase tracking-[0.18em] text-[#0D5C48]">
               <tr>
                 <th className="px-4 py-3">Student</th>
                 <th className="px-4 py-3">Class</th>
@@ -154,20 +154,20 @@ export default function HomeworkApprovalTable({ items = [], onRefresh }) {
                 <th className="px-4 py-3">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-[#F1EADC]">
               {visibleItems.length ? visibleItems.map((item) => (
                 <tr key={item.id}>
-                  <td className="px-4 py-4 font-semibold text-slate-950">{item.student_name || "-"}</td>
-                  <td className="px-4 py-4 text-slate-600">{item.class_level || "-"}</td>
-                  <td className="px-4 py-4 text-slate-600">{item.subject_name || "-"}</td>
-                  <td className="px-4 py-4 text-slate-600">{item.title || "-"}</td>
-                  <td className="px-4 py-4 text-slate-600">{item.due_date ? new Date(item.due_date).toLocaleDateString("en-PK", { timeZone: "Asia/Karachi", dateStyle: "medium" }) : "-"}</td>
-                  <td className="px-4 py-4 text-slate-600">{item.submission_note || "No note."}</td>
+                  <td className="px-4 py-4 font-semibold text-[#063F32]">{item.student_name || "-"}</td>
+                  <td className="px-4 py-4 text-[#245C4F]">{item.class_level || "-"}</td>
+                  <td className="px-4 py-4 text-[#245C4F]">{item.subject_name || "-"}</td>
+                  <td className="px-4 py-4 text-[#245C4F]">{item.title || "-"}</td>
+                  <td className="px-4 py-4 text-[#245C4F]">{item.due_date ? new Date(item.due_date).toLocaleDateString("en-PK", { timeZone: "Asia/Karachi", dateStyle: "medium" }) : "-"}</td>
+                  <td className="px-4 py-4 text-[#245C4F]">{item.submission_note || "No note."}</td>
                   <td className="px-4 py-4">
                     <button
                       type="button"
                       onClick={() => setSelected(item)}
-                      className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-100"
+                      className="rounded-xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-3 py-2 text-xs font-semibold text-[#063F32] hover:bg-[#F1EADC]"
                     >
                       View / Review
                     </button>
@@ -175,7 +175,7 @@ export default function HomeworkApprovalTable({ items = [], onRefresh }) {
                 </tr>
               )) : (
                 <tr>
-                  <td colSpan={7} className="px-4 py-10 text-center text-sm text-slate-500">No homework submissions waiting for review.</td>
+                  <td colSpan={7} className="px-4 py-10 text-center text-sm text-[#245C4F]">No homework submissions waiting for review.</td>
                 </tr>
               )}
             </tbody>

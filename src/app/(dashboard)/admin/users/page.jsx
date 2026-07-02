@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import { ChevronDown } from "lucide-react";
 import AdminConfirmDialog from "@/components/admin/AdminConfirmDialog";
 import AdminDashboardCards from "@/components/admin/AdminDashboardCards";
 import AdminDataTable from "@/components/admin/AdminDataTable";
@@ -27,9 +28,9 @@ function formatLabel(value) {
 
 function DetailBlock({ label, value }) {
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-4">
-      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{label}</p>
-      <p className="mt-2 text-sm font-semibold text-slate-950">{value || "Not provided"}</p>
+    <div className="rounded-2xl border border-[#2D8A6A]/15 bg-white/90 p-4">
+      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#245C4F]">{label}</p>
+      <p className="mt-2 text-sm font-semibold text-[#063F32]">{value || "Not provided"}</p>
     </div>
   );
 }
@@ -123,6 +124,13 @@ export default function AdminUsersPage() {
   });
   const [modal, setModal] = useState({ open: false, record: null });
   const [detailModal, setDetailModal] = useState({ open: false, record: null });
+  const [resetModal, setResetModal] = useState({
+    open: false,
+    record: null,
+    password: "",
+    pending: false,
+    error: "",
+  });
   const [confirmState, setConfirmState] = useState({
     open: false,
     record: null,
@@ -130,6 +138,13 @@ export default function AdminUsersPage() {
     status: "",
     pending: false,
   });
+  const [roleOpen, setRoleOpen] = useState(false);
+  const [statusOpen, setStatusOpen] = useState(false);
+  const [classOpen, setClassOpen] = useState(false);
+
+  function closeSelectState(setter) {
+    window.setTimeout(() => setter(false), 0);
+  }
 
   useEffect(() => {
     setFilters((current) => ({
@@ -334,19 +349,19 @@ export default function AdminUsersPage() {
           key: "admins",
           label: "Admins",
           value: staffItems.filter((item) => item.role === "admin").length,
-          tone: "bg-slate-950 text-white",
+          tone: "bg-[#0D5C48] text-[#FAF7F0]",
         },
         {
           key: "coordinators",
           label: "Coordinators",
           value: staffItems.filter((item) => item.role === "coordinator").length,
-          tone: "bg-sky-50 text-sky-800",
+          tone: "bg-[#EAF6EF] text-[#0D5C48]",
         },
         {
           key: "teachers",
           label: "Teachers",
           value: staffItems.filter((item) => item.role === "teacher").length,
-          tone: "bg-amber-50 text-amber-800",
+          tone: "bg-[#FFF5D6] text-[#8A6B00]",
         },
         {
           key: "suspendedAdmins",
@@ -375,7 +390,7 @@ export default function AdminUsersPage() {
           key: "students",
           label: "Total students",
           value: state.summary?.students ?? state.items.length ?? "...",
-          tone: "bg-sky-50 text-sky-800",
+          tone: "bg-[#EAF6EF] text-[#0D5C48]",
         },
       ];
     }
@@ -396,13 +411,13 @@ export default function AdminUsersPage() {
         key: "coordinators",
         label: "Coordinators",
         value: state.summary?.coordinators ?? "...",
-        tone: "bg-sky-50 text-sky-800",
+        tone: "bg-[#EAF6EF] text-[#0D5C48]",
       },
       {
         key: "teachers",
         label: "Teachers",
         value: state.summary?.teachers ?? "...",
-        tone: "bg-amber-50 text-amber-800",
+        tone: "bg-[#FFF5D6] text-[#8A6B00]",
       },
     ];
   }, [state.overviewItems, state.summary, isStaffView, state.items.length, view]);
@@ -429,19 +444,39 @@ export default function AdminUsersPage() {
   }
 
   async function resetPassword(record) {
-    const customPassword = window.prompt(
-      "Enter a new password. Leave blank to auto-generate one."
-    );
-
-    if (customPassword === null) {
+    if (!record?.id) {
       return;
     }
 
+    setResetModal({
+      open: true,
+      record,
+      password: "",
+      pending: false,
+      error: "",
+    });
+  }
+
+  async function submitResetPassword() {
+    if (!resetModal.record?.id) {
+      return;
+    }
+
+    if (!String(resetModal.password || "").trim()) {
+      setResetModal((current) => ({
+        ...current,
+        error: "Password is required.",
+      }));
+      return;
+    }
+
+    setResetModal((current) => ({ ...current, pending: true, error: "" }));
+
     try {
-      const response = await fetch(`/api/admin/users/${record.id}/reset-password`, {
+      const response = await fetch(`/api/admin/users/${resetModal.record.id}/reset-password`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ newPassword: customPassword }),
+        body: JSON.stringify({ newPassword: resetModal.password.trim() }),
       });
       const data = await response.json();
 
@@ -450,10 +485,19 @@ export default function AdminUsersPage() {
       }
 
       window.alert(`Temporary password: ${data.temporaryPassword}`);
+      setResetModal({
+        open: false,
+        record: null,
+        password: "",
+        pending: false,
+        error: "",
+      });
     } catch (error) {
-      window.alert(
-        error instanceof Error ? error.message : "Unable to reset password."
-      );
+      setResetModal((current) => ({
+        ...current,
+        pending: false,
+        error: error instanceof Error ? error.message : "Unable to reset password.",
+      }));
     }
   }
 
@@ -531,18 +575,20 @@ export default function AdminUsersPage() {
   }
 
   return (
-    <div className="space-y-6 min-h-screen">
-      <section className="rounded-[2rem] border border-white/70 bg-[linear-gradient(135deg,rgba(255,255,255,0.92),rgba(241,248,255,0.92))] p-6 shadow-[0_24px_80px_-36px_rgba(15,23,42,0.25)] sm:p-8">
+    <div className="min-h-screen rounded-[2rem] bg-[#FAF7F0]">
+      <div className="pointer-events-none absolute inset-0 rounded-[2rem] bg-[radial-gradient(circle_at_top_left,rgba(201,162,39,0.12),transparent_35%),radial-gradient(circle_at_top_right,rgba(45,138,106,0.12),transparent_32%),linear-gradient(180deg,#FAF7F0_0%,#F7F1E3_100%)]" />
+      <div className="relative mx-auto max-w-7xl space-y-6 px-4 py-4 sm:px-6 lg:px-8">
+      <section className="rounded-[2rem] border border-[#2D8A6A]/15 bg-[linear-gradient(135deg,rgba(13,59,46,0.98),rgba(13,92,72,0.94))] p-6 text-[#FAF7F0] shadow-[0_24px_80px_-36px_rgba(13,59,46,0.32)] sm:p-8">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
           <div className="max-w-3xl">
-            <h1 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">
+            <h1 className="mt-3 font-serif text-3xl font-semibold tracking-tight text-[#FAF7F0] sm:text-4xl">
               {view === "students"
                 ? "Students management"
                 : view === "parents"
                   ? "Parents management"
                   : "Staff management"}
             </h1>
-            <p className="mt-3 text-sm leading-7 text-slate-600 sm:text-base">
+            <p className="mt-3 text-sm leading-7 text-[#EAF6EF] sm:text-base">
               {view === "students"
                 ? "Manage student accounts and keep their profiles organized."
                 : view === "parents"
@@ -555,7 +601,7 @@ export default function AdminUsersPage() {
             <button
               type="button"
               onClick={() => setModal({ open: true, record: null })}
-              className="inline-flex items-center justify-center rounded-2xl bg-slate-950 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800"
+              className="inline-flex items-center justify-center rounded-2xl bg-[#FAF7F0] px-5 py-3 text-sm font-semibold text-[#0D5C48] transition hover:bg-[#DBD8D5]"
             >
               Create staff member
             </button>
@@ -565,7 +611,7 @@ export default function AdminUsersPage() {
 
       <AdminDashboardCards items={cards} />
 
-      <section className="rounded-[1.75rem] border border-white/70 bg-white/90 p-4 shadow-[0_20px_70px_-36px_rgba(15,23,42,0.25)] sm:p-5">
+      <section className="rounded-[1.75rem] border border-[#2D8A6A]/15 bg-white/90 p-4 shadow-[0_20px_70px_-36px_rgba(13,59,46,0.18)] sm:p-5">
         <form
           className={`grid gap-3 ${
             view === "staff"
@@ -577,7 +623,7 @@ export default function AdminUsersPage() {
           onSubmit={submitSearch}
         >
           <label className="block">
-            <span className="mb-2 block text-sm font-medium text-slate-700">
+            <span className="mb-2 block text-sm font-medium text-[#245C4F]">
               Search users
             </span>
             <input
@@ -590,24 +636,28 @@ export default function AdminUsersPage() {
                 }))
               }
               placeholder="Name, email, or phone"
-              className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-950 outline-none transition focus:border-sky-400 focus:bg-white focus:ring-4 focus:ring-sky-100"
+              className="w-full rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 text-sm text-[#063F32] outline-none transition focus:border-[#2D8A6A] focus:bg-white focus:ring-4 focus:ring-[#FFF5D6]"
             />
           </label>
 
           {view === "students" ? (
             <label className="block">
-              <span className="mb-2 block text-sm font-medium text-slate-700">
+              <span className="mb-2 block text-sm font-medium text-[#245C4F]">
                 Class
               </span>
+              <div className="relative">
               <select
                 value={filters.classLevel}
+                onMouseDown={() => setClassOpen((current) => !current)}
+                onFocus={() => setClassOpen(true)}
+                onBlur={() => closeSelectState(setClassOpen)}
                 onChange={(event) =>
                   setFilters((current) => ({
                     ...current,
                     classLevel: event.target.value,
                   }))
                 }
-                className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-950 outline-none transition focus:border-sky-400 focus:bg-white focus:ring-4 focus:ring-sky-100"
+                className="w-full appearance-none rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 pr-11 text-sm text-[#063F32] outline-none transition focus:border-[#2D8A6A] focus:bg-white focus:ring-4 focus:ring-[#FFF5D6]"
               >
                 <option value="">All classes</option>
                 {classOptions.map((classLevel) => (
@@ -616,23 +666,29 @@ export default function AdminUsersPage() {
                   </option>
                 ))}
               </select>
+              <ChevronDown className={`pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#0D5C48] transition-transform duration-200 ${classOpen ? "rotate-180" : "rotate-0"}`} />
+              </div>
             </label>
           ) : null}
 
           {view === "staff" ? (
             <label className="block">
-              <span className="mb-2 block text-sm font-medium text-slate-700">
+              <span className="mb-2 block text-sm font-medium text-[#245C4F]">
                 Role
               </span>
+              <div className="relative">
               <select
                 value={filters.role}
+                onMouseDown={() => setRoleOpen((current) => !current)}
+                onFocus={() => setRoleOpen(true)}
+                onBlur={() => closeSelectState(setRoleOpen)}
                 onChange={(event) =>
                   setFilters((current) => ({
                     ...current,
                     role: event.target.value,
                   }))
                 }
-                className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-950 outline-none transition focus:border-sky-400 focus:bg-white focus:ring-4 focus:ring-sky-100"
+                className="w-full appearance-none rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 pr-11 text-sm text-[#063F32] outline-none transition focus:border-[#2D8A6A] focus:bg-white focus:ring-4 focus:ring-[#FFF5D6]"
               >
                 {(isStaffView ? STAFF_ROLE_OPTIONS : ROLE_OPTIONS).map((option) => (
                   <option key={option || "all"} value={option}>
@@ -640,22 +696,28 @@ export default function AdminUsersPage() {
                   </option>
                 ))}
               </select>
+              <ChevronDown className={`pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#0D5C48] transition-transform duration-200 ${roleOpen ? "rotate-180" : "rotate-0"}`} />
+              </div>
             </label>
           ) : null}
 
           <label className="block">
-            <span className="mb-2 block text-sm font-medium text-slate-700">
+            <span className="mb-2 block text-sm font-medium text-[#245C4F]">
               Status
             </span>
+            <div className="relative">
               <select
                 value={filters.status}
+                onMouseDown={() => setStatusOpen((current) => !current)}
+                onFocus={() => setStatusOpen(true)}
+                onBlur={() => closeSelectState(setStatusOpen)}
                 onChange={(event) =>
                   setFilters((current) => ({
                     ...current,
                     status: event.target.value,
                   }))
                 }
-                className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-950 outline-none transition focus:border-sky-400 focus:bg-white focus:ring-4 focus:ring-sky-100"
+                className="w-full appearance-none rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 pr-11 text-sm text-[#063F32] outline-none transition focus:border-[#2D8A6A] focus:bg-white focus:ring-4 focus:ring-[#FFF5D6]"
               >
               {statusOptions.map((option) => (
                 <option key={option || "all"} value={option}>
@@ -663,11 +725,13 @@ export default function AdminUsersPage() {
                 </option>
               ))}
             </select>
+            <ChevronDown className={`pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#0D5C48] transition-transform duration-200 ${statusOpen ? "rotate-180" : "rotate-0"}`} />
+            </div>
           </label>
 
           <button
             type="submit"
-            className="mt-7 inline-flex h-12 items-center justify-center rounded-2xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+            className="mt-7 inline-flex h-12 items-center justify-center rounded-2xl border border-[#2D8A6A]/20 bg-[#0D5C48] px-4 text-sm font-semibold text-[#FAF7F0] transition hover:bg-[#063F32]"
           >
             Apply
           </button>
@@ -687,8 +751,8 @@ export default function AdminUsersPage() {
             label: "User",
             render: (row) => (
               <div>
-                <p className="font-semibold text-slate-950">{row.name}</p>
-                <div className="mt-1 text-xs text-slate-500">
+                <p className="font-semibold text-[#063F32]">{row.name}</p>
+                <div className="mt-1 text-xs text-[#245C4F]">
                   <p>{row.email || "No email"}</p>
                 </div>
               </div>
@@ -768,7 +832,7 @@ export default function AdminUsersPage() {
               <button
                 type="button"
                 onClick={() => setModal({ open: true, record: row })}
-                className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
+                className="rounded-xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-3 py-2 text-xs font-semibold text-[#063F32] transition hover:bg-[#F1EADC]"
               >
                 Edit
               </button>
@@ -784,7 +848,7 @@ export default function AdminUsersPage() {
                     pending: false,
                   })
                 }
-                className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
+                className="rounded-xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-3 py-2 text-xs font-semibold text-[#063F32] transition hover:bg-[#F1EADC]"
               >
                 {row.status === "suspended" ? "Activate" : "Suspend"}
               </button>
@@ -793,7 +857,7 @@ export default function AdminUsersPage() {
               <button
                 type="button"
                 onClick={() => resetPassword(row)}
-                className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
+                className="rounded-xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-3 py-2 text-xs font-semibold text-[#063F32] transition hover:bg-[#F1EADC]"
               >
                 Reset password
               </button>
@@ -803,14 +867,14 @@ export default function AdminUsersPage() {
                 <button
                   type="button"
                   onClick={() => openDetails(row)}
-                  className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
+                  className="rounded-xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-3 py-2 text-xs font-semibold text-[#063F32] transition hover:bg-[#F1EADC]"
                 >
                   View
                 </button>
                 <button
                   type="button"
                   onClick={() => setModal({ open: true, record: row })}
-                  className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
+                  className="rounded-xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-3 py-2 text-xs font-semibold text-[#063F32] transition hover:bg-[#F1EADC]"
                 >
                   Edit
                 </button>
@@ -863,25 +927,25 @@ export default function AdminUsersPage() {
       ) : null}
 
       {detailModal.open && detailModal.record ? (
-        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-950/50 px-4 py-10 backdrop-blur-sm">
-          <div className="w-full max-w-5xl rounded-[2rem] border border-white/70 bg-white shadow-[0_30px_90px_-40px_rgba(15,23,42,0.4)]">
-            <div className="flex items-center justify-between border-b border-slate-200 px-6 py-5">
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-[#063F32]/45 px-4 py-10 backdrop-blur-sm">
+          <div className="w-full max-w-5xl rounded-[2rem] border border-[#2D8A6A]/15 bg-white shadow-[0_30px_90px_-40px_rgba(13,59,46,0.24)]">
+            <div className="flex items-center justify-between border-b border-[#2D8A6A]/15 px-6 py-5">
               <div>
-                <h2 className="text-xl font-semibold text-slate-950">Parent Details</h2>
-                <p className="mt-1 text-sm text-slate-500">{detailModal.record.name || detailModal.record.full_name || "Selected user"}</p>
+                <h2 className="text-xl font-semibold text-[#063F32]">User Details</h2>
+                <p className="mt-1 text-sm text-[#245C4F]">{detailModal.record.name || detailModal.record.full_name || "Selected user"}</p>
               </div>
               <button
                 type="button"
                 onClick={closeDetails}
-                className="rounded-full border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-50"
+                className="rounded-full border border-[#2D8A6A]/20 bg-[#FAF7F0] px-3 py-2 text-sm font-semibold text-[#063F32] transition hover:bg-[#F1EADC]"
               >
                 Close
               </button>
             </div>
             <div className="max-h-[calc(100vh-10rem)] overflow-y-auto px-6 py-6">
               <div className="grid gap-6 lg:grid-cols-2">
-                <section className="rounded-[1.5rem] border border-slate-200 bg-slate-50/70 p-5">
-                  <h3 className="text-lg font-semibold text-slate-950">Account</h3>
+                <section className="rounded-[1.5rem] border border-[#2D8A6A]/15 bg-[#FAF7F0] p-5">
+                  <h3 className="text-lg font-semibold text-[#063F32]">Account</h3>
                   <div className="mt-4 grid gap-4 sm:grid-cols-2 break-words">
                     {[
                       ["Name", detailModal.record.name || detailModal.record.full_name],
@@ -890,16 +954,16 @@ export default function AdminUsersPage() {
                       ["Role", formatLabel(detailModal.record.role)],
                       ["Status", formatLabel(detailModal.record.status)],
                     ].map(([label, value]) => (
-                      <div key={label} className="rounded-2xl border border-slate-200 bg-white p-4">
-                        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{label}</p>
-                        <p className="mt-2 text-sm font-semibold text-slate-950">{value || "Not provided"}</p>
+                      <div key={label} className="rounded-2xl border border-[#2D8A6A]/15 bg-white/90 p-4">
+                        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#245C4F]">{label}</p>
+                        <p className="mt-2 text-sm font-semibold text-[#063F32]">{value || "Not provided"}</p>
                       </div>
                     ))}
                   </div>
                 </section>
 
-                <section className="rounded-[1.5rem] border border-slate-200 bg-slate-50/70 p-5">
-                  <h3 className="text-lg font-semibold text-slate-950">
+                <section className="rounded-[1.5rem] border border-[#2D8A6A]/15 bg-[#FAF7F0] p-5">
+                  <h3 className="text-lg font-semibold text-[#063F32]">
                     {detailModal.record.role === "parent" ? "Parent details" : "Student details"}
                   </h3>
                   <div className="mt-4 grid gap-4 sm:grid-cols-2">
@@ -933,6 +997,92 @@ export default function AdminUsersPage() {
         </div>
       ) : null}
 
+      {resetModal.open && resetModal.record ? (
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-[#063F32]/45 px-4 pt-24 pb-10 backdrop-blur-sm">
+          <div className="w-full max-w-lg rounded-[2rem] border border-[#2D8A6A]/18 bg-[#FAF7F0] shadow-[0_30px_90px_-40px_rgba(13,59,46,0.28)]">
+            <div className="flex items-center justify-between border-b border-[#2D8A6A]/15 px-6 py-5">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#C9A227]">
+                  Reset password
+                </p>
+                <h2 className="mt-2 text-xl font-semibold text-[#063F32]">
+                  {resetModal.record.name || resetModal.record.full_name || "Selected user"}
+                </h2>
+              </div>
+              <button
+                type="button"
+                onClick={() =>
+                  setResetModal({
+                    open: false,
+                    record: null,
+                    password: "",
+                    pending: false,
+                    error: "",
+                  })
+                }
+                className="rounded-full border border-[#2D8A6A]/20 bg-white px-3 py-2 text-sm font-semibold text-[#063F32] transition hover:bg-[#F1EADC]"
+              >
+                Close
+              </button>
+            </div>
+            <div className="space-y-5 px-6 py-6">
+              <p className="text-sm leading-6 text-[#245C4F]">
+                Leave the password blank to auto-generate a temporary password, or enter a new one to set it manually.
+              </p>
+              <label className="block">
+                <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-[#245C4F]">
+                  New password
+                </span>
+                <input
+                  type="text"
+                  value={resetModal.password}
+                  onChange={(event) =>
+                    setResetModal((current) => ({
+                      ...current,
+                      password: event.target.value,
+                      error: "",
+                    }))
+                  }
+                  placeholder="Leave blank for auto-generated password"
+                  required
+                  className="h-12 w-full rounded-2xl border border-[#2D8A6A]/18 bg-white px-4 text-sm text-[#063F32] outline-none transition placeholder:text-[#7A938B] focus:border-[#2D8A6A] focus:ring-4 focus:ring-[#2D8A6A]/10"
+                />
+              </label>
+              {resetModal.error ? (
+                <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">
+                  {resetModal.error}
+                </div>
+              ) : null}
+              <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
+                <button
+                  type="button"
+                  onClick={() =>
+                    setResetModal({
+                      open: false,
+                      record: null,
+                      password: "",
+                      pending: false,
+                      error: "",
+                    })
+                  }
+                  className="inline-flex h-12 items-center justify-center rounded-2xl border border-[#2D8A6A]/20 bg-white px-5 text-sm font-semibold text-[#063F32] transition hover:bg-[#F1EADC]"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={submitResetPassword}
+                  disabled={resetModal.pending}
+                  className="inline-flex h-12 items-center justify-center rounded-2xl border border-[#2D8A6A]/20 bg-[#0D5C48] px-5 text-sm font-semibold text-[#FAF7F0] transition hover:bg-[#063F32] disabled:cursor-not-allowed disabled:opacity-70"
+                >
+                  {resetModal.pending ? "Resetting..." : "Reset password"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       <AdminConfirmDialog
         open={confirmState.open}
         pending={confirmState.pending}
@@ -950,6 +1100,7 @@ export default function AdminUsersPage() {
         }
         onConfirm={confirmStatusChange}
       />
+      </div>
     </div>
   );
 }

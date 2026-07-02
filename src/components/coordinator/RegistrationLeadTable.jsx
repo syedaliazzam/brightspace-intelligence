@@ -2,15 +2,16 @@
 
 import { useState } from "react";
 import { motion } from "framer-motion";
+import { ChevronDown } from "lucide-react";
 
 const STATUS_STYLES = {
-  new_lead: "bg-sky-50 text-sky-700",
-  voucher_created: "bg-amber-50 text-amber-700",
-  fee_submitted: "bg-violet-50 text-violet-700",
-  fee_verified: "bg-emerald-50 text-emerald-700",
-  access_granted: "bg-teal-50 text-teal-700",
+  new_lead: "bg-[#EAF6EF] text-[#0D5C48]",
+  voucher_created: "bg-[#FFF5D6] text-[#8A6B00]",
+  fee_submitted: "bg-[#FFF5D6] text-[#8A6B00]",
+  fee_verified: "bg-[#EAF6EF] text-[#0D5C48]",
+  access_granted: "bg-[#EAF6EF] text-[#0D5C48]",
   rejected: "bg-rose-50 text-rose-700",
-  pending_clarification: "bg-orange-50 text-orange-700",
+  pending_clarification: "bg-[#FFF5D6] text-[#8A6B00]",
 };
 
 function formatStatus(value) {
@@ -47,8 +48,8 @@ function getDisplayStatus(lead) {
 function DetailRow({ label, value }) {
   return (
     <div>
-      <dt className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{label}</dt>
-      <dd className="mt-1 text-sm leading-6 text-slate-800">{value || "Not provided"}</dd>
+      <dt className="text-xs font-semibold uppercase tracking-[0.18em] text-[#245C4F]">{label}</dt>
+      <dd className="mt-1 text-sm leading-6 text-[#063F32]">{value || "Not provided"}</dd>
     </div>
   );
 }
@@ -61,7 +62,7 @@ function DocumentLink({ label, href }) {
       href={href}
       target="_blank"
       rel="noreferrer"
-      className="inline-flex rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+      className="inline-flex rounded-full border border-[#2D8A6A]/20 bg-[#0D5C48] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#063F32]"
     >
       {label}
     </a>
@@ -77,12 +78,12 @@ function LeadDetailsModal({ lead, onClose, onCreateVoucher }) {
     lead?.status === "new_lead";
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-slate-950/50 px-4 py-8 backdrop-blur-sm">
-      <div className="w-full max-w-6xl rounded-[2rem] border border-white/70 bg-white shadow-[0_30px_90px_-40px_rgba(15,23,42,0.4)]">
-        <div className="sticky top-0 z-10 flex items-center justify-between rounded-t-[2rem] border-b border-slate-200 bg-white px-6 py-5">
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-[#063F32]/45 px-4 py-8 backdrop-blur-sm">
+      <div className="w-full max-w-6xl rounded-[2rem] border border-[#2D8A6A]/15 bg-[#FAF7F0] shadow-[0_30px_90px_-40px_rgba(13,59,46,0.28)]">
+        <div className="sticky top-0 z-10 flex items-center justify-between rounded-t-[2rem] border-b border-[#2D8A6A]/15 bg-[#FAF7F0] px-6 py-5">
           <div>
-            <h2 className="text-xl font-semibold text-slate-950">{lead.student_name}</h2>
-            <p className="mt-1 text-sm text-slate-500">
+            <h2 className="text-xl font-semibold text-[#063F32]">{lead.student_name}</h2>
+            <p className="mt-1 text-sm text-[#245C4F]">
               {lead.class_level || "Class not selected"} • Submitted {formatDateTime(lead.submitted_at)}
             </p>
           </div>
@@ -94,7 +95,7 @@ function LeadDetailsModal({ lead, onClose, onCreateVoucher }) {
                   onCreateVoucher?.(lead);
                   onClose();
                 }}
-                className="rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800"
+                className="rounded-full bg-[#0D5C48] px-4 py-2 text-sm font-semibold text-[#FAF7F0] transition hover:bg-[#063F32]"
               >
                 Create Voucher
               </button>
@@ -102,7 +103,7 @@ function LeadDetailsModal({ lead, onClose, onCreateVoucher }) {
             <button
               type="button"
               onClick={onClose}
-              className="rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+              className="rounded-full border border-[#2D8A6A]/20 px-4 py-2 text-sm font-semibold text-[#063F32] transition hover:bg-[#F1EADC]"
             >
               Close
             </button>
@@ -111,8 +112,8 @@ function LeadDetailsModal({ lead, onClose, onCreateVoucher }) {
 
         <div className="max-h-[calc(100vh-8rem)] overflow-y-auto px-6 py-6">
           <div className="grid gap-6 lg:grid-cols-2">
-            <section className="rounded-[1.5rem] border border-slate-200 bg-slate-50/70 p-5">
-              <h3 className="text-lg font-semibold text-slate-950">Admission overview</h3>
+            <section className="rounded-[1.5rem] border border-[#2D8A6A]/15 bg-white/90 p-5">
+              <h3 className="text-lg font-semibold text-[#063F32]">Admission overview</h3>
               <dl className="mt-4 grid gap-4 sm:grid-cols-2">
                 <DetailRow label="Programme" value={lead.program_name} />
                 <DetailRow
@@ -128,8 +129,8 @@ function LeadDetailsModal({ lead, onClose, onCreateVoucher }) {
               </dl>
             </section>
 
-            <section className="rounded-[1.5rem] border border-slate-200 bg-slate-50/70 p-5">
-              <h3 className="text-lg font-semibold text-slate-950">Student details</h3>
+            <section className="rounded-[1.5rem] border border-[#2D8A6A]/15 bg-white/90 p-5">
+              <h3 className="text-lg font-semibold text-[#063F32]">Student details</h3>
               <dl className="mt-4 grid gap-4 sm:grid-cols-2">
                 <DetailRow label="Student name" value={lead.student_name} />
                 <DetailRow label="Student name Urdu" value={lead.student_name_urdu} />
@@ -146,8 +147,8 @@ function LeadDetailsModal({ lead, onClose, onCreateVoucher }) {
               </dl>
             </section>
 
-            <section className="rounded-[1.5rem] border border-slate-200 bg-slate-50/70 p-5">
-              <h3 className="text-lg font-semibold text-slate-950">Child profile</h3>
+            <section className="rounded-[1.5rem] border border-[#2D8A6A]/15 bg-white/90 p-5">
+              <h3 className="text-lg font-semibold text-[#063F32]">Child profile</h3>
               <dl className="mt-4 grid gap-4">
                 <DetailRow label="Child profile" value={lead.child_profile} />
                 <DetailRow label="Strengths" value={lead.child_strengths} />
@@ -159,8 +160,8 @@ function LeadDetailsModal({ lead, onClose, onCreateVoucher }) {
               </dl>
             </section>
 
-            <section className="rounded-[1.5rem] border border-slate-200 bg-slate-50/70 p-5">
-              <h3 className="text-lg font-semibold text-slate-950">Contact summary</h3>
+            <section className="rounded-[1.5rem] border border-[#2D8A6A]/15 bg-white/90 p-5">
+              <h3 className="text-lg font-semibold text-[#063F32]">Contact summary</h3>
               <dl className="mt-4 grid gap-4 sm:grid-cols-2 break-words">
                 <DetailRow label="Parent name" value={lead.parent_name} />
                 <DetailRow label="Relation" value={lead.parent_relation} />
@@ -173,8 +174,8 @@ function LeadDetailsModal({ lead, onClose, onCreateVoucher }) {
               </dl>
             </section>
 
-            <section className="rounded-[1.5rem] border border-slate-200 bg-slate-50/70 p-5">
-              <h3 className="text-lg font-semibold text-slate-950">Father details</h3>
+            <section className="rounded-[1.5rem] border border-[#2D8A6A]/15 bg-white/90 p-5">
+              <h3 className="text-lg font-semibold text-[#063F32]">Father details</h3>
               <dl className="mt-4 grid gap-4 sm:grid-cols-2 break-words">
                 <DetailRow label="Name English" value={lead.father_name_english} />
                 <DetailRow label="Name Urdu" value={lead.father_name_urdu} />
@@ -191,8 +192,8 @@ function LeadDetailsModal({ lead, onClose, onCreateVoucher }) {
               </dl>
             </section>
 
-            <section className="rounded-[1.5rem] border border-slate-200 bg-slate-50/70 p-5">
-              <h3 className="text-lg font-semibold text-slate-950">Mother details</h3>
+            <section className="rounded-[1.5rem] border border-[#2D8A6A]/15 bg-white/90 p-5">
+              <h3 className="text-lg font-semibold text-[#063F32]">Mother details</h3>
               <dl className="mt-4 grid gap-4 sm:grid-cols-2 break-words">
                 <DetailRow label="Name English" value={lead.mother_name_english} />
                 <DetailRow label="Name Urdu" value={lead.mother_name_urdu} />
@@ -210,8 +211,8 @@ function LeadDetailsModal({ lead, onClose, onCreateVoucher }) {
             </section>
           </div>
 
-          <section className="mt-6 rounded-[1.5rem] border border-slate-200 bg-slate-50/70 p-5">
-            <h3 className="text-lg font-semibold text-slate-950">Documents and notes</h3>
+          <section className="mt-6 rounded-[1.5rem] border border-[#2D8A6A]/15 bg-white/90 p-5">
+            <h3 className="text-lg font-semibold text-[#063F32]">Documents and notes</h3>
             <div className="mt-4 flex flex-wrap gap-3">
               <DocumentLink label="Birth certificate" href={lead.birth_certificate_file_url} />
               <DocumentLink label="Parent CNIC" href={lead.parent_cnic_file_url} />
@@ -236,7 +237,7 @@ export default function RegistrationLeadTable({ leads, onCreateVoucher }) {
 
   if (!leads.length) {
     return (
-      <section className="rounded-[1.75rem] border border-dashed border-slate-300 bg-white/85 p-10 text-center text-sm text-slate-500 shadow-[0_18px_60px_-36px_rgba(15,23,42,0.18)]">
+      <section className="rounded-[1.75rem] border border-dashed border-[#2D8A6A]/25 bg-white/85 p-10 text-center text-sm text-[#245C4F] shadow-[0_18px_60px_-36px_rgba(13,59,46,0.18)]">
         No registration records match the current filters.
       </section>
     );
@@ -244,11 +245,11 @@ export default function RegistrationLeadTable({ leads, onCreateVoucher }) {
 
   return (
     <section className="space-y-4">
-      <div className="hidden overflow-hidden rounded-[1.75rem] border border-white/70 bg-white/90 shadow-[0_20px_70px_-36px_rgba(15,23,42,0.25)] lg:block">
+      <div className="hidden overflow-hidden rounded-[1.75rem] border border-[#2D8A6A]/15 bg-white/90 shadow-[0_20px_70px_-36px_rgba(13,59,46,0.18)] lg:block">
         <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-slate-200">
-            <thead className="bg-slate-50/80">
-              <tr className="text-left text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+          <table className="min-w-full divide-y divide-[#F1EADC]">
+            <thead className="bg-[#FAF7F0]/80">
+              <tr className="text-left text-xs font-semibold uppercase tracking-[0.18em] text-[#245C4F]">
                 <th className="px-6 py-4">Child</th>
                 <th className="px-6 py-4">Parent</th>
                 <th className="px-6 py-4">Class</th>
@@ -258,7 +259,7 @@ export default function RegistrationLeadTable({ leads, onCreateVoucher }) {
                 <th className="px-6 py-4 text-right">Action</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-[#F1EADC]">
               {leads.map((lead, index) => {
                 const displayStatus = getDisplayStatus(lead);
                 const canCreateVoucher =
@@ -275,26 +276,26 @@ export default function RegistrationLeadTable({ leads, onCreateVoucher }) {
                     className="align-top"
                   >
                     <td className="px-6 py-5">
-                      <p className="font-semibold text-slate-950">{lead.student_name}</p>
-                      <p className="mt-1 text-sm text-slate-500">
+                      <p className="font-semibold text-[#063F32]">{lead.student_name}</p>
+                      <p className="mt-1 text-sm text-[#245C4F]">
                         {lead.gender || "Gender not provided"} • {formatDate(lead.date_of_birth)}
                       </p>
-                      <p className="mt-1 text-sm text-slate-500">{lead.current_school || "Current school not provided"}</p>
+                      <p className="mt-1 text-sm text-[#245C4F]">{lead.current_school || "Current school not provided"}</p>
                     </td>
                     <td className="px-6 py-5">
-                      <p className="font-medium text-slate-800">{lead.parent_name || "Not provided"}</p>
-                      <p className="mt-1 text-sm text-slate-500">{lead.parent_relation || "Relation not set"}</p>
-                      <p className="mt-1 text-sm text-slate-500">{lead.city_country || "Location not provided"}</p>
+                      <p className="font-medium text-[#063F32]">{lead.parent_name || "Not provided"}</p>
+                      <p className="mt-1 text-sm text-[#245C4F]">{lead.parent_relation || "Relation not set"}</p>
+                      <p className="mt-1 text-sm text-[#245C4F]">{lead.city_country || "Location not provided"}</p>
                     </td>
                     <td className="px-6 py-5">
-                      <p className="font-medium text-slate-800">{lead.class_level || "Class not selected"}</p>
-                      <p className="mt-1 text-sm text-slate-500">{lead.program_name || "Programme not set"}</p>
+                      <p className="font-medium text-[#063F32]">{lead.class_level || "Class not selected"}</p>
+                      <p className="mt-1 text-sm text-[#245C4F]">{lead.program_name || "Programme not set"}</p>
                     </td>
                     <td className="px-6 py-5">
-                      <p className="text-sm text-slate-700">{lead.email || "No email"}</p>
-                      <p className="mt-1 text-sm text-slate-500">{lead.phone || "No phone"}</p>
+                      <p className="text-sm text-[#063F32]">{lead.email || "No email"}</p>
+                      <p className="mt-1 text-sm text-[#245C4F]">{lead.phone || "No phone"}</p>
                     </td>
-                    <td className="px-6 py-5 text-sm text-slate-600">{formatDateTime(lead.submitted_at)}</td>
+                    <td className="px-6 py-5 text-sm text-[#245C4F]">{formatDateTime(lead.submitted_at)}</td>
                     <td className="px-6 py-5">
                       <span
                         className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${
@@ -309,7 +310,7 @@ export default function RegistrationLeadTable({ leads, onCreateVoucher }) {
                         <button
                           type="button"
                           onClick={() => setSelectedLead(lead)}
-                          className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                        className="rounded-full border border-[#2D8A6A]/20 bg-white px-4 py-2 text-sm font-semibold text-[#063F32] transition hover:bg-[#F1EADC]"
                         >
                           View Details
                         </button>
@@ -317,7 +318,7 @@ export default function RegistrationLeadTable({ leads, onCreateVoucher }) {
                           <button
                             type="button"
                             onClick={() => onCreateVoucher?.(lead)}
-                            className="rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800"
+                            className="rounded-full bg-[#0D5C48] px-4 py-2 text-sm font-semibold text-[#FAF7F0] transition hover:bg-[#063F32]"
                           >
                             Create Voucher
                           </button>
@@ -342,13 +343,13 @@ export default function RegistrationLeadTable({ leads, onCreateVoucher }) {
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.2, delay: index * 0.02 }}
-              className="rounded-[1.5rem] border border-white/70 bg-white/90 p-5 shadow-[0_18px_60px_-36px_rgba(15,23,42,0.22)]"
+              className="rounded-[1.5rem] border border-[#2D8A6A]/15 bg-white/90 p-5 shadow-[0_18px_60px_-36px_rgba(13,59,46,0.18)]"
             >
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <p className="text-lg font-semibold text-slate-950">{lead.student_name}</p>
-                  <p className="mt-1 text-sm text-slate-500">{lead.class_level}</p>
-                  <p className="mt-1 text-sm text-slate-500">
+                  <p className="text-lg font-semibold text-[#063F32]">{lead.student_name}</p>
+                  <p className="mt-1 text-sm text-[#245C4F]">{lead.class_level}</p>
+                  <p className="mt-1 text-sm text-[#245C4F]">
                     {lead.gender || "Gender not provided"} • {formatDate(lead.date_of_birth)}
                   </p>
                 </div>
@@ -363,20 +364,20 @@ export default function RegistrationLeadTable({ leads, onCreateVoucher }) {
 
               <dl className="mt-4 grid gap-3 text-sm text-slate-600 sm:grid-cols-2">
                 <div>
-                  <dt className="font-medium text-slate-500">Parent</dt>
-                  <dd className="mt-1 text-slate-800">{lead.parent_name || "Not provided"}</dd>
+                  <dt className="font-medium text-[#245C4F]">Parent</dt>
+                  <dd className="mt-1 text-[#063F32]">{lead.parent_name || "Not provided"}</dd>
                 </div>
                 <div>
-                  <dt className="font-medium text-slate-500">Contact</dt>
-                  <dd className="mt-1 text-slate-800">{lead.email || lead.phone || "Not provided"}</dd>
+                  <dt className="font-medium text-[#245C4F]">Contact</dt>
+                  <dd className="mt-1 text-[#063F32]">{lead.email || lead.phone || "Not provided"}</dd>
                 </div>
                 <div>
-                  <dt className="font-medium text-slate-500">Location</dt>
-                  <dd className="mt-1 text-slate-800">{lead.city_country || "Not provided"}</dd>
+                  <dt className="font-medium text-[#245C4F]">Location</dt>
+                  <dd className="mt-1 text-[#063F32]">{lead.city_country || "Not provided"}</dd>
                 </div>
                 <div>
-                  <dt className="font-medium text-slate-500">Programme</dt>
-                  <dd className="mt-1 text-slate-800">{lead.program_name || "Not provided"}</dd>
+                  <dt className="font-medium text-[#245C4F]">Programme</dt>
+                  <dd className="mt-1 text-[#063F32]">{lead.program_name || "Not provided"}</dd>
                 </div>
               </dl>
 
@@ -384,7 +385,7 @@ export default function RegistrationLeadTable({ leads, onCreateVoucher }) {
                 <button
                   type="button"
                   onClick={() => setSelectedLead(lead)}
-                  className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                  className="rounded-full border border-[#2D8A6A]/20 bg-white px-4 py-2 text-sm font-semibold text-[#063F32] transition hover:bg-[#F1EADC]"
                 >
                   View Details
                 </button>
@@ -392,7 +393,7 @@ export default function RegistrationLeadTable({ leads, onCreateVoucher }) {
                   <button
                     type="button"
                     onClick={() => onCreateVoucher?.(lead)}
-                    className="rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800"
+                    className="rounded-full bg-[#0D5C48] px-4 py-2 text-sm font-semibold text-[#FAF7F0] transition hover:bg-[#063F32]"
                   >
                     Create Voucher
                   </button>

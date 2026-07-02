@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { ChevronDown } from "lucide-react";
 
 export default function HomeworkForm({ lectures = [], excludeLectureIds = [], initialValue = null, onSaved }) {
   const [form, setForm] = useState({ lectureId: "", title: "", description: "", dueDate: "" });
   const [pending, setPending] = useState(false);
+  const [lectureOpen, setLectureOpen] = useState(false);
 
   const allowedLectures = useMemo(() => lectures.filter((item) => {
     const status = String(item.display_status || item.status || "").toLowerCase();
@@ -52,18 +54,32 @@ export default function HomeworkForm({ lectures = [], excludeLectureIds = [], in
   }
 
   return (
-    <form onSubmit={submit} className="grid gap-3 rounded-[1.75rem] border border-white/70 bg-white/90 p-5 shadow-[0_20px_70px_-36px_rgba(15,23,42,0.25)]">
+    <form onSubmit={submit} className="grid gap-3 rounded-[1.75rem] border border-[#2D8A6A]/15 bg-white/90 p-5 shadow-[0_20px_70px_-36px_rgba(13,59,46,0.18)]">
       <div className="grid gap-3 md:grid-cols-3">
-        <select value={form.lectureId} onChange={(event) => setForm((current) => ({ ...current, lectureId: event.target.value }))} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm" required>
-          <option value="">Select lecture</option>
-          {uniqueAllowedLectures.map((item) => <option key={item.id} value={item.id}>{formatLectureLabel(item)}</option>)}
-        </select>
-        <input value={form.title} onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))} placeholder="Homework title" className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm" required />
-        <input type="date" value={form.dueDate} onChange={(event) => setForm((current) => ({ ...current, dueDate: event.target.value }))} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm" />
+        <div className="relative">
+          <select
+            value={form.lectureId}
+            onMouseDown={() => setLectureOpen((current) => !current)}
+            onChange={(event) => {
+              setLectureOpen(false);
+              setForm((current) => ({ ...current, lectureId: event.target.value }));
+            }}
+            onFocus={() => setLectureOpen(true)}
+            onBlur={() => setLectureOpen(false)}
+            className="w-full appearance-none rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 pr-11 text-sm text-[#063F32] outline-none focus:border-[#2D8A6A] focus:ring-2 focus:ring-[#2D8A6A]/20"
+            required
+          >
+            <option value="">Select lecture</option>
+            {uniqueAllowedLectures.map((item) => <option key={item.id} value={item.id}>{formatLectureLabel(item)}</option>)}
+          </select>
+          <ChevronDown className={`pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#0D5C48] transition-transform duration-200 ${lectureOpen ? "rotate-180" : "rotate-0"}`} />
+        </div>
+        <input value={form.title} onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))} placeholder="Homework title" className="rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 text-sm text-[#063F32] outline-none focus:border-[#2D8A6A] focus:ring-2 focus:ring-[#2D8A6A]/20" required />
+        <input type="date" value={form.dueDate} onChange={(event) => setForm((current) => ({ ...current, dueDate: event.target.value }))} className="rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 text-sm text-[#063F32] outline-none focus:border-[#2D8A6A] focus:ring-2 focus:ring-[#2D8A6A]/20" />
       </div>
-      <textarea value={form.description} onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))} placeholder="Description" className="min-h-28 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm" />
+      <textarea value={form.description} onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))} placeholder="Description" className="min-h-28 rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 text-sm text-[#063F32] outline-none focus:border-[#2D8A6A] focus:ring-2 focus:ring-[#2D8A6A]/20" />
       <div className="flex justify-end">
-        <button disabled={pending} className="rounded-2xl bg-slate-950 px-4 py-3 text-sm font-semibold text-white">{pending ? "Saving..." : initialValue ? "Update homework" : "Create homework"}</button>
+        <button disabled={pending} className="rounded-2xl bg-[#0D5C48] px-4 py-3 text-sm font-semibold text-[#FAF7F0] shadow-[0_10px_28px_-18px_rgba(13,59,46,0.45)]">{pending ? "Saving..." : initialValue ? "Update homework" : "Create homework"}</button>
       </div>
     </form>
   );

@@ -119,23 +119,26 @@ export default function StaffFormModal({
     }
   }
 
+  const inputClass =
+    "w-full rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 text-sm text-[#063F32] outline-none transition focus:border-[#2D8A6A] focus:bg-white focus:ring-4 focus:ring-[#65B891]/20";
+
   return (
     <AnimatePresence>
       {open ? (
-        <div className="fixed inset-0 z-50 flex items-start justify-center bg-slate-950/45 px-4 py-8 pt-24">
+        <div className="fixed inset-0 z-50 flex items-start justify-center bg-[#063F32]/45 px-4 py-8 pt-24">
           <motion.div
             initial={{ opacity: 0, y: 18 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 18 }}
             transition={{ duration: 0.2 }}
-            className="max-h-[calc(100vh-7rem)] w-full max-w-2xl overflow-y-auto rounded-[2rem] border border-white/70 bg-white p-6 shadow-[0_24px_80px_-36px_rgba(15,23,42,0.32)] sm:p-8"
+            className="max-h-[calc(100vh-7rem)] w-full max-w-2xl overflow-y-auto rounded-[2rem] border border-[#2D8A6A]/15 bg-white p-6 shadow-[0_24px_80px_-36px_rgba(13,59,46,0.22)] sm:p-8"
           >
             <div className="flex items-start justify-between gap-4">
               <div>
-                <p className="text-sm font-semibold uppercase tracking-[0.24em] text-sky-700">
+                <p className="text-sm font-semibold uppercase tracking-[0.24em] text-[#0D5C48]">
                   Admin staff
                 </p>
-                <h2 className="mt-3 text-2xl font-semibold tracking-tight text-slate-950">
+                <h2 className="mt-3 text-2xl font-semibold tracking-tight text-[#063F32]">
                   {mode === "edit" ? "Edit staff member" : "Create staff member"}
                 </h2>
               </div>
@@ -143,7 +146,7 @@ export default function StaffFormModal({
               <button
                 type="button"
                 onClick={onClose}
-                className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
+                className="rounded-xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-3 py-2 text-sm font-semibold text-[#063F32] transition hover:bg-[#F1EADC]"
               >
                 Close
               </button>
@@ -152,51 +155,51 @@ export default function StaffFormModal({
             <form className="mt-6 grid gap-4" onSubmit={handleSubmit}>
               <div className="grid gap-4 sm:grid-cols-2">
                 <label className="block sm:col-span-2">
-                  <span className="mb-2 block text-sm font-medium text-slate-700">
+                  <span className="mb-2 block text-sm font-medium text-[#245C4F]">
                     Full name
                   </span>
                   <input
                     type="text"
                     value={form.fullName}
                     onChange={(event) => updateField("fullName", event.target.value)}
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-950 outline-none transition focus:border-sky-400 focus:bg-white focus:ring-4 focus:ring-sky-100"
+                    className={inputClass}
                     required
                   />
                 </label>
 
                 <label className="block">
-                  <span className="mb-2 block text-sm font-medium text-slate-700">
+                  <span className="mb-2 block text-sm font-medium text-[#245C4F]">
                     Email
                   </span>
                   <input
                     type="email"
                     value={form.email}
                     onChange={(event) => updateField("email", event.target.value)}
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-950 outline-none transition focus:border-sky-400 focus:bg-white focus:ring-4 focus:ring-sky-100"
+                    className={inputClass}
                   />
                 </label>
 
                 <label className="block">
-                  <span className="mb-2 block text-sm font-medium text-slate-700">
+                  <span className="mb-2 block text-sm font-medium text-[#245C4F]">
                     Phone
                   </span>
                   <input
                     type="text"
                     value={form.phone}
                     onChange={(event) => updateField("phone", event.target.value)}
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-950 outline-none transition focus:border-sky-400 focus:bg-white focus:ring-4 focus:ring-sky-100"
+                    className={inputClass}
                   />
                 </label>
 
                 {isParentEdit ? (
                   <label className="block">
-                    <span className="mb-2 block text-sm font-medium text-slate-700">
+                    <span className="mb-2 block text-sm font-medium text-[#245C4F]">
                       Relation
                     </span>
                     <select
                       value={form.relation}
                       onChange={(event) => updateField("relation", event.target.value)}
-                      className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-950 outline-none transition focus:border-sky-400 focus:bg-white focus:ring-4 focus:ring-sky-100"
+                      className={inputClass}
                     >
                       <option value="">Select relation</option>
                       {PARENT_RELATION_OPTIONS.map((option) => (
@@ -211,29 +214,29 @@ export default function StaffFormModal({
                 {isStudentEdit ? (
                   <>
                     <label className="block">
-                      <span className="mb-2 block text-sm font-medium text-slate-700">
+                      <span className="mb-2 block text-sm font-medium text-[#245C4F]">
                         Admission number
                       </span>
                       <input
                         type="text"
                         value={form.admissionNo}
                         onChange={(event) => updateField("admissionNo", event.target.value)}
-                        className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-950 outline-none transition focus:border-sky-400 focus:bg-white focus:ring-4 focus:ring-sky-100"
+                        className={inputClass}
                       />
                     </label>
                     <label className="block">
-                      <span className="mb-2 block text-sm font-medium text-slate-700">
+                      <span className="mb-2 block text-sm font-medium text-[#245C4F]">
                         Class
                       </span>
                       <input
                         type="text"
                         value={form.gradeLevel}
                         onChange={(event) => updateField("gradeLevel", event.target.value)}
-                        className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-950 outline-none transition focus:border-sky-400 focus:bg-white focus:ring-4 focus:ring-sky-100"
+                        className={inputClass}
                       />
                     </label>
                     <label className="block">
-                      <span className="mb-2 block text-sm font-medium text-slate-700">
+                      <span className="mb-2 block text-sm font-medium text-[#245C4F]">
                         Age
                       </span>
                       <input
@@ -242,7 +245,7 @@ export default function StaffFormModal({
                         max="100"
                         value={form.age}
                         onChange={(event) => updateField("age", event.target.value)}
-                        className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-950 outline-none transition focus:border-sky-400 focus:bg-white focus:ring-4 focus:ring-sky-100"
+                        className={inputClass}
                       />
                     </label>
                   </>
@@ -250,13 +253,13 @@ export default function StaffFormModal({
 
                 {!isParentEdit ? (
                   <label className="block">
-                    <span className="mb-2 block text-sm font-medium text-slate-700">
+                    <span className="mb-2 block text-sm font-medium text-[#245C4F]">
                       Role
                     </span>
                     <select
                       value={form.role}
                       onChange={(event) => updateField("role", event.target.value)}
-                      className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-950 outline-none transition focus:border-sky-400 focus:bg-white focus:ring-4 focus:ring-sky-100"
+                      className={inputClass}
                     >
                       {(mode === "edit" ? ALL_ROLE_OPTIONS : roleOptions).map((option) => (
                         <option key={option.value} value={option.value}>
@@ -269,13 +272,13 @@ export default function StaffFormModal({
 
                 {mode === "edit" && !isParentEdit ? (
                   <label className="block">
-                    <span className="mb-2 block text-sm font-medium text-slate-700">
+                    <span className="mb-2 block text-sm font-medium text-[#245C4F]">
                       Status
                     </span>
                     <select
                       value={form.status}
                       onChange={(event) => updateField("status", event.target.value)}
-                      className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-950 outline-none transition focus:border-sky-400 focus:bg-white focus:ring-4 focus:ring-sky-100"
+                      className={inputClass}
                     >
                       {STATUS_OPTIONS.map((option) => (
                         <option key={option.value} value={option.value}>
@@ -286,14 +289,14 @@ export default function StaffFormModal({
                   </label>
                 ) : mode !== "edit" ? (
                   <label className="block">
-                    <span className="mb-2 block text-sm font-medium text-slate-700">
+                    <span className="mb-2 block text-sm font-medium text-[#245C4F]">
                       Temporary password
                     </span>
                     <input
                       type="password"
                       value={form.password}
                       onChange={(event) => updateField("password", event.target.value)}
-                      className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-950 outline-none transition focus:border-sky-400 focus:bg-white focus:ring-4 focus:ring-sky-100"
+                      className={inputClass}
                       minLength={8}
                       required
                     />
@@ -312,14 +315,14 @@ export default function StaffFormModal({
                   type="button"
                   onClick={onClose}
                   disabled={pending}
-                  className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-60"
+                  className="rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 text-sm font-semibold text-[#063F32] transition hover:bg-[#F1EADC] disabled:opacity-60"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={pending}
-                  className="rounded-2xl bg-slate-950 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:opacity-60"
+                  className="rounded-2xl bg-[#0D5C48] px-4 py-3 text-sm font-semibold text-[#FAF7F0] transition hover:bg-[#063F32] disabled:opacity-60"
                 >
                   {pending ? "Saving..." : mode === "edit" ? "Save changes" : "Create staff"}
                 </button>

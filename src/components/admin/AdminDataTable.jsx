@@ -32,7 +32,7 @@ export default function AdminDataTable({
 
   if (!rows.length) {
     return (
-      <section className="rounded-[1.75rem] border border-dashed border-slate-300 bg-white/85 p-10 text-center text-sm text-slate-500 shadow-[0_18px_60px_-36px_rgba(15,23,42,0.18)]">
+      <section className="rounded-[1.75rem] border border-dashed border-[#2D8A6A]/25 bg-white/85 p-10 text-center text-sm text-[#245C4F] shadow-[0_18px_60px_-36px_rgba(13,59,46,0.18)]">
         {emptyMessage}
       </section>
     );
@@ -40,11 +40,11 @@ export default function AdminDataTable({
 
   return (
     <section className="space-y-4">
-      <div className="hidden overflow-hidden rounded-[1.75rem] border border-white/70 bg-white/90 shadow-[0_20px_70px_-36px_rgba(15,23,42,0.25)] lg:block">
+      <div className="hidden overflow-hidden rounded-[1.75rem] border border-[#2D8A6A]/15 bg-white/90 shadow-[0_20px_70px_-36px_rgba(13,59,46,0.18)] lg:block">
         <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-slate-200">
-            <thead className="bg-slate-50/80">
-              <tr className="text-left text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+          <table className="min-w-full divide-y divide-[#F1EADC]">
+            <thead className="bg-[#FAF7F0]/90">
+              <tr className="text-left text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]">
                 {columns.map((column) => (
                   <th key={column.key} className="px-6 py-4">
                     {column.label}
@@ -53,7 +53,7 @@ export default function AdminDataTable({
                 {actions ? <th className="px-6 py-4">Actions</th> : null}
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-[#F1EADC]">
               {visibleRows.map((row, index) => (
                 <motion.tr
                   key={row[keyField] || index}
@@ -64,7 +64,7 @@ export default function AdminDataTable({
                   {columns.map((column) => (
                     <td
                       key={column.key}
-                      className={`px-6 py-5 align-top text-sm text-slate-700 ${column.cellClassName || ""}`}
+                      className={`px-6 py-5 align-top text-sm text-[#245C4F] ${column.cellClassName || ""}`}
                     >
                       {renderValue(column, row)}
                     </td>
@@ -96,15 +96,15 @@ export default function AdminDataTable({
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.18, delay: index * 0.02 }}
-            className="rounded-[1.5rem] border border-white/70 bg-white/90 p-5 shadow-[0_18px_60px_-36px_rgba(15,23,42,0.22)]"
+            className="rounded-[1.5rem] border border-[#2D8A6A]/15 bg-white/90 p-5 shadow-[0_18px_60px_-36px_rgba(13,59,46,0.18)]"
           >
             <div className="space-y-3">
               {columns.map((column) => (
                 <div key={column.key}>
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]">
                     {column.label}
                   </p>
-                  <div className="mt-1 text-sm text-slate-800">
+                  <div className="mt-1 text-sm text-[#245C4F]">
                     {renderValue(column, row)}
                   </div>
                 </div>
@@ -117,7 +117,7 @@ export default function AdminDataTable({
           </motion.article>
         ))}
         {rows.length > pageSize ? (
-          <div className="rounded-[1.5rem] border border-white/70 bg-white/90 shadow-[0_18px_60px_-36px_rgba(15,23,42,0.22)]">
+          <div className="rounded-[1.5rem] border border-[#2D8A6A]/15 bg-white/90 shadow-[0_18px_60px_-36px_rgba(13,59,46,0.18)]">
             <PaginationControls
               page={currentPage}
               pageSize={pageSize}
