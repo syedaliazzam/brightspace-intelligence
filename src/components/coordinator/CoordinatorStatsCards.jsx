@@ -11,12 +11,12 @@ export default function CoordinatorStatsCards({ items = [] }) {
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.2, delay: index * 0.03 }}
-          className="rounded-[1.75rem] border border-white/70 bg-white/90 p-5 shadow-[0_18px_60px_-36px_rgba(15,23,42,0.22)]"
+          className="rounded-[1.75rem] border border-[#2D8A6A]/15 bg-white/90 p-5 shadow-[0_18px_60px_-36px_rgba(13,59,46,0.18)]"
         >
-          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-sky-700">
+          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#245C4F]">
             {item.label}
           </p>
-          <p className="mt-4 text-3xl font-semibold tracking-tight text-slate-950">
+          <p className="mt-4 text-3xl font-semibold tracking-tight text-[#063F32]">
             {item.value}
           </p>
         </motion.article>
@@ -24,4 +24,3 @@ export default function CoordinatorStatsCards({ items = [] }) {
     </div>
   );
 }
-

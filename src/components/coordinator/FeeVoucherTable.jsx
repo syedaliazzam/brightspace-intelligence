@@ -6,17 +6,17 @@ import { jsPDF } from "jspdf";
 import FeeVoucherPreviewModal from "@/components/coordinator/FeeVoucherPreviewModal";
 
 const STATUS_STYLES = {
-  unpaid: "bg-slate-100 text-slate-700",
-  submitted: "bg-amber-50 text-amber-700",
-  verified: "bg-emerald-50 text-emerald-700",
+  unpaid: "bg-[#FFF5D6] text-[#8A6B00]",
+  submitted: "bg-[#FFF5D6] text-[#8A6B00]",
+  verified: "bg-[#EAF6EF] text-[#0D5C48]",
   rejected: "bg-rose-50 text-rose-700",
-  expired: "bg-violet-50 text-violet-700",
-  new_lead: "bg-sky-50 text-sky-700",
-  voucher_created: "bg-amber-50 text-amber-700",
-  fee_submitted: "bg-violet-50 text-violet-700",
-  fee_verified: "bg-emerald-50 text-emerald-700",
-  access_granted: "bg-teal-50 text-teal-700",
-  pending_clarification: "bg-orange-50 text-orange-700",
+  expired: "bg-[#FFF5D6] text-[#8A6B00]",
+  new_lead: "bg-[#EAF6EF] text-[#0D5C48]",
+  voucher_created: "bg-[#FFF5D6] text-[#8A6B00]",
+  fee_submitted: "bg-[#FFF5D6] text-[#8A6B00]",
+  fee_verified: "bg-[#EAF6EF] text-[#0D5C48]",
+  access_granted: "bg-[#EAF6EF] text-[#0D5C48]",
+  pending_clarification: "bg-[#FFF5D6] text-[#8A6B00]",
 };
 
 function formatStatus(value) {
@@ -184,12 +184,12 @@ function buildVoucherPrintHtml(voucher) {
         <title>${safe(voucher.voucher_no || "Voucher")}</title>
         <style>
           @page { size: A4; margin: 18mm; }
-          body { margin:0; font-family: Arial, sans-serif; color:#0f172a; background:#ffffff; }
-          .card { border:1px solid #e2e8f0; border-radius:24px; overflow:hidden; }
-          .header { background:linear-gradient(135deg,#0f172a,#1e293b); color:#fff; padding:28px; }
+          body { margin:0; font-family: Arial, sans-serif; color:#063F32; background:#FAF7F0; }
+          .card { border:1px solid #2D8A6A; border-radius:24px; overflow:hidden; background:#FAF7F0; }
+          .header { background:linear-gradient(135deg,#0D3B2E,#0D5C48); color:#FAF7F0; padding:28px; }
           .body { padding:28px; }
           .meta { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:18px; }
-          .box { border:1px solid #e2e8f0; border-radius:18px; background:#f8fafc; padding:18px; }
+          .box { border:1px solid #2D8A6A; border-radius:18px; background:#ffffff; padding:18px; }
           table { width:100%; border-collapse:collapse; }
           td { font-size:14px; }
           .section { margin-top:20px; }
@@ -198,15 +198,15 @@ function buildVoucherPrintHtml(voucher) {
       <body>
         <div class="card">
           <div class="header">
-            <div style="font-size:12px;letter-spacing:.18em;text-transform:uppercase;opacity:.8;">LMS Fee Voucher</div>
+            <div style="font-size:12px;letter-spacing:.18em;text-transform:uppercase;opacity:.85;color:#FFF5D6;">Ash-Shajrah Learning Hub Fee Voucher</div>
             <h1 style="margin:8px 0 0;font-size:28px;line-height:1.2;">${safe(voucher.voucher_no || "Voucher")}</h1>
           </div>
           <div class="body">
             <div class="meta">
-              <div class="box"><div style="color:#64748b;font-size:12px;text-transform:uppercase;letter-spacing:.18em;">Student</div><div style="margin-top:8px;font-weight:700;">${safe(voucher.student_name || "")}</div></div>
-              <div class="box"><div style="color:#64748b;font-size:12px;text-transform:uppercase;letter-spacing:.18em;">Parent</div><div style="margin-top:8px;font-weight:700;">${safe(voucher.parent_name || "Not provided")}</div></div>
-              <div class="box"><div style="color:#64748b;font-size:12px;text-transform:uppercase;letter-spacing:.18em;">Bank Name</div><div style="margin-top:8px;font-weight:700;">${safe(bankName)}</div></div>
-              <div class="box"><div style="color:#64748b;font-size:12px;text-transform:uppercase;letter-spacing:.18em;">Due Date</div><div style="margin-top:8px;font-weight:700;">${safe(formatDate(voucher.due_date))}</div></div>
+              <div class="box"><div style="color:#245C4F;font-size:12px;text-transform:uppercase;letter-spacing:.18em;">Student</div><div style="margin-top:8px;font-weight:700;color:#063F32;">${safe(voucher.student_name || "")}</div></div>
+              <div class="box"><div style="color:#245C4F;font-size:12px;text-transform:uppercase;letter-spacing:.18em;">Parent</div><div style="margin-top:8px;font-weight:700;color:#063F32;">${safe(voucher.parent_name || "Not provided")}</div></div>
+              <div class="box"><div style="color:#245C4F;font-size:12px;text-transform:uppercase;letter-spacing:.18em;">Bank Name</div><div style="margin-top:8px;font-weight:700;color:#063F32;">${safe(bankName)}</div></div>
+              <div class="box"><div style="color:#245C4F;font-size:12px;text-transform:uppercase;letter-spacing:.18em;">Due Date</div><div style="margin-top:8px;font-weight:700;color:#063F32;">${safe(formatDate(voucher.due_date))}</div></div>
             </div>
 
             <div class="section box">
@@ -216,20 +216,20 @@ function buildVoucherPrintHtml(voucher) {
             </div>
 
             <div class="section box">
-              <div style="color:#64748b;font-size:12px;text-transform:uppercase;letter-spacing:.18em;">Payment Instructions</div>
-              <p style="margin:12px 0 0;white-space:pre-line;line-height:1.7;">${safe(voucher.payment_instructions || "No payment instructions were added for this voucher.")}</p>
+              <div style="color:#245C4F;font-size:12px;text-transform:uppercase;letter-spacing:.18em;">Payment Instructions</div>
+              <p style="margin:12px 0 0;white-space:pre-line;line-height:1.7;color:#245C4F;">${safe(voucher.payment_instructions || "No payment instructions were added for this voucher.")}</p>
             </div>
 
             <div class="section box">
-              <div style="color:#64748b;font-size:12px;text-transform:uppercase;letter-spacing:.18em;">Payment Method Details</div>
+              <div style="color:#245C4F;font-size:12px;text-transform:uppercase;letter-spacing:.18em;">Payment Method Details</div>
               <table style="margin-top:10px;">
-                <tr><td style="padding:6px 0;color:#64748b;">Method</td><td style="padding:6px 0;text-align:right;font-weight:700;">${safe(paymentMethodName)}</td></tr>
-                <tr><td style="padding:6px 0;color:#64748b;">Bank Name</td><td style="padding:6px 0;text-align:right;font-weight:700;">${safe(voucher.bank_name || paymentMethod.bank_name || "-")}</td></tr>
-                <tr><td style="padding:6px 0;color:#64748b;">Account Title</td><td style="padding:6px 0;text-align:right;font-weight:700;">${safe(voucher.account_title || paymentMethod.account_title || "-")}</td></tr>
-                <tr><td style="padding:6px 0;color:#64748b;">Account Number</td><td style="padding:6px 0;text-align:right;font-weight:700;">${safe(voucher.account_number || paymentMethod.account_number || "-")}</td></tr>
-                <tr><td style="padding:6px 0;color:#64748b;">IBAN</td><td style="padding:6px 0;text-align:right;font-weight:700;">${safe(voucher.iban || paymentMethod.iban || "-")}</td></tr>
-                <tr><td style="padding:6px 0;color:#64748b;">Branch Code</td><td style="padding:6px 0;text-align:right;font-weight:700;">${safe(voucher.branch_code || paymentMethod.branch_code || "-")}</td></tr>
-                <tr><td style="padding:6px 0;color:#64748b;">Instructions</td><td style="padding:6px 0;text-align:right;font-weight:700;">${safe(voucher.payment_method_instructions || voucher.payment_instructions || paymentMethod.instructions || "-")}</td></tr>
+                <tr><td style="padding:6px 0;color:#245C4F;">Method</td><td style="padding:6px 0;text-align:right;font-weight:700;color:#063F32;">${safe(paymentMethodName)}</td></tr>
+                <tr><td style="padding:6px 0;color:#245C4F;">Bank Name</td><td style="padding:6px 0;text-align:right;font-weight:700;color:#063F32;">${safe(voucher.bank_name || paymentMethod.bank_name || "-")}</td></tr>
+                <tr><td style="padding:6px 0;color:#245C4F;">Account Title</td><td style="padding:6px 0;text-align:right;font-weight:700;color:#063F32;">${safe(voucher.account_title || paymentMethod.account_title || "-")}</td></tr>
+                <tr><td style="padding:6px 0;color:#245C4F;">Account Number</td><td style="padding:6px 0;text-align:right;font-weight:700;color:#063F32;">${safe(voucher.account_number || paymentMethod.account_number || "-")}</td></tr>
+                <tr><td style="padding:6px 0;color:#245C4F;">IBAN</td><td style="padding:6px 0;text-align:right;font-weight:700;color:#063F32;">${safe(voucher.iban || paymentMethod.iban || "-")}</td></tr>
+                <tr><td style="padding:6px 0;color:#245C4F;">Branch Code</td><td style="padding:6px 0;text-align:right;font-weight:700;color:#063F32;">${safe(voucher.branch_code || paymentMethod.branch_code || "-")}</td></tr>
+                <tr><td style="padding:6px 0;color:#245C4F;">Instructions</td><td style="padding:6px 0;text-align:right;font-weight:700;color:#063F32;">${safe(voucher.payment_method_instructions || voucher.payment_instructions || paymentMethod.instructions || "-")}</td></tr>
               </table>
             </div>
           </div>
@@ -277,7 +277,7 @@ async function downloadVoucherPdf(voucher) {
 
   doc.setFont("helvetica", "bold");
   doc.setFontSize(18);
-  doc.text("LMS Fee Voucher", margin, y);
+  doc.text("Ash-Shajrah Learning Hub Fee Voucher", margin, y);
   y += 28;
 
   doc.setFont("helvetica", "normal");
@@ -324,7 +324,7 @@ export default function FeeVoucherTable({ vouchers }) {
 
   if (!vouchers.length) {
     return (
-      <section className="rounded-[1.75rem] border border-dashed border-slate-300 bg-white/85 p-10 text-center text-sm text-slate-500 shadow-[0_18px_60px_-36px_rgba(15,23,42,0.18)]">
+      <section className="rounded-[1.75rem] border border-dashed border-[#2D8A6A]/25 bg-white/85 p-10 text-center text-sm text-[#245C4F] shadow-[0_18px_60px_-36px_rgba(13,59,46,0.18)]">
         No fee vouchers match the current filters.
       </section>
     );
@@ -333,16 +333,16 @@ export default function FeeVoucherTable({ vouchers }) {
   return (
     <>
       {toast ? (
-        <div className="fixed right-6 top-6 z-[80] rounded-2xl border border-sky-200 bg-white px-4 py-3 text-sm font-semibold text-sky-700 shadow-[0_18px_60px_-36px_rgba(15,23,42,0.28)]">
+        <div className="fixed right-6 top-6 z-[80] rounded-2xl border border-[#2D8A6A]/20 bg-white px-4 py-3 text-sm font-semibold text-[#063F32] shadow-[0_18px_60px_-36px_rgba(13,59,46,0.22)]">
           {toast}
         </div>
       ) : null}
       <section className="space-y-4">
-        <div className="hidden overflow-hidden rounded-[1.75rem] border border-white/70 bg-white/90 shadow-[0_20px_70px_-36px_rgba(15,23,42,0.25)] lg:block">
+        <div className="hidden overflow-hidden rounded-[1.75rem] border border-[#2D8A6A]/15 bg-white/90 shadow-[0_20px_70px_-36px_rgba(13,59,46,0.18)] lg:block">
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-slate-200">
-              <thead className="bg-slate-50/80">
-                <tr className="text-left text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+            <table className="min-w-full divide-y divide-[#F1EADC]">
+              <thead className="bg-[#FAF7F0]/80">
+                <tr className="text-left text-xs font-semibold uppercase tracking-[0.18em] text-[#245C4F]">
                   <th className="px-6 py-4">Voucher</th>
                   <th className="px-6 py-4">Student</th>
                   <th className="px-6 py-4">Amount</th>
@@ -363,25 +363,25 @@ export default function FeeVoucherTable({ vouchers }) {
                     transition={{ duration: 0.18, delay: index * 0.02 }}
                   >
                     <td className="px-6 py-5">
-                      <p className="font-semibold text-slate-950">{voucher.voucher_no}</p>
-                      <p className="mt-1 text-sm text-slate-500">{getDisplayBankName(voucher)}</p>
+                  <p className="font-semibold text-[#063F32]">{voucher.voucher_no}</p>
+                  <p className="mt-1 text-sm text-[#245C4F]">{getDisplayBankName(voucher)}</p>
                     </td>
                     <td className="px-6 py-5">
-                      <p className="font-semibold text-slate-950">{voucher.student_name}</p>
-                      <p className="mt-1 text-sm text-slate-500">
+                  <p className="font-semibold text-[#063F32]">{voucher.student_name}</p>
+                  <p className="mt-1 text-sm text-[#245C4F]">
                         {voucher.parent_name || "Parent pending"}
                       </p>
                     </td>
-                    <td className="px-6 py-5 font-semibold text-slate-900">
+                    <td className="px-6 py-5 font-semibold text-[#063F32]">
                       {formatMoney(voucher.amount)}
                     </td>
-                    <td className="px-6 py-5 text-sm text-slate-600">
+                    <td className="px-6 py-5 text-sm text-[#245C4F]">
                       {formatDate(voucher.due_date)}
                     </td>
                     <td className="px-6 py-5">
                       <span
                         className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${
-                          STATUS_STYLES[displayStatus] || "bg-slate-100 text-slate-700"
+                          STATUS_STYLES[displayStatus] || "bg-[#FFF5D6] text-[#8A6B00]"
                         }`}
                       >
                         {formatStatus(displayStatus)}
@@ -392,21 +392,21 @@ export default function FeeVoucherTable({ vouchers }) {
                         <button
                           type="button"
                           onClick={() => setSelectedVoucher(voucher)}
-                          className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
+                          className="rounded-xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-3 py-2 text-xs font-semibold text-[#063F32] transition hover:bg-[#F1EADC]"
                         >
                           View voucher
                         </button>
                         <button
                           type="button"
                           onClick={() => copyVoucherLink(voucher.id)}
-                          className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
+                          className="rounded-xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-3 py-2 text-xs font-semibold text-[#063F32] transition hover:bg-[#F1EADC]"
                         >
                           Copy voucher link
                         </button>
                         <button
                           type="button"
                           onClick={() => downloadVoucherPdf(voucher)}
-                          className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-100"
+                          className="rounded-xl border border-[#2D8A6A]/20 bg-white px-3 py-2 text-xs font-semibold text-[#063F32] transition hover:bg-[#F1EADC]"
                         >
                           Download PDF
                         </button>
@@ -431,26 +431,26 @@ export default function FeeVoucherTable({ vouchers }) {
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.18, delay: index * 0.02 }}
-              className="rounded-[1.5rem] border border-white/70 bg-white/90 p-5 shadow-[0_18px_60px_-36px_rgba(15,23,42,0.22)]"
+              className="rounded-[1.5rem] border border-[#2D8A6A]/15 bg-white/90 p-5 shadow-[0_18px_60px_-36px_rgba(13,59,46,0.18)]"
             >
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                  <p className="text-lg font-semibold text-slate-950">{voucher.voucher_no}</p>
-                  <p className="mt-1 text-sm text-slate-600">{voucher.student_name}</p>
-                  <p className="mt-1 text-sm text-slate-500">
+                  <p className="text-lg font-semibold text-[#063F32]">{voucher.voucher_no}</p>
+                  <p className="mt-1 text-sm text-[#245C4F]">{voucher.student_name}</p>
+                  <p className="mt-1 text-sm text-[#245C4F]">
                     {getDisplayBankName(voucher)}
                   </p>
                 </div>
                 <span
                   className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${
-                    STATUS_STYLES[displayStatus] || "bg-slate-100 text-slate-700"
+                    STATUS_STYLES[displayStatus] || "bg-[#FFF5D6] text-[#8A6B00]"
                   }`}
                 >
                   {formatStatus(displayStatus)}
                 </span>
               </div>
 
-              <div className="mt-4 grid gap-2 text-sm text-slate-600">
+              <div className="mt-4 grid gap-2 text-sm text-[#245C4F]">
                 <p>Regular Fee: {formatMoney(voucher.regular_fee_amount)}</p>
                 <p>Other Fee: {formatMoney(voucher.admission_fee_amount)}</p>
                 <p>Subtotal: {formatMoney(voucher.subtotal_amount)}</p>
@@ -464,21 +464,21 @@ export default function FeeVoucherTable({ vouchers }) {
                 <button
                   type="button"
                   onClick={() => setSelectedVoucher(voucher)}
-                  className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
+                  className="rounded-xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-3 py-2 text-xs font-semibold text-[#063F32] transition hover:bg-[#F1EADC]"
                 >
                   View voucher
                 </button>
                 <button
                   type="button"
                   onClick={() => copyVoucherLink(voucher.id)}
-                  className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
+                  className="rounded-xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-3 py-2 text-xs font-semibold text-[#063F32] transition hover:bg-[#F1EADC]"
                 >
                   Copy voucher link
                 </button>
                 <button
                   type="button"
                   onClick={() => downloadVoucherPdf(voucher)}
-                  className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-100"
+                  className="rounded-xl border border-[#2D8A6A]/20 bg-white px-3 py-2 text-xs font-semibold text-[#063F32] transition hover:bg-[#F1EADC]"
                 >
                   Download PDF
                 </button>

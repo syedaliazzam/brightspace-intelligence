@@ -86,16 +86,16 @@ export default function InterestedStudentsPanel({ items = [], onRefresh }) {
   }
 
   if (!items.length) {
-    return <section className="rounded-[1.75rem] border border-dashed border-slate-300 bg-white/85 p-10 text-center text-sm text-slate-500 shadow-[0_18px_60px_-36px_rgba(15,23,42,0.18)]">No interested students found.</section>;
+    return <section className="rounded-[1.75rem] border border-dashed border-[#2D8A6A]/25 bg-white/85 p-10 text-center text-sm text-[#245C4F] shadow-[0_18px_60px_-36px_rgba(13,59,46,0.18)]">No interested students found.</section>;
   }
 
   return (
     <>
-      <section className="overflow-hidden rounded-[1.75rem] border border-white/70 bg-white/90 shadow-[0_20px_70px_-36px_rgba(15,23,42,0.25)]">
+      <section className="overflow-hidden rounded-[1.75rem] border border-[#2D8A6A]/15 bg-white/90 shadow-[0_20px_70px_-36px_rgba(13,59,46,0.18)]">
         <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-slate-200">
-            <thead className="bg-slate-50/80">
-              <tr className="text-left text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+          <table className="min-w-full divide-y divide-[#F1EADC]">
+            <thead className="bg-[#FAF7F0]/80">
+              <tr className="text-left text-xs font-semibold uppercase tracking-[0.18em] text-[#245C4F]">
                 <th className="px-6 py-4">Student Name</th>
                 <th className="px-6 py-4">Parent Name</th>
                 <th className="px-6 py-4">Email</th>
@@ -105,18 +105,18 @@ export default function InterestedStudentsPanel({ items = [], onRefresh }) {
                 <th className="px-6 py-4 text-right">Action</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-[#F1EADC]">
               {items.map((item) => (
                 <tr key={item.id} className="align-top">
-                  <td className="px-6 py-5 font-semibold text-slate-950">{item.student_name || "-"}</td>
-                  <td className="px-6 py-5 text-slate-700">{item.parent_name || "-"}</td>
-                  <td className="px-6 py-5 text-slate-700">{item.email || "-"}</td>
-                  <td className="px-6 py-5 text-slate-700">{item.phone || "-"}</td>
-                  <td className="px-6 py-5">
-                    <span className="inline-flex rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">{statusLabel(item.status)}</span>
+                  <td className="px-5 py-5 font-semibold text-[#063F32]">{item.student_name || "-"}</td>
+                  <td className="px-5 py-5 text-[#245C4F]">{item.parent_name || "-"}</td>
+                  <td className="px-5 py-5 text-[#245C4F]">{item.email || "-"}</td>
+                  <td className="px-5 py-5 text-[#245C4F]">{item.phone || "-"}</td>
+                  <td className="px-5 py-5">
+                    <span className="inline-flex rounded-full bg-[#EAF6EF] px-3 py-1 text-xs font-semibold text-[#0D5C48]">{statusLabel(item.status)}</span>
                   </td>
-                  <td className="px-6 py-5 text-sm text-slate-600">{formatDate(item.created_at)}</td>
-                  <td className="px-6 py-5 text-right">
+                  <td className="px-5 py-5 text-sm text-[#245C4F]">{formatDate(item.created_at)}</td>
+                  <td className="px-5 py-5 text-right">
                     <button
                       type="button"
                       onClick={() => {
@@ -124,7 +124,7 @@ export default function InterestedStudentsPanel({ items = [], onRefresh }) {
                         setLink(item.registration_link || "");
                         setMessage("");
                       }}
-                      className="rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800"
+                      className="rounded-full bg-[#0D5C48] px-4 py-2 text-sm font-semibold text-[#FAF7F0] transition hover:bg-[#063F32]"
                     >
                       Details
                     </button>
@@ -137,32 +137,32 @@ export default function InterestedStudentsPanel({ items = [], onRefresh }) {
       </section>
 
       {selected ? (
-        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-hidden bg-slate-950/50 px-4 pt-28 pb-10">
-          <div className="w-full max-w-2xl max-h-[calc(100vh-6.5rem)] overflow-y-auto rounded-[2rem] bg-white p-6 shadow-[0_24px_80px_-32px_rgba(15,23,42,0.35)]">
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-hidden bg-[#063F32]/45 px-4 pt-10 pb-10">
+          <div className="w-full max-w-2xl max-h-[calc(100vh-6.5rem)] overflow-y-auto rounded-[2rem] border border-[#2D8A6A]/15 bg-[#FAF7F0] p-6 shadow-[0_24px_80px_-32px_rgba(13,59,46,0.24)]">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <p className="text-sm font-semibold uppercase tracking-[0.24em] text-sky-700">Interested student</p>
-                <h3 className="mt-2 text-2xl font-semibold text-slate-950">{selected.student_name || "-"}</h3>
+                <p className="text-sm font-semibold uppercase tracking-[0.24em] text-[#C9A227]">Interested student</p>
+                <h3 className="mt-2 text-2xl font-semibold text-[#063F32]">{selected.student_name || "-"}</h3>
               </div>
-              <button type="button" onClick={() => setSelected(null)} className="rounded-full bg-slate-100 px-3 py-2 text-sm font-semibold text-slate-700">
+              <button type="button" onClick={() => setSelected(null)} className="rounded-full border border-[#2D8A6A]/20 bg-white px-3 py-2 text-sm font-semibold text-[#063F32] transition hover:bg-[#F1EADC]">
                 Close
               </button>
             </div>
 
             <dl className="mt-6 grid gap-4 text-sm sm:grid-cols-2">
-              <div><dt className="text-slate-500">Parent Name</dt><dd className="mt-1 font-medium text-slate-900">{selected.parent_name || "-"}</dd></div>
-              <div><dt className="text-slate-500">Email</dt><dd className="mt-1 font-medium text-slate-900">{selected.email || "-"}</dd></div>
-              <div><dt className="text-slate-500">Phone</dt><dd className="mt-1 font-medium text-slate-900">{selected.phone || "-"}</dd></div>
-              <div><dt className="text-slate-500">Status</dt><dd className="mt-1 font-medium text-slate-900">{statusLabel(selected.status)}</dd></div>
-              <div><dt className="text-slate-500">Created At</dt><dd className="mt-1 font-medium text-slate-900">{formatDate(selected.created_at)}</dd></div>
+              <div><dt className="text-[#245C4F]">Parent Name</dt><dd className="mt-1 font-medium text-[#063F32]">{selected.parent_name || "-"}</dd></div>
+              <div><dt className="text-[#245C4F]">Email</dt><dd className="mt-1 font-medium text-[#063F32]">{selected.email || "-"}</dd></div>
+              <div><dt className="text-[#245C4F]">Phone</dt><dd className="mt-1 font-medium text-[#063F32]">{selected.phone || "-"}</dd></div>
+              <div><dt className="text-[#245C4F]">Status</dt><dd className="mt-1 font-medium text-[#063F32]">{statusLabel(selected.status)}</dd></div>
+              <div><dt className="text-[#245C4F]">Created At</dt><dd className="mt-1 font-medium text-[#063F32]">{formatDate(selected.created_at)}</dd></div>
               <div>
-                <dt className="flex items-center justify-between gap-3 text-slate-500">
+                <dt className="flex items-center justify-between gap-3 text-[#245C4F]">
                   <span>Registration Link</span>
                   {selectedLink ? (
                     <button
                       type="button"
                       onClick={() => void copyLink()}
-                      className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700 transition hover:bg-slate-100"
+                      className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-[#2D8A6A]/20 bg-white text-[#063F32] transition hover:bg-[#F1EADC]"
                       aria-label="Copy registration link"
                       title="Copy registration link"
                     >
@@ -173,21 +173,21 @@ export default function InterestedStudentsPanel({ items = [], onRefresh }) {
                     </button>
                   ) : null}
                 </dt>
-                <dd className="mt-1 break-all font-medium text-slate-900">{selectedLink || "Not generated yet."}</dd>
+                <dd className="mt-1 break-all font-medium text-[#063F32]">{selectedLink || "Not generated yet."}</dd>
               </div>
             </dl>
 
             {linkMessage ? (
-              <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-700">
+              <div className="mt-5 rounded-2xl border border-[#2D8A6A]/15 bg-white/90 px-4 py-4 text-sm text-[#245C4F]">
                 <div className="flex items-start justify-between gap-3">
                   <div className="space-y-1">
-                    <p className="font-semibold text-slate-950">Registration message</p>
+                    <p className="font-semibold text-[#063F32]">Registration message</p>
                     <p className="whitespace-pre-wrap leading-7">{linkMessage}</p>
                   </div>
                   <button
                     type="button"
                     onClick={() => void copyLinkMessage()}
-                    className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-100"
+                    className="inline-flex items-center gap-2 rounded-full border border-[#2D8A6A]/20 bg-white px-3 py-2 text-xs font-semibold text-[#063F32] transition hover:bg-[#F1EADC]"
                   >
                     <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                       <rect x="9" y="9" width="11" height="11" rx="2" />
@@ -199,14 +199,14 @@ export default function InterestedStudentsPanel({ items = [], onRefresh }) {
               </div>
             ) : null}
 
-            {message ? <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">{message}</div> : null}
+            {message ? <div className="mt-5 rounded-2xl border border-[#2D8A6A]/15 bg-[#FAF7F0] px-4 py-3 text-sm text-[#245C4F]">{message}</div> : null}
 
             <div className="mt-6 flex flex-wrap gap-3">
               <button
                 type="button"
                 onClick={() => void generateLink(selected)}
                 disabled={loadingId === selected.id}
-                className="rounded-full bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-70"
+                className="rounded-full bg-[#0D5C48] px-4 py-2.5 text-sm font-semibold text-[#FAF7F0] transition hover:bg-[#063F32] disabled:cursor-not-allowed disabled:opacity-70"
               >
                 {loadingId === selected.id ? "Generating..." : selected.registration_token ? "Generate Registration Message" : "Generate Registration Message"}
               </button>

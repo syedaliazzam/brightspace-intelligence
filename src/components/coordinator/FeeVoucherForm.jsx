@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
+import { ChevronDown } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 export default function FeeVoucherForm({ leads, initialLeadId = "", showTrigger = true, onCreated, onClose }) {
@@ -13,6 +14,10 @@ export default function FeeVoucherForm({ leads, initialLeadId = "", showTrigger 
   const [loadingOptions, setLoadingOptions] = useState(false);
   const [error, setError] = useState("");
   const [successEmail, setSuccessEmail] = useState(null);
+  const [leadOpen, setLeadOpen] = useState(false);
+  const [otherFeeOpen, setOtherFeeOpen] = useState(false);
+  const [discountOpen, setDiscountOpen] = useState(false);
+  const [paymentMethodOpen, setPaymentMethodOpen] = useState(false);
   const [options, setOptions] = useState({
     discounts: [],
     feeSettings: {},
@@ -158,6 +163,10 @@ export default function FeeVoucherForm({ leads, initialLeadId = "", showTrigger 
     }));
   }
 
+  function closeSelectState(setter) {
+    window.setTimeout(() => setter(false), 0);
+  }
+
   async function handleSubmit(event) {
     event.preventDefault();
     setPending(true);
@@ -236,26 +245,26 @@ export default function FeeVoucherForm({ leads, initialLeadId = "", showTrigger 
           type="button"
           onClick={() => setOpen(true)}
           disabled={pending || loadingOptions || !hasEligibleLead}
-          className="inline-flex items-center justify-center rounded-2xl bg-slate-950 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+          className="inline-flex items-center justify-center rounded-2xl bg-[#0D5C48] px-4 py-3 text-sm font-semibold text-[#FAF7F0] transition hover:bg-[#063F32] disabled:cursor-not-allowed disabled:opacity-60"
         >
           Create fee voucher
         </button>
       ) : null}
 
       {open ? (
-        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-hidden bg-slate-950/45 px-4 pt-10 pb-10">
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-hidden bg-[#063F32]/45 px-4 pt-10 pb-10">
           <motion.div
             initial={{ opacity: 0, y: 18 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.2 }}
-            className="w-full max-w-3xl max-h-[calc(100vh-6.5rem)] overflow-y-auto rounded-[2rem] border border-white/70 bg-white p-6 shadow-[0_24px_80px_-36px_rgba(15,23,42,0.32)] sm:p-8"
+            className="w-full max-w-3xl max-h-[calc(100vh-6.5rem)] overflow-y-auto rounded-[2rem] border border-[#2D8A6A]/15 bg-[#FAF7F0] p-6 shadow-[0_24px_80px_-36px_rgba(13,59,46,0.24)] sm:p-8"
           >
             <div className="flex items-start justify-between gap-4">
               <div>
-                <p className="text-sm font-semibold uppercase tracking-[0.24em] text-sky-700">
+                <p className="text-sm font-semibold uppercase tracking-[0.24em] text-[#C9A227]">
                   Voucher issuance
                 </p>
-                <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">
+                <h2 className="mt-2 text-2xl font-semibold tracking-tight text-[#063F32]">
                   Create fee voucher
                 </h2>
               </div>
@@ -266,7 +275,7 @@ export default function FeeVoucherForm({ leads, initialLeadId = "", showTrigger 
                   setOpen(false);
                   onClose?.();
                 }}
-                className="rounded-xl border border-slate-200 bg-black text-white px-3 py-2 text-sm font-semibold text-slate-700 transition"
+                className="rounded-xl border border-[#2D8A6A]/20 bg-white px-3 py-2 text-sm font-semibold text-[#063F32] transition hover:bg-[#F1EADC]"
               >
                 Close
               </button>
@@ -274,57 +283,63 @@ export default function FeeVoucherForm({ leads, initialLeadId = "", showTrigger 
 
             <form className="mt-6 grid gap-4 md:grid-cols-2" onSubmit={handleSubmit}>
               {initialLeadId && selectedLead ? (
-                <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white md:col-span-2">
-                  <div className="border-b border-slate-200 bg-slate-50 px-4 py-3">
+                <div className="overflow-hidden rounded-2xl border border-[#2D8A6A]/15 bg-white/90 md:col-span-2">
+                  <div className="border-b border-[#2D8A6A]/15 bg-[#FAF7F0] px-4 py-3">
                     <div className="flex items-center justify-between gap-3">
-                      <span className="text-sm font-semibold text-slate-700">Selected registration lead</span>
-                      <span className="rounded-full bg-slate-950 px-3 py-1 text-xs font-semibold text-white">
+                      <span className="text-sm font-semibold text-[#063F32]">Selected registration lead</span>
+                      <span className="rounded-full bg-[#0D5C48] px-3 py-1 text-xs font-semibold text-[#FAF7F0]">
                         Locked
                       </span>
                     </div>
                   </div>
                   <div className="grid gap-0 sm:grid-cols-2 lg:grid-cols-4">
-                    <div className="border-b border-r border-slate-200 px-4 py-3">
-                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Student</p>
-                      <p className="mt-1 text-sm font-semibold text-slate-950">{selectedLead.student_name || "—"}</p>
+                    <div className="border-b border-r border-[#2D8A6A]/15 px-4 py-3">
+                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#245C4F]">Student</p>
+                      <p className="mt-1 text-sm font-semibold text-[#063F32]">{selectedLead.student_name || "—"}</p>
                     </div>
-                    <div className="border-b border-slate-200 px-4 py-3 sm:border-r">
-                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Parent</p>
-                      <p className="mt-1 text-sm font-semibold text-slate-950">{selectedLead.parent_name || "Parent pending"}</p>
+                    <div className="border-b border-[#2D8A6A]/15 px-4 py-3 sm:border-r">
+                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#245C4F]">Parent</p>
+                      <p className="mt-1 text-sm font-semibold text-[#063F32]">{selectedLead.parent_name || "Parent pending"}</p>
                     </div>
-                    <div className="border-b border-r border-slate-200 px-4 py-3 lg:border-b-0">
-                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Class</p>
-                      <p className="mt-1 text-sm font-semibold text-slate-950">{selectedLead.class_level || "—"}</p>
+                    <div className="border-b border-r border-[#2D8A6A]/15 px-4 py-3 lg:border-b-0">
+                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#245C4F]">Class</p>
+                      <p className="mt-1 text-sm font-semibold text-[#063F32]">{selectedLead.class_level || "—"}</p>
                     </div>
                     <div className="px-4 py-3">
-                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Contact</p>
-                      <p className="mt-1 text-sm font-semibold text-slate-950">{selectedLead.phone || selectedLead.email || "No contact"}</p>
+                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#245C4F]">Contact</p>
+                      <p className="mt-1 text-sm font-semibold text-[#063F32]">{selectedLead.phone || selectedLead.email || "No contact"}</p>
                     </div>
                   </div>
                 </div>
               ) : (
                 <label className="block md:col-span-2">
-                  <span className="mb-2 block text-sm font-medium text-slate-700">
+                  <span className="mb-2 block text-sm font-medium text-[#245C4F]">
                     Registration lead
                   </span>
-                  <select
-                    value={form.registrationLeadId}
-                    onChange={(event) => updateField("registrationLeadId", event.target.value)}
-                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-950 outline-none transition focus:border-sky-400 focus:bg-white focus:ring-4 focus:ring-sky-100"
-                  >
-                    <option value="" disabled>
-                      Select registration lead
-                    </option>
-                    {eligibleLeads.map((lead) => (
-                      <option key={lead.id} value={lead.id}>
-                        {lead.student_name} - {lead.class_level}
+                  <div className="relative">
+                    <select
+                      value={form.registrationLeadId}
+                      onMouseDown={() => setLeadOpen((current) => !current)}
+                      onFocus={() => setLeadOpen(true)}
+                      onBlur={() => closeSelectState(setLeadOpen)}
+                      onChange={(event) => updateField("registrationLeadId", event.target.value)}
+                      className="w-full appearance-none rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 pr-11 text-sm text-[#063F32] outline-none transition focus:border-[#2D8A6A] focus:bg-white focus:ring-4 focus:ring-[#FFF5D6]"
+                    >
+                      <option value="" disabled>
+                        Select registration lead
                       </option>
-                    ))}
-                  </select>
+                      {eligibleLeads.map((lead) => (
+                        <option key={lead.id} value={lead.id}>
+                          {lead.student_name} - {lead.class_level}
+                        </option>
+                      ))}
+                    </select>
+                    <ChevronDown className={`pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#0D5C48] transition-transform duration-200 ${leadOpen ? "rotate-180" : "rotate-0"}`} />
+                  </div>
                 </label>
               )}
 
-              <label className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 md:col-span-2">
+              <label className="flex items-center gap-3 rounded-2xl border border-[#2D8A6A]/15 bg-white/90 px-4 py-3 md:col-span-2">
                 <input
                   type="checkbox"
                   checked={form.regularFeeApplied}
@@ -333,111 +348,129 @@ export default function FeeVoucherForm({ leads, initialLeadId = "", showTrigger 
                     updateField("regularFeeApplied", checked);
                     updateField("regularFeeId", checked ? selectedRegularFeeRecord?.id || "" : "");
                   }}
-                  className="h-4 w-4 rounded border-slate-300 text-slate-950"
+                  className="h-4 w-4 rounded border-[#2D8A6A]/30 text-[#0D5C48]"
                 />
-                <span className="text-sm font-medium text-slate-700">
+                <span className="text-sm font-medium text-[#063F32]">
                   Apply regular fee
                 </span>
-                <span className="ml-auto text-sm font-semibold text-slate-950">
+                <span className="ml-auto text-sm font-semibold text-[#063F32]">
                   {form.regularFeeApplied ? `PKR ${selectedRegularFee.toFixed(2)}` : "PKR 0.00"}
                 </span>
               </label>
 
               <label className="block">
-                <span className="mb-2 block text-sm font-medium text-slate-700">Other fee</span>
-                <select
-                  value={form.otherFeeId}
-                  onChange={(event) => {
-                    const nextOtherFee = options.otherFees.find((item) => item.id === event.target.value);
-                    updateField("otherFeeId", event.target.value);
-                    updateField("admissionFeeAmount", nextOtherFee ? String(nextOtherFee.amount || "") : "");
-                  }}
-                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-950 outline-none transition focus:border-sky-400 focus:bg-white focus:ring-4 focus:ring-sky-100"
-                >
-                  <option value="">Select other fee</option>
-                  {options.otherFees.map((fee) => (
-                    <option key={fee.id} value={fee.id}>
-                      {(fee.title || fee.name || "Other fee")} - Rs. {Number(fee.amount || 0).toFixed(2)}
-                    </option>
-                  ))}
-                </select>
-              </label>
-
-              <label className="block">
-                <span className="mb-2 block text-sm font-medium text-slate-700">Discount</span>
-                <select
-                  value={form.discountId}
-                  onChange={(event) => {
-                    const nextDiscount = options.discounts.find((item) => item.id === event.target.value);
-                    updateField("discountId", event.target.value);
-                    updateField("discountPercent", nextDiscount?.percent || "");
-                  }}
-                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-950 outline-none transition focus:border-sky-400 focus:bg-white focus:ring-4 focus:ring-sky-100"
-                >
-                  <option value="">No discount</option>
-                  {options.discounts
-                    .filter((discount) => Number(discount.percent || 0) <= maxDiscountPercent)
-                    .map((discount) => (
-                      <option key={discount.id} value={discount.id}>
-                        {discount.label}
+                <span className="mb-2 block text-sm font-medium text-[#245C4F]">Other fee</span>
+                <div className="relative">
+                  <select
+                    value={form.otherFeeId}
+                    onMouseDown={() => setOtherFeeOpen((current) => !current)}
+                    onFocus={() => setOtherFeeOpen(true)}
+                    onBlur={() => closeSelectState(setOtherFeeOpen)}
+                    onChange={(event) => {
+                      const nextOtherFee = options.otherFees.find((item) => item.id === event.target.value);
+                      updateField("otherFeeId", event.target.value);
+                      updateField("admissionFeeAmount", nextOtherFee ? String(nextOtherFee.amount || "") : "");
+                    }}
+                    className="w-full appearance-none rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 pr-11 text-sm text-[#063F32] outline-none transition focus:border-[#2D8A6A] focus:bg-white focus:ring-4 focus:ring-[#FFF5D6]"
+                  >
+                    <option value="">Select other fee</option>
+                    {options.otherFees.map((fee) => (
+                      <option key={fee.id} value={fee.id}>
+                        {(fee.title || fee.name || "Other fee")} - Rs. {Number(fee.amount || 0).toFixed(2)}
                       </option>
                     ))}
-                </select>
+                  </select>
+                  <ChevronDown className={`pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#0D5C48] transition-transform duration-200 ${otherFeeOpen ? "rotate-180" : "rotate-0"}`} />
+                </div>
               </label>
 
               <label className="block">
-                <span className="mb-2 block text-sm font-medium text-slate-700">Due date</span>
+                <span className="mb-2 block text-sm font-medium text-[#245C4F]">Discount</span>
+                <div className="relative">
+                  <select
+                    value={form.discountId}
+                    onMouseDown={() => setDiscountOpen((current) => !current)}
+                    onFocus={() => setDiscountOpen(true)}
+                    onBlur={() => closeSelectState(setDiscountOpen)}
+                    onChange={(event) => {
+                      const nextDiscount = options.discounts.find((item) => item.id === event.target.value);
+                      updateField("discountId", event.target.value);
+                      updateField("discountPercent", nextDiscount?.percent || "");
+                    }}
+                    className="w-full appearance-none rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 pr-11 text-sm text-[#063F32] outline-none transition focus:border-[#2D8A6A] focus:bg-white focus:ring-4 focus:ring-[#FFF5D6]"
+                  >
+                    <option value="">No discount</option>
+                    {options.discounts
+                      .filter((discount) => Number(discount.percent || 0) <= maxDiscountPercent)
+                      .map((discount) => (
+                        <option key={discount.id} value={discount.id}>
+                          {discount.label}
+                        </option>
+                      ))}
+                  </select>
+                  <ChevronDown className={`pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#0D5C48] transition-transform duration-200 ${discountOpen ? "rotate-180" : "rotate-0"}`} />
+                </div>
+              </label>
+
+              <label className="block">
+                <span className="mb-2 block text-sm font-medium text-[#245C4F]">Due date</span>
                 <input
                   type="date"
                   value={form.dueDate}
                   onChange={(event) => updateField("dueDate", event.target.value)}
-                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-950 outline-none transition focus:border-sky-400 focus:bg-white focus:ring-4 focus:ring-sky-100"
+                  className="w-full rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 text-sm text-[#063F32] outline-none transition focus:border-[#2D8A6A] focus:bg-white focus:ring-4 focus:ring-[#FFF5D6]"
                 />
               </label>
 
               <label className="block md:col-span-2">
-                <span className="mb-2 block text-sm font-medium text-slate-700">
+                <span className="mb-2 block text-sm font-medium text-[#245C4F]">
                   Payment method
                 </span>
-                <select
-                  value={form.paymentMethodId}
-                  onChange={(event) => {
-                    const method = options.paymentMethods.find((item) => item.id === event.target.value);
-                    updateField("paymentMethodId", event.target.value);
-                    updateField("paymentMethod", method?.method_key || method?.name || "");
-                    updateField("paymentInstructions", method?.instructions || "");
-                  }}
-                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-950 outline-none transition focus:border-sky-400 focus:bg-white focus:ring-4 focus:ring-sky-100"
-                >
-                  <option value="">Select payment method</option>
-                  {options.paymentMethods.map((method) => (
-                    <option key={method.id} value={method.id}>
-                      {method.name}
-                    </option>
-                  ))}
-                </select>
+                <div className="relative">
+                  <select
+                    value={form.paymentMethodId}
+                    onMouseDown={() => setPaymentMethodOpen((current) => !current)}
+                    onFocus={() => setPaymentMethodOpen(true)}
+                    onBlur={() => closeSelectState(setPaymentMethodOpen)}
+                    onChange={(event) => {
+                      const method = options.paymentMethods.find((item) => item.id === event.target.value);
+                      updateField("paymentMethodId", event.target.value);
+                      updateField("paymentMethod", method?.method_key || method?.name || "");
+                      updateField("paymentInstructions", method?.instructions || "");
+                    }}
+                    className="w-full appearance-none rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 pr-11 text-sm text-[#063F32] outline-none transition focus:border-[#2D8A6A] focus:bg-white focus:ring-4 focus:ring-[#FFF5D6]"
+                  >
+                    <option value="">Select payment method</option>
+                    {options.paymentMethods.map((method) => (
+                      <option key={method.id} value={method.id}>
+                        {method.name}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown className={`pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#0D5C48] transition-transform duration-200 ${paymentMethodOpen ? "rotate-180" : "rotate-0"}`} />
+                </div>
               </label>
 
               {selectedPaymentMethod ? (
-                <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-700 md:col-span-2">
-                  <p className="font-semibold text-slate-950">{selectedPaymentMethod.name}</p>
+                <div className="rounded-2xl border border-[#2D8A6A]/15 bg-white/90 px-4 py-4 text-sm text-[#245C4F] md:col-span-2">
+                  <p className="font-semibold text-[#063F32]">{selectedPaymentMethod.name}</p>
                   <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                    {selectedPaymentMethod.bank_name ? <p><span className="font-medium text-slate-900">Bank Name:</span> {selectedPaymentMethod.bank_name}</p> : null}
-                    {selectedPaymentMethod.account_title ? <p><span className="font-medium text-slate-900">Account Title:</span> {selectedPaymentMethod.account_title}</p> : null}
-                    {selectedPaymentMethod.account_number ? <p><span className="font-medium text-slate-900">Account Number:</span> {selectedPaymentMethod.account_number}</p> : null}
-                    {selectedPaymentMethod.iban ? <p><span className="font-medium text-slate-900">IBAN:</span> {selectedPaymentMethod.iban}</p> : null}
-                    {selectedPaymentMethod.branch_code ? <p><span className="font-medium text-slate-900">Branch Code:</span> {selectedPaymentMethod.branch_code}</p> : null}
-                    {selectedPaymentMethod.instructions ? <p className="sm:col-span-2"><span className="font-medium text-slate-900">Instructions:</span> {selectedPaymentMethod.instructions}</p> : null}
+                    {selectedPaymentMethod.bank_name ? <p><span className="font-medium text-[#063F32]">Bank Name:</span> {selectedPaymentMethod.bank_name}</p> : null}
+                    {selectedPaymentMethod.account_title ? <p><span className="font-medium text-[#063F32]">Account Title:</span> {selectedPaymentMethod.account_title}</p> : null}
+                    {selectedPaymentMethod.account_number ? <p><span className="font-medium text-[#063F32]">Account Number:</span> {selectedPaymentMethod.account_number}</p> : null}
+                    {selectedPaymentMethod.iban ? <p><span className="font-medium text-[#063F32]">IBAN:</span> {selectedPaymentMethod.iban}</p> : null}
+                    {selectedPaymentMethod.branch_code ? <p><span className="font-medium text-[#063F32]">Branch Code:</span> {selectedPaymentMethod.branch_code}</p> : null}
+                    {selectedPaymentMethod.instructions ? <p className="sm:col-span-2"><span className="font-medium text-[#063F32]">Instructions:</span> {selectedPaymentMethod.instructions}</p> : null}
                   </div>
                 </div>
               ) : null}
 
               {selectedLead ? (
-                <div className="rounded-2xl bg-slate-50 px-4 py-4 text-sm text-slate-600 md:col-span-2">
+                <div className="rounded-2xl border border-[#2D8A6A]/15 bg-[#FAF7F0] px-4 py-4 text-sm text-[#245C4F] md:col-span-2">
                   <div className="flex items-center justify-between gap-3">
-                    <p className="font-semibold text-slate-900">{selectedLead.student_name}</p>
+                    <p className="font-semibold text-[#063F32]">{selectedLead.student_name}</p>
                     {initialLeadId ? (
-                      <span className="rounded-full bg-slate-950 px-3 py-1 text-xs font-semibold text-white">
+                      <span className="rounded-full bg-[#0D5C48] px-3 py-1 text-xs font-semibold text-[#FAF7F0]">
                         Selected lead locked
                       </span>
                     ) : null}
@@ -463,21 +496,21 @@ export default function FeeVoucherForm({ leads, initialLeadId = "", showTrigger 
                   rows={4}
                   value={form.paymentInstructions}
                   onChange={(event) => updateField("paymentInstructions", event.target.value)}
-                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-950 outline-none transition focus:border-sky-400 focus:bg-white focus:ring-4 focus:ring-sky-100"
+                  className="w-full rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 text-sm text-[#063F32] outline-none transition focus:border-[#2D8A6A] focus:bg-white focus:ring-4 focus:ring-[#FFF5D6]"
                   placeholder="Provide account title, account number, branch details, and reference notes."
                 />
               </label>
 
-              <div className="grid gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-700 md:col-span-2 sm:grid-cols-3">
-                <p>Regular Fee: <span className="font-semibold text-slate-950">PKR {regularFeeAmount.toFixed(2)}</span></p>
-                <p>Other Fee: <span className="font-semibold text-slate-950">PKR {admissionFeeAmount.toFixed(2)}</span></p>
-                <p>Discount on Regular Fee: <span className="font-semibold text-slate-950">PKR {discountAmount.toFixed(2)}</span></p>
-                <p className="sm:col-span-3">Total Payable: <span className="font-semibold text-slate-950">PKR {totalAmount.toFixed(2)}</span></p>
+              <div className="grid gap-3 rounded-2xl border border-[#2D8A6A]/15 bg-white/90 px-4 py-4 text-sm text-[#245C4F] md:col-span-2 sm:grid-cols-3">
+                <p>Regular Fee: <span className="font-semibold text-[#063F32]">PKR {regularFeeAmount.toFixed(2)}</span></p>
+                <p>Other Fee: <span className="font-semibold text-[#063F32]">PKR {admissionFeeAmount.toFixed(2)}</span></p>
+                <p>Discount on Regular Fee: <span className="font-semibold text-[#063F32]">PKR {discountAmount.toFixed(2)}</span></p>
+                <p className="sm:col-span-3">Total Payable: <span className="font-semibold text-[#063F32]">PKR {totalAmount.toFixed(2)}</span></p>
               </div>
 
               {selectedLead ? (
-                <div className="rounded-2xl bg-slate-50 px-4 py-4 text-sm text-slate-600 md:col-span-2">
-                  <p className="font-semibold text-slate-900">{selectedLead.student_name}</p>
+                <div className="rounded-2xl border border-[#2D8A6A]/15 bg-[#FAF7F0] px-4 py-4 text-sm text-[#245C4F] md:col-span-2">
+                  <p className="font-semibold text-[#063F32]">{selectedLead.student_name}</p>
                   <p className="mt-1">
                     {selectedLead.parent_name || "Parent pending"} | {selectedLead.phone || selectedLead.email || "No contact"}
                   </p>
@@ -497,14 +530,14 @@ export default function FeeVoucherForm({ leads, initialLeadId = "", showTrigger 
                     setOpen(false);
                     onClose?.();
                   }}
-                  className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                  className="rounded-2xl border border-[#2D8A6A]/20 bg-white px-4 py-3 text-sm font-semibold text-[#063F32] transition hover:bg-[#F1EADC]"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={pending || loadingOptions}
-                  className="rounded-2xl bg-slate-950 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-70"
+                  className="rounded-2xl bg-[#0D5C48] px-4 py-3 text-sm font-semibold text-[#FAF7F0] transition hover:bg-[#063F32] disabled:cursor-not-allowed disabled:opacity-70"
                 >
                   {pending ? "Creating..." : "Create voucher"}
                 </button>
@@ -515,9 +548,9 @@ export default function FeeVoucherForm({ leads, initialLeadId = "", showTrigger 
       ) : null}
 
       {successEmail ? (
-        <div className="fixed inset-0 z-[60] flex items-start justify-center overflow-hidden bg-slate-950/50 px-4 pt-28 pb-10">
-          <div className="w-full max-w-2xl max-h-[calc(100vh-6.5rem)] overflow-y-auto rounded-[2rem] border border-white/70 bg-white p-6 shadow-[0_24px_80px_-36px_rgba(15,23,42,0.32)] sm:p-8">
-            <p className="text-sm font-semibold uppercase tracking-[0.24em] text-emerald-700">
+        <div className="fixed inset-0 z-[60] flex items-start justify-center overflow-hidden bg-[#063F32]/45 px-4 pt-28 pb-10">
+          <div className="w-full max-w-2xl max-h-[calc(100vh-6.5rem)] overflow-y-auto rounded-[2rem] border border-[#2D8A6A]/15 bg-[#FAF7F0] p-6 shadow-[0_24px_80px_-36px_rgba(13,59,46,0.24)] sm:p-8">
+            <p className="text-sm font-semibold uppercase tracking-[0.24em] text-[#C9A227]">
               Voucher Created Successfully
             </p>
             <div className="mt-4 space-y-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
