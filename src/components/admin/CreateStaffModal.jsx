@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { Eye, EyeOff } from "lucide-react";
 
 const INITIAL_FORM = {
   role: "coordinator",
@@ -17,12 +18,20 @@ export default function CreateStaffModal() {
   const [form, setForm] = useState(INITIAL_FORM);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
 
   function updateField(name, value) {
     setForm((current) => ({
       ...current,
       [name]: value,
     }));
+  }
+
+  function closeModal() {
+    setOpen(false);
+    setError("");
+    setShowPassword(false);
+    setForm(INITIAL_FORM);
   }
 
   async function handleSubmit(event) {
@@ -43,6 +52,7 @@ export default function CreateStaffModal() {
       }
 
       setForm(INITIAL_FORM);
+      setShowPassword(false);
       setOpen(false);
       router.refresh();
     } catch (submitError) {
@@ -63,7 +73,12 @@ export default function CreateStaffModal() {
     <>
       <button
         type="button"
-        onClick={() => setOpen(true)}
+        onClick={() => {
+          setForm(INITIAL_FORM);
+          setShowPassword(false);
+          setError("");
+          setOpen(true);
+        }}
         className="inline-flex items-center justify-center rounded-2xl bg-[#0D5C48] px-4 py-3 text-sm font-semibold text-[#FAF7F0] transition hover:bg-[#063F32]"
       >
         Create coordinator or teacher
@@ -84,10 +99,7 @@ export default function CreateStaffModal() {
 
               <button
                 type="button"
-                onClick={() => {
-                  setOpen(false);
-                  setError("");
-                }}
+                onClick={closeModal}
                 className="rounded-xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-3 py-2 text-sm font-semibold text-[#063F32] transition hover:bg-[#F1EADC]"
               >
                 Close
@@ -125,6 +137,7 @@ export default function CreateStaffModal() {
                   value={form.email}
                   onChange={(event) => updateField("email", event.target.value)}
                   className={inputClass}
+                  autoComplete="off"
                   placeholder="name@example.com"
                 />
               </label>
@@ -136,19 +149,31 @@ export default function CreateStaffModal() {
                   value={form.phone}
                   onChange={(event) => updateField("phone", event.target.value)}
                   className={inputClass}
+                  autoComplete="off"
                   placeholder="+92..."
                 />
               </label>
 
               <label className="block md:col-span-2">
                 <span className="mb-2 block text-sm font-medium text-[#245C4F]">Password</span>
-                <input
-                  type="password"
-                  value={form.password}
-                  onChange={(event) => updateField("password", event.target.value)}
-                  className={inputClass}
-                  placeholder="Minimum 8 characters"
-                />
+                <div className="relative">
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    value={form.password}
+                    onChange={(event) => updateField("password", event.target.value)}
+                    className={`${inputClass} pr-12`}
+                    autoComplete="new-password"
+                    placeholder="Minimum 8 characters"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((current) => !current)}
+                    className="absolute inset-y-0 right-0 z-10 flex items-center justify-center px-4 text-[#0D5C48] transition hover:text-[#063F32]"
+                    aria-label={showPassword ? "Hide password" : "Show password"}
+                  >
+                    {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                  </button>
+                </div>
               </label>
 
               {error ? (
@@ -160,7 +185,7 @@ export default function CreateStaffModal() {
               <div className="md:col-span-2 flex justify-end gap-3">
                 <button
                   type="button"
-                  onClick={() => setOpen(false)}
+                  onClick={closeModal}
                   className="rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 text-sm font-semibold text-[#063F32] transition hover:bg-[#F1EADC]"
                 >
                   Cancel

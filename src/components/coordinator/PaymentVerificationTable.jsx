@@ -262,7 +262,7 @@ export default function PaymentVerificationTable({ items, onRefresh }) {
             >
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                  <p className="text-lg font-semibold text-slate-950">{item.student_name}</p>
+                  <p className="text-lg font-semibold text-[#063F32]">{item.student_name}</p>
                   <p className="mt-1 text-sm text-slate-600">{item.voucher_no}</p>
                   {isMonthlyVoucher(item) ? (
                     <span className="mt-2 inline-flex rounded-full bg-sky-50 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-sky-700">
@@ -274,7 +274,7 @@ export default function PaymentVerificationTable({ items, onRefresh }) {
                   </p>
                 </div>
                 <span
-                  className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${STATUS_STYLES[normalizeStatus(item.status)] || "bg-slate-100 text-slate-700"
+                  className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${STATUS_STYLES[normalizeStatus(item.status)] || "bg-slate-100 text-[#245C4F]"
                     }`}
                 >
                   {formatStatus(normalizeStatus(item.status))}
@@ -291,7 +291,7 @@ export default function PaymentVerificationTable({ items, onRefresh }) {
                 <button
                   type="button"
                   onClick={() => openProofPreview(item)}
-                  className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
+                  className="rounded-xl border border-[#2D8A6A]/15 bg-[#FAF7F0] px-3 py-2 text-xs font-semibold text-[#245C4F] transition hover:bg-[#FAF7F0]"
                 >
                   View proof
                 </button>
@@ -329,30 +329,30 @@ export default function PaymentVerificationTable({ items, onRefresh }) {
       />
 
       {credentialsEmail ? (
-        <div className="fixed inset-0 z-[70] flex items-start justify-center overflow-hidden bg-slate-950/50 px-4 pt-28 pb-10">
-          <div className="w-full max-w-2xl max-h-[calc(100vh-6.5rem)] overflow-y-auto rounded-[2rem] border border-white/70 bg-white p-6 shadow-[0_24px_80px_-36px_rgba(15,23,42,0.32)] sm:p-8">
-            <p className="text-sm font-semibold uppercase tracking-[0.24em] text-emerald-700">
+        <div className="fixed inset-0 z-[70] flex items-start justify-center overflow-hidden bg-[#063F32]/45 px-4 pt-28 pb-10">
+          <div className="w-full max-w-2xl max-h-[calc(100vh-6.5rem)] overflow-y-auto rounded-[2rem] border border-[#2D8A6A]/15 bg-[#FAF7F0] p-6 shadow-[0_24px_80px_-36px_rgba(13,59,46,0.24)] sm:p-8">
+            <p className="text-sm font-semibold uppercase tracking-[0.24em] text-[#C9A227]">
               Payment Approved Successfully
             </p>
-            <div className="mt-4 space-y-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
-              <p><span className="font-semibold text-slate-950">Recipient Email:</span> {credentialsEmail.recipient_email || "—"}</p>
-              <p><span className="font-semibold text-slate-950">Subject:</span> {credentialsEmail.subject || "—"}</p>
-              <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3">
-                <p className="text-sm text-slate-700">
-                  <span className="font-semibold text-slate-950">Parent Phone:</span>{" "}
-                  {credentialsEmail.parent_phone || "—"}
+            <div className="mt-4 space-y-3 rounded-2xl border border-[#2D8A6A]/15 bg-white/85 p-4 text-sm text-[#245C4F]">
+              <p><span className="font-semibold text-[#063F32]">Recipient Email:</span> {credentialsEmail.recipient_email || "â€”"}</p>
+              <p><span className="font-semibold text-[#063F32]">Subject:</span> {credentialsEmail.subject || "â€”"}</p>
+              <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-[#2D8A6A]/15 bg-[#FAF7F0] px-4 py-3">
+                <p className="text-sm text-[#245C4F]">
+                  <span className="font-semibold text-[#063F32]">Parent Phone:</span>{" "}
+                  {credentialsEmail.parent_phone || "â€”"}
                 </p>
                 <button
                   type="button"
                   onClick={() => void copyParentPhone()}
-                  className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-100"
+                  className="rounded-full border border-[#2D8A6A]/20 bg-white px-3 py-1.5 text-xs font-semibold text-[#0D5C48] transition hover:bg-[#F1EADC]"
                 >
                   Copy Number
                 </button>
               </div>
               <div>
-                <p className="font-semibold text-slate-950">Credentials Email Content</p>
-                <pre className="mt-2 max-h-72 overflow-auto whitespace-pre-wrap rounded-2xl border border-slate-200 bg-white p-4 text-xs text-slate-700">
+                <p className="font-semibold text-[#063F32]">Credentials Email Content</p>
+                <pre className="mt-2 max-h-72 overflow-auto whitespace-pre-wrap rounded-2xl border border-[#2D8A6A]/15 bg-[#FAF7F0] p-4 text-xs text-[#245C4F]">
                   {credentialsEmail.body_text || ""}
                 </pre>
               </div>
@@ -361,7 +361,7 @@ export default function PaymentVerificationTable({ items, onRefresh }) {
               <button
                 type="button"
                 onClick={() => navigator.clipboard.writeText(credentialsEmail.body_text || "")}
-                className="rounded-2xl bg-slate-950 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800"
+                className="rounded-2xl bg-[#0D5C48] px-4 py-3 text-sm font-semibold text-[#FAF7F0] transition hover:bg-[#063F32]"
               >
                 Copy Message
               </button>
@@ -374,7 +374,7 @@ export default function PaymentVerificationTable({ items, onRefresh }) {
                     window.location.reload();
                   }
                 }}
-                className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                className="rounded-2xl border border-[#2D8A6A]/20 bg-white px-4 py-3 text-sm font-semibold text-[#0D5C48] transition hover:bg-[#FAF7F0]"
               >
                 Close
               </button>
@@ -434,3 +434,4 @@ export default function PaymentVerificationTable({ items, onRefresh }) {
     </>
   );
 }
+

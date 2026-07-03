@@ -295,7 +295,7 @@ export default function FeeVoucherForm({ leads, initialLeadId = "", showTrigger 
                   <div className="grid gap-0 sm:grid-cols-2 lg:grid-cols-4">
                     <div className="border-b border-r border-[#2D8A6A]/15 px-4 py-3">
                       <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#245C4F]">Student</p>
-                      <p className="mt-1 text-sm font-semibold text-[#063F32]">{selectedLead.student_name || "—"}</p>
+                      <p className="mt-1 text-sm font-semibold text-[#063F32]">{selectedLead.student_name || "â€”"}</p>
                     </div>
                     <div className="border-b border-[#2D8A6A]/15 px-4 py-3 sm:border-r">
                       <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#245C4F]">Parent</p>
@@ -303,7 +303,7 @@ export default function FeeVoucherForm({ leads, initialLeadId = "", showTrigger 
                     </div>
                     <div className="border-b border-r border-[#2D8A6A]/15 px-4 py-3 lg:border-b-0">
                       <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#245C4F]">Class</p>
-                      <p className="mt-1 text-sm font-semibold text-[#063F32]">{selectedLead.class_level || "—"}</p>
+                      <p className="mt-1 text-sm font-semibold text-[#063F32]">{selectedLead.class_level || "â€”"}</p>
                     </div>
                     <div className="px-4 py-3">
                       <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#245C4F]">Contact</p>
@@ -475,7 +475,7 @@ export default function FeeVoucherForm({ leads, initialLeadId = "", showTrigger 
                       </span>
                     ) : null}
                   </div>
-                  <p className="mt-1">Class: {selectedLead.class_level || "—"}</p>
+                  <p className="mt-1">Class: {selectedLead.class_level || "â€”"}</p>
                   {form.regularFeeApplied ? (
                     selectedRegularFee > 0 ? (
                       <p className="mt-1">Regular fee: PKR {selectedRegularFee.toFixed(2)}</p>
@@ -489,7 +489,7 @@ export default function FeeVoucherForm({ leads, initialLeadId = "", showTrigger 
               ) : null}
 
               <label className="block md:col-span-2">
-                <span className="mb-2 block text-sm font-medium text-slate-700">
+                <span className="mb-2 block text-sm font-medium text-[#245C4F]">
                   Payment instructions
                 </span>
                 <textarea
@@ -553,36 +553,36 @@ export default function FeeVoucherForm({ leads, initialLeadId = "", showTrigger 
             <p className="text-sm font-semibold uppercase tracking-[0.24em] text-[#C9A227]">
               Voucher Created Successfully
             </p>
-            <div className="mt-4 space-y-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
-              <p><span className="font-semibold text-slate-950">Recipient:</span> {successEmail.recipient_email || "—"}</p>
-              <p><span className="font-semibold text-slate-950">Subject:</span> {successEmail.subject || "—"}</p>
-              <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3">
-                <p className="text-sm text-slate-700">
-                  <span className="font-semibold text-slate-950">Parent Number:</span>{" "}
-                  {successEmail?.recipient_phone || selectedLead?.phone || selectedLead?.parent_phone || "—"}
+            <div className="mt-4 space-y-3 rounded-2xl border border-[#2D8A6A]/15 bg-white/85 p-4 text-sm text-[#245C4F]">
+              <p><span className="font-semibold text-[#063F32]">Recipient:</span> {successEmail.recipient_email || "â€”"}</p>
+              <p><span className="font-semibold text-[#063F32]">Subject:</span> {successEmail.subject || "â€”"}</p>
+              <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-[#2D8A6A]/15 bg-[#FAF7F0] px-4 py-3">
+                <p className="text-sm text-[#245C4F]">
+                  <span className="font-semibold text-[#063F32]">Parent Number:</span>{" "}
+                  {successEmail?.recipient_phone || selectedLead?.phone || selectedLead?.parent_phone || "â€”"}
                 </p>
                 <button
                   type="button"
                   onClick={() => void copyParentNumber()}
-                  className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-700 transition hover:bg-slate-100"
+                  className="rounded-full border border-[#2D8A6A]/20 bg-white px-3 py-1.5 text-xs font-semibold text-[#0D5C48] transition hover:bg-[#F1EADC]"
                 >
                   Copy Number
                 </button>
               </div>
               <div>
-                <p className="font-semibold text-slate-950">Email Body</p>
-                <pre className="mt-2 max-h-72 overflow-auto whitespace-pre-wrap rounded-2xl border border-slate-200 bg-white p-4 text-xs text-slate-700">
+                <p className="font-semibold text-[#063F32]">Email Body</p>
+                <pre className="mt-2 max-h-72 overflow-auto whitespace-pre-wrap rounded-2xl border border-[#2D8A6A]/15 bg-[#FAF7F0] p-4 text-xs text-[#245C4F]">
                   {successEmail.body_text || successEmail.body_html || ""}
                 </pre>
               </div>
               {successEmail.payment_submit_url ? (
-                <div className="rounded-2xl border border-sky-100 bg-sky-50 p-4 text-sm text-sky-900">
+                <div className="rounded-2xl border border-[#E4C766]/40 bg-[#FFF5D6] p-4 text-sm text-[#063F32]">
                   <p className="font-semibold">Payment submit link</p>
                   <a
                     href={successEmail.payment_submit_url}
                     target="_blank"
                     rel="noreferrer"
-                    className="mt-2 inline-flex break-all font-medium text-sky-700 underline-offset-4 hover:underline"
+                    className="mt-2 inline-flex break-all font-medium text-[#0D5C48] underline-offset-4 hover:underline"
                   >
                     {successEmail.payment_submit_url}
                   </a>
@@ -593,7 +593,7 @@ export default function FeeVoucherForm({ leads, initialLeadId = "", showTrigger 
               <button
                 type="button"
                 onClick={copyEmailBody}
-                className="rounded-2xl bg-slate-950 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800"
+                className="rounded-2xl bg-[#0D5C48] px-4 py-3 text-sm font-semibold text-[#FAF7F0] transition hover:bg-[#063F32]"
               >
                 Copy Message
               </button>
@@ -602,7 +602,7 @@ export default function FeeVoucherForm({ leads, initialLeadId = "", showTrigger 
                   href={successEmail.payment_submit_url}
                   target="_blank"
                   rel="noreferrer"
-                  className="rounded-2xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm font-semibold text-sky-700 transition hover:bg-sky-100"
+                  className="rounded-2xl border border-[#2D8A6A]/20 bg-white px-4 py-3 text-sm font-semibold text-[#0D5C48] transition hover:bg-[#FAF7F0]"
                 >
                   Open Payment Page
                 </a>
@@ -614,7 +614,7 @@ export default function FeeVoucherForm({ leads, initialLeadId = "", showTrigger 
                     setOpen(false);
                     onClose?.();
                   }}
-                  className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                  className="rounded-2xl border border-[#2D8A6A]/20 bg-white px-4 py-3 text-sm font-semibold text-[#0D5C48] transition hover:bg-[#FAF7F0]"
                 >
                   Close
               </button>

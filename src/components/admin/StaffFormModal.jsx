@@ -2,6 +2,7 @@
 
 import { AnimatePresence, motion } from "framer-motion";
 import { useState } from "react";
+import { ChevronDown, Eye, EyeOff } from "lucide-react";
 
 const ROLE_OPTIONS = [
   { label: "Coordinator", value: "coordinator" },
@@ -54,11 +55,25 @@ export default function StaffFormModal({
   const [form, setForm] = useState(getInitialState(record));
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [relationOpen, setRelationOpen] = useState(false);
+  const [roleOpen, setRoleOpen] = useState(false);
+  const [statusOpen, setStatusOpen] = useState(false);
   const isParentEdit = mode === "edit" && form.role === "parent";
   const isStudentEdit = mode === "edit" && form.role === "student";
 
   function updateField(name, value) {
     setForm((current) => ({ ...current, [name]: value }));
+  }
+
+  function handleClose() {
+    setShowPassword(false);
+    setRelationOpen(false);
+    setRoleOpen(false);
+    setStatusOpen(false);
+    setError("");
+    setForm(getInitialState(record));
+    onClose?.();
   }
 
   async function handleSubmit(event) {
@@ -107,6 +122,10 @@ export default function StaffFormModal({
       }
 
       onSuccess?.(data?.item);
+      setShowPassword(false);
+      setRelationOpen(false);
+      setRoleOpen(false);
+      setStatusOpen(false);
       onClose?.();
     } catch (submitError) {
       setError(
@@ -121,6 +140,8 @@ export default function StaffFormModal({
 
   const inputClass =
     "w-full rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 text-sm text-[#063F32] outline-none transition focus:border-[#2D8A6A] focus:bg-white focus:ring-4 focus:ring-[#65B891]/20";
+  const selectClass = `${inputClass} pr-12 appearance-none`;
+  const selectIconClass = "pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#0D5C48] transition-transform duration-200";
 
   return (
     <AnimatePresence>
@@ -145,7 +166,7 @@ export default function StaffFormModal({
 
               <button
                 type="button"
-                onClick={onClose}
+                onClick={handleClose}
                 className="rounded-xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-3 py-2 text-sm font-semibold text-[#063F32] transition hover:bg-[#F1EADC]"
               >
                 Close
@@ -196,18 +217,26 @@ export default function StaffFormModal({
                     <span className="mb-2 block text-sm font-medium text-[#245C4F]">
                       Relation
                     </span>
-                    <select
-                      value={form.relation}
-                      onChange={(event) => updateField("relation", event.target.value)}
-                      className={inputClass}
-                    >
-                      <option value="">Select relation</option>
-                      {PARENT_RELATION_OPTIONS.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
+                    <div className="relative">
+                      <select
+                        value={form.relation}
+                        onChange={(event) => updateField("relation", event.target.value)}
+                        className={selectClass}
+                        onFocus={() => setRelationOpen(true)}
+                        onBlur={() => window.setTimeout(() => setRelationOpen(false), 0)}
+                        onMouseDown={() => setRelationOpen((current) => !current)}
+                      >
+                        <option value="">Select relation</option>
+                        {PARENT_RELATION_OPTIONS.map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                      <ChevronDown
+                        className={`${selectIconClass} ${relationOpen ? "rotate-180" : "rotate-0"}`}
+                      />
+                    </div>
                   </label>
                 ) : null}
 
@@ -252,21 +281,29 @@ export default function StaffFormModal({
                 ) : null}
 
                 {!isParentEdit ? (
-                  <label className="block">
+              <label className="block">
                     <span className="mb-2 block text-sm font-medium text-[#245C4F]">
                       Role
                     </span>
-                    <select
-                      value={form.role}
-                      onChange={(event) => updateField("role", event.target.value)}
-                      className={inputClass}
-                    >
-                      {(mode === "edit" ? ALL_ROLE_OPTIONS : roleOptions).map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
+                    <div className="relative">
+                      <select
+                        value={form.role}
+                        onChange={(event) => updateField("role", event.target.value)}
+                        className={selectClass}
+                        onFocus={() => setRoleOpen(true)}
+                        onBlur={() => window.setTimeout(() => setRoleOpen(false), 0)}
+                        onMouseDown={() => setRoleOpen((current) => !current)}
+                      >
+                        {(mode === "edit" ? ALL_ROLE_OPTIONS : roleOptions).map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                      <ChevronDown
+                        className={`${selectIconClass} ${roleOpen ? "rotate-180" : "rotate-0"}`}
+                      />
+                    </div>
                   </label>
                 ) : null}
 
@@ -275,31 +312,50 @@ export default function StaffFormModal({
                     <span className="mb-2 block text-sm font-medium text-[#245C4F]">
                       Status
                     </span>
-                    <select
-                      value={form.status}
-                      onChange={(event) => updateField("status", event.target.value)}
-                      className={inputClass}
-                    >
-                      {STATUS_OPTIONS.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
+                    <div className="relative">
+                      <select
+                        value={form.status}
+                        onChange={(event) => updateField("status", event.target.value)}
+                        className={selectClass}
+                        onFocus={() => setStatusOpen(true)}
+                        onBlur={() => window.setTimeout(() => setStatusOpen(false), 0)}
+                        onMouseDown={() => setStatusOpen((current) => !current)}
+                      >
+                        {STATUS_OPTIONS.map((option) => (
+                          <option key={option.value} value={option.value}>
+                            {option.label}
+                          </option>
+                        ))}
+                      </select>
+                      <ChevronDown
+                        className={`${selectIconClass} ${statusOpen ? "rotate-180" : "rotate-0"}`}
+                      />
+                    </div>
                   </label>
                 ) : mode !== "edit" ? (
                   <label className="block">
                     <span className="mb-2 block text-sm font-medium text-[#245C4F]">
                       Temporary password
                     </span>
-                    <input
-                      type="password"
-                      value={form.password}
-                      onChange={(event) => updateField("password", event.target.value)}
-                      className={inputClass}
-                      minLength={8}
-                      required
-                    />
+                    <div className="relative">
+                      <input
+                        type={showPassword ? "text" : "password"}
+                        value={form.password}
+                        onChange={(event) => updateField("password", event.target.value)}
+                        className={`${inputClass} pr-12`}
+                        autoComplete="new-password"
+                        minLength={8}
+                        required
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword((current) => !current)}
+                        className="absolute inset-y-0 right-0 z-10 flex items-center justify-center px-4 text-[#0D5C48] transition hover:text-[#063F32]"
+                        aria-label={showPassword ? "Hide password" : "Show password"}
+                      >
+                        {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                      </button>
+                    </div>
                   </label>
                 ) : null}
               </div>
@@ -313,7 +369,7 @@ export default function StaffFormModal({
               <div className="flex flex-wrap justify-end gap-3">
                 <button
                   type="button"
-                  onClick={onClose}
+                  onClick={handleClose}
                   disabled={pending}
                   className="rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 text-sm font-semibold text-[#063F32] transition hover:bg-[#F1EADC] disabled:opacity-60"
                 >
