@@ -84,16 +84,16 @@ export default function CoordinatorLectureVerificationsPage() {
   }, [filter, load]);
 
   return (
-    <div className="min-h-screen space-y-6">
-      <section className="rounded-[2rem] border border-white/70 bg-[linear-gradient(135deg,rgba(255,255,255,0.92),rgba(241,248,255,0.92))] p-6 shadow-[0_24px_80px_-36px_rgba(15,23,42,0.25)] sm:p-8">
+    <div className="min-h-screen space-y-6 bg-[#FAF7F0] rounded-[2rem] px-4 py-6 sm:px-6 lg:px-8">
+      <section className="rounded-[2rem] border border-[#2D8A6A]/20 bg-[linear-gradient(135deg,rgba(13,59,46,0.96),rgba(13,92,72,0.95))] p-6 text-[#FAF7F0] shadow-[0_24px_80px_-36px_rgba(6,63,50,0.45)] sm:p-8">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <h1 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">Approve class delivery outcomes</h1>
-            <p className="mt-3 text-sm leading-7 text-slate-600 sm:text-base">
+            <h1 className="mt-3 text-3xl font-semibold tracking-tight text-[#FAF7F0] sm:text-4xl">Approve class delivery outcomes</h1>
+            <p className="mt-3 text-sm leading-7 text-[#FAF7F0] sm:text-base">
               Review teacher completion submissions, attendance signals, and final coordinator decisions.
             </p>
           </div>
-          <div className="rounded-2xl border border-slate-200 bg-white/80 px-4 py-3 text-sm text-slate-600">
+          <div className="rounded-2xl border border-[#E4C766]/30 bg-[#FAF7F0]/10 px-4 py-3 text-sm text-[#FAF7F0]">
             {state.items.length} verification records loaded
           </div>
         </div>
@@ -113,10 +113,10 @@ export default function CoordinatorLectureVerificationsPage() {
             key={item}
             type="button"
             onClick={() => setFilter(item)}
-            className={`rounded-full px-4 py-2 text-sm font-semibold ${
+          className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
               filter === item
-                ? "bg-slate-950 text-white"
-                : "bg-white text-slate-700 ring-1 ring-inset ring-slate-200"
+                ? "bg-[linear-gradient(135deg,#C9A227,#E4C766)] text-[#063F32]"
+                : "bg-white text-[#245C4F] ring-1 ring-inset ring-[#2D8A6A]/20"
             }`}
           >
             {item}

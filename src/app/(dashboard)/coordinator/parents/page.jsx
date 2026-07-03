@@ -38,24 +38,26 @@ export default function CoordinatorParentsPage() {
   }, [state.items, search]);
 
   return (
-    <div className="min-h-screen space-y-6">
-      <section className="rounded-[2rem] border border-white/70 bg-[linear-gradient(135deg,rgba(255,255,255,0.92),rgba(241,248,255,0.92))] p-6 shadow-[0_24px_80px_-36px_rgba(15,23,42,0.25)] sm:p-8">
-        <h1 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">Family registry</h1>
-        <p className="mt-3 text-sm leading-7 text-slate-600 sm:text-base">
+    <div className="min-h-screen space-y-6 rounded-[2rem] bg-[#FAF7F0] px-4 py-6 sm:px-6 lg:px-8">
+      <div className="mx-auto w-full max-w-7xl space-y-6">
+      <section className="rounded-[2rem] border border-[#2D8A6A]/20 bg-[linear-gradient(135deg,rgba(13,59,46,0.96),rgba(13,92,72,0.95))] p-6 text-[#FAF7F0] shadow-[0_24px_80px_-36px_rgba(6,63,50,0.45)] sm:p-8">
+        <h1 className="mt-3 text-3xl font-semibold tracking-tight text-[#FAF7F0] sm:text-4xl">Family registry</h1>
+        <p className="mt-3 text-sm leading-7 text-[#FAF7F0] sm:text-base">
           Manage parent contact records and linked students.
         </p>
-        <div className="mt-6">
-          <label className="space-y-2">
-            <span className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">Search parent name or email</span>
-            <input
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="Search by parent name or email"
-              className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-sky-400 focus:ring-4 focus:ring-sky-100"
-            />
-          </label>
-        </div>
       </section>
+
+      <div className="rounded-[1.5rem] border border-[#2D8A6A]/15 bg-white/90 p-4 shadow-[0_20px_70px_-36px_rgba(6,63,50,0.12)]">
+        <label className="space-y-2">
+          <span className="text-xs font-semibold uppercase tracking-[0.2em] text-[#245C4F]">Search parent name or email</span>
+          <input
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Search by parent name or email"
+            className="w-full rounded-2xl border border-[#2D8A6A]/25 bg-[#FAF7F0] px-4 py-3 text-sm text-[#063F32] outline-none transition focus:border-[#2D8A6A] focus:ring-4 focus:ring-[#C9A227]/20"
+          />
+        </label>
+      </div>
 
       {state.error ? <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">{state.error}</div> : null}
       {state.loading ? <div className="rounded-2xl bg-white p-5 text-sm text-slate-500">Loading parents...</div> : null}
@@ -66,6 +68,7 @@ export default function CoordinatorParentsPage() {
         renderItems={(visibleItems) => <ParentTable items={visibleItems} onRefresh={load} />}
         emptyMessage="No parent records available."
       />
+      </div>
     </div>
   );
 }

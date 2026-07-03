@@ -13,10 +13,10 @@ function PaginationControls({ page, pageSize, totalItems, onPageChange }) {
   );
 
   return (
-    <div className="flex flex-col gap-3 border-t border-slate-200 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
-      <p className="text-sm text-slate-600">
-        Showing <span className="font-semibold text-slate-950">{start}-{end}</span> of{" "}
-        <span className="font-semibold text-slate-950">{totalItems}</span>
+    <div className="flex flex-col gap-3 border-t border-[#2D8A6A]/12 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
+      <p className="text-sm text-[#245C4F]">
+        Showing <span className="font-semibold text-[#063F32]">{start}-{end}</span> of{" "}
+        <span className="font-semibold text-[#063F32]">{totalItems}</span>
       </p>
 
       <div className="flex flex-wrap items-center gap-2">
@@ -24,7 +24,7 @@ function PaginationControls({ page, pageSize, totalItems, onPageChange }) {
           type="button"
           onClick={() => onPageChange(currentPage - 1)}
           disabled={currentPage <= 1}
-          className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
+          className="rounded-full border border-[#2D8A6A]/20 bg-white px-4 py-2 text-sm font-semibold text-[#063F32] transition hover:bg-[#FAF7F0] disabled:cursor-not-allowed disabled:opacity-50"
         >
           Previous
         </button>
@@ -36,8 +36,8 @@ function PaginationControls({ page, pageSize, totalItems, onPageChange }) {
             onClick={() => onPageChange(number)}
             className={`min-w-10 rounded-full px-4 py-2 text-sm font-semibold transition ${
               number === currentPage
-                ? "bg-slate-950 text-white"
-                : "border border-slate-200 bg-white text-slate-700 hover:bg-slate-100"
+                ? "bg-[linear-gradient(135deg,#C9A227,#E4C766)] text-[#063F32]"
+                : "border border-[#2D8A6A]/20 bg-white text-[#063F32] hover:bg-[#FAF7F0]"
             }`}
           >
             {number}
@@ -48,7 +48,7 @@ function PaginationControls({ page, pageSize, totalItems, onPageChange }) {
           type="button"
           onClick={() => onPageChange(currentPage + 1)}
           disabled={currentPage >= totalPages}
-          className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50"
+          className="rounded-full border border-[#2D8A6A]/20 bg-white px-4 py-2 text-sm font-semibold text-[#063F32] transition hover:bg-[#FAF7F0] disabled:cursor-not-allowed disabled:opacity-50"
         >
           Next
         </button>
@@ -83,14 +83,14 @@ export default function ShowMoreSection({
   return (
     <section className={`space-y-4 ${wrapperClassName}`}>
       {(title || description) && (
-        <div className="rounded-[1.75rem] border border-white/70 bg-white/90 p-5 shadow-[0_20px_70px_-36px_rgba(15,23,42,0.25)]">
+        <div className="rounded-[1.75rem] border border-[#2D8A6A]/15 bg-white/90 p-5 shadow-[0_20px_70px_-36px_rgba(6,63,50,0.18)]">
           {title ? (
-            <p className="text-sm font-semibold uppercase tracking-[0.22em] text-sky-700">
+            <p className="text-sm font-semibold uppercase tracking-[0.22em] text-[#0D5C48]">
               {title}
             </p>
           ) : null}
           {description ? (
-            <p className="mt-2 text-sm leading-7 text-slate-600">{description}</p>
+            <p className="mt-2 text-sm leading-7 text-[#245C4F]">{description}</p>
           ) : null}
         </div>
       )}
@@ -108,7 +108,7 @@ export default function ShowMoreSection({
           ) : null}
         </>
       ) : (
-        <section className="rounded-[1.75rem] border border-dashed border-slate-300 bg-white/85 p-10 text-center text-sm text-slate-500 shadow-[0_18px_60px_-36px_rgba(15,23,42,0.18)]">
+        <section className="rounded-[1.75rem] border border-dashed border-[#2D8A6A]/25 bg-[#FAF7F0]/80 p-10 text-center text-sm text-[#245C4F] shadow-[0_18px_60px_-36px_rgba(6,63,50,0.16)]">
           {emptyMessage}
         </section>
       )}

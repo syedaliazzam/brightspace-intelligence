@@ -53,10 +53,11 @@ export default function CoordinatorTeacherAssignmentsPage() {
   }, [load]);
 
   return (
-    <div className="space-y-6">
-      <section className="rounded-[2rem] border border-white/70 bg-[linear-gradient(135deg,rgba(255,255,255,0.92),rgba(241,248,255,0.92))] p-6 shadow-[0_24px_80px_-36px_rgba(15,23,42,0.25)] sm:p-8">
-        <h1 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">Class and subject assignments</h1>
-        <p className="mt-3 text-sm leading-7 text-slate-600 sm:text-base">
+    <div className="min-h-screen space-y-6 rounded-[2rem] bg-[#FAF7F0] px-4 py-6 sm:px-6 lg:px-8">
+      <div className="mx-auto w-full max-w-7xl space-y-6">
+      <section className="rounded-[2rem] border border-[#2D8A6A]/20 bg-[linear-gradient(135deg,rgba(13,59,46,0.96),rgba(13,92,72,0.95))] p-6 text-[#FAF7F0] shadow-[0_24px_80px_-36px_rgba(6,63,50,0.45)] sm:p-8">
+        <h1 className="mt-3 text-3xl font-semibold tracking-tight text-[#FAF7F0] sm:text-4xl">Class and subject assignments</h1>
+        <p className="mt-3 text-sm leading-7 text-[#FAF7F0] sm:text-base">
           Assign teachers to class subjects and manage active assignments.
         </p>
       </section>
@@ -71,6 +72,7 @@ export default function CoordinatorTeacherAssignmentsPage() {
         renderItems={(visibleItems) => <TeacherAssignmentTable items={visibleItems} onRefresh={load} />}
         emptyMessage="No teacher assignments available."
       />
+      </div>
     </div>
   );
 }

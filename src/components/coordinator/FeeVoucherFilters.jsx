@@ -62,7 +62,7 @@ export default function FeeVoucherFilters({ initialSearch, initialStatus = "", o
   }
 
   function closeSelectState(setter) {
-    window.setTimeout(() => setter(false), 0);
+    setter(false);
   }
 
   return (
@@ -94,9 +94,8 @@ export default function FeeVoucherFilters({ initialSearch, initialStatus = "", o
             <div className="relative">
               <select
                 value={status}
-                onMouseDown={() => setStatusOpen((current) => !current)}
                 onFocus={() => setStatusOpen(true)}
-                onBlur={() => closeSelectState(setStatusOpen)}
+                onBlur={() => setStatusOpen(false)}
                 onChange={(event) => {
                   const nextStatus = event.target.value;
                   setStatus(nextStatus);

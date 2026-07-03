@@ -148,7 +148,7 @@ export default function PaymentVerificationTable({ items, onRefresh }) {
 
   if (!items.length) {
     return (
-      <section className="rounded-[1.75rem] border border-dashed border-slate-300 bg-white/85 p-10 text-center text-sm text-slate-500 shadow-[0_18px_60px_-36px_rgba(15,23,42,0.18)]">
+      <section className="rounded-[1.75rem] border border-dashed border-[#2D8A6A]/30 bg-[#FAF7F0]/80 p-10 text-center text-sm text-[#245C4F] shadow-[0_18px_60px_-36px_rgba(6,63,50,0.16)]">
         No payment submissions match the current filter.
       </section>
     );
@@ -157,11 +157,11 @@ export default function PaymentVerificationTable({ items, onRefresh }) {
   return (
     <>
       <section className="space-y-4">
-        <div className="hidden overflow-hidden rounded-[1.75rem] border border-white/70 bg-white/90 shadow-[0_20px_70px_-36px_rgba(15,23,42,0.25)] lg:block">
+        <div className="hidden overflow-hidden rounded-[1.75rem] border border-[#2D8A6A]/20 bg-white/90 shadow-[0_20px_70px_-36px_rgba(6,63,50,0.18)] lg:block">
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-slate-200">
-              <thead className="bg-slate-50/80">
-                <tr className="text-left text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+            <table className="min-w-full divide-y divide-[#2D8A6A]/10">
+              <thead className="bg-[#FAF7F0]">
+                <tr className="text-left text-xs font-semibold uppercase tracking-[0.18em] text-[#245C4F]">
                   <th className="px-6 py-4">Student</th>
                   <th className="px-6 py-4">Voucher</th>
                   <th className="px-6 py-4">Submitted amount</th>
@@ -170,7 +170,7 @@ export default function PaymentVerificationTable({ items, onRefresh }) {
                   <th className="px-6 py-4">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-[#2D8A6A]/10">
                 {items.map((item, index) => (
                   <motion.tr
                     key={item.id}
@@ -179,35 +179,35 @@ export default function PaymentVerificationTable({ items, onRefresh }) {
                     transition={{ duration: 0.18, delay: index * 0.02 }}
                   >
                     <td className="px-6 py-5">
-                      <p className="font-semibold text-slate-950">{item.student_name}</p>
-                      <p className="mt-1 text-sm text-slate-500">
+                      <p className="font-semibold text-[#063F32]">{item.student_name}</p>
+                      <p className="mt-1 text-sm text-[#245C4F]">
                         {item.parent_name || "Parent pending"}
                       </p>
                     </td>
                     <td className="px-6 py-5">
-                      <p className="font-semibold text-slate-950">{item.voucher_no}</p>
-                      <p className="mt-1 text-sm text-slate-500">
+                      <p className="font-semibold text-[#063F32]">{item.voucher_no}</p>
+                      <p className="mt-1 text-sm text-[#245C4F]">
                         Voucher amount: PKR {item.voucher_amount}
                       </p>
                       {isMonthlyVoucher(item) ? (
-                        <span className="mt-2 inline-flex rounded-full bg-sky-50 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-sky-700">
+                        <span className="mt-2 inline-flex rounded-full bg-[#FFF5D6] px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#8A6B00]">
                           Monthly
                         </span>
                       ) : null}
                     </td>
                     <td className="px-6 py-5">
-                      <p className="font-semibold text-slate-950">PKR {item.paid_amount}</p>
-                      <p className="mt-1 text-sm text-slate-500">{formatDate(item.paid_at)}</p>
+                      <p className="font-semibold text-[#063F32]">PKR {item.paid_amount}</p>
+                      <p className="mt-1 text-sm text-[#245C4F]">{formatDate(item.paid_at)}</p>
                     </td>
                     <td className="px-6 py-5">
-                      <p className="font-semibold text-slate-950">{item.transaction_id}</p>
-                      <p className="mt-1 text-sm text-slate-500">
+                      <p className="font-semibold text-[#063F32]">{item.transaction_id}</p>
+                      <p className="mt-1 text-sm text-[#245C4F]">
                         {item.phone || item.email || "No contact"}
                       </p>
                     </td>
                     <td className="px-6 py-5">
                       <span
-                        className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${STATUS_STYLES[normalizeStatus(item.status)] || "bg-slate-100 text-slate-700"
+                        className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${STATUS_STYLES[normalizeStatus(item.status)] || "bg-[#F1EADC] text-[#245C4F]"
                           }`}
                       >
                         {formatStatus(normalizeStatus(item.status))}
@@ -218,7 +218,7 @@ export default function PaymentVerificationTable({ items, onRefresh }) {
                         <button
                           type="button"
                           onClick={() => openProofPreview(item)}
-                          className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
+                          className="rounded-xl border border-[#2D8A6A]/20 bg-white px-3 py-2 text-xs font-semibold text-[#063F32] transition hover:bg-[#FAF7F0]"
                         >
                           View proof
                         </button>
@@ -228,7 +228,7 @@ export default function PaymentVerificationTable({ items, onRefresh }) {
                               type="button"
                               disabled={pendingId === `${item.id}:approve`}
                               onClick={() => verifyPayment(item.id, "approve")}
-                              className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-100 disabled:opacity-60"
+                              className="rounded-xl border border-[#2D8A6A]/20 bg-[#EAF6EF] px-3 py-2 text-xs font-semibold text-[#0D5C48] transition hover:bg-[#DFF1E7] disabled:opacity-60"
                             >
                               Approve payment
                             </button>
@@ -384,21 +384,21 @@ export default function PaymentVerificationTable({ items, onRefresh }) {
       ) : null}
 
       {rejectingItem ? (
-        <div className="fixed inset-0 z-[70] flex items-start justify-center overflow-hidden bg-slate-950/50 px-4 pt-28 pb-10">
-          <div className="w-full max-w-2xl max-h-[calc(100vh-6.5rem)] overflow-y-auto rounded-[2rem] border border-white/70 bg-white p-6 shadow-[0_24px_80px_-36px_rgba(15,23,42,0.32)] sm:p-8">
+        <div className="fixed inset-0 z-[70] flex items-start justify-center overflow-hidden bg-[#063F32]/45 px-4 pt-28 pb-10 backdrop-blur-sm">
+          <div className="w-full max-w-2xl max-h-[calc(100vh-6.5rem)] overflow-y-auto rounded-[2rem] border border-[#2D8A6A]/20 bg-[#FAF7F0] p-6 shadow-[0_24px_80px_-36px_rgba(6,63,50,0.24)] sm:p-8">
             <p className="text-sm font-semibold uppercase tracking-[0.24em] text-rose-700">Reject Payment</p>
-            <p className="mt-2 text-sm text-slate-600">
-              Enter the rejection reason for <span className="font-semibold text-slate-950">{rejectingItem.student_name || "this payment"}</span>.
+            <p className="mt-2 text-sm text-[#245C4F]">
+              Enter the rejection reason for <span className="font-semibold text-[#063F32]">{rejectingItem.student_name || "this payment"}</span>.
             </p>
 
             <form onSubmit={submitRejection} className="mt-5 space-y-4">
               <label className="space-y-2 block">
-                <span className="text-sm font-medium text-slate-700">Reason</span>
+                <span className="text-sm font-medium text-[#245C4F]">Reason</span>
                 <textarea
                   value={rejectionReason}
                   onChange={(event) => setRejectionReason(event.target.value)}
                   rows={5}
-                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm outline-none transition focus:border-rose-400 focus:ring-4 focus:ring-rose-100"
+                  className="w-full rounded-2xl border border-[#2D8A6A]/20 bg-white px-4 py-3 text-sm text-[#063F32] outline-none transition focus:border-[#2D8A6A] focus:ring-4 focus:ring-[#C9A227]/20"
                   placeholder="Enter reason for rejection"
                 />
               </label>
@@ -415,7 +415,7 @@ export default function PaymentVerificationTable({ items, onRefresh }) {
                       else router.refresh();
                     });
                   }}
-                  className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                  className="rounded-2xl border border-[#2D8A6A]/20 bg-white px-4 py-3 text-sm font-semibold text-[#063F32] transition hover:bg-[#FAF7F0]"
                 >
                   Cancel
                 </button>

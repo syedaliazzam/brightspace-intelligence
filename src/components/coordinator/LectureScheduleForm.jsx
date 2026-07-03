@@ -1,5 +1,6 @@
 "use client";
 
+import { ChevronDown } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 export default function LectureScheduleForm({ options, onSuccess }) {
@@ -26,6 +27,9 @@ export default function LectureScheduleForm({ options, onSuccess }) {
   const [teachersLoading, setTeachersLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const assignmentLookupRef = useRef(0);
+  const [classOpen, setClassOpen] = useState(false);
+  const [subjectOpen, setSubjectOpen] = useState(false);
+  const [teacherOpen, setTeacherOpen] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -167,6 +171,12 @@ export default function LectureScheduleForm({ options, onSuccess }) {
     };
   }, [form.courseId, form.subjectId]);
 
+  function closeSelectState() {
+    setClassOpen(false);
+    setSubjectOpen(false);
+    setTeacherOpen(false);
+  }
+
   function toggleStudent(studentId) {
     setForm((current) => ({
       ...current,
@@ -279,62 +289,78 @@ export default function LectureScheduleForm({ options, onSuccess }) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="grid gap-3 rounded-[1.75rem] border border-white/70 bg-white/90 p-5 shadow-[0_20px_70px_-36px_rgba(15,23,42,0.25)] lg:grid-cols-2">
-      <select value={form.courseId} onChange={(event) => setForm((current) => ({ ...current, courseId: event.target.value, subjectId: "", teacherId: "" }))} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm">
-        <option value="">Select class</option>
-        {classes.map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}
-      </select>
+    <form onSubmit={handleSubmit} className="grid gap-3 rounded-[1.75rem] border border-[#2D8A6A]/15 bg-white/90 p-5 shadow-[0_20px_70px_-36px_rgba(6,63,50,0.18)] lg:grid-cols-2">
+      <div className="relative">
+        <select
+          value={form.courseId}
+          onChange={(event) => setForm((current) => ({ ...current, courseId: event.target.value, subjectId: "", teacherId: "" }))}
+          onMouseDown={() => setClassOpen((current) => !current)}
+          onFocus={() => setClassOpen(true)}
+          onBlur={closeSelectState}
+          className="w-full appearance-none rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 pr-11 text-sm text-[#063F32] outline-none transition focus:border-[#2D8A6A] focus:ring-4 focus:ring-[#C9A227]/20"
+        >
+          <option value="">Select class</option>
+          {classes.map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}
+        </select>
+        <ChevronDown aria-hidden="true" className={`pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#0D5C48] transition-transform duration-200 ${classOpen ? "rotate-180" : "rotate-0"}`} />
+      </div>
 
-      <select value={form.subjectId} onChange={(event) => setForm((current) => ({ ...current, subjectId: event.target.value, teacherId: "" }))} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm">
-        <option value="">{loadingOptions ? "Loading subjects..." : form.courseId ? "Select class subject" : "Select class first"}</option>
-        {subjects.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
-      </select>
+      <div className="relative">
+        <select
+          value={form.subjectId}
+          onChange={(event) => setForm((current) => ({ ...current, subjectId: event.target.value, teacherId: "" }))}
+          onMouseDown={() => setSubjectOpen((current) => !current)}
+          onFocus={() => setSubjectOpen(true)}
+          onBlur={closeSelectState}
+          className="w-full appearance-none rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 pr-11 text-sm text-[#063F32] outline-none transition focus:border-[#2D8A6A] focus:ring-4 focus:ring-[#C9A227]/20"
+        >
+          <option value="">{loadingOptions ? "Loading subjects..." : form.courseId ? "Select class subject" : "Select class first"}</option>
+          {subjects.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+        </select>
+        <ChevronDown aria-hidden="true" className={`pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#0D5C48] transition-transform duration-200 ${subjectOpen ? "rotate-180" : "rotate-0"}`} />
+      </div>
 
-      <input
-        type="text"
-        readOnly
-        value={teachers.length === 1 ? teachers[0].teacher_name : teacherNotice || ""}
-        placeholder={teachersLoading ? "Loading assigned teacher..." : "Assigned teacher appears here"}
-        className="rounded-2xl border border-slate-200 bg-slate-100 px-4 py-3 text-sm text-slate-700"
-      />
+      <div className="rounded-2xl border border-[#2D8A6A]/15 bg-[#FAF7F0] px-4 py-3 text-sm text-[#245C4F]">
+        {teachers.length === 1 ? teachers[0].teacher_name : teacherNotice || (teachersLoading ? "Loading assigned teacher..." : "Assigned teacher appears here")}
+      </div>
 
-      {teacherNotice ? <p className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">{teacherNotice}</p> : null}
+      {teacherNotice ? <p className="rounded-2xl border border-[#2D8A6A]/15 bg-[#FAF7F0] px-4 py-3 text-sm text-[#245C4F]">{teacherNotice}</p> : null}
 
-      <input value={form.title} onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))} placeholder="Lecture title" className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm" />
+      <input value={form.title} onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))} placeholder="Lecture title" className="rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 text-sm text-[#063F32] outline-none focus:border-[#2D8A6A] focus:ring-4 focus:ring-[#C9A227]/20" />
       <input
         value={form.googleMeetLink}
         onChange={(event) => setForm((current) => ({ ...current, googleMeetLink: event.target.value }))}
         placeholder="Google Meet Link"
-        className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm lg:col-span-2"
+        className="rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 text-sm text-[#063F32] outline-none lg:col-span-2 focus:border-[#2D8A6A] focus:ring-4 focus:ring-[#C9A227]/20"
       />
 
-      <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4 lg:col-span-2">
-        <p className="text-sm text-slate-500">
+      <div className="rounded-2xl border border-[#2D8A6A]/15 bg-[#FAF7F0] p-4 lg:col-span-2">
+        <p className="text-sm text-[#245C4F]">
           Lecture will be scheduled for all active students enrolled in this class. New active students added later will also be included when the lecture is created.
         </p>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2 lg:col-span-2">
         <div>
-          <label className="block text-sm font-semibold text-slate-700">Start date</label>
-          <input type="date" value={form.startDate} onChange={(event) => setForm((current) => ({ ...current, startDate: event.target.value }))} className="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm" />
+          <label className="block text-sm font-semibold text-[#245C4F]">Start date</label>
+          <input type="date" value={form.startDate} onChange={(event) => setForm((current) => ({ ...current, startDate: event.target.value }))} className="mt-2 w-full rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 text-sm text-[#063F32] outline-none focus:border-[#2D8A6A] focus:ring-4 focus:ring-[#C9A227]/20" />
         </div>
         <div>
-          <label className="block text-sm font-semibold text-slate-700">End date</label>
-          <input type="date" value={form.endDate} onChange={(event) => setForm((current) => ({ ...current, endDate: event.target.value }))} className="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm" />
+          <label className="block text-sm font-semibold text-[#245C4F]">End date</label>
+          <input type="date" value={form.endDate} onChange={(event) => setForm((current) => ({ ...current, endDate: event.target.value }))} className="mt-2 w-full rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 text-sm text-[#063F32] outline-none focus:border-[#2D8A6A] focus:ring-4 focus:ring-[#C9A227]/20" />
         </div>
         <div>
-          <label className="block text-sm font-semibold text-slate-700">Start time</label>
-          <input type="time" value={form.startTime} onChange={(event) => setForm((current) => ({ ...current, startTime: event.target.value }))} className="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm" />
+          <label className="block text-sm font-semibold text-[#245C4F]">Start time</label>
+          <input type="time" value={form.startTime} onChange={(event) => setForm((current) => ({ ...current, startTime: event.target.value }))} className="mt-2 w-full rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 text-sm text-[#063F32] outline-none focus:border-[#2D8A6A] focus:ring-4 focus:ring-[#C9A227]/20" />
         </div>
         <div>
-          <label className="block text-sm font-semibold text-slate-700">End time</label>
-          <input type="time" value={form.endTime} onChange={(event) => setForm((current) => ({ ...current, endTime: event.target.value }))} className="mt-2 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm" />
+          <label className="block text-sm font-semibold text-[#245C4F]">End time</label>
+          <input type="time" value={form.endTime} onChange={(event) => setForm((current) => ({ ...current, endTime: event.target.value }))} className="mt-2 w-full rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 text-sm text-[#063F32] outline-none focus:border-[#2D8A6A] focus:ring-4 focus:ring-[#C9A227]/20" />
         </div>
       </div>
 
       <div className="lg:col-span-2">
-        <p className="mb-2 text-sm font-semibold text-slate-700">Lecture days</p>
+        <p className="mb-2 text-sm font-semibold text-[#245C4F]">Lecture days</p>
         <div className="grid gap-2 grid-cols-3 lg:grid-cols-7">
           {[
             { key: "sun", label: "Sunday" },
@@ -345,7 +371,7 @@ export default function LectureScheduleForm({ options, onSuccess }) {
             { key: "fri", label: "Friday" },
             { key: "sat", label: "Saturday" },
           ].map((weekday) => (
-            <label key={weekday.key} className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
+            <label key={weekday.key} className="inline-flex items-center gap-2 rounded-2xl border border-[#2D8A6A]/15 bg-white px-4 py-3 text-sm text-[#063F32]">
               <input
                 type="checkbox"
                 checked={form.days.includes(weekday.key)}
@@ -362,9 +388,9 @@ export default function LectureScheduleForm({ options, onSuccess }) {
         </div>
       </div>
 
-      <textarea value={form.description} onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))} placeholder="Coordinator notes or agenda" className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm lg:col-span-2" />
+      <textarea value={form.description} onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))} placeholder="Coordinator notes or agenda" className="rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 text-sm text-[#063F32] outline-none lg:col-span-2 focus:border-[#2D8A6A] focus:ring-4 focus:ring-[#C9A227]/20" />
 
-      <button type="submit" disabled={submitting} className="rounded-2xl bg-slate-950 px-5 py-3 text-sm font-semibold text-white lg:col-span-2">
+      <button type="submit" disabled={submitting} className="rounded-2xl bg-[#0D5C48] px-5 py-3 text-sm font-semibold text-[#FAF7F0] transition hover:bg-[#063F32] lg:col-span-2">
         {submitting ? "Saving..." : "Schedule for all active students"}
       </button>
     </form>

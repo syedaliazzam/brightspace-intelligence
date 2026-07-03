@@ -41,19 +41,19 @@ export default function LectureVerificationTable({ items = [], onRefresh }) {
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-4">
       {items.length ? (
         items.map((item) => (
-          <article key={item.id} className="rounded-[1.75rem] border border-white/70 bg-white/90 p-5 shadow-[0_20px_70px_-36px_rgba(15,23,42,0.25)]">
+          <article key={item.id} className="rounded-[1.75rem] border border-[#2D8A6A]/15 bg-white/90 p-5 shadow-[0_20px_70px_-36px_rgba(6,63,50,0.18)]">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
               <div>
-                <p className="text-lg font-semibold text-slate-950">{item.title}</p>
-                <p className="mt-1 text-sm text-slate-500">
+                <p className="text-lg font-semibold text-[#063F32]">{item.title}</p>
+                <p className="mt-1 text-sm text-[#245C4F]">
                   Class roster: {item.course_title || item.class_level || "Class"} · {item.subject_name} · {item.teacher_name}
                 </p>
-                <p className="mt-1 text-sm text-slate-500">{formatDateTimeRange(item.scheduled_start, item.scheduled_end)}</p>
-                <p className="mt-2 text-xs font-semibold uppercase tracking-[0.18em] text-sky-700">{item.display_status || getLectureDisplayStatus(item)}</p>
+                <p className="mt-1 text-sm text-[#245C4F]">{formatDateTimeRange(item.scheduled_start, item.scheduled_end)}</p>
+                <p className="mt-2 text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]">{item.display_status || getLectureDisplayStatus(item)}</p>
               </div>
 
               <div className="flex flex-wrap gap-2">
-                <button type="button" onClick={() => syncMeetAttendance(item.id).catch((error) => window.alert(error.message))} className="rounded-xl border border-sky-200 bg-sky-50 px-3 py-2 text-xs font-semibold text-sky-700">
+                <button type="button" onClick={() => syncMeetAttendance(item.id).catch((error) => window.alert(error.message))} className="rounded-xl border border-[#2D8A6A]/20 bg-[#EAF6EF] px-3 py-2 text-xs font-semibold text-[#0D5C48]">
                   Sync Meet Attendance
                 </button>
                 {['completed_by_teacher', 'live', 'scheduled', 'upcoming'].includes(String(item.display_status || item.status || '').toLowerCase()) ? (
@@ -67,7 +67,7 @@ export default function LectureVerificationTable({ items = [], onRefresh }) {
                         if (!item.summary && !item.topic_covered && !manualConfirm) return;
                         updateVerification(item.id, { action: "approve", manualConfirm }).catch((error) => window.alert(error.message));
                       }}
-                      className="rounded-xl bg-slate-950 px-3 py-2 text-xs font-semibold text-white"
+                      className="rounded-xl bg-[#0D5C48] px-3 py-2 text-xs font-semibold text-[#FAF7F0]"
                     >
                       Approve
                     </button>
@@ -78,11 +78,11 @@ export default function LectureVerificationTable({ items = [], onRefresh }) {
                         if (remarks === null) return;
                         updateVerification(item.id, { action: "reject", remarks }).catch((error) => window.alert(error.message));
                       }}
-                      className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700"
+                      className="rounded-xl border border-[#2D8A6A]/20 bg-white px-3 py-2 text-xs font-semibold text-[#063F32]"
                     >
                       Reject
                     </button>
-                    <button type="button" onClick={() => updateVerification(item.id, { action: "mark_missed" }).catch((error) => window.alert(error.message))} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700">
+                    <button type="button" onClick={() => updateVerification(item.id, { action: "mark_missed" }).catch((error) => window.alert(error.message))} className="rounded-xl border border-[#2D8A6A]/20 bg-white px-3 py-2 text-xs font-semibold text-[#063F32]">
                       Mark missed
                     </button>
                   </>
@@ -91,59 +91,59 @@ export default function LectureVerificationTable({ items = [], onRefresh }) {
             </div>
 
             <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-              <div className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-600">
-                <p className="font-semibold text-slate-950">Teacher report</p>
+              <div className="rounded-2xl bg-[#FAF7F0] p-4 text-sm text-[#245C4F]">
+                <p className="font-semibold text-[#063F32]">Teacher report</p>
                 <p className="mt-2">{item.summary || item.topic_covered || "No teacher summary submitted."}</p>
               </div>
-              <div className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-600">
-                <p className="font-semibold text-slate-950">Teacher attendance</p>
+              <div className="rounded-2xl bg-[#FAF7F0] p-4 text-sm text-[#245C4F]">
+                <p className="font-semibold text-[#063F32]">Teacher attendance</p>
                 <p className="mt-2">Joined: {item.teacher_joined ? "Yes" : "No"}</p>
-                <p className="mt-1 text-xs text-slate-500">Status: {item.teacher_attendance_status}</p>
-                <p className="mt-1 text-xs text-slate-500">Joined at: {item.teacher_joined_at ? formatDateTime(item.teacher_joined_at) : "-"}</p>
-                <p className="mt-1 text-xs text-slate-500">Left at: {item.teacher_left_at ? formatDateTime(item.teacher_left_at) : "-"}</p>
-                <p className="mt-1 text-xs text-slate-500">{item.teacher_duration_minutes || 0} minutes</p>
+                <p className="mt-1 text-xs text-[#245C4F]">Status: {item.teacher_attendance_status}</p>
+                <p className="mt-1 text-xs text-[#245C4F]">Joined at: {item.teacher_joined_at ? formatDateTime(item.teacher_joined_at) : "-"}</p>
+                <p className="mt-1 text-xs text-[#245C4F]">Left at: {item.teacher_left_at ? formatDateTime(item.teacher_left_at) : "-"}</p>
+                <p className="mt-1 text-xs text-[#245C4F]">{item.teacher_duration_minutes || 0} minutes</p>
               </div>
-              <div className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-600">
-                <p className="font-semibold text-slate-950">Student attendance</p>
+              <div className="rounded-2xl bg-[#FAF7F0] p-4 text-sm text-[#245C4F]">
+                <p className="font-semibold text-[#063F32]">Student attendance</p>
                 <p className="mt-2">Class roster: {item.total_students_count || 0}</p>
-                <p className="mt-1 text-xs text-slate-500">Present count: {item.joined_students_count || 0}</p>
-                <p className="mt-1 text-xs text-slate-500">Absent count: {item.absent_students_count ?? 0}</p>
+                <p className="mt-1 text-xs text-[#245C4F]">Present count: {item.joined_students_count || 0}</p>
+                <p className="mt-1 text-xs text-[#245C4F]">Absent count: {item.absent_students_count ?? 0}</p>
               </div>
-              <div className="rounded-2xl bg-slate-50 p-4 text-sm text-slate-600">
-                <p className="font-semibold text-slate-950">Remarks</p>
+              <div className="rounded-2xl bg-[#FAF7F0] p-4 text-sm text-[#245C4F]">
+                <p className="font-semibold text-[#063F32]">Remarks</p>
                 <p className="mt-2">{item.remarks || item.student_performance || "No remarks yet."}</p>
               </div>
             </div>
 
-            <div className="mt-4 overflow-hidden rounded-2xl border border-slate-200">
-              <div className="grid grid-cols-[1fr_1fr_1fr] bg-slate-50 px-4 py-3 text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+            <div className="mt-4 overflow-hidden rounded-2xl border border-[#2D8A6A]/15">
+              <div className="grid grid-cols-[1fr_1fr_1fr] bg-[#FAF7F0] px-4 py-3 text-xs font-semibold uppercase tracking-[0.16em] text-[#245C4F]">
                 <span>Student Name</span>
                 <span>Username / Phone</span>
                 <span>Status</span>
               </div>
               {Array.isArray(item.attendance_rows) && item.attendance_rows.length ? (
                 item.attendance_rows.map((row) => (
-                  <div key={row.id || row.user_id} className="grid grid-cols-[1fr_1fr_1fr] px-4 py-3 text-sm text-slate-600">
+                  <div key={row.id || row.user_id} className="grid grid-cols-[1fr_1fr_1fr] px-4 py-3 text-sm text-[#245C4F]">
                     <span>{row.student_name}</span>
                     <span>{row.username || row.student_phone || row.student_email || "-"}</span>
                     <span>{row.status || getAttendanceStatus(row.duration_minutes)}</span>
                   </div>
                 ))
               ) : (
-                <div className="grid grid-cols-[1fr_1fr_1fr] px-4 py-3 text-sm text-slate-600">
+                <div className="grid grid-cols-[1fr_1fr_1fr] px-4 py-3 text-sm text-[#245C4F]">
                   <span>{item.course_title || item.class_level || "Class roster"}</span>
                   <span>{item.total_students_count || 0} students</span>
                   <span>{item.student_attendance_status || getAttendanceStatus(item.student_duration_minutes)}</span>
                 </div>
               )}
             </div>
-            <p className="mt-3 rounded-2xl bg-amber-50 px-4 py-3 text-xs text-amber-800">
+            <p className="mt-3 rounded-2xl bg-[#FFF5D6] px-4 py-3 text-xs text-[#8A6B00]">
               Meet attendance may be available only after Google finishes processing the conference record.
             </p>
           </article>
         ))
       ) : (
-        <div className="rounded-[1.75rem] border border-white/70 bg-white/90 px-5 py-10 text-sm text-slate-500 shadow-[0_20px_70px_-36px_rgba(15,23,42,0.25)]">
+        <div className="rounded-[1.75rem] border border-[#2D8A6A]/15 bg-white/90 px-5 py-10 text-sm text-[#245C4F] shadow-[0_20px_70px_-36px_rgba(6,63,50,0.18)]">
           No lecture verification records available.
         </div>
       )}

@@ -40,10 +40,6 @@ export default function RegularFeeVouchersPage() {
   const [classOpen, setClassOpen] = useState(false);
   const [paymentOpen, setPaymentOpen] = useState(false);
 
-  function closeSelectState(setter) {
-    window.setTimeout(() => setter(false), 0);
-  }
-
   async function load() {
     setLoading(true);
     try {
@@ -115,7 +111,7 @@ export default function RegularFeeVouchersPage() {
           <label className="block">
             <span className="mb-2 block text-sm font-medium text-[#245C4F]">Class</span>
             <div className="relative">
-              <select value={form.classId} onMouseDown={() => setClassOpen((current) => !current)} onFocus={() => setClassOpen(true)} onBlur={() => closeSelectState(setClassOpen)} onChange={(e) => handleClassChange(e.target.value)} className="w-full appearance-none rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 pr-11 text-sm text-[#063F32] outline-none transition focus:border-[#2D8A6A] focus:bg-white focus:ring-4 focus:ring-[#FFF5D6]" required>
+              <select value={form.classId} onFocus={() => setClassOpen(true)} onBlur={() => setClassOpen(false)} onChange={(e) => handleClassChange(e.target.value)} className="w-full appearance-none rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 pr-11 text-sm text-[#063F32] outline-none transition focus:border-[#2D8A6A] focus:bg-white focus:ring-4 focus:ring-[#FFF5D6]" required>
                 <option value="">Select class</option>
                 {classes.map((item) => (
                   <option key={item.id} value={item.id}>
@@ -148,9 +144,8 @@ export default function RegularFeeVouchersPage() {
             <div className="relative">
               <select
                 value={form.paymentMethodId}
-                onMouseDown={() => setPaymentOpen((current) => !current)}
                 onFocus={() => setPaymentOpen(true)}
-                onBlur={() => closeSelectState(setPaymentOpen)}
+                onBlur={() => setPaymentOpen(false)}
                 onChange={(e) => setForm((c) => ({ ...c, paymentMethodId: e.target.value }))}
                 className="w-full appearance-none rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 pr-11 text-sm text-[#063F32] outline-none transition focus:border-[#2D8A6A] focus:bg-white focus:ring-4 focus:ring-[#FFF5D6]"
                 required

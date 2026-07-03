@@ -1,5 +1,6 @@
 "use client";
 
+import { ChevronDown } from "lucide-react";
 import { useEffect, useState } from "react";
 
 export default function TeacherAssignmentForm({ options, onSuccess }) {
@@ -11,6 +12,15 @@ export default function TeacherAssignmentForm({ options, onSuccess }) {
   const [submitting, setSubmitting] = useState(false);
   const [classSubjects, setClassSubjects] = useState([]);
   const [subjectsLoading, setSubjectsLoading] = useState(false);
+  const [teacherOpen, setTeacherOpen] = useState(false);
+  const [classOpen, setClassOpen] = useState(false);
+  const [subjectOpen, setSubjectOpen] = useState(false);
+
+  function closeSelectState() {
+    setTeacherOpen(false);
+    setClassOpen(false);
+    setSubjectOpen(false);
+  }
 
   useEffect(() => {
     let active = true;
@@ -81,27 +91,57 @@ export default function TeacherAssignmentForm({ options, onSuccess }) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="grid gap-3 rounded-[1.75rem] border border-white/70 bg-white/90 p-5 shadow-[0_20px_70px_-36px_rgba(15,23,42,0.25)] lg:grid-cols-3">
-      <select value={form.teacherId} onChange={(event) => setForm((current) => ({ ...current, teacherId: event.target.value }))} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm">
-        <option value="">Select teacher</option>
-        {options.teachers?.map((item) => <option key={item.id} value={item.id}>{item.full_name}</option>)}
-      </select>
-      <select value={form.courseId} onChange={(event) => { setClassSubjects([]); setForm((current) => ({ ...current, courseId: event.target.value, subjectId: "" })); }} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm">
-        <option value="">Select class</option>
-        {options.courses?.map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}
-      </select>
-      <div className="flex gap-3">
-        <select value={form.subjectId} onChange={(event) => setForm((current) => ({ ...current, subjectId: event.target.value }))} className="flex-1 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm">
-          <option value="" disabled>
-            {subjectsLoading
-              ? "Loading available subjects..."
-              : form.courseId
-                ? "Select available subject"
-                : "Select class first"}
-          </option>
-          {classSubjects.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+    <form onSubmit={handleSubmit} className="grid gap-3 rounded-[1.75rem] border border-[#2D8A6A]/15 bg-white/90 p-5 shadow-[0_20px_70px_-36px_rgba(6,63,50,0.18)] lg:grid-cols-3">
+      <div className="relative">
+        <select
+          value={form.teacherId}
+          onChange={(event) => setForm((current) => ({ ...current, teacherId: event.target.value }))}
+          onMouseDown={() => setTeacherOpen((current) => !current)}
+          onFocus={() => setTeacherOpen(true)}
+          onBlur={closeSelectState}
+          className="w-full appearance-none rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 pr-11 text-sm text-[#063F32] outline-none transition focus:border-[#2D8A6A] focus:ring-4 focus:ring-[#C9A227]/20"
+        >
+          <option value="">Select teacher</option>
+          {options.teachers?.map((item) => <option key={item.id} value={item.id}>{item.full_name}</option>)}
         </select>
-        <button type="submit" disabled={submitting} className="rounded-2xl bg-slate-950 px-5 py-3 text-sm font-semibold text-white">
+        <ChevronDown aria-hidden="true" className={`pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#0D5C48] transition-transform duration-200 ${teacherOpen ? "rotate-180" : "rotate-0"}`} />
+      </div>
+      <div className="relative">
+        <select
+          value={form.courseId}
+          onChange={(event) => { setClassSubjects([]); setForm((current) => ({ ...current, courseId: event.target.value, subjectId: "" })); }}
+          onMouseDown={() => setClassOpen((current) => !current)}
+          onFocus={() => setClassOpen(true)}
+          onBlur={closeSelectState}
+          className="w-full appearance-none rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 pr-11 text-sm text-[#063F32] outline-none transition focus:border-[#2D8A6A] focus:ring-4 focus:ring-[#C9A227]/20"
+        >
+          <option value="">Select class</option>
+          {options.courses?.map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}
+        </select>
+        <ChevronDown aria-hidden="true" className={`pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#0D5C48] transition-transform duration-200 ${classOpen ? "rotate-180" : "rotate-0"}`} />
+      </div>
+      <div className="flex gap-3">
+        <div className="relative flex-1">
+          <select
+            value={form.subjectId}
+            onChange={(event) => setForm((current) => ({ ...current, subjectId: event.target.value }))}
+            onMouseDown={() => setSubjectOpen((current) => !current)}
+            onFocus={() => setSubjectOpen(true)}
+            onBlur={closeSelectState}
+            className="w-full appearance-none rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 pr-11 text-sm text-[#063F32] outline-none transition focus:border-[#2D8A6A] focus:ring-4 focus:ring-[#C9A227]/20"
+          >
+            <option value="" disabled>
+              {subjectsLoading
+                ? "Loading available subjects..."
+                : form.courseId
+                  ? "Select available subject"
+                  : "Select class first"}
+            </option>
+            {classSubjects.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+          </select>
+          <ChevronDown aria-hidden="true" className={`pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#0D5C48] transition-transform duration-200 ${subjectOpen ? "rotate-180" : "rotate-0"}`} />
+        </div>
+        <button type="submit" disabled={submitting} className="rounded-2xl bg-[#0D5C48] px-5 py-3 text-sm font-semibold text-[#FAF7F0] transition hover:bg-[#063F32]">
           {submitting ? "Saving..." : "Assign"}
         </button>
       </div>
