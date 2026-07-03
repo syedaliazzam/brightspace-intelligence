@@ -10,6 +10,7 @@ import NoteThreadsBoard from "@/components/shared/NoteThreadsBoard";
 import LMSCalendar from "@/components/calendar/LMSCalendar";
 import PaymentAccessGuard from "@/components/shared/PaymentAccessGuard";
 import ActiveHeadlinesBanner from "@/components/shared/ActiveHeadlinesBanner";
+import { OpenBookLoader } from "@/components/shared/AshShajrahLoaders";
 
 function todayDate() {
   const date = new Date();
@@ -144,6 +145,7 @@ export default function StudentDashboardPage() {
               <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-[#0D5C48]">Lecture Calendar</p>
               <h2 className="mt-2 font-serif text-2xl font-semibold tracking-tight text-[#063F32]">Plan your study week</h2>
             </div>
+            {state.loading ? <OpenBookLoader title="Loading lectures" subtitle="Preparing your calendar..." /> : null}
             <LMSCalendar apiUrl="/api/student/calendar-lectures" filters={state.filters} onDateSelect={(date) => updateFilters({ ...state.filters, date, range: "selected_date" })} />
           </motion.section>
 

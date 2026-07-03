@@ -548,7 +548,7 @@ export default function FeeVoucherForm({ leads, initialLeadId = "", showTrigger 
       ) : null}
 
       {successEmail ? (
-        <div className="fixed inset-0 z-[60] flex items-start justify-center overflow-hidden bg-[#063F32]/45 px-4 pt-28 pb-10">
+        <div className="fixed inset-0 z-[60] flex items-start justify-center overflow-hidden bg-[#063F32]/45 px-4 pt-10 pb-10">
           <div className="w-full max-w-2xl max-h-[calc(100vh-6.5rem)] overflow-y-auto rounded-[2rem] border border-[#2D8A6A]/15 bg-[#FAF7F0] p-6 shadow-[0_24px_80px_-36px_rgba(13,59,46,0.24)] sm:p-8">
             <p className="text-sm font-semibold uppercase tracking-[0.24em] text-[#C9A227]">
               Voucher Created Successfully

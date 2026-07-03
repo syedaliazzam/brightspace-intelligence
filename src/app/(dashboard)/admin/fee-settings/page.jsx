@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { ChevronDown } from "lucide-react";
 import AdminDashboardCards from "@/components/admin/AdminDashboardCards";
+import { LeafSpinnerInline, OpenBookLoader } from "@/components/shared/AshShajrahLoaders";
 
 const TABS = [
   { key: "regular", label: "Regular Fees" },
@@ -349,7 +350,14 @@ export default function AdminFeeSettingsPage() {
           </div>
           <div className="flex gap-3 md:col-span-4">
             <button disabled={saving || !forms.regular.class_level} className="rounded-2xl bg-[#0D5C48] px-4 py-3 text-sm font-semibold text-[#FAF7F0] disabled:opacity-60 hover:bg-[#063F32]">
-              {editing.regular ? "Save regular fee" : "Add regular fee"}
+              {saving ? (
+                <span className="inline-flex items-center gap-2">
+                  <LeafSpinnerInline />
+                  {editing.regular ? "Saving..." : "Adding..."}
+                </span>
+              ) : (
+                editing.regular ? "Save regular fee" : "Add regular fee"
+              )}
             </button>
             {editing.regular ? (
               <button type="button" className="rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 text-sm font-semibold text-[#063F32]" onClick={() => { setEditing((current) => ({ ...current, regular: "" })); setForms((current) => ({ ...current, regular: EMPTY_FORM.regular })); }}>
@@ -410,7 +418,14 @@ export default function AdminFeeSettingsPage() {
           </div>
           <div className="flex gap-3 md:col-span-3 md:justify-end">
             <button disabled={saving} className="rounded-2xl bg-[#0D5C48] px-4 py-3 text-sm font-semibold text-[#FAF7F0] disabled:opacity-60 hover:bg-[#063F32]">
-              {editing.other ? "Save other fee" : "Add other fee"}
+              {saving ? (
+                <span className="inline-flex items-center gap-2">
+                  <LeafSpinnerInline />
+                  {editing.other ? "Saving..." : "Adding..."}
+                </span>
+              ) : (
+                editing.other ? "Save other fee" : "Add other fee"
+              )}
             </button>
             {editing.other ? (
               <button type="button" className="rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold" onClick={() => { setEditing((current) => ({ ...current, other: "" })); setForms((current) => ({ ...current, other: EMPTY_FORM.other })); }}>
@@ -476,7 +491,14 @@ export default function AdminFeeSettingsPage() {
           </div>
           <div className="flex gap-3 md:col-span-3 md:justify-end">
             <button disabled={saving} className="rounded-2xl bg-[#0D5C48] px-4 py-3 text-sm font-semibold text-[#FAF7F0] disabled:opacity-60 hover:bg-[#063F32]">
-              {editing.payment ? "Save payment method" : "Add payment method"}
+              {saving ? (
+                <span className="inline-flex items-center gap-2">
+                  <LeafSpinnerInline />
+                  {editing.payment ? "Saving..." : "Adding..."}
+                </span>
+              ) : (
+                editing.payment ? "Save payment method" : "Add payment method"
+              )}
             </button>
             {editing.payment ? (
               <button type="button" className="rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 text-sm font-semibold text-[#063F32] transition hover:bg-[#F1EADC]" onClick={() => { setEditing((current) => ({ ...current, payment: "" })); setForms((current) => ({ ...current, payment: EMPTY_FORM.payment })); }}>
@@ -589,7 +611,14 @@ export default function AdminFeeSettingsPage() {
                         onClick={() => void saveSetting(setting.id)}
                         className="rounded-2xl bg-[#0D5C48] px-4 py-3 text-sm font-semibold text-[#FAF7F0] hover:bg-[#063F32]"
                       >
-                        Save setting
+                        {saving ? (
+                          <span className="inline-flex items-center gap-2">
+                            <LeafSpinnerInline />
+                            Saving...
+                          </span>
+                        ) : (
+                          "Save setting"
+                        )}
                       </button>
                     ) : null}
                   </div>
@@ -636,9 +665,10 @@ export default function AdminFeeSettingsPage() {
 
         <div className="mt-6">
           {loading ? (
-            <div className="rounded-2xl border border-[#2D8A6A]/15 bg-[#FAF7F0] p-6 text-sm text-[#245C4F]">
-              Loading fee management data...
-            </div>
+            <OpenBookLoader
+              title="Loading fee management"
+              subtitle="Fetching regular fees, payment methods, and settings..."
+            />
           ) : (
             sectionContent[activeTab]
           )}

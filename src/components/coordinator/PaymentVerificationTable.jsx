@@ -384,7 +384,7 @@ export default function PaymentVerificationTable({ items, onRefresh }) {
       ) : null}
 
       {rejectingItem ? (
-        <div className="fixed inset-0 z-[70] flex items-start justify-center overflow-hidden bg-[#063F32]/45 px-4 pt-28 pb-10 backdrop-blur-sm">
+        <div className="fixed inset-0 z-[70] flex items-start justify-center overflow-hidden bg-[#063F32]/45 px-4 pt-10 pb-10 backdrop-blur-sm">
           <div className="w-full max-w-2xl max-h-[calc(100vh-6.5rem)] overflow-y-auto rounded-[2rem] border border-[#2D8A6A]/20 bg-[#FAF7F0] p-6 shadow-[0_24px_80px_-36px_rgba(6,63,50,0.24)] sm:p-8">
             <p className="text-sm font-semibold uppercase tracking-[0.24em] text-rose-700">Reject Payment</p>
             <p className="mt-2 text-sm text-[#245C4F]">

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { OpenBookLoader } from "@/components/shared/AshShajrahLoaders";
 import InterestedStudentsPanel from "@/components/coordinator/InterestedStudentsPanel";
 
 export default function CoordinatorInterestedStudentsPage() {
@@ -46,7 +47,7 @@ export default function CoordinatorInterestedStudentsPage() {
       </section>
 
       {state.error ? <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">{state.error}</div> : null}
-      {state.loading ? <div className="rounded-2xl border border-[#2D8A6A]/15 bg-white/90 p-5 text-sm text-[#245C4F] shadow-[0_18px_60px_-36px_rgba(13,59,46,0.18)]">Loading interested students...</div> : null}
+      {state.loading ? <OpenBookLoader title="Loading interested students" subtitle="Fetching admission leads..." /> : null}
       <InterestedStudentsPanel items={state.items} />
       </div>
     </div>

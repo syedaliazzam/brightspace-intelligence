@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import TeacherAssignmentForm from "@/components/coordinator/TeacherAssignmentForm";
 import TeacherAssignmentTable from "@/components/coordinator/TeacherAssignmentTable";
 import ShowMoreSection from "@/components/coordinator/ShowMoreSection";
+import { OpenBookLoader } from "@/components/shared/AshShajrahLoaders";
 
 export default function CoordinatorTeacherAssignmentsPage() {
   const [state, setState] = useState({
@@ -64,7 +65,7 @@ export default function CoordinatorTeacherAssignmentsPage() {
 
       {state.error ? <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">{state.error}</div> : null}
       <TeacherAssignmentForm options={state} onSuccess={load} />
-      {state.loading ? <div className="rounded-2xl bg-white p-5 text-sm text-slate-500">Loading assignments...</div> : null}
+      {state.loading ? <OpenBookLoader title="Loading assignments" subtitle="Fetching teacher assignment records..." /> : null}
       <ShowMoreSection
         items={state.items}
         initialCount={7}

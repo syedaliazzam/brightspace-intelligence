@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { ChevronDown } from "lucide-react";
+import { LeafSpinnerInline } from "@/components/shared/AshShajrahLoaders";
 
 export default function HomeworkForm({ lectures = [], excludeLectureIds = [], initialValue = null, onSaved }) {
   const [form, setForm] = useState({ lectureId: "", title: "", description: "", dueDate: "" });
@@ -79,7 +80,14 @@ export default function HomeworkForm({ lectures = [], excludeLectureIds = [], in
       </div>
       <textarea value={form.description} onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))} placeholder="Description" className="min-h-28 rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 text-sm text-[#063F32] outline-none focus:border-[#2D8A6A] focus:ring-2 focus:ring-[#2D8A6A]/20" />
       <div className="flex justify-end">
-        <button disabled={pending} className="rounded-2xl bg-[#0D5C48] px-4 py-3 text-sm font-semibold text-[#FAF7F0] shadow-[0_10px_28px_-18px_rgba(13,59,46,0.45)]">{pending ? "Saving..." : initialValue ? "Update homework" : "Create homework"}</button>
+        <button disabled={pending} className="rounded-2xl bg-[#0D5C48] px-4 py-3 text-sm font-semibold text-[#FAF7F0] shadow-[0_10px_28px_-18px_rgba(13,59,46,0.45)]">
+          {pending ? (
+            <span className="inline-flex items-center gap-2">
+              <LeafSpinnerInline />
+              Saving...
+            </span>
+          ) : initialValue ? "Update homework" : "Create homework"}
+        </button>
       </div>
     </form>
   );

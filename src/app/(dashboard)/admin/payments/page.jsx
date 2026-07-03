@@ -255,6 +255,9 @@ export default function AdminPaymentsPage() {
       ) : null}
 
       <AdminDataTable
+        loading={state.loading}
+        loadingTitle="Loading payments"
+        loadingSubtitle="Preparing the payments table..."
         columns={[
           {
             key: "student_name",

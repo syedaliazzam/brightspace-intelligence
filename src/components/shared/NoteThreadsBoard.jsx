@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronDown } from "lucide-react";
+import { OpenBookLoader } from "@/components/shared/AshShajrahLoaders";
 
 function groupLectureOptions(lectures) {
   const map = new Map();
@@ -253,7 +254,11 @@ export default function NoteThreadsBoard({ mode = "viewer", lectures = [] }) {
             </thead>
             <tbody className="divide-y divide-[#F1EADC]">
               {loading ? (
-                <tr><td colSpan={5} className="px-4 py-10 text-center text-sm text-[#245C4F]">Loading notes...</td></tr>
+                <tr>
+                  <td colSpan={5} className="px-4 py-10">
+                    <OpenBookLoader title="Loading notes" subtitle="Preparing your notes threads..." />
+                  </td>
+                </tr>
               ) : threads.length ? threads.map((thread) => (
                 <tr key={thread.id}>
                   <td className="px-4 py-4 font-semibold text-[#063F32]">{thread.class_level || thread.course_title || "-"}</td>
@@ -309,7 +314,9 @@ export default function NoteThreadsBoard({ mode = "viewer", lectures = [] }) {
           showTopClose={false}
         >
           {messagesLoading ? (
-            <div className="rounded-2xl border border-dashed border-[#2D8A6A]/20 bg-[#FAF7F0] p-6 text-sm text-[#245C4F]">Loading chat...</div>
+            <div className="rounded-2xl border border-dashed border-[#2D8A6A]/20 bg-[#FAF7F0] p-6 text-sm text-[#245C4F]">
+              <OpenBookLoader title="Loading chat" subtitle="Opening the conversation..." />
+            </div>
           ) : (
             <div className="max-h-[52vh] space-y-3 overflow-y-auto pr-1">
               {messages.map((message) => <MessageBubble key={message.id} message={message} mode={mode} />)}

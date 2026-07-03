@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { signOut } from "next-auth/react";
+import { OpenBookLoader } from "@/components/shared/AshShajrahLoaders";
 
 export default function PaymentAccessGuard({ children }) {
   const [loading, setLoading] = useState(true);
@@ -34,10 +35,8 @@ export default function PaymentAccessGuard({ children }) {
 
   if (loading) {
     return (
-      <div className="flex min-h-[80vh] items-center justify-center">
-        <div className="rounded-2xl border border-slate-200 px-4 py-3 text-sm text-slate-600 shadow-sm">
-          Checking access...
-        </div>
+      <div className="flex min-h-[80vh] items-center justify-center bg-[#FAF7F0]">
+        <OpenBookLoader title="Checking access" subtitle="Opening your classroom..." />
       </div>
     );
   }

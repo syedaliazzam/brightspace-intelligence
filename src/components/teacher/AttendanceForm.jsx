@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { LeafSpinnerInline } from "@/components/shared/AshShajrahLoaders";
 
 export default function AttendanceForm({ lecture, onSaved }) {
   const [status, setStatus] = useState("present");
@@ -46,7 +47,16 @@ export default function AttendanceForm({ lecture, onSaved }) {
         <option value="late">Late</option>
         <option value="partial">Partial</option>
       </select>
-      <button disabled={pending} className="rounded-2xl bg-slate-950 px-4 py-3 text-sm font-semibold text-white">{pending ? "Saving..." : "Save attendance"}</button>
+      <button disabled={pending} className="rounded-2xl bg-[#0D5C48] px-4 py-3 text-sm font-semibold text-[#FAF7F0]">
+        {pending ? (
+          <span className="inline-flex items-center gap-2">
+            <LeafSpinnerInline />
+            Saving...
+          </span>
+        ) : (
+          "Save attendance"
+        )}
+      </button>
     </form>
   );
 }

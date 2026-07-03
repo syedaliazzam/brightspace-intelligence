@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import LectureScheduleForm from "@/components/coordinator/LectureScheduleForm";
 import LectureScheduleTable from "@/components/coordinator/LectureScheduleTable";
 import ShowMoreSection from "@/components/coordinator/ShowMoreSection";
+import { OpenBookLoader } from "@/components/shared/AshShajrahLoaders";
 
 export default function CoordinatorLectureSchedulesPage() {
   const [state, setState] = useState({
@@ -65,7 +66,7 @@ export default function CoordinatorLectureSchedulesPage() {
 
       {state.error ? <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">{state.error}</div> : null}
       <LectureScheduleForm options={state} onSuccess={load} />
-      {state.loading ? <div className="rounded-2xl bg-white p-5 text-sm text-slate-500">Loading lecture schedules...</div> : null}
+      {state.loading ? <OpenBookLoader title="Loading lecture schedules" subtitle="Fetching schedule data..." /> : null}
       <ShowMoreSection
         items={state.items}
         initialCount={7}

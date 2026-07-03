@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import PaginationControls from "@/components/teacher/PaginationControls";
+import { OpenBookLoader } from "@/components/shared/AshShajrahLoaders";
 
 function renderValue(column, row) {
   if (typeof column.render === "function") {
@@ -20,6 +21,9 @@ export default function AdminDataTable({
   emptyMessage = "No records found.",
   actions,
   pageSize = 7,
+  loading = false,
+  loadingTitle = "Loading data",
+  loadingSubtitle = "Preparing the table...",
 }) {
   const [page, setPage] = useState(1);
 
@@ -31,6 +35,13 @@ export default function AdminDataTable({
   }, [currentPage, pageSize, rows]);
 
   if (!rows.length) {
+    if (loading) {
+      return (
+        <section className="rounded-[1.75rem] border border-[#2D8A6A]/15 bg-white/90 p-6 shadow-[0_18px_60px_-36px_rgba(13,59,46,0.18)]">
+          <OpenBookLoader title={loadingTitle} subtitle={loadingSubtitle} />
+        </section>
+      );
+    }
     return (
       <section className="rounded-[1.75rem] border border-dashed border-[#2D8A6A]/25 bg-white/85 p-10 text-center text-sm text-[#245C4F] shadow-[0_18px_60px_-36px_rgba(13,59,46,0.18)]">
         {emptyMessage}

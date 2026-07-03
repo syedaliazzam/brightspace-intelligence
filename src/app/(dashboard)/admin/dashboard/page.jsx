@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import AdminDashboardCards from "@/components/admin/AdminDashboardCards";
 import AdminDataTable from "@/components/admin/AdminDataTable";
+import { OpenBookLoader } from "@/components/shared/AshShajrahLoaders";
 
 const CACHE_KEY = "admin-dashboard-stats";
 const CACHE_TTL = 60 * 1000;
@@ -188,6 +189,7 @@ export default function AdminDashboardPage() {
             : cards
         }
       />
+      {state.loading ? <OpenBookLoader title="Loading dashboard" subtitle="Preparing admin insights..." /> : null}
 
       <section className="grid gap-6 xl:grid-cols-2">
         <div className="space-y-4 rounded-[2rem] border border-[#2D8A6A]/15 bg-white/90 p-5 shadow-[0_20px_70px_-36px_rgba(13,59,46,0.18)]">
@@ -210,7 +212,7 @@ export default function AdminDashboardPage() {
               { key: "total", label: "Total users" },
               { key: "activeTotal", label: "Active users" },
             ]}
-            rows={state.data?.roles || []}
+            rows={state.loading ? [] : state.data?.roles || []}
             emptyMessage="Role insights will appear here as account activity grows."
           />
         </div>
@@ -231,7 +233,7 @@ export default function AdminDashboardPage() {
                 render: (row) => formatLabel(row.status),
               },
             ]}
-            rows={state.data?.recent?.registrationLeads || []}
+            rows={state.loading ? [] : state.data?.recent?.registrationLeads || []}
             emptyMessage="No recent registration activity to display."
           />
         </div>

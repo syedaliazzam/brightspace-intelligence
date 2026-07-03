@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import AdminDataTable from "@/components/admin/AdminDataTable";
+import { LeafSpinnerInline } from "@/components/shared/AshShajrahLoaders";
 
 function emptyForm() {
   return {
@@ -78,7 +79,14 @@ function HeadlineForm({ form, onChange, onSubmit, onCancel, submitting, submitLa
           disabled={submitting}
           className="rounded-2xl bg-[#0D5C48] px-5 py-3 text-sm font-semibold text-[#FAF7F0] transition hover:bg-[#063F32] disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {submitting ? "Saving..." : submitLabel}
+          {submitting ? (
+            <span className="inline-flex items-center gap-2">
+              <LeafSpinnerInline />
+              Saving...
+            </span>
+          ) : (
+            submitLabel
+          )}
         </button>
       </div>
     </form>
@@ -261,6 +269,9 @@ export default function AdminHeadlinesPage() {
       ) : null}
 
       <AdminDataTable
+        loading={loading}
+        loadingTitle="Loading headlines"
+        loadingSubtitle="Preparing the announcement table..."
         columns={[
           {
             key: "headline",
@@ -299,7 +310,14 @@ export default function AdminHeadlinesPage() {
               onClick={() => setDeletingItem(row)}
               className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700 transition hover:bg-rose-100"
             >
-              Delete
+              {submitting ? (
+                <span className="inline-flex items-center gap-2">
+                  <LeafSpinnerInline />
+                  Deleting...
+                </span>
+              ) : (
+                "Delete"
+              )}
             </button>
           </>
         )}
@@ -395,7 +413,14 @@ export default function AdminHeadlinesPage() {
                     disabled={submitting}
                     className="rounded-2xl bg-rose-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-60"
                   >
-                    {submitting ? "Deleting..." : "Delete headline"}
+                    {submitting ? (
+                      <span className="inline-flex items-center gap-2">
+                        <LeafSpinnerInline />
+                        Deleting...
+                      </span>
+                    ) : (
+                      "Delete headline"
+                    )}
                   </button>
                 </div>
               </div>

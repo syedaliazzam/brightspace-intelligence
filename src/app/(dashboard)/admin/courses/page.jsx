@@ -313,6 +313,9 @@ export default function AdminCoursesPage() {
       ) : null}
 
       <AdminDataTable
+        loading={state.loading}
+        loadingTitle="Loading classes"
+        loadingSubtitle="Preparing the class table..."
         columns={[
           {
             key: "name",

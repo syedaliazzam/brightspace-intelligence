@@ -2,6 +2,7 @@
 
 import { ChevronDown } from "lucide-react";
 import { useEffect, useState } from "react";
+import { LeafSpinnerInline } from "@/components/shared/AshShajrahLoaders";
 
 export default function TeacherAssignmentForm({ options, onSuccess }) {
   const [form, setForm] = useState({
@@ -142,7 +143,14 @@ export default function TeacherAssignmentForm({ options, onSuccess }) {
           <ChevronDown aria-hidden="true" className={`pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#0D5C48] transition-transform duration-200 ${subjectOpen ? "rotate-180" : "rotate-0"}`} />
         </div>
         <button type="submit" disabled={submitting} className="rounded-2xl bg-[#0D5C48] px-5 py-3 text-sm font-semibold text-[#FAF7F0] transition hover:bg-[#063F32]">
-          {submitting ? "Saving..." : "Assign"}
+          {submitting ? (
+            <span className="inline-flex items-center gap-2">
+              <LeafSpinnerInline />
+              Saving...
+            </span>
+          ) : (
+            "Assign"
+          )}
         </button>
       </div>
     </form>

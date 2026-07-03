@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { LeafSpinnerInline } from "@/components/shared/AshShajrahLoaders";
 
 function formatDate(value) {
   if (!value) return "Not available";
@@ -87,7 +88,12 @@ export default function HomeworkList({ items = [], onRefresh }) {
                     onClick={() => setActiveItem(item)}
                     className="rounded-xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-3 py-2 text-xs font-semibold text-[#0D5C48] transition hover:bg-[#F1EADC] disabled:cursor-not-allowed disabled:opacity-60"
                   >
-                    {item.status === "submitted" ? "Submitted" : submittingId === item.id ? "Submitting..." : "Submit homework"}
+                    {item.status === "submitted" ? "Submitted" : submittingId === item.id ? (
+                      <span className="inline-flex items-center gap-2">
+                        <LeafSpinnerInline />
+                        Submitting...
+                      </span>
+                    ) : "Submit homework"}
                   </button>
                 </td>
               </tr>
@@ -150,7 +156,14 @@ export default function HomeworkList({ items = [], onRefresh }) {
                   disabled={pending}
                   className="rounded-2xl bg-[linear-gradient(135deg,#0D3B2E,#0D5C48)] px-4 py-3 text-sm font-semibold text-[#FFF5D6] disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  {pending ? "Submitting..." : "Submit homework"}
+                  {pending ? (
+                    <span className="inline-flex items-center gap-2">
+                      <LeafSpinnerInline />
+                      Submitting...
+                    </span>
+                  ) : (
+                    "Submit homework"
+                  )}
                 </button>
               </div>
             </form>

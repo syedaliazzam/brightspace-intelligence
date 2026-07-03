@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import CoordinatorStatsCards from "@/components/coordinator/CoordinatorStatsCards";
 import LectureVerificationTable from "@/components/coordinator/LectureVerificationTable";
 import ShowMoreSection from "@/components/coordinator/ShowMoreSection";
+import { OpenBookLoader } from "@/components/shared/AshShajrahLoaders";
 
 const CACHE_TTL = 60 * 1000;
 
@@ -126,7 +127,7 @@ export default function CoordinatorLectureVerificationsPage() {
       </div>
 
       {state.error ? <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">{state.error}</div> : null}
-      {state.loading ? <div className="rounded-2xl bg-white p-5 text-sm text-slate-500">Loading lecture verifications...</div> : null}
+      {state.loading ? <OpenBookLoader title="Loading lecture verifications" subtitle="Fetching verification records..." /> : null}
       <ShowMoreSection
         items={state.items}
         initialCount={7}

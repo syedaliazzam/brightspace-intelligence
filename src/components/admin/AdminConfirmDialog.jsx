@@ -1,6 +1,7 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
+import { LeafSpinnerInline } from "@/components/shared/AshShajrahLoaders";
 
 export default function AdminConfirmDialog({
   open,
@@ -52,7 +53,14 @@ export default function AdminConfirmDialog({
                 disabled={pending}
                 className={`rounded-2xl px-4 py-3 text-sm font-semibold text-white transition disabled:opacity-60 ${toneClass}`}
               >
-                {pending ? "Working..." : confirmLabel}
+                {pending ? (
+                  <span className="inline-flex items-center gap-2">
+                    <LeafSpinnerInline />
+                    Working...
+                  </span>
+                ) : (
+                  confirmLabel
+                )}
               </button>
             </div>
           </motion.div>

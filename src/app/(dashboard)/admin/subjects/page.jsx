@@ -319,6 +319,9 @@ export default function AdminSubjectsPage() {
             render: (row) => formatLabel(row.status),
           },
         ]}
+        loading={state.loading}
+        loadingTitle="Loading subjects"
+        loadingSubtitle="Preparing the subject table..."
         rows={state.loading ? [] : state.items}
         emptyMessage={
           state.loading

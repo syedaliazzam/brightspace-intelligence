@@ -7,6 +7,7 @@ import AdminConfirmDialog from "@/components/admin/AdminConfirmDialog";
 import AdminDashboardCards from "@/components/admin/AdminDashboardCards";
 import AdminDataTable from "@/components/admin/AdminDataTable";
 import StaffFormModal from "@/components/admin/StaffFormModal";
+import { LeafSpinnerInline, OpenBookLoader } from "@/components/shared/AshShajrahLoaders";
 import { useDashboardSession } from "@/components/layout/DashboardSessionContext";
 
 const ROLE_OPTIONS = ["", "admin", "coordinator", "teacher", "parent", "student"];
@@ -609,6 +610,13 @@ export default function AdminUsersPage() {
         </div>
       </section>
 
+      {state.loading || state.overviewLoading ? (
+        <OpenBookLoader
+          title="Loading user management"
+          subtitle="Fetching the latest records and summary cards..."
+        />
+      ) : null}
+
       <AdminDashboardCards items={cards} />
 
       <section className="rounded-[1.75rem] border border-[#2D8A6A]/15 bg-white/90 p-4 shadow-[0_20px_70px_-36px_rgba(13,59,46,0.18)] sm:p-5">
@@ -857,9 +865,16 @@ export default function AdminUsersPage() {
               <button
                 type="button"
                 onClick={() => resetPassword(row)}
-                className="rounded-xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-3 py-2 text-xs font-semibold text-[#063F32] transition hover:bg-[#F1EADC]"
-              >
-                Reset password
+              className="rounded-xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-3 py-2 text-xs font-semibold text-[#063F32] transition hover:bg-[#F1EADC]"
+            >
+                {resetModal.pending ? (
+                  <span className="inline-flex items-center gap-2">
+                    <LeafSpinnerInline />
+                    Resetting...
+                  </span>
+                ) : (
+                  "Reset password"
+                )}
               </button>
             ) : null}
             {view !== "staff" ? (
@@ -1073,9 +1088,16 @@ export default function AdminUsersPage() {
                   type="button"
                   onClick={submitResetPassword}
                   disabled={resetModal.pending}
-                  className="inline-flex h-12 items-center justify-center rounded-2xl border border-[#2D8A6A]/20 bg-[#0D5C48] px-5 text-sm font-semibold text-[#FAF7F0] transition hover:bg-[#063F32] disabled:cursor-not-allowed disabled:opacity-70"
+                className="inline-flex h-12 items-center justify-center rounded-2xl border border-[#2D8A6A]/20 bg-[#0D5C48] px-5 text-sm font-semibold text-[#FAF7F0] transition hover:bg-[#063F32] disabled:cursor-not-allowed disabled:opacity-70"
                 >
-                  {resetModal.pending ? "Resetting..." : "Reset password"}
+                  {resetModal.pending ? (
+                    <span className="inline-flex items-center gap-2">
+                      <LeafSpinnerInline />
+                      Resetting...
+                    </span>
+                  ) : (
+                    "Reset password"
+                  )}
                 </button>
               </div>
             </div>

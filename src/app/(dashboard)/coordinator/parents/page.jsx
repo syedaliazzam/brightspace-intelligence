@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import ParentTable from "@/components/coordinator/ParentTable";
 import ShowMoreSection from "@/components/coordinator/ShowMoreSection";
+import { OpenBookLoader } from "@/components/shared/AshShajrahLoaders";
 
 export default function CoordinatorParentsPage() {
   const [state, setState] = useState({ items: [], loading: true, error: "" });
@@ -60,7 +61,7 @@ export default function CoordinatorParentsPage() {
       </div>
 
       {state.error ? <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">{state.error}</div> : null}
-      {state.loading ? <div className="rounded-2xl bg-white p-5 text-sm text-slate-500">Loading parents...</div> : null}
+      {state.loading ? <OpenBookLoader title="Loading parents" subtitle="Fetching family records..." /> : null}
       <ShowMoreSection
         items={filteredItems}
         initialCount={7}

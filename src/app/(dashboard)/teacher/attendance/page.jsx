@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { ChevronDown } from "lucide-react";
+import { LeafSpinnerInline, OpenBookLoader } from "@/components/shared/AshShajrahLoaders";
 
 const STATUS_OPTIONS = [
   { label: "Present", value: "present" },
@@ -198,7 +199,7 @@ export default function TeacherAttendancePage() {
             </label>
           </div>
 
-          {state.loading ? <p className="mt-4 text-sm text-[#245C4F]">Loading attendance...</p> : null}
+          {state.loading ? <OpenBookLoader title="Loading attendance" subtitle="Fetching roster and lecture data..." /> : null}
         </section>
 
         {state.selectedLecture ? (
@@ -219,7 +220,14 @@ export default function TeacherAttendancePage() {
                 disabled={state.saving || !roster.length}
                 className="rounded-2xl bg-[#0D5C48] px-4 py-3 text-sm font-semibold text-[#FAF7F0] disabled:cursor-not-allowed disabled:opacity-60"
               >
-                {state.saving ? "Saving..." : "Save / Update attendance"}
+                {state.saving ? (
+                  <span className="inline-flex items-center gap-2">
+                    <LeafSpinnerInline />
+                    Saving...
+                  </span>
+                ) : (
+                  "Save / Update attendance"
+                )}
               </button>
             </div>
 

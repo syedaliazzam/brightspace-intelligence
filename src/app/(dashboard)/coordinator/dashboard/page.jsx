@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import CoordinatorStatsCards from "@/components/coordinator/CoordinatorStatsCards";
 import CoordinatorGoTopButton from "@/components/coordinator/CoordinatorGoTopButton";
 import CoordinatorPortalSection from "@/components/coordinator/CoordinatorPortalSection";
+import { OpenBookLoader } from "@/components/shared/AshShajrahLoaders";
 
 const CACHE_KEY = "coordinator-dashboard";
 const CACHE_TTL = 60 * 1000;
@@ -145,6 +146,13 @@ export default function CoordinatorDashboardPage() {
         <section className="rounded-[1.75rem] border border-rose-200 bg-rose-50 p-5 text-sm text-rose-700">
           {state.error}
         </section>
+      ) : null}
+
+      {state.loading ? (
+        <OpenBookLoader
+          title="Loading coordinator dashboard"
+          subtitle="Fetching summary cards and recent activity..."
+        />
       ) : null}
 
       <CoordinatorPortalSection
