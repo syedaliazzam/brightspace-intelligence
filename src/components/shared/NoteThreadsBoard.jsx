@@ -24,7 +24,9 @@ function MessageBubble({ message, mode }) {
       ? senderRole === "admin"
       : mode === "student"
         ? senderRole === "student"
-        : ["teacher", "admin"].includes(senderRole);
+      : mode === "parent"
+          ? senderRole === "parent"
+          : ["teacher", "admin"].includes(senderRole);
 
   return (
     <div className={`flex ${mine ? "justify-end" : "justify-start"}`}>
@@ -233,7 +235,7 @@ export default function NoteThreadsBoard({ mode = "viewer", lectures = [] }) {
           <textarea value={compose.message} onChange={(e) => setCompose((c) => ({ ...c, message: e.target.value }))} placeholder="Add note or message" className="min-h-[120px] rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 text-sm text-[#063F32] outline-none focus:border-[#C9A227] focus:ring-4 focus:ring-[#FFF5D6]" required />
           <div className="flex items-center justify-between gap-3">
             <div className="rounded-2xl bg-[#FAF7F0] px-4 py-3 text-xs text-[#245C4F]">Select class and subject first, then write the note.</div>
-            <button className="rounded-2xl bg-[linear-gradient(135deg,#0D3B2E,#0D5C48)] px-4 py-3 text-sm font-semibold text-[#FAF7F0]">Add note</button>
+            <button className="rounded-2xl bg-[#0D5C48] px-4 py-3 text-sm font-semibold text-[#FAF7F0] hover:bg-[#063F32]">Add note</button>
           </div>
         </form>
       ) : null}

@@ -40,7 +40,7 @@ export default function TeacherClassTable({ items = [], onOpen }) {
               <td className="px-3 py-4 text-[#245C4F]">{item.display_status || getLectureDisplayStatus(item)}</td>
                 <td className="px-3 py-4">
                   {["completed_by_teacher", "verified_by_coordinator"].includes(String(item.status || "").toLowerCase()) ? null : (
-                    <button onClick={() => onOpen?.(item)} className="rounded-xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-3 py-2 text-xs font-semibold text-[#063F32]">Open</button>
+                    <button onClick={() => onOpen?.(item)} className="rounded-xl border border-[#2D8A6A]/20 px-3 py-2 text-xs font-semibold bg-[#FAF7F0] text-black hover:bg-[#F1EADC]">Open</button>
                   )}
                 </td>
               </tr>

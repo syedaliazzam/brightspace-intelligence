@@ -123,8 +123,8 @@ export default function HomeworkTable({ items = [], onEdit }) {
                   <td className="px-4 py-4 text-[#245C4F]">{item.pending_count || 0}</td>
                   <td className="px-4 py-4">
                     <div className="flex flex-wrap gap-2">
-                      <button type="button" onClick={() => setDetailsItem(item)} className="rounded-xl border border-[#2D8A6A]/20 px-3 py-2 text-xs font-semibold text-[#063F32]">View details</button>
-                      <button type="button" onClick={() => setEditItem(item)} className="rounded-xl bg-[#0D5C48] px-3 py-2 text-xs font-semibold text-[#FAF7F0]">Edit</button>
+                      <button type="button" onClick={() => setDetailsItem(item)} className="rounded-xl border border-[#2D8A6A]/20 px-3 py-2 text-xs font-semibold bg-[#FAF7F0] text-black hover:bg-[#F1EADC]">View details</button>
+                      <button type="button" onClick={() => setEditItem(item)} className="rounded-xl bg-[#0D5C48] hover:bg-[#063F32] px-3 py-2 text-xs font-semibold text-[#FAF7F0]">Edit</button>
                     </div>
                   </td>
                 </tr>
