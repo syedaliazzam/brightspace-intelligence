@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
 import { ALLOWED_CLASS_LEVELS } from "@/lib/academicCatalog";
@@ -239,7 +239,7 @@ function FieldError({ error }) {
   return error ? <p className="mt-2 text-sm text-rose-600">{error}</p> : null;
 }
 
-export default function AdmissionFormPage() {
+function AdmissionFormContent() {
   const [form, setForm] = useState(initialForm);
   const [errors, setErrors] = useState({});
   const [step, setStep] = useState(0);
@@ -875,5 +875,13 @@ export default function AdmissionFormPage() {
         </motion.div>
       </div>
     </main>
+  );
+}
+
+export default function AdmissionFormPage() {
+  return (
+    <Suspense fallback={<main className="min-h-screen bg-[#FAF7F0]" />}>
+      <AdmissionFormContent />
+    </Suspense>
   );
 }
