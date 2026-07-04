@@ -43,9 +43,9 @@ const REPORTS = [
   {
     key: "teacherClassReport",
     title: "Teacher Workload",
-    description: "Teachers with the highest number of assigned classes.",
+    description: "Teachers with the highest number of assigned lectures.",
     itemLabel: "Teacher",
-    valueLabel: "Classes",
+    valueLabel: "Lectures",
   },
 ];
 
@@ -161,7 +161,7 @@ export default function CoordinatorReportsPanel({ data }) {
                 <span className="text-[#245C4F]">{row.teacher_name || "-"}</span>
                 <span className="text-[#245C4F]">{row.class_name || "-"}</span>
                 <span className="text-right text-[#245C4F]">{formatDate(row.scheduled_start)}</span>
-                <span className="text-right text-[#245C4F]">
+                <span className="text-right text-[#245C4F]">  
                   {String(row.display_status || row.status || "").toLowerCase() === "ended"
                     ? "Ended"
                     : humanize(row.display_status || row.status)}

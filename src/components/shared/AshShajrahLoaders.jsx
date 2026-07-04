@@ -14,38 +14,15 @@ function LoadingTitle({ title, subtitle }) {
 export function OpenBookLoader({ title = "Loading", subtitle = "Opening your classroom..." }) {
   return (
     <div className="grid place-items-center gap-3 py-10">
-      <div className="book-loader relative h-[126px] w-[170px] perspective-[700px]">
+      <div className="ash-book-loader relative h-[126px] w-[170px] perspective-[700px]">
         <div className="book-base absolute left-1/2 bottom-[18px] h-[72px] w-[150px] -translate-x-1/2 rounded-[10px_10px_18px_18px] border border-[#2D8A6A]/15 bg-[linear-gradient(135deg,rgba(13,59,46,0.12),rgba(201,162,39,0.14))]" />
-        <div className="page-left absolute bottom-[28px] left-[15px] h-[82px] w-[70px] origin-right rounded-[14px_4px_8px_14px] border border-[#2D8A6A]/10 bg-[#fffaf0] shadow-[0_12px_26px_rgba(13,59,46,0.1)]" />
-        <div className="page-right absolute bottom-[28px] right-[15px] h-[82px] w-[70px] origin-left rounded-[4px_14px_14px_8px] border border-[#2D8A6A]/10 bg-[#fffaf0] shadow-[0_12px_26px_rgba(13,59,46,0.1)]" />
-        <div className="book-line absolute left-[20px] right-[20px] bottom-0 h-[5px] overflow-hidden rounded-full bg-[#2D8A6A]/10">
-          <span className="book-line-bar block h-full w-[45%] rounded-full bg-[linear-gradient(90deg,#2D8A6A,#C9A227,#E4C766)]" />
+        <div className="ash-book-page-left absolute bottom-[28px] left-[15px] h-[82px] w-[70px] origin-right rounded-[14px_4px_8px_14px] border border-[#2D8A6A]/10 bg-[#fffaf0] shadow-[0_12px_26px_rgba(13,59,46,0.1)]" />
+        <div className="ash-book-page-right absolute bottom-[28px] right-[15px] h-[82px] w-[70px] origin-left rounded-[4px_14px_14px_8px] border border-[#2D8A6A]/10 bg-[#fffaf0] shadow-[0_12px_26px_rgba(13,59,46,0.1)]" />
+        <div className="ash-book-line absolute left-[20px] right-[20px] bottom-0 h-[5px] overflow-hidden rounded-full bg-[#2D8A6A]/10">
+          <span className="ash-book-line-bar block h-full w-[45%] rounded-full bg-[linear-gradient(90deg,#2D8A6A,#C9A227,#E4C766)]" />
         </div>
       </div>
       <LoadingTitle title={title} subtitle={subtitle} />
-      <style jsx>{`
-        .page-left {
-          animation: ash-leftPage 1.8s ease-in-out infinite;
-        }
-        .page-right {
-          animation: ash-rightPage 1.8s ease-in-out infinite;
-        }
-        .book-line-bar {
-          animation: ash-bookLine 1.8s ease-in-out infinite;
-        }
-        @keyframes ash-leftPage {
-          0%, 100% { transform: rotateY(0deg); }
-          50% { transform: rotateY(22deg); }
-        }
-        @keyframes ash-rightPage {
-          0%, 100% { transform: rotateY(0deg); }
-          50% { transform: rotateY(-22deg); }
-        }
-        @keyframes ash-bookLine {
-          0% { transform: translateX(-110%); }
-          100% { transform: translateX(250%); }
-        }
-      `}</style>
     </div>
   );
 }

@@ -1,6 +1,6 @@
 import crypto from "crypto";
 import { NextResponse } from "next/server";
-import { sendEmail } from "@/lib/email";
+import { sendEmail, themedEmailShell } from "@/lib/email";
 import prisma from "@/lib/prisma";
 import { uploadPaymentProof } from "@/lib/supabaseStorage";
 
@@ -205,26 +205,23 @@ Paid At: ${paidAt}
 Please wait for coordinator approval.
 
 Login: ${portalUrl}`;
-    const parentHtml = `
-      <div style="font-family:Arial,sans-serif;background:#f8fafc;padding:24px;color:#0f172a;">
-        <div style="max-width:720px;margin:0 auto;background:#fff;border:1px solid #e2e8f0;border-radius:20px;padding:24px;">
-          <h2 style="margin:0 0 16px;">Payment Submitted</h2>
-          <p style="margin:0 0 16px;">Assalamualaikum <strong>${lead?.parent_name || payerName || "Parent"}</strong>, your payment submission has been received and is waiting for approval.</p>
-          <table style="width:100%;border-collapse:collapse;font-size:14px;">
-            <tr><td style="padding:6px 0;color:#64748b;">Student</td><td style="padding:6px 0;text-align:right;font-weight:700;">${lead?.student_name || "-"}</td></tr>
-            <tr><td style="padding:6px 0;color:#64748b;">Parent</td><td style="padding:6px 0;text-align:right;font-weight:700;">${lead?.parent_name || "-"}</td></tr>
-            <tr><td style="padding:6px 0;color:#64748b;">Email</td><td style="padding:6px 0;text-align:right;font-weight:700;">${lead?.email || "-"}</td></tr>
-            <tr><td style="padding:6px 0;color:#64748b;">Phone</td><td style="padding:6px 0;text-align:right;font-weight:700;">${lead?.phone || "-"}</td></tr>
-            <tr><td style="padding:6px 0;color:#64748b;">Class Level</td><td style="padding:6px 0;text-align:right;font-weight:700;">${lead?.class_level || "-"}</td></tr>
-            <tr><td style="padding:6px 0;color:#64748b;">Voucher No</td><td style="padding:6px 0;text-align:right;font-weight:700;">${voucherNo}</td></tr>
-            <tr><td style="padding:6px 0;color:#64748b;">Transaction ID</td><td style="padding:6px 0;text-align:right;font-weight:700;">${transactionId}</td></tr>
-            <tr><td style="padding:6px 0;color:#64748b;">Paid Amount</td><td style="padding:6px 0;text-align:right;font-weight:700;">${paidAmount}</td></tr>
-            <tr><td style="padding:6px 0;color:#64748b;">Paid At</td><td style="padding:6px 0;text-align:right;font-weight:700;">${paidAt}</td></tr>
-          </table>
-          <p style="margin:16px 0 0;color:#64748b;">Please wait for coordinator approval.</p>
-        </div>
-      </div>
-    `;
+    const parentHtml = themedEmailShell({
+      eyebrow: "Payment Submitted",
+      title: "Your payment submission has been received",
+      intro: `Assalamualaikum ${lead?.parent_name || payerName || "Parent"}, your payment submission has been received and is waiting for approval.`,
+      rows: [
+        ["Student", lead?.student_name || "-"],
+        ["Parent", lead?.parent_name || "-"],
+        ["Email", lead?.email || "-"],
+        ["Phone", lead?.phone || "-"],
+        ["Class Level", lead?.class_level || "-"],
+        ["Voucher No", voucherNo],
+        ["Transaction ID", transactionId],
+        ["Paid Amount", paidAmount],
+        ["Paid At", paidAt],
+      ],
+      footerNote: "Please wait for coordinator approval.",
+    });
 
     const coordinatorSubject = `Payment submitted: ${voucherNo}`;
     const coordinatorText = `Assalamualaikum ${coordinator?.full_name || "Coordinator"},
@@ -240,25 +237,22 @@ Voucher No: ${voucherNo}
 Transaction ID: ${transactionId}
 Paid Amount: ${paidAmount}
 Paid At: ${paidAt}`;
-    const coordinatorHtml = `
-      <div style="font-family:Arial,sans-serif;background:#f8fafc;padding:24px;color:#0f172a;">
-        <div style="max-width:720px;margin:0 auto;background:#fff;border:1px solid #e2e8f0;border-radius:20px;padding:24px;">
-          <h2 style="margin:0 0 16px;">Payment Submitted by User</h2>
-          <p style="margin:0 0 16px;">Assalamualaikum <strong>${coordinator?.full_name || "Coordinator"}</strong>, payment has been submitted and is waiting for approval.</p>
-          <table style="width:100%;border-collapse:collapse;font-size:14px;">
-            <tr><td style="padding:6px 0;color:#64748b;">Student</td><td style="padding:6px 0;text-align:right;font-weight:700;">${lead?.student_name || "-"}</td></tr>
-            <tr><td style="padding:6px 0;color:#64748b;">Parent</td><td style="padding:6px 0;text-align:right;font-weight:700;">${lead?.parent_name || "-"}</td></tr>
-            <tr><td style="padding:6px 0;color:#64748b;">Email</td><td style="padding:6px 0;text-align:right;font-weight:700;">${lead?.email || "-"}</td></tr>
-            <tr><td style="padding:6px 0;color:#64748b;">Phone</td><td style="padding:6px 0;text-align:right;font-weight:700;">${lead?.phone || "-"}</td></tr>
-            <tr><td style="padding:6px 0;color:#64748b;">Class Level</td><td style="padding:6px 0;text-align:right;font-weight:700;">${lead?.class_level || "-"}</td></tr>
-            <tr><td style="padding:6px 0;color:#64748b;">Voucher No</td><td style="padding:6px 0;text-align:right;font-weight:700;">${voucherNo}</td></tr>
-            <tr><td style="padding:6px 0;color:#64748b;">Transaction ID</td><td style="padding:6px 0;text-align:right;font-weight:700;">${transactionId}</td></tr>
-            <tr><td style="padding:6px 0;color:#64748b;">Paid Amount</td><td style="padding:6px 0;text-align:right;font-weight:700;">${paidAmount}</td></tr>
-            <tr><td style="padding:6px 0;color:#64748b;">Paid At</td><td style="padding:6px 0;text-align:right;font-weight:700;">${paidAt}</td></tr>
-          </table>
-        </div>
-      </div>
-    `;
+    const coordinatorHtml = themedEmailShell({
+      eyebrow: "Payment Submitted by User",
+      title: "A payment submission is waiting for approval",
+      intro: `Assalamualaikum ${coordinator?.full_name || "Coordinator"}, payment has been submitted and is waiting for approval.`,
+      rows: [
+        ["Student", lead?.student_name || "-"],
+        ["Parent", lead?.parent_name || "-"],
+        ["Email", lead?.email || "-"],
+        ["Phone", lead?.phone || "-"],
+        ["Class Level", lead?.class_level || "-"],
+        ["Voucher No", voucherNo],
+        ["Transaction ID", transactionId],
+        ["Paid Amount", paidAmount],
+        ["Paid At", paidAt],
+      ],
+    });
 
     try {
       if (lead?.email) {
