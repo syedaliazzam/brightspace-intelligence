@@ -29,15 +29,21 @@ export default function TeacherClassesPage() {
   useEffect(() => { load().catch((error) => setState((current) => ({ ...current, error: error.message }))); }, []);
 
   return (
-    <div className="space-y-6 min-h-screen">
-      <section className="rounded-[2rem] border border-white/70 bg-white/90 p-6 shadow-[0_24px_80px_-36px_rgba(15,23,42,0.25)] sm:p-8">
-        <p className="text-sm font-semibold uppercase tracking-[0.24em] text-sky-700">Lectures</p>
-        <h1 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">Assigned lecture history</h1>
+    <div className="min-h-screen rounded-[2rem] border-0 space-y-6 bg-[#FAF7F0]">
+      <div className="pointer-events-none rounded-[2rem] border-0 absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(201,162,39,0.12),transparent_35%),radial-gradient(circle_at_top_right,rgba(45,138,106,0.12),transparent_32%),linear-gradient(180deg,#FAF7F0_0%,#F7F1E3_100%)]" />
+      <div className="relative rounded-[2rem] border-0 mx-auto max-w-7xl space-y-6 px-4 py-4 sm:px-6 lg:px-8">
+      <section className="relative overflow-hidden rounded-[2rem] border border-[#2D8A6A]/15 bg-[linear-gradient(135deg,rgba(13,59,46,0.98),rgba(13,92,72,0.94))] p-6 text-[#FAF7F0] shadow-[0_24px_80px_-36px_rgba(13,59,46,0.32)] sm:p-8">
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(228,198,102,0.12),transparent_28%),radial-gradient(circle_at_bottom_left,rgba(101,184,145,0.14),transparent_30%)]" />
+        <div className="relative max-w-6xl">
+          <p className="inline-flex rounded-full border border-[#FFF5D6]/30 bg-[#FFF5D6]/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.24em] text-[#FFF5D6]">Lectures</p>
+          <h1 className="mb-3 mt-4 text-3xl font-bold text-[#FAF7F0] sm:text-4xl lg:text-5xl font-display">Assigned lecture history</h1>
+        </div>
       </section>
-      <div className="flex flex-wrap gap-2">{FILTERS.map((item) => <button key={item.value || "all"} onClick={() => load(item.value).catch((error) => setState((current) => ({ ...current, error: error.message })))} className={`rounded-2xl px-4 py-2 text-sm font-semibold ${state.status === item.value ? "bg-slate-950 text-white" : "border border-slate-200 bg-white text-slate-700"}`}>{item.label}</button>)}</div>
+      <div className="flex flex-wrap gap-2">{FILTERS.map((item) => <button key={item.value || "all"} onClick={() => load(item.value).catch((error) => setState((current) => ({ ...current, error: error.message })))} className={`rounded-2xl px-4 py-2 text-sm font-semibold transition ${state.status === item.value ? "bg-[linear-gradient(135deg,#C9A227,#E4C766)] text-[#063F32] shadow-[0_10px_28px_-18px_rgba(13,59,46,0.45)]" : "border border-[#2D8A6A]/20 bg-[#FAF7F0] text-[#063F32] hover:bg-[#F1EADC]"}`}>{item.label}</button>)}</div>
       {state.error ? <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">{state.error}</div> : null}
       <TeacherClassTable items={state.items} onOpen={(item) => setState((current) => ({ ...current, selected: item }))} />
       <ClassActionModal lecture={state.selected} open={Boolean(state.selected)} onClose={() => setState((current) => ({ ...current, selected: null }))} onChanged={() => load()} />
+      </div>
     </div>
   );
 }

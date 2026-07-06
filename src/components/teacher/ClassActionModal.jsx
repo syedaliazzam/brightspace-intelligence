@@ -34,11 +34,11 @@ export default function ClassActionModal({ lecture, open, onClose, onChanged }) 
   return (
     <AnimatePresence>
       <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-[#063F32]/45 px-4 pt-24 pb-8">
-        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 12 }} className="max-h-[calc(100vh-7rem)] w-full max-w-3xl overflow-y-auto rounded-[2rem] border border-[#2D8A6A]/15 bg-white p-6 shadow-[0_24px_80px_-36px_rgba(13,59,46,0.32)]">
+        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 12 }} className="max-h-[calc(100vh-7rem)] w-full max-w-3xl overflow-y-auto rounded-[2rem] border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(250,247,240,0.98)_100%)] p-6 shadow-[0_24px_80px_-36px_rgba(13,59,46,0.32)]">
           <div className="flex items-start justify-between gap-4">
             <div>
               <p className="text-sm font-semibold uppercase tracking-[0.22em] text-[#0D5C48]">Class actions</p>
-              <h2 className="mt-2 text-2xl font-semibold text-[#063F32]">{lecture.title}</h2>
+              <h2 className="mt-2 font-body text-2xl font-semibold text-[#063F32]">{lecture.title}</h2>
               <p className="mt-1 text-sm text-[#245C4F]">{lecture.student_name} - {lecture.subject_name}</p>
             </div>
             <button onClick={onClose} className="rounded-xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-3 py-2 text-sm font-semibold text-[#063F32]">Close</button>

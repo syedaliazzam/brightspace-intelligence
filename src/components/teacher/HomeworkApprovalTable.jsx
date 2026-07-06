@@ -8,13 +8,13 @@ function HomeworkSubmissionModal({ item, onClose, onAction }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center bg-[#063F32]/45 px-4 pt-28 pb-8">
-      <div className="w-full max-w-3xl overflow-hidden rounded-[2rem] border border-[#2D8A6A]/15 bg-white shadow-[0_24px_80px_-36px_rgba(13,59,46,0.32)]">
+      <div className="w-full max-w-3xl overflow-hidden rounded-[2rem] border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(250,247,240,0.98)_100%)] shadow-[0_24px_80px_-36px_rgba(13,59,46,0.32)]">
         <div className="flex items-start justify-between gap-4 border-b border-[#2D8A6A]/10 px-6 py-4">
           <div>
             <p className="text-sm font-semibold uppercase tracking-[0.24em] text-[#0D5C48]">Approve homework</p>
-            <h3 className="mt-2 text-2xl font-semibold tracking-tight text-[#063F32]">{item.title}</h3>
+            <h3 className="mt-2 font-body text-2xl font-semibold tracking-tight text-[#063F32]">{item.title}</h3>
             <p className="mt-1 text-sm text-[#245C4F]">
-              {item.student_name} Â· {item.subject_name} Â· {item.class_level}
+              {item.student_name} · {item.subject_name} · {item.class_level}
             </p>
           </div>
           <button
@@ -28,14 +28,14 @@ function HomeworkSubmissionModal({ item, onClose, onAction }) {
 
         <div className="space-y-4 p-6">
           <div className="grid gap-4 md:grid-cols-2">
-            <div className="rounded-2xl bg-[#FAF7F0] p-4 text-sm text-[#245C4F]">
+            <div className="rounded-[1.5rem] border border-[#2D8A6A]/12 bg-[#FAF7F0] p-4 text-sm text-[#245C4F]">
               <p className="font-semibold text-[#063F32]">Submission info</p>
               <p className="mt-2"><strong>Teacher:</strong> {item.teacher_name || "-"}</p>
               <p className="mt-1"><strong>Due date:</strong> {item.due_date ? new Date(item.due_date).toLocaleDateString("en-PK", { timeZone: "Asia/Karachi", dateStyle: "medium" }) : "-"}</p>
               <p className="mt-1"><strong>Status:</strong> {item.status || "-"}</p>
               <p className="mt-1"><strong>Submitted text:</strong> {item.submission_note || "No text submitted."}</p>
             </div>
-            <div className="rounded-2xl bg-[#FAF7F0] p-4 text-sm text-[#245C4F]">
+            <div className="rounded-[1.5rem] border border-[#2D8A6A]/12 bg-[#FAF7F0] p-4 text-sm text-[#245C4F]">
               <p className="font-semibold text-[#063F32]">Homework text</p>
               <p className="mt-2 whitespace-pre-line">{item.description || "No description."}</p>
             </div>
@@ -68,7 +68,7 @@ function RejectHomeworkModal({ onClose, onSubmit }) {
 
   return (
     <div className="fixed inset-0 z-[60] flex items-start justify-center bg-[#063F32]/45 px-4 pt-28 pb-8">
-      <div className="w-full max-w-xl rounded-[2rem] border border-[#2D8A6A]/15 bg-white shadow-[0_24px_80px_-36px_rgba(13,59,46,0.32)]">
+      <div className="w-full max-w-xl rounded-[2rem] border border-rose-200 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(250,247,240,0.98)_100%)] shadow-[0_24px_80px_-36px_rgba(13,59,46,0.32)]">
         <div className="border-b border-[#2D8A6A]/10 px-6 py-4">
           <p className="text-sm font-semibold uppercase tracking-[0.24em] text-rose-700">Reject homework</p>
           <h3 className="mt-2 text-2xl font-semibold tracking-tight text-[#063F32]">Add rejection reason</h3>
@@ -140,30 +140,30 @@ export default function HomeworkApprovalTable({ items = [], onRefresh }) {
 
   return (
     <>
-      <section className="overflow-hidden rounded-[1.75rem] border border-[#2D8A6A]/15 bg-white/90 shadow-[0_20px_70px_-36px_rgba(13,59,46,0.18)]">
+      <section className="overflow-hidden rounded-[2rem] border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(250,247,240,0.98)_100%)] shadow-[0_20px_70px_-36px_rgba(13,59,46,0.18)] backdrop-blur-xl">
         <div className="overflow-x-auto">
-          <table className="min-w-full text-left text-sm">
-            <thead className="bg-[#FAF7F0] text-xs uppercase tracking-[0.18em] text-[#0D5C48]">
+          <table className="min-w-full divide-y divide-[#F1EADC] text-left text-sm">
+            <thead className="bg-[linear-gradient(180deg,#FAF7F0_0%,#F1EADC_100%)] text-xs uppercase tracking-[0.18em] text-[#0D5C48]">
               <tr>
-                <th className="px-4 py-3">Student</th>
-                <th className="px-4 py-3">Class</th>
-                <th className="px-4 py-3">Subject</th>
-                <th className="px-4 py-3">Homework</th>
-                <th className="px-4 py-3">Due Date</th>
-                <th className="px-4 py-3">Submitted Note</th>
-                <th className="px-4 py-3">Actions</th>
+                <th className="px-6 py-4">Student</th>
+                <th className="px-6 py-4">Class</th>
+                <th className="px-6 py-4">Subject</th>
+                <th className="px-6 py-4">Homework</th>
+                <th className="px-6 py-4">Due Date</th>
+                <th className="px-6 py-4">Submitted Note</th>
+                <th className="px-6 py-4">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[#F1EADC]">
               {visibleItems.length ? visibleItems.map((item) => (
                 <tr key={item.id}>
-                  <td className="px-4 py-4 font-semibold text-[#063F32]">{item.student_name || "-"}</td>
-                  <td className="px-4 py-4 text-[#245C4F]">{item.class_level || "-"}</td>
-                  <td className="px-4 py-4 text-[#245C4F]">{item.subject_name || "-"}</td>
-                  <td className="px-4 py-4 text-[#245C4F]">{item.title || "-"}</td>
-                  <td className="px-4 py-4 text-[#245C4F]">{item.due_date ? new Date(item.due_date).toLocaleDateString("en-PK", { timeZone: "Asia/Karachi", dateStyle: "medium" }) : "-"}</td>
-                  <td className="px-4 py-4 text-[#245C4F]">{item.submission_note || "No note."}</td>
-                  <td className="px-4 py-4">
+                  <td className="px-6 py-4 font-semibold text-[#063F32]">{item.student_name || "-"}</td>
+                  <td className="px-6 py-4 text-[#245C4F]">{item.class_level || "-"}</td>
+                  <td className="px-6 py-4 text-[#245C4F]">{item.subject_name || "-"}</td>
+                  <td className="px-6 py-4 text-[#245C4F]">{item.title || "-"}</td>
+                  <td className="px-6 py-4 text-[#245C4F]">{item.due_date ? new Date(item.due_date).toLocaleDateString("en-PK", { timeZone: "Asia/Karachi", dateStyle: "medium" }) : "-"}</td>
+                  <td className="px-6 py-4 text-[#245C4F]">{item.submission_note || "No note."}</td>
+                  <td className="px-6 py-4">
                     <button
                       type="button"
                       onClick={() => setSelected(item)}

@@ -247,11 +247,11 @@ export default function NoteThreadsBoard({ mode = "viewer", lectures = [] }) {
           <table className="min-w-full text-left text-sm">
             <thead className="bg-[linear-gradient(180deg,#FAF7F0_0%,#F1EADC_100%)] text-xs uppercase tracking-[0.18em] text-[#0D5C48]">
               <tr>
-                <th className="px-5 py-4">Class</th>
-                <th className="px-5 py-4">Subject</th>
-                <th className="px-5 py-4">Last Message</th>
-                <th className="px-5 py-4">Date</th>
-                <th className="px-5 py-4">Actions</th>
+                <th className="px-6 py-4">Class</th>
+                <th className="px-6 py-4">Subject</th>
+                <th className="px-6 py-4">Last Message</th>
+                <th className="px-6 py-4">Date</th>
+                <th className="px-6 py-4">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[#F1EADC]">
@@ -263,11 +263,11 @@ export default function NoteThreadsBoard({ mode = "viewer", lectures = [] }) {
                 </tr>
               ) : threads.length ? threads.map((thread) => (
                 <tr key={thread.id}>
-                  <td className="px-5 py-4 font-semibold text-[#063F32]">{thread.class_level || thread.course_title || "-"}</td>
-                  <td className="px-5 py-4 text-[#245C4F]">{thread.subject_name || "-"}</td>
-                  <td className="px-5 py-4 text-[#245C4F]">{thread.last_message || "-"}</td>
-                  <td className="px-5 py-4 text-[#245C4F]">{thread.last_message_at ? new Date(thread.last_message_at).toLocaleString("en-PK", { timeZone: "Asia/Karachi" }) : "-"}</td>
-                  <td className="px-5 py-4">
+                  <td className="px-6 py-4 font-semibold text-[#063F32]">{thread.class_level || thread.course_title || "-"}</td>
+                  <td className="px-6 py-4 text-[#245C4F]">{thread.subject_name || "-"}</td>
+                  <td className="px-6 py-4 text-[#245C4F]">{thread.last_message || "-"}</td>
+                  <td className="px-6 py-4 text-[#245C4F]">{thread.last_message_at ? new Date(thread.last_message_at).toLocaleString("en-PK", { timeZone: "Asia/Karachi" }) : "-"}</td>
+                  <td className="px-6 py-4">
                     <div className="flex flex-wrap gap-2">
                       <button type="button" onClick={() => openThread(thread).catch((err) => setError(err.message))} className={`${buttonBase} border-[#2D8A6A]/20 bg-[#FAF7F0] text-[#063F32] hover:bg-[#F1EADC]`}>View</button>
                       {mode === "teacher" ? (

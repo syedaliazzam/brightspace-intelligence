@@ -107,18 +107,21 @@ export default function TeacherAttendancePage() {
   }
 
   return (
-    <div className="min-h-screen rounded-[2rem] border-0 space-y-6 bg-[#FAF7F0]">
-      <div className="pointer-events-none rounded-[2rem] border-0 absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(201,162,39,0.12),transparent_35%),radial-gradient(circle_at_top_right,rgba(45,138,106,0.12),transparent_32%),linear-gradient(180deg,#FAF7F0_0%,#F7F1E3_100%)]" />
+    <div className="min-h-screen border-0 space-y-6 bg-[#FAF7F0]">
+      <div className="pointer-events-none border-0 absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(201,162,39,0.12),transparent_35%),radial-gradient(circle_at_top_right,rgba(45,138,106,0.12),transparent_32%),linear-gradient(180deg,#FAF7F0_0%,#F7F1E3_100%)]" />
       <div className="relative rounded-[2rem] border-0 mx-auto max-w-7xl space-y-6 px-4 py-4 sm:px-6 lg:px-8">
-        <section className="rounded-[2rem] border border-[#2D8A6A]/15 bg-[linear-gradient(135deg,rgba(13,59,46,0.98),rgba(13,92,72,0.94))] p-6 text-[#FAF7F0] shadow-[0_24px_80px_-36px_rgba(13,59,46,0.32)] sm:p-8">
-          <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-[#E4C766]">Attendance</p>
-          <h1 className="mt-3 font-serif text-3xl font-semibold tracking-tight text-[#FAF7F0] sm:text-4xl">Manual student attendance</h1>
-          <p className="mt-3 max-w-2xl text-sm text-[#F1EADC]">Select a class, subject, and ended lecture to mark student attendance. Teacher Meet attendance remains synced separately.</p>
+        <section className="relative overflow-hidden rounded-[2rem] border border-[#2D8A6A]/15 bg-[linear-gradient(135deg,rgba(13,59,46,0.98),rgba(13,92,72,0.94))] p-6 text-[#FAF7F0] shadow-[0_24px_80px_-36px_rgba(13,59,46,0.32)] sm:p-8">
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(228,198,102,0.12),transparent_28%),radial-gradient(circle_at_bottom_left,rgba(101,184,145,0.14),transparent_30%)]" />
+          <div className="relative max-w-6xl">
+            <p className="inline-flex rounded-full border border-[#FFF5D6]/30 bg-[#FFF5D6]/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.24em] text-[#FFF5D6]">Attendance</p>
+            <h1 className="mb-3 mt-4 text-3xl font-bold text-[#FAF7F0] sm:text-4xl lg:text-5xl font-display">Manual student attendance</h1>
+            <p className="mt-3 max-w-2xl text-sm text-[#F1EADC]">Select a class, subject, and ended lecture to mark student attendance. Teacher Meet attendance remains synced separately.</p>
+          </div>
         </section>
 
         {state.error ? <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">{state.error}</div> : null}
 
-        <section className="rounded-[1.75rem] border border-[#2D8A6A]/15 bg-white/90 p-5 shadow-[0_20px_70px_-36px_rgba(13,59,46,0.18)]">
+        <section className="rounded-[2rem] border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(250,247,240,0.98)_100%)] p-5 shadow-[0_20px_70px_-36px_rgba(13,59,46,0.18)] backdrop-blur-xl">
           <div className="grid gap-3 md:grid-cols-3">
             <label className="block">
               <span className="mb-2 block text-sm font-medium text-[#245C4F]">Class</span>
@@ -203,12 +206,12 @@ export default function TeacherAttendancePage() {
         </section>
 
         {state.selectedLecture ? (
-          <section className="rounded-[1.75rem] border border-[#2D8A6A]/15 bg-white/90 p-5 shadow-[0_20px_70px_-36px_rgba(13,59,46,0.18)]">
+        <section className="rounded-[2rem] border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(250,247,240,0.98)_100%)] p-5 shadow-[0_20px_70px_-36px_rgba(13,59,46,0.18)] backdrop-blur-xl">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
               <div>
                 <p className="text-sm font-semibold uppercase tracking-[0.22em] text-[#0D5C48]">Lecture</p>
-                <h2 className="mt-2 text-2xl font-semibold text-[#063F32]">{state.selectedLecture.title}</h2>
-                <p className="mt-1 text-sm text-[#245C4F]">{state.selectedLecture.subject_name} Â· {state.selectedLecture.class_level}</p>
+                <h2 className="mt-2 font-body text-2xl font-semibold text-[#063F32]">{state.selectedLecture.title}</h2>
+                <p className="mt-1 text-sm text-[#245C4F]">{state.selectedLecture.subject_name} · {state.selectedLecture.class_level}</p>
                 <p className="mt-2 text-xs font-semibold uppercase tracking-[0.16em] text-[#0D5C48]">
                   {state.students.some((student) => String(student.source || "").toLowerCase() === "manual")
                     ? "Edit saved attendance"
@@ -232,14 +235,14 @@ export default function TeacherAttendancePage() {
             </div>
 
             <div className="mt-5 overflow-x-auto">
-              <table className="min-w-full text-left text-sm">
-                <thead className="text-xs uppercase tracking-[0.18em] text-[#0D5C48]">
+              <table className="min-w-full divide-y divide-[#F1EADC] text-left text-sm">
+                <thead className="bg-[linear-gradient(180deg,#FAF7F0_0%,#F1EADC_100%)] text-xs uppercase tracking-[0.18em] text-[#0D5C48]">
                   <tr>
-                    <th className="px-3 py-3">Student</th>
-                    <th className="px-3 py-3">Username</th>
-                    <th className="px-3 py-3">Email</th>
-                    <th className="px-3 py-3">Phone</th>
-                    <th className="px-3 py-3">Attendance</th>
+                    <th className="px-6 py-4">Student</th>
+                    <th className="px-6 py-4">Username</th>
+                    <th className="px-6 py-4">Email</th>
+                    <th className="px-6 py-4">Phone</th>
+                    <th className="px-6 py-4">Attendance</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#F1EADC]">

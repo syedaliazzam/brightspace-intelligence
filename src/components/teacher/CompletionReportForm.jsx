@@ -32,11 +32,11 @@ export default function CompletionReportForm({ lecture, onSaved }) {
   }
 
   return (
-    <form onSubmit={submit} className="grid gap-3">
-      <input value={form.topicCovered} onChange={(event) => setForm((current) => ({ ...current, topicCovered: event.target.value }))} placeholder="Topic covered" className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm" />
-      <textarea value={form.summary} onChange={(event) => setForm((current) => ({ ...current, summary: event.target.value }))} placeholder="Class summary" className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm" />
-      <input value={form.homeworkGiven} onChange={(event) => setForm((current) => ({ ...current, homeworkGiven: event.target.value }))} placeholder="Homework given" className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm" />
-      <textarea value={form.studentPerformance} onChange={(event) => setForm((current) => ({ ...current, studentPerformance: event.target.value }))} placeholder="Student performance note" className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm" />
+    <form onSubmit={submit} className="grid gap-3 rounded-[1.75rem] border border-[#2D8A6A]/12 bg-[linear-gradient(180deg,rgba(255,255,255,0.94)_0%,rgba(250,247,240,0.92)_100%)] p-4">
+      <input value={form.topicCovered} onChange={(event) => setForm((current) => ({ ...current, topicCovered: event.target.value }))} placeholder="Topic covered" className="rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 text-sm text-[#063F32] outline-none transition focus:border-[#2D8A6A] focus:ring-2 focus:ring-[#2D8A6A]/20" />
+      <textarea value={form.summary} onChange={(event) => setForm((current) => ({ ...current, summary: event.target.value }))} placeholder="Class summary" className="min-h-24 rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 text-sm text-[#063F32] outline-none transition focus:border-[#2D8A6A] focus:ring-2 focus:ring-[#2D8A6A]/20" />
+      <input value={form.homeworkGiven} onChange={(event) => setForm((current) => ({ ...current, homeworkGiven: event.target.value }))} placeholder="Homework given" className="rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 text-sm text-[#063F32] outline-none transition focus:border-[#2D8A6A] focus:ring-2 focus:ring-[#2D8A6A]/20" />
+      <textarea value={form.studentPerformance} onChange={(event) => setForm((current) => ({ ...current, studentPerformance: event.target.value }))} placeholder="Student performance note" className="min-h-24 rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 text-sm text-[#063F32] outline-none transition focus:border-[#2D8A6A] focus:ring-2 focus:ring-[#2D8A6A]/20" />
       <button disabled={pending} className="rounded-2xl bg-[#0D5C48] px-4 py-3 text-sm font-semibold text-[#FAF7F0]">
         {pending ? (
           <span className="inline-flex items-center gap-2">

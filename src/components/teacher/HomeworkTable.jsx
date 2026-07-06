@@ -24,11 +24,11 @@ function HomeworkDetailsModal({ item, onClose }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center bg-[#063F32]/45 px-4 pt-10 pb-8">
-      <div className="max-h-[calc(100vh-8rem)] w-full max-w-4xl overflow-hidden rounded-[2rem] border border-[#2D8A6A]/15 bg-white shadow-[0_24px_80px_-36px_rgba(13,59,46,0.32)]">
+      <div className="max-h-[calc(100vh-8rem)] w-full max-w-4xl overflow-hidden rounded-[2rem] border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(250,247,240,0.98)_100%)] shadow-[0_24px_80px_-36px_rgba(13,59,46,0.32)]">
         <div className="flex items-start justify-between gap-4 border-b border-[#2D8A6A]/10 px-6 py-4">
           <div>
             <p className="text-sm font-semibold uppercase tracking-[0.24em] text-[#0D5C48]">Homework details</p>
-            <h3 className="mt-2 text-2xl font-semibold tracking-tight text-[#063F32]">{item.title}</h3>
+            <h3 className="mt-2 font-body text-2xl font-semibold tracking-tight text-[#063F32]">{item.title}</h3>
           </div>
           <div className="flex items-center gap-2">
             <button type="button" onClick={onClose} className="rounded-xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-2 text-sm font-semibold text-[#063F32] hover:bg-[#F1EADC]">Close</button>
@@ -36,7 +36,7 @@ function HomeworkDetailsModal({ item, onClose }) {
         </div>
         <div className="max-h-[calc(100vh-8rem-92px)] overflow-y-auto p-6">
           <div className="grid gap-4 md:grid-cols-2">
-            <div className="rounded-2xl bg-[#FAF7F0] p-4 text-sm text-[#245C4F]">
+            <div className="rounded-[1.5rem] border border-[#2D8A6A]/12 bg-[#FAF7F0] p-4 text-sm text-[#245C4F]">
               <p className="font-semibold text-[#063F32]">Homework info</p>
               <p className="mt-2"><strong>Class:</strong> {item.class_level || item.course_title || "-"}</p>
               <p className="mt-1"><strong>Subject:</strong> {item.subject_name || "-"}</p>
@@ -46,14 +46,14 @@ function HomeworkDetailsModal({ item, onClose }) {
               <p className="mt-1"><strong>Submitted:</strong> {submittedRows.length}</p>
               <p className="mt-1"><strong>Not submitted:</strong> {pendingRows.length}</p>
             </div>
-            <div className="rounded-2xl bg-[#FAF7F0] p-4 text-sm text-[#245C4F]">
+            <div className="rounded-[1.5rem] border border-[#2D8A6A]/12 bg-[#FAF7F0] p-4 text-sm text-[#245C4F]">
               <p className="font-semibold text-[#063F32]">Description</p>
               <p className="mt-2 whitespace-pre-line">{item.description || "No description."}</p>
             </div>
           </div>
 
-          <div className="mt-6 rounded-2xl border border-[#2D8A6A]/15">
-            <div className="grid grid-cols-[1fr_1fr_1fr] bg-[#FAF7F0] px-4 py-3 text-xs font-semibold uppercase tracking-[0.16em] text-[#0D5C48]">
+          <div className="mt-6 overflow-hidden rounded-[1.75rem] border border-[#2D8A6A]/15">
+            <div className="grid grid-cols-[1fr_1fr_1fr] bg-[linear-gradient(180deg,#FAF7F0_0%,#F1EADC_100%)] px-4 py-3 text-xs font-semibold uppercase tracking-[0.16em] text-[#0D5C48]">
               <span>Student</span>
               <span>Username</span>
               <span>Status</span>
@@ -93,37 +93,37 @@ export default function HomeworkTable({ items = [], onEdit }) {
 
   return (
     <>
-      <section className="overflow-hidden rounded-[1.75rem] border border-[#2D8A6A]/15 bg-white/90 shadow-[0_20px_70px_-36px_rgba(13,59,46,0.18)]">
+      <section className="overflow-hidden rounded-[2rem] border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(250,247,240,0.98)_100%)] shadow-[0_20px_70px_-36px_rgba(13,59,46,0.18)] backdrop-blur-xl">
         <div className="overflow-x-auto">
-          <table className="min-w-full text-left text-sm">
-            <thead className="bg-[#FAF7F0] text-xs uppercase tracking-[0.18em] text-[#0D5C48]">
+          <table className="min-w-full divide-y divide-[#F1EADC] text-left text-sm">
+            <thead className="bg-[linear-gradient(180deg,#FAF7F0_0%,#F1EADC_100%)] text-xs uppercase tracking-[0.18em] text-[#0D5C48]">
               <tr>
-                <th className="px-4 py-3">Homework</th>
-                <th className="px-4 py-3">Lecture</th>
-                <th className="px-4 py-3">Class</th>
-                <th className="px-4 py-3">Subject</th>
-                <th className="px-4 py-3">Due Date</th>
-                <th className="px-4 py-3">Submitted</th>
-                <th className="px-4 py-3">Pending</th>
-                <th className="px-4 py-3">Actions</th>
+                <th className="px-6 py-4">Homework</th>
+                <th className="px-6 py-4">Lecture</th>
+                <th className="px-6 py-4">Class</th>
+                <th className="px-6 py-4">Subject</th>
+                <th className="px-6 py-4">Due Date</th>
+                <th className="px-6 py-4">Submitted</th>
+                <th className="px-6 py-4">Pending</th>
+                <th className="px-6 py-4">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[#F1EADC]">
               {visibleItems.length ? visibleItems.map((item, index) => (
                 <tr key={`${item.lecture_id}-${index}`}>
-                  <td className="px-4 py-4">
+                  <td className="px-6 py-4">
                     <p className="font-semibold text-[#063F32]">{item.title}</p>
                     <p className="mt-1 text-xs text-[#245C4F]">{item.description || "No description."}</p>
                   </td>
-                  <td className="px-4 py-4 text-[#245C4F]">{formatLectureLabel(item)}</td>
-                  <td className="px-4 py-4 text-[#245C4F]">{item.class_level || item.course_title || "-"}</td>
-                  <td className="px-4 py-4 text-[#245C4F]">{item.subject_name || "-"}</td>
-                  <td className="px-4 py-4 text-[#245C4F]">{formatDate(item.due_date)}</td>
-                  <td className="px-4 py-4 text-[#245C4F]">{item.submitted_count || 0}</td>
-                  <td className="px-4 py-4 text-[#245C4F]">{item.pending_count || 0}</td>
-                  <td className="px-4 py-4">
+                  <td className="px-6 py-4 text-[#245C4F]">{formatLectureLabel(item)}</td>
+                  <td className="px-6 py-4 text-[#245C4F]">{item.class_level || item.course_title || "-"}</td>
+                  <td className="px-6 py-4 text-[#245C4F]">{item.subject_name || "-"}</td>
+                  <td className="px-6 py-4 text-[#245C4F]">{formatDate(item.due_date)}</td>
+                  <td className="px-6 py-4 text-[#245C4F]">{item.submitted_count || 0}</td>
+                  <td className="px-6 py-4 text-[#245C4F]">{item.pending_count || 0}</td>
+                  <td className="px-6 py-4">
                     <div className="flex flex-wrap gap-2">
-                      <button type="button" onClick={() => setDetailsItem(item)} className="rounded-xl border border-[#2D8A6A]/20 px-3 py-2 text-xs font-semibold bg-[#FAF7F0] text-black hover:bg-[#F1EADC]">View details</button>
+                      <button type="button" onClick={() => setDetailsItem(item)} className="rounded-xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-3 py-2 text-xs font-semibold text-[#063F32] transition hover:bg-[#F1EADC]">View details</button>
                       <button type="button" onClick={() => setEditItem(item)} className="rounded-xl bg-[#0D5C48] hover:bg-[#063F32] px-3 py-2 text-xs font-semibold text-[#FAF7F0]">Edit</button>
                     </div>
                   </td>
@@ -202,11 +202,11 @@ function EditHomeworkModal({ item, onClose, onSaved }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center bg-[#063F32]/45 px-4 pt-28 pb-8">
-      <div className="max-h-[calc(100vh-8rem)] w-full max-w-4xl overflow-hidden rounded-[2rem] border border-[#2D8A6A]/15 bg-white shadow-[0_24px_80px_-36px_rgba(13,59,46,0.32)]">
+      <div className="max-h-[calc(100vh-8rem)] w-full max-w-4xl overflow-hidden rounded-[2rem] border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(250,247,240,0.98)_100%)] shadow-[0_24px_80px_-36px_rgba(13,59,46,0.32)]">
         <div className="flex items-start justify-between gap-4 border-b border-[#2D8A6A]/10 px-6 py-4">
           <div>
             <p className="text-sm font-semibold uppercase tracking-[0.24em] text-[#0D5C48]">Edit homework</p>
-            <h3 className="mt-2 text-2xl font-semibold tracking-tight text-[#063F32]">{item.title}</h3>
+            <h3 className="mt-2 font-body text-2xl font-semibold tracking-tight text-[#063F32]">{item.title}</h3>
           </div>
           <button type="button" onClick={onClose} className="rounded-xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-2 text-sm font-semibold text-[#063F32] hover:bg-[#F1EADC]">
             Close

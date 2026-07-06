@@ -21,11 +21,11 @@ export default function TeacherClassTable({ items = [], onOpen }) {
   const totalPages = Math.max(1, Math.ceil(items.length / pageSize));
 
   return (
-    <section className="rounded-[1.75rem] border border-[#2D8A6A]/15 bg-white/90 p-5 shadow-[0_20px_70px_-36px_rgba(13,59,46,0.18)]">
-      <div className="overflow-x-auto">
-        <table className="min-w-full text-left text-sm">
-          <thead className="text-xs uppercase tracking-[0.18em] text-[#0D5C48]">
-            <tr><th className="px-3 py-3">Class</th><th className="px-3 py-3">Student</th><th className="px-3 py-3">Subject</th><th className="px-3 py-3">Schedule</th><th className="px-3 py-3">Meet</th><th className="px-3 py-3">Status</th><th className="px-3 py-3">Actions</th></tr>
+    <section className="rounded-[2rem] border-0 border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(250,247,240,0.98)_100%)] p-0 shadow-[0_20px_70px_-36px_rgba(13,59,46,0.18)] backdrop-blur-xl">
+      <div className="overflow-x-auto rounded-[2rem]">
+        <table className="min-w-full divide-y rounded-[2rem] divide-[#F1EADC] text-left text-sm">
+          <thead className="bg-[linear-gradient(180deg,#FAF7F0_0%,#F1EADC_100%)] text-xs uppercase tracking-[0.18em] text-[#0D5C48]">
+            <tr><th className="px-6 py-4">Class</th><th className="px-6 py-4">Student</th><th className="px-6 py-4">Subject</th><th className="px-6 py-4">Schedule</th><th className="px-6 py-4">Meet</th><th className="px-6 py-4">Status</th><th className="px-6 py-4">Actions</th></tr>
           </thead>
           <tbody className="divide-y divide-[#F1EADC]">
             {visibleItems.length ? visibleItems.map((item) => (
@@ -40,7 +40,7 @@ export default function TeacherClassTable({ items = [], onOpen }) {
               <td className="px-3 py-4 text-[#245C4F]">{item.display_status || getLectureDisplayStatus(item)}</td>
                 <td className="px-3 py-4">
                   {["completed_by_teacher", "verified_by_coordinator"].includes(String(item.status || "").toLowerCase()) ? null : (
-                    <button onClick={() => onOpen?.(item)} className="rounded-xl border border-[#2D8A6A]/20 px-3 py-2 text-xs font-semibold bg-[#FAF7F0] text-black hover:bg-[#F1EADC]">Open</button>
+                    <button onClick={() => onOpen?.(item)} className="rounded-xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-3 py-2 text-xs font-semibold text-[#063F32] transition hover:bg-[#F1EADC]">Open</button>
                   )}
                 </td>
               </tr>

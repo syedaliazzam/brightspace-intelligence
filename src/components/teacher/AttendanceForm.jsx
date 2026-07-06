@@ -41,7 +41,7 @@ export default function AttendanceForm({ lecture, onSaved }) {
 
   return (
     <form onSubmit={submit} className="flex flex-col gap-3 sm:flex-row">
-      <select value={status} onChange={(event) => setStatus(event.target.value)} className="flex-1 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm">
+      <select value={status} onChange={(event) => setStatus(event.target.value)} className="flex-1 rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 text-sm text-[#063F32] outline-none transition focus:border-[#2D8A6A] focus:ring-2 focus:ring-[#2D8A6A]/20">
         <option value="present">Present</option>
         <option value="absent">Absent</option>
         <option value="late">Late</option>
