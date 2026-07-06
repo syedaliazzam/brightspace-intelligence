@@ -3,8 +3,17 @@
 import { motion } from "framer-motion";
 
 export default function AdminDashboardCards({ items = [] }) {
+  const gridClass =
+    items.length >= 6
+      ? "grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6"
+      : items.length === 5
+        ? "grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5"
+        : items.length === 4
+          ? "grid gap-4 sm:grid-cols-2 xl:grid-cols-4"
+          : "grid gap-4 sm:grid-cols-2 xl:grid-cols-3";
+
   return (
-    <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+    <section className={gridClass}>
       {items.map((item, index) => (
         <motion.article
           key={item.key}

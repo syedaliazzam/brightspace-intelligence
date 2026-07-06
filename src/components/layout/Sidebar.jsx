@@ -5,7 +5,7 @@ import { signOut } from "next-auth/react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { getNavigationForRole } from "@/config/navigation";
 import {
   LayoutDashboard,
@@ -32,6 +32,7 @@ import {
   PanelTop,
   ClipboardList,
   Wallet,
+  ChevronDown,
 } from "lucide-react";
 
 function isActive(pathname, href) {
@@ -41,13 +42,14 @@ function isActive(pathname, href) {
 function getIconForLabel(label) {
   const key = String(label || "").toLowerCase();
   if (key.includes("dashboard")) return LayoutDashboard;
+  if (key.includes("staff")) return UserCog;
   if (key.includes("interested students")) return Users;
   if (key.includes("admission records") || key.includes("registration")) return ClipboardList;
   if (key.includes("fee management")) return Wallet;
   if (key.includes("fee vouchers") || key.includes("fees")) return ReceiptText;
   if (key.includes("payments")) return CreditCard;
-  if (key === "students") return GraduationCap;
-  if (key === "parents") return UserRound;
+  if (key.includes("student")) return GraduationCap;
+  if (key.includes("parent")) return UserRound;
   if (key.includes("teacher assignments")) return UserCog;
   if (key.includes("lecture schedule")) return CalendarDays;
   if (key.includes("lecture verification")) return ClipboardCheck;
@@ -86,9 +88,17 @@ export default function Sidebar({
   const isUserManagementActive =
     pathname.startsWith("/admin/users") || openGroups.userManagement;
 
+  useEffect(() => {
+    if (!pathname.startsWith("/admin/users")) {
+      setOpenGroups((current) =>
+        current.userManagement ? { ...current, userManagement: false } : current
+      );
+    }
+  }, [pathname]);
+
   const shell = (
     <aside
-      className={`flex h-full w-72 flex-col border-r border-[#2D8A6A]/15 bg-[linear-gradient(180deg,#0D3B2E_0%,#063F32_100%)] shadow-[0_18px_60px_-40px_rgba(13,59,46,0.18)] backdrop-blur-xl transition-[width] duration-200 ${collapsed ? "lg:w-20" : "lg:w-72"
+      className={`flex h-full w-72 flex-col overflow-x-hidden border-r border-[#2D8A6A]/15 bg-[linear-gradient(180deg,#0D3B2E_0%,#063F32_100%)] shadow-[0_18px_60px_-40px_rgba(13,59,46,0.18)] backdrop-blur-xl transition-[width] duration-200 ${collapsed ? "lg:w-20" : "lg:w-72"
         }`}
     >
       <div
@@ -135,11 +145,11 @@ export default function Sidebar({
         </button>
       </div>
 
-      <nav className="scrollbar-thin scrollbar-thumb-white/20 flex-1 space-y-1 overflow-y-auto px-3 py-4">
+      <nav className="scrollbar-thin scrollbar-thumb-white/20 flex-1 space-y-1 overflow-x-hidden overflow-y-auto px-3 py-4">
         {items.map((item) => {
           if (item.label === "User Management" && Array.isArray(item.children)) {
             return (
-              <div key={item.label} className="space-y-2 rounded-2xl bg-white/5 p-2">
+              <div key={item.label} className="space-y-2 rounded-2xl bg-white/5 p-0 overflow-x-hidden">
                 <button
                   type="button"
                   onClick={() =>
@@ -151,9 +161,9 @@ export default function Sidebar({
                   className={`flex w-full items-center justify-between rounded-[18px] px-3 py-2 text-xs font-semibold uppercase tracking-[0.22em] transition ${isUserManagementActive
                       ? "bg-[linear-gradient(135deg,#C9A227_0%,#E4C766_100%)] text-[#063F32] shadow-[0_10px_24px_rgba(201,162,39,0.22)]"
                       : "text-[#F1EADC]/75 hover:bg-white/10 hover:text-[#FAF7F0]"
-                    }`}
+                    } ${collapsed ? "lg:justify-center lg:px-2" : ""}`}
                 >
-                  <span className="flex items-center gap-2">
+                  <span className={`flex min-w-0 items-center gap-2 ${collapsed ? "lg:justify-center" : ""}`}>
                     <span
                       className={`flex h-7 w-7 items-center justify-center rounded-xl transition ${isUserManagementActive
                           ? "bg-[#FFF5D6] text-[#063F32]"
@@ -162,32 +172,54 @@ export default function Sidebar({
                     >
                       <Users className="h-3.5 w-3.5" strokeWidth={2} />
                     </span>
-                    <span>{item.label}</span>
+                    <span
+                      className={`truncate transition-all duration-200 ${collapsed
+                          ? "lg:hidden lg:max-w-0 lg:overflow-hidden lg:opacity-0 lg:pointer-events-none"
+                          : "lg:max-w-full opacity-100"
+                        }`}
+                    >
+                      {item.label}
+                    </span>
                   </span>
-                  <span className="text-base leading-none text-[#FAF7F0]">{openGroups.userManagement ? "−" : "+"}</span>
+                  <span
+                    className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/10 text-[#FAF7F0] transition-transform duration-200 ${openGroups.userManagement ? "rotate-180" : ""} ${collapsed ? "lg:hidden" : ""}`}
+                  >
+                    <ChevronDown className="h-4 w-4" strokeWidth={2.25} />
+                  </span>
                 </button>
 
                 {openGroups.userManagement ? (
-                  <div className="space-y-1 pl-2">
+                  <div className={`space-y-1 overflow-x-hidden ${collapsed ? "pl-0" : "pl-0"}`}>
                     {item.children.map((child) => {
                       const childHref = child.href.split("?")[0];
                       const childView = new URLSearchParams(child.href.split("?")[1] || "").get("view");
                       const active =
                         pathname === childHref &&
                         (adminView ? adminView === childView : true);
+                      const ChildIcon = getIconForLabel(child.label);
 
                       return (
                         <Link
                           key={child.href}
                           href={child.href}
                           aria-current={active ? "page" : undefined}
-                          className={`flex items-center justify-between rounded-[18px] px-3 py-3 text-sm font-medium transition ${active
+                          className={`flex items-center justify-between gap-2 rounded-[18px] px-3 py-2 text-sm font-medium transition ${active
                               ? "bg-[linear-gradient(135deg,#C9A227_0%,#E4C766_100%)] text-[#063F32] shadow-[0_10px_24px_rgba(201,162,39,0.22)]"
                               : "text-[#F1EADC]/75 hover:bg-white/10 hover:text-[#FAF7F0]"
-                            }`}
+                            } ${collapsed ? "lg:px-2" : ""}`}
                           onClick={onMobileClose}
                         >
-                          <span className="truncate">{child.label}</span>
+                          <span className={`flex min-w-0 items-center gap-2 ${collapsed ? "lg:justify-center" : ""}`}>
+                            <span
+                              className={`flex h-7 w-7 shrink-0 items-center ml-2 justify-center rounded-xl transition ${active
+                                  ? "bg-[#FFF5D6] text-[#063F32]"
+                                  : "bg-white/10 text-[#FAF7F0]"
+                                }`}
+                            >
+                              <ChildIcon className="h-3.5 w-3.5" strokeWidth={2} />
+                            </span>
+                            <span className="truncate">{child.label}</span>
+                          </span>
                         </Link>
                       );
                     })}
@@ -279,3 +311,6 @@ export default function Sidebar({
     </>
   );
 }
+
+
+

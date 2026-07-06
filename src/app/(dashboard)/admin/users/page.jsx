@@ -840,7 +840,7 @@ export default function AdminUsersPage() {
               <button
                 type="button"
                 onClick={() => setModal({ open: true, record: row })}
-                className="rounded-xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-3 py-2 text-xs font-semibold text-[#063F32] transition hover:bg-[#F1EADC]"
+                className="rounded-xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-1 py-2 text-xs font-semibold text-[#063F32] transition hover:bg-[#F1EADC]"
               >
                 Edit
               </button>

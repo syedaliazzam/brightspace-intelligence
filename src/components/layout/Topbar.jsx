@@ -64,14 +64,6 @@ export default function Topbar({ session, onMenuClick, onToggleCollapsed, collap
               <p className="text-xs text-[#245C4F]">{role}</p>
             </div>
           </div>
-
-          <button
-            type="button"
-            onClick={onToggleCollapsed}
-            className="hidden rounded-2xl border border-[rgba(13,59,46,0.12)] bg-white/90 px-3 py-2 text-sm font-semibold text-[#0D5C48] transition hover:bg-[#FAF7F0] lg:inline-flex"
-          >
-            {collapsed ? "Expand" : "Collapse"}
-          </button>
         </div>
       </div>
     </header>
