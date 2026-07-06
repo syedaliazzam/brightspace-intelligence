@@ -10,7 +10,7 @@ export default function UpcomingClassesCard({ items = [] }) {
         <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-[#0D5C48]">
           Upcoming lectures
         </p>
-        <h2 className="mt-2 font-serif text-2xl font-semibold tracking-tight text-[#063F32]">
+        <h2 className="mt-2 font-body text-2xl font-semibold tracking-tight text-[#063F32]">
           Google Meet schedule
         </h2>
       </div>

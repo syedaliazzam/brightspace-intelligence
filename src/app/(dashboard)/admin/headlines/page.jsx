@@ -77,7 +77,7 @@ function HeadlineForm({ form, onChange, onSubmit, onCancel, submitting, submitLa
         <button
           type="submit"
           disabled={submitting}
-          className="rounded-2xl bg-[#0D5C48] px-5 py-3 text-sm font-semibold text-[#FAF7F0] transition hover:bg-[#063F32] disabled:cursor-not-allowed disabled:opacity-60"
+          className="rounded-2xl bg-[linear-gradient(135deg,#0D5C48_0%,#2D8A6A_55%,#C9A227_160%)] px-5 py-3 text-sm font-semibold text-[#FAF7F0] shadow-[0_12px_28px_rgba(201,162,39,0.16)] transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
         >
           {submitting ? (
             <span className="inline-flex items-center gap-2">
@@ -227,106 +227,114 @@ export default function AdminHeadlinesPage() {
   }
 
   return (
-    <div className="min-h-screen rounded-[2rem] bg-[#FAF7F0]">
-      <div className="pointer-events-none absolute inset-0 rounded-[2rem] bg-[radial-gradient(circle_at_top_left,rgba(201,162,39,0.12),transparent_35%),radial-gradient(circle_at_top_right,rgba(45,138,106,0.12),transparent_32%),linear-gradient(180deg,#FAF7F0_0%,#F7F1E3_100%)]" />
-      <div className="relative mx-auto max-w-7xl space-y-6 px-4 py-4 sm:px-6 lg:px-8">
-      <section className="rounded-[2rem] border border-[#2D8A6A]/15 bg-[linear-gradient(135deg,rgba(13,59,46,0.98),rgba(13,92,72,0.94))] p-6 text-[#FAF7F0] shadow-[0_24px_80px_-36px_rgba(13,59,46,0.32)] sm:p-8">
-        <div className="max-w-3xl">
-          <h1 className="mt-3 font-serif text-3xl font-semibold tracking-tight text-[#FAF7F0] sm:text-4xl">Schedule dashboard announcements</h1>
-          <p className="mt-3 text-sm leading-7 text-[#EAF6EF] sm:text-base">
-            Create time-based headlines that appear at the top of student, teacher, and parent dashboards while their date range is active.
-          </p>
-        </div>
-      </section>
-
-      <section className="rounded-[2rem] border border-[#2D8A6A]/15 bg-white/90 p-5 shadow-[0_20px_70px_-36px_rgba(13,59,46,0.18)] sm:p-6">
-        <div className="mb-5 flex items-center justify-between gap-3">
-          <div>
-            <p className="text-sm font-semibold uppercase tracking-[0.22em] text-[#0D5C48]">Create headline</p>
-            <h2 className="mt-2 text-2xl font-semibold tracking-tight text-[#063F32]">New dashboard headline</h2>
+    <div className="min-h-screen bg-[#FAF7F0] text-[#063F32]">
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(201,162,39,0.14),transparent_32%),radial-gradient(circle_at_top_right,rgba(45,138,106,0.14),transparent_28%),linear-gradient(180deg,#FAF7F0_0%,#F7F1E3_100%)]" />
+      <div className="relative mx-auto max-w-7xl space-y-6 px-4 py-5 sm:px-6 lg:px-8">
+        <section className="relative overflow-hidden rounded-[2rem] border border-[#2D8A6A]/15 bg-[linear-gradient(135deg,rgba(13,59,46,0.98),rgba(13,92,72,0.94))] p-6 text-[#FAF7F0] shadow-[0_24px_80px_-36px_rgba(13,59,46,0.32)] sm:p-8">
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(228,198,102,0.12),transparent_28%),radial-gradient(circle_at_bottom_left,rgba(101,184,145,0.14),transparent_30%)]" />
+          <div className="relative max-w-6xl">
+            <p className="inline-flex rounded-full border border-[#FFF5D6]/30 bg-[#FFF5D6]/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.24em] text-[#FFF5D6]">
+              Headlines
+            </p>
+            <h1 className="mb-3 mt-4 text-3xl font-bold text-white-deep sm:text-4xl lg:text-5xl font-display">
+              Schedule dashboard announcements
+            </h1>
+            <p className="mt-3 max-w-2xl text-sm leading-7 text-[#EAF6EF] sm:text-base">
+              Create time-based headlines that appear at the top of student, teacher, and parent dashboards while their date range is active.
+            </p>
           </div>
+        </section>
+
+        <section className="rounded-[2rem] border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(250,247,240,0.98)_100%)] p-5 shadow-[0_20px_70px_-36px_rgba(13,59,46,0.18)] backdrop-blur-xl sm:p-6">
+          <div className="mb-5 flex items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-semibold uppercase tracking-[0.22em] text-[#0D5C48]">Create headline</p>
+              <h2 className="mt-2 font-body text-2xl font-semibold tracking-tight text-[#063F32]">New dashboard headline</h2>
+            </div>
+          </div>
+
+          <HeadlineForm
+            form={createForm}
+            onChange={setCreateForm}
+            onSubmit={createHeadline}
+            submitting={submitting}
+            submitLabel="Create headline"
+          />
+        </section>
+
+        {error ? (
+          <section className="rounded-[1.75rem] border border-rose-200 bg-rose-50/95 p-5 text-sm text-rose-700 shadow-[0_18px_60px_-36px_rgba(185,28,28,0.12)] backdrop-blur-xl">
+            {error}
+          </section>
+        ) : null}
+
+        {!available ? (
+          <section className="rounded-[1.75rem] border border-dashed border-[#C9A227]/35 bg-[#FFF5D6] p-5 text-sm text-[#8A6B00] shadow-[0_18px_60px_-36px_rgba(201,162,39,0.12)]">
+            Headlines table is not available yet. Run the SQL script first, then refresh this page.
+          </section>
+        ) : null}
+
+        <div className="rounded-[2rem] border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(250,247,240,0.98)_100%)] p-5 shadow-[0_20px_70px_-36px_rgba(13,59,46,0.18)] backdrop-blur-xl">
+          <AdminDataTable
+            loading={loading}
+            loadingTitle="Loading headlines"
+            loadingSubtitle="Preparing the announcement table..."
+            columns={[
+              {
+                key: "headline",
+                label: "Headline",
+                render: (row) => <p className="max-w-xl whitespace-pre-wrap font-medium text-[#063F32]">{row.headline}</p>,
+              },
+              {
+                key: "date_range",
+                label: "Date range",
+                render: (row) => `${formatDate(row.start_date)} to ${formatDate(row.end_date)}`,
+              },
+              {
+                key: "display_status",
+                label: "Status",
+                render: (row) => formatStatus(row.display_status),
+              },
+              {
+                key: "created_by_name",
+                label: "Created by",
+                render: (row) => row.created_by_name || "Admin",
+              },
+            ]}
+            rows={loading ? [] : items}
+            emptyMessage={loading ? "Loading headlines..." : "No headlines have been created yet."}
+            actions={(row) => (
+              <>
+                <button
+                  type="button"
+                  onClick={() => startEdit(row)}
+                  className="rounded-xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-3 py-2 text-xs font-semibold text-[#063F32] transition hover:bg-[#F1EADC]"
+                >
+                  Edit
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDeletingItem(row)}
+                  className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700 transition hover:bg-rose-100"
+                >
+                  {submitting ? (
+                    <span className="inline-flex items-center gap-2">
+                      <LeafSpinnerInline />
+                      Deleting...
+                    </span>
+                  ) : (
+                    "Delete"
+                  )}
+                </button>
+              </>
+            )}
+          />
         </div>
 
-        <HeadlineForm
-          form={createForm}
-          onChange={setCreateForm}
-          onSubmit={createHeadline}
-          submitting={submitting}
-          submitLabel="Create headline"
-        />
-      </section>
-
-      {error ? (
-        <section className="rounded-[1.75rem] border border-rose-200 bg-rose-50 p-5 text-sm text-rose-700">
-          {error}
-        </section>
-      ) : null}
-
-      {!available ? (
-        <section className="rounded-[1.75rem] border border-dashed border-[#C9A227]/35 bg-[#FFF5D6] p-5 text-sm text-[#8A6B00]">
-          Headlines table is not available yet. Run the SQL script first, then refresh this page.
-        </section>
-      ) : null}
-
-      <AdminDataTable
-        loading={loading}
-        loadingTitle="Loading headlines"
-        loadingSubtitle="Preparing the announcement table..."
-        columns={[
-          {
-            key: "headline",
-            label: "Headline",
-            render: (row) => <p className="max-w-xl whitespace-pre-wrap font-medium text-[#063F32]">{row.headline}</p>,
-          },
-          {
-            key: "date_range",
-            label: "Date range",
-            render: (row) => `${formatDate(row.start_date)} to ${formatDate(row.end_date)}`,
-          },
-          {
-            key: "display_status",
-            label: "Status",
-            render: (row) => formatStatus(row.display_status),
-          },
-          {
-            key: "created_by_name",
-            label: "Created by",
-            render: (row) => row.created_by_name || "Admin",
-          },
-        ]}
-        rows={loading ? [] : items}
-        emptyMessage={loading ? "Loading headlines..." : "No headlines have been created yet."}
-        actions={(row) => (
-          <>
-            <button
-              type="button"
-              onClick={() => startEdit(row)}
-              className="rounded-xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-3 py-2 text-xs font-semibold text-black transition hover:bg-[#F1EADC]"
-            >
-              Edit
-            </button>
-            <button
-              type="button"
-              onClick={() => setDeletingItem(row)}
-              className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700 transition hover:bg-rose-100"
-            >
-              {submitting ? (
-                <span className="inline-flex items-center gap-2">
-                  <LeafSpinnerInline />
-                  Deleting...
-                </span>
-              ) : (
-                "Delete"
-              )}
-            </button>
-          </>
-        )}
-      />
-
-      {editingId ? (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-[#063F32]/45 px-4 pb-8 pt-24 backdrop-blur-sm sm:pt-28">
-          <div className="mx-auto w-full max-w-3xl">
-            <section className="overflow-hidden rounded-[2rem] border border-[#2D8A6A]/15 bg-white shadow-[0_32px_90px_-38px_rgba(13,59,46,0.24)]">
+        {editingId ? (
+          <div className="fixed inset-0 z-50 overflow-y-auto bg-[#063F32]/45 px-4 pb-8 pt-24 backdrop-blur-sm sm:pt-28">
+            <div className="mx-auto w-full max-w-3xl">
+              <section className="overflow-hidden rounded-[2rem] border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(250,247,240,0.98)_100%)] shadow-[0_32px_90px_-38px_rgba(13,59,46,0.24)]">
               <div className="bg-[linear-gradient(135deg,rgba(13,59,46,0.98),rgba(13,92,72,0.94))] px-6 py-6 text-[#FAF7F0] sm:px-8">
                 <div className="flex items-start justify-between gap-4">
                   <div className="max-w-2xl">
@@ -362,15 +370,15 @@ export default function AdminHeadlinesPage() {
                   submitLabel="Update headline"
                 />
               </div>
-            </section>
+              </section>
+            </div>
           </div>
-        </div>
-      ) : null}
+        ) : null}
 
-      {deletingItem ? (
-        <div className="fixed inset-0 z-[60] overflow-y-auto bg-[#063F32]/45 px-4 pb-8 pt-20 backdrop-blur-sm sm:pt-24">
-          <div className="mx-auto w-full max-w-2xl">
-            <section className="overflow-hidden rounded-[2rem] border border-rose-200 bg-white shadow-[0_32px_90px_-38px_rgba(13,59,46,0.24)]">
+        {deletingItem ? (
+          <div className="fixed inset-0 z-[60] overflow-y-auto bg-[#063F32]/45 px-4 pb-8 pt-20 backdrop-blur-sm sm:pt-24">
+            <div className="mx-auto w-full max-w-2xl">
+              <section className="overflow-hidden rounded-[2rem] border border-rose-200 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(250,247,240,0.98)_100%)] shadow-[0_32px_90px_-38px_rgba(13,59,46,0.24)]">
               <div className="bg-[linear-gradient(135deg,rgba(127,29,29,0.98),rgba(185,28,28,0.95),rgba(254,226,226,0.92))] px-6 py-6 text-white sm:px-8">
                 <div className="flex items-start justify-between gap-4">
                   <div className="max-w-xl">
@@ -390,7 +398,7 @@ export default function AdminHeadlinesPage() {
                 </div>
               </div>
 
-              <div className="space-y-5 p-6 sm:p-8">
+              <div className="space-y-5 p-6 sm:p-8 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(250,247,240,0.98)_100%)]">
                 <div className="rounded-2xl border border-[#2D8A6A]/15 bg-[#FAF7F0] p-5">
                   <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#245C4F]">Headline preview</p>
                   <p className="mt-3 whitespace-pre-wrap text-base font-medium text-[#063F32]">{deletingItem.headline || "-"}</p>
@@ -424,10 +432,10 @@ export default function AdminHeadlinesPage() {
                   </button>
                 </div>
               </div>
-            </section>
+              </section>
+            </div>
           </div>
-        </div>
-      ) : null}
+        ) : null}
       </div>
     </div>
   );

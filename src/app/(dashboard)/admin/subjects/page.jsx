@@ -146,29 +146,33 @@ export default function AdminSubjectsPage() {
   }, [load]);
 
   return (
-    <div className="min-h-screen rounded-[2rem] bg-[#FAF7F0]">
-      <div className="pointer-events-none absolute inset-0 rounded-[2rem] bg-[radial-gradient(circle_at_top_left,rgba(201,162,39,0.12),transparent_35%),radial-gradient(circle_at_top_right,rgba(45,138,106,0.12),transparent_32%),linear-gradient(180deg,#FAF7F0_0%,#F7F1E3_100%)]" />
-      <div className="relative mx-auto max-w-7xl space-y-6 px-4 py-4 sm:px-6 lg:px-8">
-      <section className="rounded-[2rem] border border-[#2D8A6A]/15 bg-[linear-gradient(135deg,rgba(13,59,46,0.98),rgba(13,92,72,0.94))] p-6 text-[#FAF7F0] shadow-[0_24px_80px_-36px_rgba(13,59,46,0.32)] sm:p-8">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-          <div className="max-w-3xl">
-            <h1 className="mt-3 font-serif text-3xl font-semibold tracking-tight text-[#FAF7F0] sm:text-4xl">
-              Maintain the subject catalog
-            </h1>
-            <p className="mt-3 text-sm leading-7 text-[#EAF6EF] sm:text-base">
-              Create and refine the academic subject structure that courses and classes will build on.
-            </p>
-          </div>
+    <div className="min-h-screen bg-[#FAF7F0] text-[#063F32]">
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(201,162,39,0.14),transparent_32%),radial-gradient(circle_at_top_right,rgba(45,138,106,0.14),transparent_28%),linear-gradient(180deg,#FAF7F0_0%,#F7F1E3_100%)]" />
+      <div className="relative mx-auto max-w-7xl space-y-6 px-4 py-5 sm:px-6 lg:px-8">
+        <section className="relative overflow-hidden rounded-[2.25rem] border border-[#2D8A6A]/15 bg-[linear-gradient(135deg,rgba(13,59,46,0.98),rgba(13,92,72,0.94))] p-6 text-[#FAF7F0] shadow-[0_24px_80px_-36px_rgba(13,59,46,0.32)] sm:p-8">
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(228,198,102,0.12),transparent_28%),radial-gradient(circle_at_bottom_left,rgba(101,184,145,0.14),transparent_30%)]" />
+          <div className="relative flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+            <div className="max-w-6xl">
+              <p className="inline-flex rounded-full border border-[#FFF5D6]/30 bg-[#FFF5D6]/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.24em] text-[#FFF5D6]">
+                Subject catalog
+              </p>
+              <h1 className="mb-3 mt-4 text-3xl font-bold text-white-deep sm:text-4xl lg:text-5xl font-display">
+                Maintain the subject catalog
+              </h1>
+              <p className="mt-3 text-sm leading-7 text-[#EAF6EF] sm:text-base">
+                Create and refine the academic subject structure that courses and classes will build on.
+              </p>
+            </div>
 
-          <button
-            type="button"
-            onClick={() => setModal({ open: true, record: null })}
-            className="inline-flex items-center justify-center rounded-2xl bg-[#FAF7F0] px-5 py-3 text-sm font-semibold text-[#0D5C48] transition hover:bg-[#DBD8D5]"
-          >
-            Create subject
-          </button>
-        </div>
-      </section>
+            <button
+              type="button"
+              onClick={() => setModal({ open: true, record: null })}
+              className="inline-flex items-center justify-center rounded-2xl bg-[#FAF7F0] px-5 py-3 text-sm font-semibold text-[#0D5C48] transition hover:bg-[#DBD8D5]"
+            >
+              Create subject
+            </button>
+          </div>
+        </section>
 
       <AdminDashboardCards
         items={[
@@ -199,7 +203,7 @@ export default function AdminSubjectsPage() {
         ]}
       />
 
-      <section className="rounded-[2rem] border border-[#2D8A6A]/15 bg-white/90 p-4 shadow-[0_20px_70px_-36px_rgba(13,59,46,0.18)] sm:p-5">
+        <section className="rounded-[2rem] border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(250,247,240,0.98)_100%)] p-4 shadow-[0_20px_70px_-36px_rgba(13,59,46,0.18)] backdrop-blur-xl sm:p-5">
         <form
           className="grid gap-3 lg:grid-cols-[minmax(0,1.2fr)_220px_220px_auto]"
           onSubmit={(event) => {
@@ -288,7 +292,7 @@ export default function AdminSubjectsPage() {
             Apply
           </button>
         </form>
-      </section>
+        </section>
 
       {state.error ? (
         <section className="rounded-[1.75rem] border border-rose-200 bg-rose-50 p-5 text-sm text-rose-700">
@@ -296,7 +300,7 @@ export default function AdminSubjectsPage() {
         </section>
       ) : null}
 
-      <AdminDataTable
+        <AdminDataTable
         columns={[
           {
             key: "name",
@@ -339,7 +343,7 @@ export default function AdminSubjectsPage() {
         )}
       />
 
-      {modal.open ? (
+        {modal.open ? (
         <SubjectFormModal
           key={modal.record?.id || "create-subject"}
           open={modal.open}
@@ -348,7 +352,7 @@ export default function AdminSubjectsPage() {
           onClose={() => setModal({ open: false, record: null })}
           onSuccess={() => load({ force: true })}
         />
-      ) : null}
+        ) : null}
       </div>
     </div>
   );

@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronDown } from "lucide-react";
-import { OpenBookLoader } from "@/components/shared/AshShajrahLoaders";
+import { LeafSpinnerInline, OpenBookLoader } from "@/components/shared/AshShajrahLoaders";
 
 function groupLectureOptions(lectures) {
   const map = new Map();
@@ -50,7 +50,7 @@ function Modal({ title, subtitle, onClose, children, actions, showTopClose = tru
           <div className="flex items-start justify-between gap-4">
             <div>
               <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-[#0D5C48]">{title}</p>
-              <h3 className="mt-2 font-serif text-2xl font-semibold tracking-tight text-[#063F32]">{subtitle}</h3>
+              <h3 className="mt-2 font-body text-2xl font-semibold tracking-tight text-[#063F32]">{subtitle}</h3>
             </div>
             {showTopClose ? (
               <button type="button" onClick={onClose} className="rounded-xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-2 text-sm font-semibold text-[#0D5C48] hover:bg-[#F1EADC]">
@@ -210,7 +210,7 @@ export default function NoteThreadsBoard({ mode = "viewer", lectures = [] }) {
     return () => window.clearTimeout(timer);
   }, []);
 
-  const panel = "rounded-[1.75rem] border border-[#2D8A6A]/15 bg-white/90 shadow-[0_20px_70px_-36px_rgba(13,59,46,0.18)]";
+  const panel = "rounded-[2rem] border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(250,247,240,0.98)_100%)] shadow-[0_20px_70px_-36px_rgba(13,59,46,0.18)] backdrop-blur-xl";
   const buttonBase = "rounded-xl border px-3 py-2 text-xs font-semibold transition";
 
   return (
@@ -245,31 +245,31 @@ export default function NoteThreadsBoard({ mode = "viewer", lectures = [] }) {
       <section className={`overflow-hidden ${panel}`}>
         <div className="overflow-x-auto">
           <table className="min-w-full text-left text-sm">
-            <thead className="bg-[#FAF7F0] text-xs uppercase tracking-[0.18em] text-[#0D5C48]">
+            <thead className="bg-[linear-gradient(180deg,#FAF7F0_0%,#F1EADC_100%)] text-xs uppercase tracking-[0.18em] text-[#0D5C48]">
               <tr>
-                <th className="px-4 py-3">Class</th>
-                <th className="px-4 py-3">Subject</th>
-                <th className="px-4 py-3">Last Message</th>
-                <th className="px-4 py-3">Date</th>
-                <th className="px-4 py-3">Actions</th>
+                <th className="px-5 py-4">Class</th>
+                <th className="px-5 py-4">Subject</th>
+                <th className="px-5 py-4">Last Message</th>
+                <th className="px-5 py-4">Date</th>
+                <th className="px-5 py-4">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[#F1EADC]">
               {loading ? (
                 <tr>
-                  <td colSpan={5} className="px-4 py-10">
+                  <td colSpan={5} className="px-5 py-10">
                     <OpenBookLoader title="Loading notes" subtitle="Preparing your notes threads..." />
                   </td>
                 </tr>
               ) : threads.length ? threads.map((thread) => (
                 <tr key={thread.id}>
-                  <td className="px-4 py-4 font-semibold text-[#063F32]">{thread.class_level || thread.course_title || "-"}</td>
-                  <td className="px-4 py-4 text-[#245C4F]">{thread.subject_name || "-"}</td>
-                  <td className="px-4 py-4 text-[#245C4F]">{thread.last_message || "-"}</td>
-                  <td className="px-4 py-4 text-[#245C4F]">{thread.last_message_at ? new Date(thread.last_message_at).toLocaleString("en-PK", { timeZone: "Asia/Karachi" }) : "-"}</td>
-                  <td className="px-4 py-4">
+                  <td className="px-5 py-4 font-semibold text-[#063F32]">{thread.class_level || thread.course_title || "-"}</td>
+                  <td className="px-5 py-4 text-[#245C4F]">{thread.subject_name || "-"}</td>
+                  <td className="px-5 py-4 text-[#245C4F]">{thread.last_message || "-"}</td>
+                  <td className="px-5 py-4 text-[#245C4F]">{thread.last_message_at ? new Date(thread.last_message_at).toLocaleString("en-PK", { timeZone: "Asia/Karachi" }) : "-"}</td>
+                  <td className="px-5 py-4">
                     <div className="flex flex-wrap gap-2">
-                      <button type="button" onClick={() => openThread(thread).catch((err) => setError(err.message))} className={`${buttonBase} border-[#2D8A6A]/20 bg-[#FAF7F0] text-black hover:bg-[#F1EADC]`}>View</button>
+                      <button type="button" onClick={() => openThread(thread).catch((err) => setError(err.message))} className={`${buttonBase} border-[#2D8A6A]/20 bg-[#FAF7F0] text-[#063F32] hover:bg-[#F1EADC]`}>View</button>
                       {mode === "teacher" ? (
                         <>
                           <button type="button" onClick={() => { setEditingThread(thread); setEditingText(thread.last_message || ""); }} className={`${buttonBase} border-[#2D8A6A]/20 bg-[#0D5C48] text-[#FAF7F0] hover:bg-[#063F32]`}>Edit</button>
@@ -316,8 +316,14 @@ export default function NoteThreadsBoard({ mode = "viewer", lectures = [] }) {
           showTopClose={false}
         >
           {messagesLoading ? (
-            <div className="rounded-2xl border border-dashed border-[#2D8A6A]/20 bg-[#FAF7F0] p-6 text-sm text-[#245C4F]">
-              <OpenBookLoader title="Loading chat" subtitle="Opening the conversation..." />
+            <div className="grid place-items-center gap-3 rounded-2xl border border-dashed border-[#2D8A6A]/20 bg-[#FAF7F0] p-6 text-sm text-[#245C4F]">
+              <LeafSpinnerInline className="h-6 w-6 border-2 border-[#2D8A6A]/20 border-t-[#C9A227]" />
+              <div className="text-center">
+                <p className="text-sm font-semibold uppercase tracking-[0.22em] text-[#0D5C48]">
+                  Loading chat
+                </p>
+                <p className="mt-2 text-sm text-[#245C4F]">Opening the conversation...</p>
+              </div>
             </div>
           ) : (
             <div className="max-h-[52vh] space-y-3 overflow-y-auto pr-1">

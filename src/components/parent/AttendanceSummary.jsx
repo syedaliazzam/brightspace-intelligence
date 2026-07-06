@@ -22,7 +22,7 @@ export default function AttendanceSummary({ summary = {}, items = [] }) {
     <section className="rounded-[1.75rem] border border-[#2D8A6A]/15 bg-white/90 p-5 shadow-[0_20px_70px_-36px_rgba(13,59,46,0.18)]">
       <div className="mb-5">
         <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-[#0D5C48]">Attendance</p>
-        <h2 className="mt-2 font-serif text-2xl font-semibold tracking-tight text-[#063F32]">
+        <h2 className="mt-2 font-body text-2xl font-semibold tracking-tight text-[#063F32]">
           {summary.percentage || 0}% present
         </h2>
         <p className="mt-2 text-sm text-[#245C4F]">{summary.present || 0} of {summary.total || 0} records marked present.</p>

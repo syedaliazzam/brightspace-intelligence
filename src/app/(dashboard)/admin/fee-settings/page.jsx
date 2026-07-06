@@ -50,16 +50,37 @@ function TabButton({ active, children, ...props }) {
     <button
       type="button"
       {...props}
-      className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
+      className={`rounded-full px-4 py-2 text-sm font-semibold transition-all duration-200 ${
         active
-          ? "bg-[linear-gradient(135deg,#C9A227,#E4C766)] text-[#063F32]"
-          : "border border-[#2D8A6A]/20 bg-[#FAF7F0] text-[#063F32] hover:bg-[#F1EADC]"
+          ? "bg-[linear-gradient(135deg,#C9A227,#E4C766)] text-[#063F32] shadow-[0_14px_30px_-18px_rgba(201,162,39,0.55)]"
+          : "border border-[#2D8A6A]/20 bg-[linear-gradient(180deg,rgba(255,255,255,0.92)_0%,rgba(250,247,240,0.98)_100%)] text-[#063F32] hover:border-[#C9A227]/35 hover:bg-[#FFF5D6]"
       }`}
     >
       {children}
     </button>
   );
 }
+
+const fieldClass =
+  "w-full rounded-2xl border border-[#2D8A6A]/18 bg-[linear-gradient(180deg,rgba(255,255,255,0.88)_0%,rgba(250,247,240,0.98)_100%)] px-4 py-3 text-[#063F32] outline-none transition placeholder:text-[#6A8B82] focus:border-[#2D8A6A] focus:bg-white focus:ring-4 focus:ring-[#FFF5D6]";
+
+const selectClass =
+  "w-full appearance-none rounded-2xl border border-[#2D8A6A]/18 bg-[linear-gradient(180deg,rgba(255,255,255,0.88)_0%,rgba(250,247,240,0.98)_100%)] px-4 py-3 pr-11 text-[#063F32] outline-none transition focus:border-[#2D8A6A] focus:bg-white focus:ring-4 focus:ring-[#FFF5D6]";
+
+const panelClass =
+  "rounded-[2rem] border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(250,247,240,0.98)_100%)] shadow-[0_20px_70px_-36px_rgba(13,59,46,0.18)] backdrop-blur-xl";
+
+const tablePanelClass =
+  "hidden overflow-hidden rounded-[1.75rem] border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(250,247,240,0.98)_100%)] shadow-[0_20px_70px_-36px_rgba(13,59,46,0.18)] backdrop-blur-xl lg:block";
+
+const tableHeadClass =
+  "bg-[linear-gradient(180deg,#FAF7F0_0%,#F1EADC_100%)]";
+
+const tableRowClass =
+  "transition hover:bg-[rgba(255,245,214,0.24)]";
+
+const actionButtonClass =
+  "rounded-xl border border-[#2D8A6A]/18 bg-[linear-gradient(180deg,rgba(255,255,255,0.94)_0%,rgba(250,247,240,0.98)_100%)] px-3 py-2 text-xs font-semibold text-[#063F32] transition hover:border-[#C9A227]/35 hover:bg-[#FFF5D6]";
 
 export default function AdminFeeSettingsPage() {
   const [activeTab, setActiveTab] = useState("regular");
@@ -308,17 +329,27 @@ export default function AdminFeeSettingsPage() {
   const sectionContent = {
     regular: (
       <div className="space-y-6">
-        <form
-          className="grid gap-4 rounded-[1.75rem] border border-[#2D8A6A]/15 bg-white/90 p-5 shadow-[0_20px_70px_-36px_rgba(13,59,46,0.18)] md:grid-cols-4"
-          onSubmit={(event) => {
-            event.preventDefault();
-            void submitEntity("regular");
-          }}
-        >
+        <div className={panelClass + " p-5"}>
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-semibold uppercase tracking-[0.22em] text-[#0D5C48]">Regular fees</p>
+              <h3 className="mt-2 font-body text-2xl font-semibold tracking-tight text-[#063F32]">
+                Class fee setup
+              </h3>
+            </div>
+          </div>
+
+          <form
+            className="grid gap-4 md:grid-cols-4"
+            onSubmit={(event) => {
+              event.preventDefault();
+              void submitEntity("regular");
+            }}
+          >
           {classLevels.length ? (
             <div className="relative">
               <select
-                className="w-full appearance-none rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 pr-11 text-[#063F32] outline-none focus:border-[#2D8A6A] focus:bg-white focus:ring-4 focus:ring-[#FFF5D6]"
+                className={selectClass}
                 value={forms.regular.class_level}
                 onMouseDown={() => setRegularClassOpen((current) => !current)}
                 onFocus={() => setRegularClassOpen(true)}
@@ -339,17 +370,17 @@ export default function AdminFeeSettingsPage() {
               No active class levels found. Please add courses first.
             </p>
           )}
-          <input className="rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 text-[#063F32] outline-none focus:border-[#2D8A6A] focus:bg-white focus:ring-4 focus:ring-[#FFF5D6]" placeholder="Fee name" value={forms.regular.name} onChange={(event) => updateForm("regular", "name", event.target.value)} />
-          <input type="number" min="0" step="0.01" className="rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 text-[#063F32] outline-none focus:border-[#2D8A6A] focus:bg-white focus:ring-4 focus:ring-[#FFF5D6]" placeholder="Amount" value={forms.regular.amount} onChange={(event) => updateForm("regular", "amount", event.target.value)} />
+          <input className={fieldClass} placeholder="Fee name" value={forms.regular.name} onChange={(event) => updateForm("regular", "name", event.target.value)} />
+          <input type="number" min="0" step="0.01" className={fieldClass} placeholder="Amount" value={forms.regular.amount} onChange={(event) => updateForm("regular", "amount", event.target.value)} />
           <div className="relative">
-            <select className="w-full appearance-none rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 pr-11 text-[#063F32] outline-none focus:border-[#2D8A6A] focus:bg-white focus:ring-4 focus:ring-[#FFF5D6]" value={forms.regular.status} onMouseDown={() => setRegularStatusOpen((current) => !current)} onFocus={() => setRegularStatusOpen(true)} onBlur={() => closeSelectState(setRegularStatusOpen)} onChange={(event) => updateForm("regular", "status", event.target.value)}>
+            <select className={selectClass} value={forms.regular.status} onMouseDown={() => setRegularStatusOpen((current) => !current)} onFocus={() => setRegularStatusOpen(true)} onBlur={() => closeSelectState(setRegularStatusOpen)} onChange={(event) => updateForm("regular", "status", event.target.value)}>
               <option value="active">Active</option>
               <option value="inactive">Inactive</option>
             </select>
             <ChevronDown className={`pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#0D5C48] transition-transform duration-200 ${regularStatusOpen ? "rotate-180" : "rotate-0"}`} />
           </div>
           <div className="flex gap-3 md:col-span-4">
-            <button disabled={saving || !forms.regular.class_level} className="rounded-2xl bg-[#0D5C48] px-4 py-3 text-sm font-semibold text-[#FAF7F0] disabled:opacity-60 hover:bg-[#063F32]">
+            <button disabled={saving || !forms.regular.class_level} className="rounded-2xl bg-[linear-gradient(135deg,#0D5C48,#2D8A6A)] px-4 py-3 text-sm font-semibold text-[#FAF7F0] shadow-[0_16px_32px_-20px_rgba(13,92,72,0.55)] transition hover:brightness-105 disabled:opacity-60">
               {saving ? (
                 <span className="inline-flex items-center gap-2">
                   <LeafSpinnerInline />
@@ -360,191 +391,229 @@ export default function AdminFeeSettingsPage() {
               )}
             </button>
             {editing.regular ? (
-              <button type="button" className="rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 text-sm font-semibold text-[#063F32]" onClick={() => { setEditing((current) => ({ ...current, regular: "" })); setForms((current) => ({ ...current, regular: EMPTY_FORM.regular })); }}>
+              <button type="button" className="rounded-2xl border border-[#2D8A6A]/18 bg-[linear-gradient(180deg,rgba(255,255,255,0.94)_0%,rgba(250,247,240,0.98)_100%)] px-4 py-3 text-sm font-semibold text-[#063F32] transition hover:border-[#C9A227]/35 hover:bg-[#FFF5D6]" onClick={() => { setEditing((current) => ({ ...current, regular: "" })); setForms((current) => ({ ...current, regular: EMPTY_FORM.regular })); }}>
                 Cancel
               </button>
             ) : null}
           </div>
-        </form>
+          </form>
+        </div>
 
-          <div className="overflow-hidden rounded-[1.75rem] border border-[#2D8A6A]/15 bg-white/90 shadow-[0_20px_70px_-36px_rgba(13,59,46,0.18)]">
-          <table className="min-w-full table-fixed">
-            <thead className="bg-[#FAF7F0] text-left text-xs font-semibold uppercase tracking-[0.18em] text-[#245C4F]">
-              <tr>
-                <th className="px-4 py-3">Class</th>
-                <th className="px-4 py-3">Name</th>
-                <th className="px-4 py-3">Amount</th>
-                <th className="px-4 py-3">Status</th>
-                <th className="px-4 py-3">Actions</th>
+        <div className={tablePanelClass}>
+          <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-[#F1EADC]">
+            <thead className={tableHeadClass}>
+              <tr className="text-left text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]">
+                <th className="px-6 py-4">Class</th>
+                <th className="px-6 py-4">Name</th>
+                <th className="px-6 py-4">Amount</th>
+                <th className="px-6 py-4">Status</th>
+                <th className="px-6 py-4">Actions</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="divide-y divide-[#F1EADC]">
               {regularFees.map((item, index) => (
-                <tr key={rowKey(item, index)} className="border-t border-[#F1EADC]">
+                <tr key={rowKey(item, index)} className={tableRowClass}>
                   <td className="px-4 py-3 text-sm">{item.class_level || "—"}</td>
                   <td className="px-4 py-3 text-sm">{item.name || item.title || "—"}</td>
                   <td className="px-4 py-3 text-sm">PKR {money(item.amount)}</td>
                   <td className="px-4 py-3 text-sm">{item.status || "active"}</td>
-                  <td className="px-4 py-3 text-sm">
-                    <button type="button" className="rounded-xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-3 py-2 text-xs font-semibold text-[#063F32] transition hover:bg-[#F1EADC]" onClick={() => startEdit("regular", item)}>Edit</button>
+                  <td className="px-6 py-5 align-top text-sm text-[#245C4F]">
+                    <button type="button" className={actionButtonClass} onClick={() => startEdit("regular", item)}>Edit</button>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
+          </div>
         </div>
       </div>
     ),
     other: (
       <div className="space-y-6">
-        <form
-          className="grid gap-4 rounded-[1.75rem] border border-[#2D8A6A]/15 bg-white/90 p-5 shadow-[0_20px_70px_-36px_rgba(13,59,46,0.18)] md:grid-cols-4"
-          onSubmit={(event) => {
-            event.preventDefault();
-            void submitEntity("other");
-          }}
-        >
-          <input className="rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 text-[#063F32] outline-none focus:border-[#2D8A6A] focus:bg-white focus:ring-4 focus:ring-[#FFF5D6]" placeholder="Fee title" value={forms.other.name} onChange={(event) => updateForm("other", "name", event.target.value)} />
-          <input className="rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 text-[#063F32] outline-none focus:border-[#2D8A6A] focus:bg-white focus:ring-4 focus:ring-[#FFF5D6]" placeholder="Fee type" value={forms.other.fee_type} onChange={(event) => updateForm("other", "fee_type", event.target.value)} />
-          <input className="rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 text-[#063F32] outline-none focus:border-[#2D8A6A] focus:bg-white focus:ring-4 focus:ring-[#FFF5D6]" placeholder="Class level (optional)" value={forms.other.class_level} onChange={(event) => updateForm("other", "class_level", event.target.value)} />
-          <input type="number" min="0" step="0.01" className="rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 text-[#063F32] outline-none focus:border-[#2D8A6A] focus:bg-white focus:ring-4 focus:ring-[#FFF5D6]" placeholder="Amount" value={forms.other.amount} onChange={(event) => updateForm("other", "amount", event.target.value)} />
-          <textarea rows={3} className="rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 text-[#063F32] md:col-span-4" placeholder="Description" value={forms.other.description} onChange={(event) => updateForm("other", "description", event.target.value)} />
-          <div className="relative md:col-span-1">
-            <select className="w-full appearance-none rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 pr-11 text-[#063F32] outline-none focus:border-[#2D8A6A] focus:bg-white focus:ring-4 focus:ring-[#FFF5D6]" value={forms.other.status} onMouseDown={() => setOtherStatusOpen((current) => !current)} onFocus={() => setOtherStatusOpen(true)} onBlur={() => closeSelectState(setOtherStatusOpen)} onChange={(event) => updateForm("other", "status", event.target.value)}>
-              <option value="active">Active</option>
-              <option value="inactive">Inactive</option>
-            </select>
-            <ChevronDown className={`pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#0D5C48] transition-transform duration-200 ${otherStatusOpen ? "rotate-180" : "rotate-0"}`} />
+        <div className={panelClass + " p-5"}>
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-semibold uppercase tracking-[0.22em] text-[#0D5C48]">Other fees</p>
+              <h3 className="mt-2 font-body text-2xl font-semibold tracking-tight text-[#063F32]">
+                Additional fee setup
+              </h3>
+            </div>
           </div>
-          <div className="flex gap-3 md:col-span-3 md:justify-end">
-            <button disabled={saving} className="rounded-2xl bg-[#0D5C48] px-4 py-3 text-sm font-semibold text-[#FAF7F0] disabled:opacity-60 hover:bg-[#063F32]">
-              {saving ? (
-                <span className="inline-flex items-center gap-2">
-                  <LeafSpinnerInline />
-                  {editing.other ? "Saving..." : "Adding..."}
-                </span>
-              ) : (
-                editing.other ? "Save other fee" : "Add other fee"
-              )}
-            </button>
-            {editing.other ? (
-              <button type="button" className="rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold" onClick={() => { setEditing((current) => ({ ...current, other: "" })); setForms((current) => ({ ...current, other: EMPTY_FORM.other })); }}>
-                Cancel
-              </button>
-            ) : null}
-          </div>
-        </form>
 
-        <div className="overflow-hidden rounded-[1.75rem] border border-[#2D8A6A]/15 bg-white/90 shadow-[0_20px_70px_-36px_rgba(13,59,46,0.18)]">
-          <table className="min-w-full table-fixed">
-            <thead className="bg-[#FAF7F0] text-left text-xs font-semibold uppercase tracking-[0.18em] text-[#245C4F]">
-              <tr>
-                <th className="px-4 py-3">Title</th>
-                <th className="px-4 py-3">Type</th>
-                <th className="px-4 py-3">Class</th>
-                <th className="px-4 py-3">Amount</th>
-                <th className="px-4 py-3">Status</th>
-                <th className="px-4 py-3">Actions</th>
+          <form
+            className="grid gap-4 md:grid-cols-4"
+            onSubmit={(event) => {
+              event.preventDefault();
+              void submitEntity("other");
+            }}
+          >
+            <input className={fieldClass} placeholder="Fee title" value={forms.other.name} onChange={(event) => updateForm("other", "name", event.target.value)} />
+            <input className={fieldClass} placeholder="Fee type" value={forms.other.fee_type} onChange={(event) => updateForm("other", "fee_type", event.target.value)} />
+            <input className={fieldClass} placeholder="Class level (optional)" value={forms.other.class_level} onChange={(event) => updateForm("other", "class_level", event.target.value)} />
+            <input type="number" min="0" step="0.01" className={fieldClass} placeholder="Amount" value={forms.other.amount} onChange={(event) => updateForm("other", "amount", event.target.value)} />
+            <textarea rows={3} className={`${fieldClass} md:col-span-4`} placeholder="Description" value={forms.other.description} onChange={(event) => updateForm("other", "description", event.target.value)} />
+            <div className="relative md:col-span-1">
+              <select className={selectClass} value={forms.other.status} onMouseDown={() => setOtherStatusOpen((current) => !current)} onFocus={() => setOtherStatusOpen(true)} onBlur={() => closeSelectState(setOtherStatusOpen)} onChange={(event) => updateForm("other", "status", event.target.value)}>
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+              </select>
+              <ChevronDown className={`pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#0D5C48] transition-transform duration-200 ${otherStatusOpen ? "rotate-180" : "rotate-0"}`} />
+            </div>
+            <div className="flex gap-3 md:col-span-3 md:justify-end">
+              <button disabled={saving} className="rounded-2xl bg-[linear-gradient(135deg,#0D5C48,#2D8A6A)] px-4 py-3 text-sm font-semibold text-[#FAF7F0] shadow-[0_16px_32px_-20px_rgba(13,92,72,0.55)] transition hover:brightness-105 disabled:opacity-60">
+                {saving ? (
+                  <span className="inline-flex items-center gap-2">
+                    <LeafSpinnerInline />
+                    {editing.other ? "Saving..." : "Adding..."}
+                  </span>
+                ) : (
+                  editing.other ? "Save other fee" : "Add other fee"
+                )}
+              </button>
+              {editing.other ? (
+                <button type="button" className="rounded-2xl border border-[#2D8A6A]/18 bg-[linear-gradient(180deg,rgba(255,255,255,0.94)_0%,rgba(250,247,240,0.98)_100%)] px-4 py-3 text-sm font-semibold text-[#063F32] transition hover:border-[#C9A227]/35 hover:bg-[#FFF5D6]" onClick={() => { setEditing((current) => ({ ...current, other: "" })); setForms((current) => ({ ...current, other: EMPTY_FORM.other })); }}>
+                  Cancel
+                </button>
+              ) : null}
+            </div>
+          </form>
+        </div>
+
+        <div className={tablePanelClass}>
+          <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-[#F1EADC]">
+            <thead className={tableHeadClass}>
+              <tr className="text-left text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]">
+                <th className="px-6 py-4">Title</th>
+                <th className="px-6 py-4">Type</th>
+                <th className="px-6 py-4">Class</th>
+                <th className="px-6 py-4">Amount</th>
+                <th className="px-6 py-4">Status</th>
+                <th className="px-6 py-4">Actions</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="divide-y divide-[#F1EADC]">
               {otherFees.map((item, index) => (
-                <tr key={rowKey(item, index)} className="border-t border-[#F1EADC]">
+                <tr key={rowKey(item, index)} className={tableRowClass}>
                   <td className="px-4 py-3 text-sm">{item.name || item.title || "—"}</td>
                   <td className="px-4 py-3 text-sm">{item.fee_type || "—"}</td>
                   <td className="px-4 py-3 text-sm">{item.class_level || "—"}</td>
                   <td className="px-4 py-3 text-sm">PKR {money(item.amount)}</td>
                   <td className="px-4 py-3 text-sm">{item.status || "active"}</td>
-                  <td className="px-4 py-3 text-sm">
-                    <button type="button" className="rounded-xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-3 py-2 text-xs font-semibold text-[#063F32] transition hover:bg-[#F1EADC]" onClick={() => startEdit("other", item)}>Edit</button>
+                  <td className="px-6 py-5 align-top text-sm text-[#245C4F]">
+                    <button type="button" className={actionButtonClass} onClick={() => startEdit("other", item)}>Edit</button>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
+          </div>
         </div>
       </div>
     ),
     payment: (
       <div className="space-y-6">
-        <form
-          className="grid gap-4 rounded-[1.75rem] border border-[#2D8A6A]/15 bg-white/90 p-5 shadow-[0_20px_70px_-36px_rgba(13,59,46,0.18)] md:grid-cols-4"
-          onSubmit={(event) => {
-            event.preventDefault();
-            void submitEntity("payment");
-          }}
-        >
-          <input className="rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 text-[#063F32] outline-none focus:border-[#2D8A6A] focus:bg-white focus:ring-4 focus:ring-[#FFF5D6]" placeholder="Method name" value={forms.payment.name} onChange={(event) => updateForm("payment", "name", event.target.value)} />
-          <input className="rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 text-[#063F32] outline-none focus:border-[#2D8A6A] focus:bg-white focus:ring-4 focus:ring-[#FFF5D6]" placeholder="Method key" value={forms.payment.method_key} onChange={(event) => updateForm("payment", "method_key", event.target.value)} />
-          <input className="rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 text-[#063F32] outline-none focus:border-[#2D8A6A] focus:bg-white focus:ring-4 focus:ring-[#FFF5D6]" placeholder="Account title" value={forms.payment.account_title} onChange={(event) => updateForm("payment", "account_title", event.target.value)} />
-          <input className="rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 text-[#063F32] outline-none focus:border-[#2D8A6A] focus:bg-white focus:ring-4 focus:ring-[#FFF5D6]" placeholder="Account number" value={forms.payment.account_number} onChange={(event) => updateForm("payment", "account_number", event.target.value)} />
-          <input className="rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 text-[#063F32] outline-none focus:border-[#2D8A6A] focus:bg-white focus:ring-4 focus:ring-[#FFF5D6]" placeholder="IBAN" value={forms.payment.iban} onChange={(event) => updateForm("payment", "iban", event.target.value)} />
-          <input className="rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 text-[#063F32] outline-none focus:border-[#2D8A6A] focus:bg-white focus:ring-4 focus:ring-[#FFF5D6]" placeholder="Bank name" value={forms.payment.bank_name} onChange={(event) => updateForm("payment", "bank_name", event.target.value)} />
-          <input className="rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 text-[#063F32] outline-none focus:border-[#2D8A6A] focus:bg-white focus:ring-4 focus:ring-[#FFF5D6]" placeholder="Branch code" value={forms.payment.branch_code} onChange={(event) => updateForm("payment", "branch_code", event.target.value)} />
-          <textarea rows={3} className="rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 text-[#063F32] outline-none md:col-span-4 focus:border-[#2D8A6A] focus:bg-white focus:ring-4 focus:ring-[#FFF5D6]" placeholder="Instructions" value={forms.payment.instructions} onChange={(event) => updateForm("payment", "instructions", event.target.value)} />
-          <div className="relative md:col-span-1">
-            <select className="w-full appearance-none rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 pr-11 text-[#063F32] outline-none focus:border-[#2D8A6A] focus:bg-white focus:ring-4 focus:ring-[#FFF5D6]" value={forms.payment.status} onMouseDown={() => setPaymentStatusOpen((current) => !current)} onFocus={() => setPaymentStatusOpen(true)} onBlur={() => closeSelectState(setPaymentStatusOpen)} onChange={(event) => updateForm("payment", "status", event.target.value)}>
-              <option value="active">Active</option>
-              <option value="inactive">Inactive</option>
-            </select>
-            <ChevronDown className={`pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#0D5C48] transition-transform duration-200 ${paymentStatusOpen ? "rotate-180" : "rotate-0"}`} />
+        <div className={panelClass + " p-5"}>
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-semibold uppercase tracking-[0.22em] text-[#0D5C48]">Payment methods</p>
+              <h3 className="mt-2 font-body text-2xl font-semibold tracking-tight text-[#063F32]">
+                Payment channel setup
+              </h3>
+            </div>
           </div>
-          <div className="flex gap-3 md:col-span-3 md:justify-end">
-            <button disabled={saving} className="rounded-2xl bg-[#0D5C48] px-4 py-3 text-sm font-semibold text-[#FAF7F0] disabled:opacity-60 hover:bg-[#063F32]">
-              {saving ? (
-                <span className="inline-flex items-center gap-2">
-                  <LeafSpinnerInline />
-                  {editing.payment ? "Saving..." : "Adding..."}
-                </span>
-              ) : (
-                editing.payment ? "Save payment method" : "Add payment method"
-              )}
-            </button>
-            {editing.payment ? (
-              <button type="button" className="rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 text-sm font-semibold text-[#063F32] transition hover:bg-[#F1EADC]" onClick={() => { setEditing((current) => ({ ...current, payment: "" })); setForms((current) => ({ ...current, payment: EMPTY_FORM.payment })); }}>
-                Cancel
-              </button>
-            ) : null}
-          </div>
-        </form>
 
-        <div className="overflow-hidden rounded-[1.75rem] border border-[#2D8A6A]/15 bg-white/90 shadow-[0_20px_70px_-36px_rgba(13,59,46,0.18)]">
-          <table className="min-w-full table-fixed">
-            <thead className="bg-[#FAF7F0] text-left text-xs font-semibold uppercase tracking-[0.18em] text-[#245C4F]">
-              <tr>
-                <th className="px-4 py-3">Name</th>
-                <th className="px-4 py-3">Method key</th>
-                <th className="px-4 py-3">Account</th>
-                <th className="px-4 py-3">Status</th>
-                <th className="px-4 py-3">Actions</th>
+          <form
+            className="grid gap-4 md:grid-cols-4"
+            onSubmit={(event) => {
+              event.preventDefault();
+              void submitEntity("payment");
+            }}
+          >
+            <input className={fieldClass} placeholder="Method name" value={forms.payment.name} onChange={(event) => updateForm("payment", "name", event.target.value)} />
+            <input className={fieldClass} placeholder="Method key" value={forms.payment.method_key} onChange={(event) => updateForm("payment", "method_key", event.target.value)} />
+            <input className={fieldClass} placeholder="Account title" value={forms.payment.account_title} onChange={(event) => updateForm("payment", "account_title", event.target.value)} />
+            <input className={fieldClass} placeholder="Account number" value={forms.payment.account_number} onChange={(event) => updateForm("payment", "account_number", event.target.value)} />
+            <input className={fieldClass} placeholder="IBAN" value={forms.payment.iban} onChange={(event) => updateForm("payment", "iban", event.target.value)} />
+            <input className={fieldClass} placeholder="Bank name" value={forms.payment.bank_name} onChange={(event) => updateForm("payment", "bank_name", event.target.value)} />
+            <input className={fieldClass} placeholder="Branch code" value={forms.payment.branch_code} onChange={(event) => updateForm("payment", "branch_code", event.target.value)} />
+            <textarea rows={3} className={`${fieldClass} md:col-span-4`} placeholder="Instructions" value={forms.payment.instructions} onChange={(event) => updateForm("payment", "instructions", event.target.value)} />
+            <div className="relative md:col-span-1">
+              <select className={selectClass} value={forms.payment.status} onMouseDown={() => setPaymentStatusOpen((current) => !current)} onFocus={() => setPaymentStatusOpen(true)} onBlur={() => closeSelectState(setPaymentStatusOpen)} onChange={(event) => updateForm("payment", "status", event.target.value)}>
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+              </select>
+              <ChevronDown className={`pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#0D5C48] transition-transform duration-200 ${paymentStatusOpen ? "rotate-180" : "rotate-0"}`} />
+            </div>
+            <div className="flex gap-3 md:col-span-3 md:justify-end">
+              <button disabled={saving} className="rounded-2xl bg-[linear-gradient(135deg,#0D5C48,#2D8A6A)] px-4 py-3 text-sm font-semibold text-[#FAF7F0] shadow-[0_16px_32px_-20px_rgba(13,92,72,0.55)] transition hover:brightness-105 disabled:opacity-60">
+                {saving ? (
+                  <span className="inline-flex items-center gap-2">
+                    <LeafSpinnerInline />
+                    {editing.payment ? "Saving..." : "Adding..."}
+                  </span>
+                ) : (
+                  editing.payment ? "Save payment method" : "Add payment method"
+                )}
+              </button>
+              {editing.payment ? (
+                <button type="button" className="rounded-2xl border border-[#2D8A6A]/18 bg-[linear-gradient(180deg,rgba(255,255,255,0.94)_0%,rgba(250,247,240,0.98)_100%)] px-4 py-3 text-sm font-semibold text-[#063F32] transition hover:border-[#C9A227]/35 hover:bg-[#FFF5D6]" onClick={() => { setEditing((current) => ({ ...current, payment: "" })); setForms((current) => ({ ...current, payment: EMPTY_FORM.payment })); }}>
+                  Cancel
+                </button>
+              ) : null}
+            </div>
+          </form>
+        </div>
+
+        <div className={tablePanelClass}>
+          <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-[#F1EADC]">
+            <thead className={tableHeadClass}>
+              <tr className="text-left text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]">
+                <th className="px-6 py-4">Name</th>
+                <th className="px-6 py-4">Method key</th>
+                <th className="px-6 py-4">Account</th>
+                <th className="px-6 py-4">Status</th>
+                <th className="px-6 py-4">Actions</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="divide-y divide-[#F1EADC]">
               {paymentMethods.map((item, index) => (
-                <tr key={rowKey(item, index)} className="border-t border-slate-100">
+                <tr key={rowKey(item, index)} className={tableRowClass}>
                   <td className="px-4 py-3 text-sm">{item.name || "—"}</td>
                   <td className="px-4 py-3 text-sm">{item.method_key || "—"}</td>
                   <td className="px-4 py-3 text-sm">{item.account_number || item.account_title || "—"}</td>
                   <td className="px-4 py-3 text-sm">{item.status || "active"}</td>
-                  <td className="px-4 py-3 text-sm">
-                    <button type="button" className="rounded-xl border border-slate-200 bg-[#FAF7F0] hover:bg-[#F1EADC] px-3 py-2 text-xs font-semibold" onClick={() => startEdit("payment", item)}>Edit</button>
+                  <td className="px-6 py-5 align-top text-sm text-[#245C4F]">
+                    <button type="button" className={actionButtonClass} onClick={() => startEdit("payment", item)}>Edit</button>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
+          </div>
         </div>
       </div>
     ),
     global: (
       <div className="space-y-6">
-        <div className="rounded-[1.75rem] border border-[#2D8A6A]/15 bg-white/90 p-5 shadow-[0_20px_70px_-36px_rgba(13,59,46,0.18)]">
+        <div className={panelClass + " p-5"}>
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-semibold uppercase tracking-[0.22em] text-[#0D5C48]">Global settings</p>
+              <h3 className="mt-2 font-body text-2xl font-semibold tracking-tight text-[#063F32]">
+                Voucher and support defaults
+              </h3>
+            </div>
+          </div>
+
           <div className="grid gap-4 md:grid-cols-2">
             {settings.map((setting) => {
               const draft = drafts[setting.id] || {};
               const isEditing = editing.setting === setting.id;
               return (
-                <article key={setting.id} className="rounded-2xl border border-[#2D8A6A]/15 bg-[#FAF7F0] p-4">
+                <article key={setting.id} className="rounded-[1.75rem] border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(250,247,240,0.98)_100%)] p-4 shadow-[0_14px_40px_-28px_rgba(13,59,46,0.18)]">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
                       <p className="font-semibold text-[#063F32]">{setting.name}</p>
@@ -553,7 +622,7 @@ export default function AdminFeeSettingsPage() {
                     <button
                       type="button"
                       onClick={() => setEditing((current) => ({ ...current, setting: isEditing ? "" : setting.id }))}
-                      className="rounded-xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-3 py-2 text-xs font-semibold text-[#063F32] transition hover:bg-[#F1EADC]"
+                      className={actionButtonClass}
                     >
                       {isEditing ? "Close" : "Edit"}
                     </button>
@@ -572,7 +641,7 @@ export default function AdminFeeSettingsPage() {
                               [setting.id]: { ...current[setting.id], value: event.target.value },
                             }))
                           }
-                          className="w-full rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 text-sm text-[#063F32] outline-none focus:border-[#2D8A6A] focus:bg-white focus:ring-4 focus:ring-[#FFF5D6] disabled:bg-slate-100"
+                          className={fieldClass + " text-sm disabled:bg-[#F1EADC]"}
                         />
                       ) : (
                         <p className="rounded-2xl border border-[#C9A227]/25 bg-[#FFF5D6] px-4 py-3 text-sm text-[#8A6B00]">
@@ -589,7 +658,7 @@ export default function AdminFeeSettingsPage() {
                           [setting.id]: { ...current[setting.id], description: event.target.value },
                         }))
                       }
-                      className="w-full rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 text-sm text-[#063F32] outline-none focus:border-[#2D8A6A] focus:bg-white focus:ring-4 focus:ring-[#FFF5D6] disabled:bg-slate-100"
+                      className={fieldClass + " text-sm disabled:bg-[#F1EADC]"}
                     />
                     <select
                       disabled={!isEditing}
@@ -600,7 +669,7 @@ export default function AdminFeeSettingsPage() {
                           [setting.id]: { ...current[setting.id], status: event.target.value },
                         }))
                       }
-                      className="w-full rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 text-sm text-[#063F32] outline-none focus:border-[#2D8A6A] focus:bg-white focus:ring-4 focus:ring-[#FFF5D6] disabled:bg-slate-100"
+                      className={selectClass + " text-sm disabled:bg-[#F1EADC]"}
                     >
                       <option value="active">Active</option>
                       <option value="inactive">Inactive</option>
@@ -609,7 +678,7 @@ export default function AdminFeeSettingsPage() {
                       <button
                         type="button"
                         onClick={() => void saveSetting(setting.id)}
-                        className="rounded-2xl bg-[#0D5C48] px-4 py-3 text-sm font-semibold text-[#FAF7F0] hover:bg-[#063F32]"
+                        className="rounded-2xl bg-[linear-gradient(135deg,#0D5C48,#2D8A6A)] px-4 py-3 text-sm font-semibold text-[#FAF7F0] shadow-[0_16px_32px_-20px_rgba(13,92,72,0.55)] transition hover:brightness-105"
                       >
                         {saving ? (
                           <span className="inline-flex items-center gap-2">
@@ -632,48 +701,52 @@ export default function AdminFeeSettingsPage() {
   };
 
   return (
-    <div className="min-h-screen rounded-[2rem] bg-[#FAF7F0]">
-      <div className="pointer-events-none absolute inset-0 rounded-[2rem] bg-[radial-gradient(circle_at_top_left,rgba(201,162,39,0.12),transparent_35%),radial-gradient(circle_at_top_right,rgba(45,138,106,0.12),transparent_32%),linear-gradient(180deg,#FAF7F0_0%,#F7F1E3_100%)]" />
-      <div className="relative mx-auto max-w-7xl space-y-6 px-4 py-4 sm:px-6 lg:px-8">
-      <section className="rounded-[2rem] border border-[#2D8A6A]/15 bg-[linear-gradient(135deg,rgba(13,59,46,0.98),rgba(13,92,72,0.94))] p-6 text-[#FAF7F0] shadow-[0_24px_80px_-36px_rgba(13,59,46,0.32)] sm:p-8">
-        <div className="max-w-3xl">
-          <h1 className="mt-3 font-serif text-3xl font-semibold tracking-tight text-[#FAF7F0] sm:text-4xl">
-            Admin fee management and payment setup
-          </h1>
-          <p className="mt-3 text-sm leading-7 text-[#EAF6EF] sm:text-base">
-            Manage class fees, extra charges, payment methods, and global voucher settings from one place.
-          </p>
-        </div>
-      </section>
-
-      <AdminDashboardCards items={cards} />
-
-      {error ? (
-        <section className="rounded-[1.75rem] border border-rose-200 bg-rose-50 p-5 text-sm text-rose-700">
-          {error}
+    <div className="min-h-screen bg-[#FAF7F0] text-[#063F32]">
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(201,162,39,0.14),transparent_32%),radial-gradient(circle_at_top_right,rgba(45,138,106,0.14),transparent_28%),linear-gradient(180deg,#FAF7F0_0%,#F7F1E3_100%)]" />
+      <div className="relative mx-auto max-w-7xl space-y-6 px-4 py-5 sm:px-6 lg:px-8">
+        <section className="relative overflow-hidden rounded-[2.25rem] border border-[#2D8A6A]/15 bg-[linear-gradient(135deg,rgba(13,59,46,0.98),rgba(13,92,72,0.94))] p-6 text-[#FAF7F0] shadow-[0_24px_80px_-36px_rgba(13,59,46,0.32)] sm:p-8">
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(228,198,102,0.12),transparent_28%),radial-gradient(circle_at_bottom_left,rgba(101,184,145,0.14),transparent_30%)]" />
+          <div className="relative max-w-6xl">
+            <p className="inline-flex rounded-full border border-[#FFF5D6]/30 bg-[#FFF5D6]/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.24em] text-[#FFF5D6]">
+              Fee management
+            </p>
+            <h1 className="mb-3 mt-4 text-3xl font-bold text-white-deep sm:text-4xl lg:text-5xl font-display">
+              Admin fee management and payment setup
+            </h1>
+            <p className="mt-3 max-w-2xl text-sm leading-7 text-[#EAF6EF] sm:text-base">
+              Manage class fees, extra charges, payment methods, and global voucher settings from one place.
+            </p>
+          </div>
         </section>
-      ) : null}
 
-      <section className="rounded-[2rem] border border-[#2D8A6A]/15 bg-white/90 p-5 shadow-[0_20px_70px_-36px_rgba(13,59,46,0.18)]">
-        <div className="flex flex-wrap gap-3">
-          {TABS.map((tab) => (
-            <TabButton key={tab.key} active={activeTab === tab.key} onClick={() => setActiveTab(tab.key)}>
-              {tab.label}
-            </TabButton>
-          ))}
-        </div>
+        <AdminDashboardCards items={cards} />
 
-        <div className="mt-6">
-          {loading ? (
-            <OpenBookLoader
-              title="Loading fee management"
-              subtitle="Fetching regular fees, payment methods, and settings..."
-            />
-          ) : (
-            sectionContent[activeTab]
-          )}
-        </div>
-      </section>
+        {error ? (
+          <section className="rounded-[1.75rem] border border-rose-200 bg-rose-50/95 p-5 text-sm text-rose-700 shadow-[0_18px_60px_-36px_rgba(185,28,28,0.12)] backdrop-blur-xl">
+            {error}
+          </section>
+        ) : null}
+
+        <section className={panelClass + " p-5"}>
+          <div className="flex flex-wrap gap-3">
+            {TABS.map((tab) => (
+              <TabButton key={tab.key} active={activeTab === tab.key} onClick={() => setActiveTab(tab.key)}>
+                {tab.label}
+              </TabButton>
+            ))}
+          </div>
+
+          <div className="mt-6">
+            {loading ? (
+              <OpenBookLoader
+                title="Loading fee management"
+                subtitle="Fetching regular fees, payment methods, and settings..."
+              />
+            ) : (
+              sectionContent[activeTab]
+            )}
+          </div>
+        </section>
       </div>
     </div>
   );

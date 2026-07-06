@@ -30,6 +30,8 @@ import {
   BookText,
   Layers3,
   PanelTop,
+  PanelLeftClose,
+  PanelLeftOpen,
   ClipboardList,
   Wallet,
   ChevronDown,
@@ -141,7 +143,11 @@ export default function Sidebar({
             }`}
           aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
         >
-          <span className={`text-sm leading-none font-bold ${collapsed ? "text-[#063F32]" : "text-white"}`}>{collapsed ? ">" : "<"}</span>
+          {collapsed ? (
+            <PanelLeftOpen className="h-4 w-4 text-[#063F32]" strokeWidth={2.25} />
+          ) : (
+            <PanelLeftClose className="h-4 w-4 text-white" strokeWidth={2.25} />
+          )}
         </button>
       </div>
 
@@ -158,14 +164,14 @@ export default function Sidebar({
                       userManagement: !current.userManagement,
                     }))
                   }
-                  className={`flex w-full items-center justify-between rounded-[18px] px-3 py-2 text-xs font-semibold uppercase tracking-[0.22em] transition ${isUserManagementActive
+                  className={`flex w-full items-center justify-between rounded-[18px] px-3 py-3 text-sm font-medium transition ${isUserManagementActive
                       ? "bg-[linear-gradient(135deg,#C9A227_0%,#E4C766_100%)] text-[#063F32] shadow-[0_10px_24px_rgba(201,162,39,0.22)]"
                       : "text-[#F1EADC]/75 hover:bg-white/10 hover:text-[#FAF7F0]"
                     } ${collapsed ? "lg:justify-center lg:px-2" : ""}`}
                 >
-                  <span className={`flex min-w-0 items-center gap-2 ${collapsed ? "lg:justify-center" : ""}`}>
+                  <span className={`flex min-w-0 items-center gap-3 ${collapsed ? "lg:justify-center" : ""}`}>
                     <span
-                      className={`flex h-7 w-7 items-center justify-center rounded-xl transition ${isUserManagementActive
+                      className={`flex h-9 w-9 items-center justify-center rounded-xl transition ${isUserManagementActive
                           ? "bg-[#FFF5D6] text-[#063F32]"
                           : "bg-white/10 text-[#FAF7F0]"
                         }`}
@@ -173,7 +179,7 @@ export default function Sidebar({
                       <Users className="h-3.5 w-3.5" strokeWidth={2} />
                     </span>
                     <span
-                      className={`truncate transition-all duration-200 ${collapsed
+                    className={`truncate transition-all duration-200 ${collapsed
                           ? "lg:hidden lg:max-w-0 lg:overflow-hidden lg:opacity-0 lg:pointer-events-none"
                           : "lg:max-w-full opacity-100"
                         }`}

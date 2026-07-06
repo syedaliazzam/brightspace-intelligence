@@ -52,8 +52,8 @@ export default function DashboardShell({ session, children }) {
           </>
         ) : null}
 
-        <main className={`transition-[padding] duration-200 ${isStudent ? "pt-0" : `pt-24 ${collapsed ? "lg:pl-20" : "lg:pl-72"}`}`}>
-          <div className="px-4 pb-4 sm:px-4 lg:px-4">
+        <main className={`transition-[padding] duration-200 ${isStudent ? "pt-0" : `pt-20 ${collapsed ? "lg:pl-20" : "lg:pl-72"}`}`}>
+          <div className="px-0 pb-0 sm:px-0 lg:px-0">
             {isStudent ? children : (
               <motion.section
                 initial={{ opacity: 0, y: 14 }}

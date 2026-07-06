@@ -18,7 +18,7 @@ export default function FeeStatusPanel({ items = [] }) {
     <section className="rounded-[1.75rem] border border-[#2D8A6A]/15 bg-white/90 p-5 shadow-[0_20px_70px_-36px_rgba(13,59,46,0.18)]">
       <div className="mb-4">
         <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-[#0D5C48]">Fees</p>
-        <h2 className="mt-2 font-serif text-2xl font-semibold tracking-tight text-[#063F32]">Voucher and payment status</h2>
+        <h2 className="mt-2 font-body text-2xl font-semibold tracking-tight text-[#063F32]">Voucher and payment status</h2>
       </div>
       <div className="grid gap-4">
         {visibleItems.length ? visibleItems.map((item, index) => (

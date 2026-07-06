@@ -29,7 +29,7 @@ function formatLabel(value) {
 
 function DetailBlock({ label, value }) {
   return (
-    <div className="rounded-2xl border border-[#2D8A6A]/15 bg-white/90 p-4">
+    <div className="rounded-2xl border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(250,247,240,0.98)_100%)] p-4 shadow-[0_14px_40px_-28px_rgba(13,59,46,0.18)]">
       <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#245C4F]">{label}</p>
       <p className="mt-2 text-sm font-semibold text-[#063F32]">{value || "Not provided"}</p>
     </div>
@@ -576,39 +576,43 @@ export default function AdminUsersPage() {
   }
 
   return (
-    <div className="min-h-screen rounded-[2rem] bg-[#FAF7F0]">
-      <div className="pointer-events-none absolute inset-0 rounded-[2rem] bg-[radial-gradient(circle_at_top_left,rgba(201,162,39,0.12),transparent_35%),radial-gradient(circle_at_top_right,rgba(45,138,106,0.12),transparent_32%),linear-gradient(180deg,#FAF7F0_0%,#F7F1E3_100%)]" />
-      <div className="relative mx-auto max-w-7xl space-y-6 px-4 py-4 sm:px-6 lg:px-8">
-      <section className="rounded-[2rem] border border-[#2D8A6A]/15 bg-[linear-gradient(135deg,rgba(13,59,46,0.98),rgba(13,92,72,0.94))] p-6 text-[#FAF7F0] shadow-[0_24px_80px_-36px_rgba(13,59,46,0.32)] sm:p-8">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-          <div className="max-w-3xl">
-            <h1 className="mt-3 font-serif text-3xl font-semibold tracking-tight text-[#FAF7F0] sm:text-4xl">
+    <div className="min-h-screen bg-[#FAF7F0] text-[#063F32]">
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(201,162,39,0.14),transparent_32%),radial-gradient(circle_at_top_right,rgba(45,138,106,0.14),transparent_28%),linear-gradient(180deg,#FAF7F0_0%,#F7F1E3_100%)]" />
+      <div className="relative mx-auto max-w-7xl space-y-6 px-4 py-5 sm:px-6 lg:px-8">
+        <section className="relative overflow-hidden rounded-[2.25rem] border border-[#2D8A6A]/15 bg-[linear-gradient(135deg,rgba(13,59,46,0.98),rgba(13,92,72,0.94))] p-6 text-[#FAF7F0] shadow-[0_24px_80px_-36px_rgba(13,59,46,0.32)] sm:p-8">
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(228,198,102,0.12),transparent_28%),radial-gradient(circle_at_bottom_left,rgba(101,184,145,0.14),transparent_30%)]" />
+          <div className="relative flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+            <div className="max-w-6xl">
+              <p className="inline-flex rounded-full border border-[#FFF5D6]/30 bg-[#FFF5D6]/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.24em] text-[#FFF5D6]">
+                User management
+              </p>
+              <h1 className="mb-3 mt-4 text-3xl font-bold text-white-deep sm:text-4xl lg:text-5xl font-display">
               {view === "students"
                 ? "Students management"
                 : view === "parents"
                   ? "Parents management"
                   : "Staff management"}
             </h1>
-            <p className="mt-3 text-sm leading-7 text-[#EAF6EF] sm:text-base">
-              {view === "students"
-                ? "Manage student accounts and keep their profiles organized."
-                : view === "parents"
-                  ? "Manage parent accounts and keep their profiles organized."
-                  : "Create, update, suspend, and reset staff accounts while keeping the directory visible to admin."}
-            </p>
-          </div>
+              <p className="mt-3 text-sm leading-7 text-[#EAF6EF] sm:text-base">
+                {view === "students"
+                  ? "Manage student accounts and keep their profiles organized."
+                  : view === "parents"
+                    ? "Manage parent accounts and keep their profiles organized."
+                    : "Create, update, suspend, and reset staff accounts while keeping the directory visible to admin."}
+              </p>
+            </div>
 
-          {view === "staff" ? (
-            <button
-              type="button"
-              onClick={() => setModal({ open: true, record: null })}
-              className="inline-flex items-center justify-center rounded-2xl bg-[#FAF7F0] px-5 py-3 text-sm font-semibold text-[#0D5C48] transition hover:bg-[#DBD8D5]"
-            >
-              Create staff member
-            </button>
-          ) : null}
-        </div>
-      </section>
+            {view === "staff" ? (
+              <button
+                type="button"
+                onClick={() => setModal({ open: true, record: null })}
+                className="inline-flex items-center justify-center rounded-2xl bg-[#FAF7F0] px-5 py-3 text-sm font-semibold text-[#0D5C48] transition hover:bg-[#DBD8D5]"
+              >
+                Create staff member
+              </button>
+            ) : null}
+          </div>
+        </section>
 
       {state.loading || state.overviewLoading ? (
         <OpenBookLoader
@@ -619,7 +623,7 @@ export default function AdminUsersPage() {
 
       <AdminDashboardCards items={cards} />
 
-      <section className="rounded-[1.75rem] border border-[#2D8A6A]/15 bg-white/90 p-4 shadow-[0_20px_70px_-36px_rgba(13,59,46,0.18)] sm:p-5">
+        <section className="rounded-[1.75rem] border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(250,247,240,0.98)_100%)] p-4 shadow-[0_20px_70px_-36px_rgba(13,59,46,0.18)] backdrop-blur-xl sm:p-5">
         <form
           className={`grid gap-3 ${
             view === "staff"
@@ -744,7 +748,7 @@ export default function AdminUsersPage() {
             Apply
           </button>
         </form>
-      </section>
+        </section>
 
       {state.error ? (
         <section className="rounded-[1.75rem] border border-rose-200 bg-rose-50 p-5 text-sm text-rose-700">

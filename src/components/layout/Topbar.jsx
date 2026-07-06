@@ -48,7 +48,7 @@ export default function Topbar({ session, onMenuClick, onToggleCollapsed, collap
             <p className="text-xs font-bold uppercase tracking-[0.24em] text-[#0D5C48]">
               Dashboard
             </p>
-            <h1 className="font-serif text-lg font-semibold text-[#063F32] sm:text-xl">
+            <h1 className="font-body text-lg font-semibold text-[#063F32] sm:text-xl">
               Welcome back, {userName}
             </h1>
           </div>

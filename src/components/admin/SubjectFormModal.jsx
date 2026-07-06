@@ -1,6 +1,7 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
+import { ChevronDown } from "lucide-react";
 import { useState } from "react";
 
 function getInitialState(record) {
@@ -26,6 +27,7 @@ export default function SubjectFormModal({
   const [form, setForm] = useState(getInitialState(record));
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
+  const [statusOpen, setStatusOpen] = useState(false);
 
   function updateField(name, value) {
     setForm((current) => ({ ...current, [name]: value }));
@@ -79,6 +81,9 @@ export default function SubjectFormModal({
 
   const inputClass =
     "w-full rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 text-sm text-[#063F32] outline-none transition focus:border-[#2D8A6A] focus:bg-white focus:ring-4 focus:ring-[#65B891]/20";
+  const selectClass = `${inputClass} appearance-none pr-12`;
+  const selectIconClass =
+    "pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#0D5C48] transition-transform duration-200";
 
   return (
     <AnimatePresence>
@@ -163,15 +168,21 @@ export default function SubjectFormModal({
                   <span className="mb-2 block text-sm font-medium text-[#245C4F]">
                     Status
                   </span>
-                  <select
-                    value={form.status}
-                    onChange={(event) => updateField("status", event.target.value)}
-                    className={inputClass}
-                  >
-                    <option value="active">Active</option>
-                    <option value="inactive">Inactive</option>
-                    <option value="archived">Archived</option>
-                  </select>
+                  <div className="relative">
+                    <select
+                      value={form.status}
+                      onMouseDown={() => setStatusOpen((current) => !current)}
+                      onFocus={() => setStatusOpen(true)}
+                      onBlur={() => setTimeout(() => setStatusOpen(false), 0)}
+                      onChange={(event) => updateField("status", event.target.value)}
+                      className={selectClass}
+                    >
+                      <option value="active">Active</option>
+                      <option value="inactive">Inactive</option>
+                      <option value="archived">Archived</option>
+                    </select>
+                    <ChevronDown className={`${selectIconClass} ${statusOpen ? "rotate-180" : "rotate-0"}`} />
+                  </div>
                 </label>
 
                 <label className="block sm:col-span-2">
