@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
+import { ChevronDown } from "lucide-react";
 import { ALLOWED_CLASS_LEVELS } from "@/lib/academicCatalog";
 
 const PROGRAM_OPTIONS = [
@@ -239,6 +240,31 @@ function FieldError({ error }) {
   return error ? <p className="mt-2 text-sm text-rose-600">{error}</p> : null;
 }
 
+function SelectField({ id, value, onChange, error, className = "", children }) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <div className="relative w-full">
+      <select
+        id={id}
+        value={value}
+        onMouseDown={() => setOpen((current) => !current)}
+        onFocus={() => setOpen(true)}
+        onBlur={() => setOpen(false)}
+        onChange={onChange}
+        className={`${className} pr-12 appearance-none`}
+      >
+        {children}
+      </select>
+      <ChevronDown
+        aria-hidden="true"
+        className={`pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#0D5C48] transition-transform duration-200 ${open ? "rotate-180" : "rotate-0"}`}
+      />
+      <FieldError error={error} />
+    </div>
+  );
+}
+
 function AdmissionFormContent() {
   const [form, setForm] = useState(initialForm);
   const [errors, setErrors] = useState({});
@@ -425,40 +451,37 @@ function AdmissionFormContent() {
   }
 
   const inputClass = (hasError) =>
-    `w-full rounded-[14px] border px-4 py-3 text-[#063F32] outline-none transition placeholder:text-[#245C4F]/45 focus:ring-4 ${
+    `w-full rounded-[14px] border px-4 py-3 font-body text-[#063F32] outline-none transition placeholder:text-[#245C4F]/45 focus:ring-4 ${
       hasError
         ? "border-rose-300 bg-rose-50 focus:border-rose-400 focus:ring-rose-100"
-        : "border-[rgba(13,59,46,0.12)] bg-white/90 focus:border-[#2D8A6A] focus:bg-white focus:ring-[#2D8A6A]/10"
+        : "border-[rgba(13,59,46,0.12)] bg-[#FCFAF5] shadow-[inset_0_1px_2px_rgba(13,59,46,0.04)] focus:border-[#2D8A6A] focus:bg-white focus:ring-[#2D8A6A]/10"
     }`;
 
   function renderProgrammeStep() {
     return (
-      <div className="grid gap-5 sm:grid-cols-2">
-        <div className="sm:col-span-2 rounded-2xl border border-[rgba(201,162,39,0.26)] bg-[#FFF5D6]/70 px-4 py-4 text-sm leading-6 text-[#063F32]">
+      <div className="grid gap-5 rounded-[1.35rem] border border-[rgba(13,59,46,0.08)] bg-white/95 p-4 shadow-[0_12px_28px_rgba(13,59,46,0.05)] sm:grid-cols-2 sm:p-6">
+        <div className="sm:col-span-2 rounded-[1.1rem] border border-[rgba(201,162,39,0.26)] bg-[#FFF5D6]/80 px-4 py-4 text-sm leading-6 text-[#063F32]">
           For Academic Year 2026-2027, admissions are being offered in the Early Childhood programme only. Available classes are limited to the classes already active in the LMS.
         </div>
         <div className="sm:col-span-2">
           <label className="mb-2 block text-[11px] font-bold uppercase tracking-[0.18em] text-[#0D5C48]" htmlFor="programName">Programme</label>
-          <select id="programName" value={form.programName} onChange={(event) => updateField("programName", event.target.value)} className={inputClass(errors.programName)}>
+          <SelectField id="programName" value={form.programName} onChange={(event) => updateField("programName", event.target.value)} error={errors.programName} className={inputClass(errors.programName)}>
             {PROGRAM_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
-          </select>
-          <FieldError error={errors.programName} />
+          </SelectField>
         </div>
         <div>
           <label className="mb-2 block text-[11px] font-bold uppercase tracking-[0.18em] text-[#0D5C48]" htmlFor="classLevel">Applying for Class</label>
-          <select id="classLevel" value={form.classLevel} onChange={(event) => updateField("classLevel", event.target.value)} className={inputClass(errors.classLevel)}>
+          <SelectField id="classLevel" value={form.classLevel} onChange={(event) => updateField("classLevel", event.target.value)} error={errors.classLevel} className={inputClass(errors.classLevel)}>
             <option value="">Select class</option>
             {[...ALLOWED_CLASS_LEVELS].map((option) => <option key={option} value={option}>{option}</option>)}
-          </select>
-          <FieldError error={errors.classLevel} />
+          </SelectField>
         </div>
         <div>
           <label className="mb-2 block text-[11px] font-bold uppercase tracking-[0.18em] text-[#0D5C48]" htmlFor="preferredStartingMonth">Preferred Starting Month</label>
-          <select id="preferredStartingMonth" value={form.preferredStartingMonth} onChange={(event) => updateField("preferredStartingMonth", event.target.value)} className={inputClass(errors.preferredStartingMonth)}>
+          <SelectField id="preferredStartingMonth" value={form.preferredStartingMonth} onChange={(event) => updateField("preferredStartingMonth", event.target.value)} error={errors.preferredStartingMonth} className={inputClass(errors.preferredStartingMonth)}>
             <option value="">Select month</option>
             {STARTING_MONTH_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
-          </select>
-          <FieldError error={errors.preferredStartingMonth} />
+          </SelectField>
         </div>
         {form.preferredStartingMonth === "Other" ? (
           <div className="sm:col-span-2">
@@ -473,7 +496,7 @@ function AdmissionFormContent() {
 
   function renderStudentStep() {
     return (
-      <div className="grid gap-5 sm:grid-cols-2">
+      <div className="grid gap-5 rounded-[1.35rem] border border-[rgba(13,59,46,0.08)] bg-white/95 p-4 shadow-[0_12px_28px_rgba(13,59,46,0.05)] sm:grid-cols-2 sm:p-6">
         <div className="sm:col-span-2">
           <label className="mb-2 block text-[11px] font-bold uppercase tracking-[0.18em] text-[#0D5C48]" htmlFor="studentName">Student Full Name (English)</label>
           <input id="studentName" value={form.studentName} onChange={(event) => updateField("studentName", event.target.value)} className={inputClass(errors.studentName)} />
@@ -485,11 +508,10 @@ function AdmissionFormContent() {
         </div>
         <div>
           <label className="mb-2 block text-[11px] font-bold uppercase tracking-[0.18em] text-[#0D5C48]" htmlFor="gender">Gender</label>
-          <select id="gender" value={form.gender} onChange={(event) => updateField("gender", event.target.value)} className={inputClass(errors.gender)}>
+          <SelectField id="gender" value={form.gender} onChange={(event) => updateField("gender", event.target.value)} error={errors.gender} className={inputClass(errors.gender)}>
             <option value="">Select gender</option>
             {GENDER_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
-          </select>
-          <FieldError error={errors.gender} />
+          </SelectField>
         </div>
         <div>
           <label className="mb-2 block text-[11px] font-bold uppercase tracking-[0.18em] text-[#0D5C48]" htmlFor="dateOfBirth">Date of Birth</label>
@@ -522,11 +544,10 @@ function AdmissionFormContent() {
         </div>
         <div>
           <label className="mb-2 block text-[11px] font-bold uppercase tracking-[0.18em] text-[#0D5C48]" htmlFor="preferredLanguage">Preferred Language of Instruction</label>
-          <select id="preferredLanguage" value={form.preferredLanguage} onChange={(event) => updateField("preferredLanguage", event.target.value)} className={inputClass(errors.preferredLanguage)}>
+          <SelectField id="preferredLanguage" value={form.preferredLanguage} onChange={(event) => updateField("preferredLanguage", event.target.value)} error={errors.preferredLanguage} className={inputClass(errors.preferredLanguage)}>
             <option value="">Select language</option>
             {LANGUAGE_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
-          </select>
-          <FieldError error={errors.preferredLanguage} />
+          </SelectField>
         </div>
         <div>
           <label className="mb-2 block text-[11px] font-bold uppercase tracking-[0.18em] text-[#0D5C48]" htmlFor="currentSchool">Current School (if applicable)</label>
@@ -542,26 +563,24 @@ function AdmissionFormContent() {
 
   function renderProfileStep() {
     return (
-      <div className="grid gap-5 sm:grid-cols-2">
+      <div className="grid gap-5 rounded-[1.35rem] border border-[rgba(13,59,46,0.08)] bg-white/95 p-4 shadow-[0_12px_28px_rgba(13,59,46,0.05)] sm:grid-cols-2 sm:p-6">
         <div className="sm:col-span-2">
           <label className="mb-2 block text-[11px] font-bold uppercase tracking-[0.18em] text-[#0D5C48]" htmlFor="shiftReason">Reason for shifting from physical to online schooling</label>
           <textarea id="shiftReason" rows={3} value={form.shiftReason} onChange={(event) => updateField("shiftReason", event.target.value)} className={inputClass(false)} />
         </div>
         <div>
           <label className="mb-2 block text-[11px] font-bold uppercase tracking-[0.18em] text-[#0D5C48]" htmlFor="attendedOnlineClasses">Has the child previously attended online classes?</label>
-          <select id="attendedOnlineClasses" value={form.attendedOnlineClasses} onChange={(event) => updateField("attendedOnlineClasses", event.target.value)} className={inputClass(errors.attendedOnlineClasses)}>
+          <SelectField id="attendedOnlineClasses" value={form.attendedOnlineClasses} onChange={(event) => updateField("attendedOnlineClasses", event.target.value)} error={errors.attendedOnlineClasses} className={inputClass(errors.attendedOnlineClasses)}>
             <option value="">Select option</option>
             {YES_NO_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
-          </select>
-          <FieldError error={errors.attendedOnlineClasses} />
+          </SelectField>
         </div>
         <div>
           <label className="mb-2 block text-[11px] font-bold uppercase tracking-[0.18em] text-[#0D5C48]" htmlFor="developmentalConcern">Any diagnosed learning difficulty or developmental concern?</label>
-          <select id="developmentalConcern" value={form.developmentalConcern} onChange={(event) => updateField("developmentalConcern", event.target.value)} className={inputClass(errors.developmentalConcern)}>
+          <SelectField id="developmentalConcern" value={form.developmentalConcern} onChange={(event) => updateField("developmentalConcern", event.target.value)} error={errors.developmentalConcern} className={inputClass(errors.developmentalConcern)}>
             <option value="">Select option</option>
             {YES_NO_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
-          </select>
-          <FieldError error={errors.developmentalConcern} />
+          </SelectField>
         </div>
         {form.developmentalConcern === "Yes" ? (
           <div className="sm:col-span-2">
@@ -609,8 +628,8 @@ function AdmissionFormContent() {
     const addressKey = `${prefix}ResidentialAddress`;
 
     return (
-      <div className="rounded-[1.5rem] border border-[rgba(13,59,46,0.12)] bg-white/80 p-4">
-        <h3 className="font-serif text-lg font-semibold text-[#063F32]">{title}</h3>
+      <div className="rounded-[1.5rem] border border-[rgba(13,59,46,0.12)] bg-[#FCFAF5] p-4 shadow-[0_10px_24px_rgba(13,59,46,0.04)]">
+        <h3 className="font-display text-lg font-semibold text-[#063F32]">{title}</h3>
         <div className="mt-4 grid gap-4">
           <div>
             <label className="mb-2 block text-[11px] font-bold uppercase tracking-[0.18em] text-[#0D5C48]">{title} Name (Block Letters)</label>
@@ -669,7 +688,7 @@ function AdmissionFormContent() {
 
   function renderParentsStep() {
     return (
-      <div className="grid gap-5">
+      <div className="grid gap-5 rounded-[1.35rem] border border-[rgba(13,59,46,0.08)] bg-white/95 p-4 shadow-[0_12px_28px_rgba(13,59,46,0.05)] sm:p-6">
         {errors.parentNames ? <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{errors.parentNames}</div> : null}
         {errors.primaryParent ? <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{errors.primaryParent}</div> : null}
         <div className="grid gap-5 lg:grid-cols-2">
@@ -679,19 +698,17 @@ function AdmissionFormContent() {
         <div className="grid gap-5 sm:grid-cols-2">
           <div>
             <label className="mb-2 block text-[11px] font-bold uppercase tracking-[0.18em] text-[#0D5C48]" htmlFor="preferredContactPerson">Preferred Contact Person</label>
-            <select id="preferredContactPerson" value={form.preferredContactPerson} onChange={(event) => updateField("preferredContactPerson", event.target.value)} className={inputClass(errors.preferredContactPerson)}>
+            <SelectField id="preferredContactPerson" value={form.preferredContactPerson} onChange={(event) => updateField("preferredContactPerson", event.target.value)} error={errors.preferredContactPerson} className={inputClass(errors.preferredContactPerson)}>
               <option value="">Select contact person</option>
               {CONTACT_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
-            </select>
-            <FieldError error={errors.preferredContactPerson} />
+            </SelectField>
           </div>
           <div>
             <label className="mb-2 block text-[11px] font-bold uppercase tracking-[0.18em] text-[#0D5C48]" htmlFor="supportPersonDuringLearning">Who will support the child during learning?</label>
-            <select id="supportPersonDuringLearning" value={form.supportPersonDuringLearning} onChange={(event) => updateField("supportPersonDuringLearning", event.target.value)} className={inputClass(errors.supportPersonDuringLearning)}>
+            <SelectField id="supportPersonDuringLearning" value={form.supportPersonDuringLearning} onChange={(event) => updateField("supportPersonDuringLearning", event.target.value)} error={errors.supportPersonDuringLearning} className={inputClass(errors.supportPersonDuringLearning)}>
               <option value="">Select support person</option>
               {SUPPORT_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
-            </select>
-            <FieldError error={errors.supportPersonDuringLearning} />
+            </SelectField>
           </div>
         </div>
       </div>
@@ -700,17 +717,16 @@ function AdmissionFormContent() {
 
   function renderReadinessStep() {
     return (
-      <div className="grid gap-5 sm:grid-cols-2">
-        <div className="sm:col-span-2 rounded-2xl border border-[rgba(201,162,39,0.26)] bg-[#FFF5D6]/75 px-4 py-4 text-sm leading-6 text-[#063F32]">
+      <div className="grid gap-5 rounded-[1.35rem] border border-[rgba(13,59,46,0.08)] bg-white/95 p-4 shadow-[0_12px_28px_rgba(13,59,46,0.05)] sm:grid-cols-2 sm:p-6">
+        <div className="sm:col-span-2 rounded-[1.1rem] border border-[rgba(201,162,39,0.26)] bg-[#FFF5D6]/80 px-4 py-4 text-sm leading-6 text-[#063F32]">
           Regular class attendance through smartphones or tablets is not permitted. Please arrange a laptop, desktop computer, or an adequately sized screen for the child.
         </div>
         <div className="sm:col-span-2">
           <label className="mb-2 block text-[11px] font-bold uppercase tracking-[0.18em] text-[#0D5C48]" htmlFor="deviceAvailable">Device available for online classes</label>
-          <select id="deviceAvailable" value={form.deviceAvailable} onChange={(event) => updateField("deviceAvailable", event.target.value)} className={inputClass(errors.deviceAvailable)}>
+          <SelectField id="deviceAvailable" value={form.deviceAvailable} onChange={(event) => updateField("deviceAvailable", event.target.value)} error={errors.deviceAvailable} className={inputClass(errors.deviceAvailable)}>
             <option value="">Select device</option>
             {DEVICE_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
-          </select>
-          <FieldError error={errors.deviceAvailable} />
+          </SelectField>
         </div>
         <div>
           <label className="mb-2 block text-[11px] font-bold uppercase tracking-[0.18em] text-[#0D5C48]" htmlFor="birthCertificateFile">Child B-Form / Birth Certificate</label>
@@ -741,7 +757,7 @@ function AdmissionFormContent() {
 
   function renderDeclarationStep() {
     return (
-      <div className="grid gap-5">
+      <div className="grid gap-5 rounded-[1.35rem] border border-[rgba(13,59,46,0.08)] bg-white/95 p-4 shadow-[0_12px_28px_rgba(13,59,46,0.05)] sm:p-6">
         <div>
           <label className="mb-2 block text-[11px] font-bold uppercase tracking-[0.18em] text-[#0D5C48]" htmlFor="whyJoinSchool">Why do you wish your child to join Ash-Shajarah?</label>
           <textarea id="whyJoinSchool" rows={4} value={form.whyJoinSchool} onChange={(event) => updateField("whyJoinSchool", event.target.value)} className={inputClass(errors.whyJoinSchool)} />
@@ -752,13 +768,13 @@ function AdmissionFormContent() {
           <textarea id="schoolExpectations" rows={4} value={form.schoolExpectations} onChange={(event) => updateField("schoolExpectations", event.target.value)} className={inputClass(errors.schoolExpectations)} />
           <FieldError error={errors.schoolExpectations} />
         </div>
-        <div className="rounded-[1.5rem] border border-[rgba(13,59,46,0.12)] bg-white/80 p-5 text-sm leading-7 text-[#245C4F]">
-          <p className="font-serif font-semibold text-[#063F32]">Declaration & Parent Commitment</p>
+        <div className="rounded-[1.5rem] border border-[rgba(201,162,39,0.22)] bg-[#FFF5D6]/80 p-5 text-sm leading-7 text-[#245C4F] shadow-[0_10px_22px_rgba(201,162,39,0.08)]">
+          <p className="font-display font-semibold text-[#063F32]">Declaration & Parent Commitment</p>
           <p className="mt-3">I/We declare that all information provided in this application is true and correct to the best of our knowledge.</p>
           <p className="mt-3">I/We understand that Ash-Shajarah follows a Parent Partnership and Guided Home Learning Model where active parental involvement is essential for meaningful learning outcomes.</p>
           <p className="mt-3">I/We understand that live online interaction will be age-appropriate and limited, and that parents are expected to support guided off-screen activities, orientation sessions, parenting workshops, academic training programmes, school schedules, assessment procedures, and healthy device practices.</p>
         </div>
-        <label className="flex items-start gap-3 rounded-2xl border border-[rgba(13,59,46,0.12)] bg-white px-4 py-4 text-sm text-[#245C4F]">
+        <label className="flex items-start gap-3 rounded-2xl border border-[rgba(13,59,46,0.12)] bg-[#FCFAF5] px-4 py-4 text-sm text-[#245C4F] shadow-[0_8px_20px_rgba(13,59,46,0.04)]">
           <input type="checkbox" checked={form.declarationAccepted} onChange={(event) => updateField("declarationAccepted", event.target.checked)} className="mt-1 h-4 w-4 rounded border-slate-300 text-[#2D8A6A] focus:ring-[#2D8A6A]" />
           <span>I/We accept the declaration and commit to working collaboratively with Ash-Shajarah as active partners in our child&apos;s learning, character development, and overall growth.</span>
         </label>
@@ -777,29 +793,29 @@ function AdmissionFormContent() {
   ];
 
   return (
-    <main className="relative min-h-screen overflow-hidden bg-[#f5f7fb] text-slate-900">
+    <main className="relative min-h-screen overflow-hidden bg-[#FAF7F0] text-[#063F32]">
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(45,138,106,0.16),_transparent_32%),radial-gradient(circle_at_bottom_right,_rgba(201,162,39,0.12),_transparent_30%),radial-gradient(circle_at_center,_rgba(101,184,145,0.08),_transparent_42%)]" />
       <div className="absolute left-[-6rem] top-24 h-56 w-56 rounded-full bg-[#2D8A6A]/10 blur-3xl" />
       <div className="absolute bottom-10 right-0 h-72 w-72 rounded-full bg-[#C9A227]/10 blur-3xl" />
 
       <div className="relative mx-auto flex min-h-screen max-w-7xl items-center px-4 py-10 sm:px-6 lg:px-8">
         <motion.div className="grid w-full items-stretch gap-8 lg:grid-cols-[0.8fr_1.2fr]" variants={container} initial="hidden" animate="show">
-          <motion.section variants={item} className="flex md-w-[550px] flex-col justify-start rounded-[2rem] border border-[rgba(13,59,46,0.12)] bg-white/85 p-6 shadow-[0_18px_48px_rgba(13,59,46,0.12)] backdrop-blur-xl sm:p-7 lg:p-8">
-            <div className="max-w-sm">
-              <span className="inline-flex rounded-full border border-[rgba(201,162,39,0.26)] bg-[#FFF5D6] px-4 py-1 text-xs font-semibold uppercase tracking-[0.24em] text-[#0D5C48]">
+          <motion.section variants={item} className="flex w-full flex-col justify-start rounded-[2.2rem] border border-[rgba(13,59,46,0.12)] bg-[linear-gradient(180deg,_rgba(252,250,245,0.98)_0%,_rgba(245,240,232,0.96)_100%)] p-6 shadow-[0_24px_60px_rgba(13,59,46,0.12)] backdrop-blur-xl sm:p-7 lg:p-8">
+            <div className="rounded-[1.6rem] bg-[linear-gradient(135deg,_#063F32_0%,_#0D5C48_45%,_#236B51_100%)] p-6 text-[#FAF7F0] shadow-[0_14px_32px_rgba(6,63,50,0.2)]">
+              <span className="inline-flex rounded-full border border-white/20 bg-white/10 px-4 py-1 text-[11px] font-semibold uppercase tracking-[0.24em] text-[#F7EFCF]">
                 Admission form
               </span>
-              <h1 className="mt-6 font-serif text-2xl font-semibold tracking-tight text-[#063F32] sm:text-4xl">
+              <h1 className="mt-6 font-display text-2xl font-semibold tracking-tight sm:text-3xl">
                 Apply for your child&apos;s admission to Ash-Shajarah Learning Hub.
               </h1>
-              <p className="mt-5 max-w-lg text-base leading-7 text-[#245C4F] sm:text-mg">
+              <p className="mt-4 max-w-lg text-base leading-7 text-[#F3EEDB]/85 sm:text-[1.02rem]">
                 Complete the admission form step by step. Our admissions team will review the application and guide you through the next stage.
               </p>
             </div>
 
-            <div className="mt-8 grid gap-3">
+            <div className="mt-7 grid gap-3 rounded-[1.6rem] border border-[rgba(13,59,46,0.08)] bg-white/70 p-3 shadow-[0_10px_24px_rgba(13,59,46,0.04)]">
               {STEP_TITLES.map((label, index) => (
-                <div key={label} className={`flex items-center gap-3 rounded-2xl border px-3 py-3 text-sm ${index === step ? "border-[#C9A227]/30 bg-[#FFF5D6]/70 text-[#063F32]" : index < step ? "border-[#2D8A6A]/20 bg-[#FAF7F0] text-[#063F32]" : "border-[rgba(13,59,46,0.10)] bg-white/70 text-[#245C4F]"}`}>
+                <div key={label} className={`flex items-center gap-3 rounded-[1.15rem] border px-3 py-3 text-sm shadow-[0_8px_20px_rgba(13,59,46,0.04)] ${index === step ? "border-[#C9A227]/30 bg-[#FFF5D6]/80 text-[#063F32]" : index < step ? "border-[#2D8A6A]/20 bg-[#F4F0E7] text-[#063F32]" : "border-[rgba(13,59,46,0.10)] bg-white/90 text-[#245C4F]"}`}>
                   <span className={`flex h-8 w-8 items-center justify-center rounded-full text-sm font-semibold ${index === step ? "bg-gradient-to-br from-[#C9A227] to-[#E4C766] text-[#063F32]" : index < step ? "bg-[#2D8A6A] text-[#FAF7F0]" : "bg-[#FAF7F0] text-[#245C4F]"}`}>
                     {index + 1}
                   </span>
@@ -813,19 +829,19 @@ function AdmissionFormContent() {
               ))}
             </div>
 
-            <div className="mt-8 rounded-3xl bg-[#063F32] px-5 py-5 text-[#FAF7F0] shadow-[0_12px_28px_rgba(13,59,46,0.18)]">
-              <p className="text-sm uppercase tracking-[0.24em] text-[#E4C766]">Healthy digital learning</p>
-              <p className="mt-3 max-w-md md:text-sm leading-6 text-[#F1EADC]">
+            <div className="mt-7 rounded-[1.5rem] border border-[rgba(13,59,46,0.08)] bg-[linear-gradient(135deg,_#063F32_0%,_#0D5C48_45%,_#236B51_100%)] p-6 text-[#FAF7F0] px-5 py-5 shadow-[0_10px_24px_rgba(13,59,46,0.04)]">
+              <p className="text-sm uppercase tracking-[0.24em] text-white">Healthy digital learning</p>
+              <p className="mt-3 max-w-md text-sm leading-6">
                 Ash-Shajarah follows a parent partnership model with age-appropriate online sessions, guided home activities, and a strong focus on healthy device use.
               </p>
             </div>
           </motion.section>
 
-          <motion.section variants={item} className="rounded-[2rem] border border-[rgba(13,59,46,0.12)] bg-white/88 p-6 shadow-[0_18px_48px_rgba(13,59,46,0.12)] sm:p-8 lg:p-10">
-            <div className="mb-8">
-              <p className="text-sm font-semibold uppercase tracking-[0.24em] text-[#0D5C48]">Online school admission form</p>
-              <h2 className="mt-3 font-serif text-3xl font-semibold tracking-tight text-[#063F32]">Step {step + 1}: {STEP_TITLES[step]}</h2>
-              <p className="mt-2 text-sm leading-6 text-[#245C4F]">Please complete this section carefully. Fields required by the admissions team should not be left blank.</p>
+          <motion.section variants={item} className="rounded-[2.2rem] border border-[rgba(13,59,46,0.12)] bg-[linear-gradient(180deg,_#FCFAF5_0%,_#F7F1E7_100%)] p-6 shadow-[0_24px_60px_rgba(13,59,46,0.1)] sm:p-8 lg:p-10">
+            <div className="mb-8 rounded-[1.4rem] border border-[rgba(13,59,46,0.08)] bg-white/90 p-5 shadow-[0_10px_24px_rgba(13,59,46,0.05)]">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#0D5C48]">Online school admission form</p>
+              <h2 className="mt-3 font-display text-3xl font-semibold tracking-tight text-[#063F32]">Step {step + 1}: {STEP_TITLES[step]}</h2>
+              <p className="mt-2 text-sm leading-6 text-[#245C4F]/80">Please complete this section carefully. Fields required by the admissions team should not be left blank.</p>
             </div>
 
             {errors.form ? <div className="mb-5 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{errors.form}</div> : null}
@@ -839,13 +855,13 @@ function AdmissionFormContent() {
                   type="button"
                   onClick={goBack}
                   disabled={step === 0 || pending}
-                  className="rounded-full border border-[rgba(13,59,46,0.12)] bg-white px-4 py-3 text-sm font-semibold text-[#0D5C48] transition hover:bg-[#FAF7F0] disabled:cursor-not-allowed disabled:opacity-60"
+                  className="rounded-full border border-[rgba(13,59,46,0.12)] bg-white px-4 py-3 text-sm font-semibold text-[#0D5C48] shadow-[0_8px_20px_rgba(13,59,46,0.04)] transition hover:bg-[#FAF7F0] disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   Back
                 </button>
 
                 <div className="flex flex-wrap items-center gap-3">
-                  <span className="text-sm text-[#245C4F]">
+                  <span className="rounded-full bg-[#FAF7F0] px-3 py-2 text-sm text-[#245C4F]">
                     {tokenLoading ? "Loading lead details..." : `Step ${step + 1} of ${STEP_TITLES.length}`}
                   </span>
                   {step < STEP_TITLES.length - 1 ? (
@@ -853,7 +869,7 @@ function AdmissionFormContent() {
                       type="button"
                       onClick={goNext}
                       disabled={pending || tokenLoading}
-                      className="rounded-full bg-[#2D8A6A] px-4 py-3 text-sm font-semibold text-[#FAF7F0] shadow-[0_12px_28px_rgba(45,138,106,0.25)] transition hover:bg-[#65B891] disabled:cursor-not-allowed disabled:opacity-70"
+                      className="rounded-full bg-[#236B51] px-4 py-3 text-sm font-semibold text-[#FAF7F0] shadow-[0_12px_28px_rgba(45,138,106,0.25)] transition hover:bg-[#184A38] disabled:cursor-not-allowed disabled:opacity-70"
                     >
                       Next step
                     </button>
@@ -863,7 +879,7 @@ function AdmissionFormContent() {
                       whileHover={{ y: -1 }}
                       whileTap={{ scale: 0.99 }}
                       disabled={pending || tokenLoading}
-                      className="rounded-full bg-[#2D8A6A] px-5 py-3 text-sm font-semibold text-[#FAF7F0] shadow-[0_12px_28px_rgba(45,138,106,0.25)] transition hover:bg-[#65B891] disabled:cursor-not-allowed disabled:opacity-70"
+                      className="rounded-full bg-[#236B51] px-5 py-3 text-sm font-semibold text-[#FAF7F0] shadow-[0_12px_28px_rgba(45,138,106,0.25)] transition hover:bg-[#184A38] disabled:cursor-not-allowed disabled:opacity-70"
                     >
                       {pending ? "Submitting..." : tokenLoading ? "Loading prefill..." : "Submit admission form"}
                     </motion.button>

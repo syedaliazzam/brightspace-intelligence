@@ -101,13 +101,13 @@ export default function StudentDashboardPage() {
 
   return (
     <PaymentAccessGuard>
-      <div className="relative bg-[#FAF7F0]">
+      <div className="relative min-h-screen overflow-hidden bg-[#FAF7F0]">
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(201,162,39,0.12),transparent_35%),radial-gradient(circle_at_top_right,rgba(45,138,106,0.12),transparent_32%),linear-gradient(180deg,#FAF7F0_0%,#F7F1E3_100%)]" />
         <div className="rounded-[2rem] relative mx-auto max-w-7xl space-y-6 px-4 py-4 sm:px-6 lg:px-8">
           <StudentPortalNavbar profile={profile} />
 
           {state.monthlyFee && !state.monthlyFee.is_paid ? (
-            <section className={`w-full rounded-[1.75rem] border px-4 py-3 text-sm shadow-[0_14px_40px_-26px_rgba(13,59,46,0.22)] ${state.monthlyFee.overdue ? "border-rose-200 bg-rose-50 text-rose-700" : state.monthlyFee.due_soon ? "border-[#E4C766]/70 bg-[#FFF5D6] text-[#8A6B00]" : "border-[#2D8A6A]/20 bg-white/85 text-[#0D5C48]"}`}>
+            <section className={`w-full rounded-[2rem] border px-5 py-4 text-sm shadow-[0_20px_70px_-36px_rgba(13,59,46,0.18)] backdrop-blur-xl ${state.monthlyFee.overdue ? "border-rose-200 bg-rose-50 text-rose-700" : state.monthlyFee.due_soon ? "border-[#E4C766]/70 bg-[#FFF5D6] text-[#8A6B00]" : "border-[#2D8A6A]/20 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(250,247,240,0.98)_100%)] text-[#0D5C48]"}`}>
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <div className="font-medium">
                   <p className="text-[#BF2106] font-bold">{state.monthlyFee.message || "Monthly fee voucher is not submitted yet. Please submit to continue LMS access."}</p>
@@ -123,9 +123,9 @@ export default function StudentDashboardPage() {
 
           <ActiveHeadlinesBanner items={state.headlines} />
 
-          <section id="dashboard" className="scroll-mt-28 rounded-[2rem] border border-[#2D8A6A]/15 bg-[linear-gradient(135deg,rgba(255,255,255,0.95),rgba(250,247,240,0.96))] p-6 shadow-[0_24px_80px_-36px_rgba(13,59,46,0.22)] sm:p-8">
-            <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-[#0D5C48]">Student dashboard</p>
-            <h1 className="mt-3 font-serif text-3xl font-semibold tracking-tight text-[#063F32] sm:text-4xl">Your learning command center</h1>
+          <section id="dashboard" className="scroll-mt-28 rounded-[2rem] border border-[#2D8A6A]/15 bg-[linear-gradient(135deg,rgba(13,59,46,0.98),rgba(13,92,72,0.94))] p-6 text-[#FAF7F0] shadow-[0_24px_80px_-36px_rgba(13,59,46,0.32)] sm:p-8">
+            <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-[#E4C766]">Student dashboard</p>
+            <h1 className="mt-3 font-display text-3xl font-bold tracking-tight text-[#FAF7F0] sm:text-4xl">Your learning command center</h1>
             {state.error ? <div className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">{state.error}</div> : null}
             <div className="mt-6">
               <StudentStatsCards items={[
@@ -140,57 +140,93 @@ export default function StudentDashboardPage() {
             </div>
           </section>
 
-          <motion.section id="calendar" className="scroll-mt-28 rounded-[2rem] border border-[#2D8A6A]/15 bg-white/90 p-5 shadow-[0_20px_70px_-36px_rgba(13,59,46,0.18)]">
+          <motion.section id="calendar" className="scroll-mt-28 rounded-[2rem] border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(250,247,240,0.98)_100%)] p-4 px-6 shadow-[0_20px_70px_-36px_rgba(13,59,46,0.18)] backdrop-blur-xl">
             <div className="mb-5">
               <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-[#0D5C48]">Lecture Calendar</p>
-              <h2 className="mt-2 font-serif text-2xl font-semibold tracking-tight text-[#063F32]">Plan your study week</h2>
+              <h2 className="mt-2 font-body text-2xl font-semibold tracking-tight text-[#063F32]">Plan your study week</h2>
             </div>
             {state.loading ? <OpenBookLoader title="Loading lectures" subtitle="Preparing your calendar..." /> : null}
             <LMSCalendar apiUrl="/api/student/calendar-lectures" filters={state.filters} onDateSelect={(date) => updateFilters({ ...state.filters, date, range: "selected_date" })} />
           </motion.section>
 
-          <motion.section id="homework" className="scroll-mt-28 rounded-[2rem] border border-[#2D8A6A]/15 bg-white/90 p-5 shadow-[0_20px_70px_-36px_rgba(13,59,46,0.18)]">
+          <motion.section id="homework" className="scroll-mt-28 rounded-[2rem] border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(250,247,240,0.98)_100%)] p-4 px-6 shadow-[0_20px_70px_-36px_rgba(13,59,46,0.18)] backdrop-blur-xl">
             <div className="mb-5">
               <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-[#0D5C48]">Homework</p>
-              <h2 className="mt-2 font-serif text-2xl font-semibold tracking-tight text-[#063F32]">Assigned work</h2>
+              <h2 className="mt-2 font-body text-2xl font-semibold tracking-tight text-[#063F32]">Assigned work</h2>
             </div>
             <HomeworkList items={state.homework} onRefresh={() => loadHomework().catch((error) => setState((current) => ({ ...current, error: error.message })))} />
           </motion.section>
 
-          <motion.section id="attendance" className="scroll-mt-28 rounded-[2rem] border border-[#2D8A6A]/15 bg-white/90 p-5 shadow-[0_20px_70px_-36px_rgba(13,59,46,0.18)]">
+          <motion.section id="attendance" className="scroll-mt-28 rounded-[2rem] border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(250,247,240,0.98)_100%)] p-4 px-6 shadow-[0_20px_70px_-36px_rgba(13,59,46,0.18)] backdrop-blur-xl">
             <div className="mb-5">
               <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-[#0D5C48]">Attendance</p>
-              <h2 className="mt-2 font-serif text-2xl font-semibold tracking-tight text-[#063F32]">Conducted lecture attendance</h2>
+              <h2 className="mt-2 font-body text-2xl font-semibold tracking-tight text-[#063F32]">Conducted lecture attendance</h2>
             </div>
             <AttendanceSummary summary={state.attendance.summary} items={state.attendance.items} />
           </motion.section>
 
-          <motion.section id="notes" className="scroll-mt-28 rounded-[2rem] border border-[#2D8A6A]/15 bg-white/90 p-5 shadow-[0_20px_70px_-36px_rgba(13,59,46,0.18)]">
+          <motion.section id="notes" className="scroll-mt-28 rounded-[2rem] border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(250,247,240,0.98)_100%)] p-4 px-6 shadow-[0_20px_70px_-36px_rgba(13,59,46,0.18)] backdrop-blur-xl">
             <div className="mb-5">
               <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-[#0D5C48]">Teacher notes</p>
-              <h2 className="mt-2 font-serif text-2xl font-semibold tracking-tight text-[#063F32]">Latest feedback and updates</h2>
+              <h2 className="mt-2 font-body text-2xl font-semibold tracking-tight text-[#063F32]">Latest feedback and updates</h2>
             </div>
             <NoteThreadsBoard mode="student" />
           </motion.section>
 
-          <motion.section id="profile" className="scroll-mt-28 rounded-[2rem] border border-[#2D8A6A]/15 bg-white/90 mb-4 p-5 shadow-[0_20px_70px_-36px_rgba(13,59,46,0.18)]">
+          <motion.section id="profile" className="scroll-mt-28 mb-4 rounded-[2rem] border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(250,247,240,0.98)_100%)] p-4 px-6 shadow-[0_20px_70px_-36px_rgba(13,59,46,0.18)] backdrop-blur-xl">
             <div className="mb-5">
               <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-[#0D5C48]">Profile</p>
-              <h2 className="mt-2 font-serif text-2xl font-semibold tracking-tight text-[#063F32]">Student details</h2>
+              <h2 className="mt-2 font-body text-2xl font-semibold tracking-tight text-[#063F32]">Student details</h2>
             </div>
             <div className="grid gap-3 text-sm text-[#245C4F] sm:grid-cols-2 lg:grid-cols-3">
-              <p className="rounded-2xl bg-[#FAF7F0] px-4 py-3"><strong className="text-[#063F32]">Name:</strong> {profile.full_name || "Not available"}</p>
-              <p className="rounded-2xl bg-[#FAF7F0] px-4 py-3"><strong className="text-[#063F32]">Username:</strong> {profile.username || "Not available"}</p>
-              <p className="rounded-2xl bg-[#FAF7F0] px-4 py-3"><strong className="text-[#063F32]">Email:</strong> {profile.email || "Not available"}</p>
-              <p className="rounded-2xl bg-[#FAF7F0] px-4 py-3"><strong className="text-[#063F32]">Phone:</strong> {profile.phone || "Not available"}</p>
-              <p className="rounded-2xl bg-[#FAF7F0] px-4 py-3"><strong className="text-[#063F32]">Admission:</strong> {profile.admission_no || "Not assigned"}</p>
-              <p className="rounded-2xl bg-[#FAF7F0] px-4 py-3"><strong className="text-[#063F32]">Age:</strong> {profile.age || "Not assigned"}</p>
-              <p className="rounded-2xl bg-[#FAF7F0] px-4 py-3"><strong className="text-[#063F32]">Class:</strong> {profile.grade_level || "Not assigned"}</p>
-              <p className="rounded-2xl bg-[#FAF7F0] px-4 py-3"><strong className="text-[#063F32]">Course:</strong> {profile.course_title || "Not assigned"}</p>
-              <p className="rounded-2xl bg-[#FAF7F0] px-4 py-3"><strong className="text-[#063F32]">Status:</strong> {profile.profile_status || profile.user_status || "Not available"}</p>
-              <p className="rounded-2xl bg-[#FAF7F0] px-4 py-3"><strong className="text-[#063F32]">Father name:</strong> {profile.father_name || "Not assigned"}</p>
-              <p className="rounded-2xl bg-[#FAF7F0] px-4 py-3"><strong className="text-[#063F32]">Father phone:</strong> {profile.father_phone || "Not assigned"}</p>
-              <p className="rounded-2xl bg-[#FAF7F0] px-4 py-3"><strong className="text-[#063F32]">Father email:</strong> {profile.father_email || "Not assigned"}</p>
+              <p className="rounded-[1.5rem] border border-[#2D8A6A]/12 bg-[linear-gradient(180deg,#FAF7F0_0%,#F1EADC_100%)] px-5 py-4 text-sm leading-6 text-[#245C4F]">
+                <strong className="block text-xs font-semibold uppercase tracking-[0.16em] text-[#0D5C48]">Name</strong>
+                <span className="mt-1 block break-words text-[#063F32]">{profile.full_name || "Not available"}</span>
+              </p>
+              <p className="rounded-[1.5rem] border border-[#2D8A6A]/12 bg-[linear-gradient(180deg,#FAF7F0_0%,#F1EADC_100%)] px-5 py-4 text-sm leading-6 text-[#245C4F]">
+                <strong className="block text-xs font-semibold uppercase tracking-[0.16em] text-[#0D5C48]">Username</strong>
+                <span className="mt-1 block break-words text-[#063F32]">{profile.username || "Not available"}</span>
+              </p>
+              <p className="rounded-[1.5rem] border border-[#2D8A6A]/12 bg-[linear-gradient(180deg,#FAF7F0_0%,#F1EADC_100%)] px-5 py-4 text-sm leading-6 text-[#245C4F]">
+                <strong className="block text-xs font-semibold uppercase tracking-[0.16em] text-[#0D5C48]">Email</strong>
+                <span className="mt-1 block break-words text-[#063F32]">{profile.email || "Not available"}</span>
+              </p>
+              <p className="rounded-[1.5rem] border border-[#2D8A6A]/12 bg-[linear-gradient(180deg,#FAF7F0_0%,#F1EADC_100%)] px-5 py-4 text-sm leading-6 text-[#245C4F]">
+                <strong className="block text-xs font-semibold uppercase tracking-[0.16em] text-[#0D5C48]">Phone</strong>
+                <span className="mt-1 block break-words text-[#063F32]">{profile.phone || "Not available"}</span>
+              </p>
+              <p className="rounded-[1.5rem] border border-[#2D8A6A]/12 bg-[linear-gradient(180deg,#FAF7F0_0%,#F1EADC_100%)] px-5 py-4 text-sm leading-6 text-[#245C4F]">
+                <strong className="block text-xs font-semibold uppercase tracking-[0.16em] text-[#0D5C48]">Admission</strong>
+                <span className="mt-1 block break-words text-[#063F32]">{profile.admission_no || "Not assigned"}</span>
+              </p>
+              <p className="rounded-[1.5rem] border border-[#2D8A6A]/12 bg-[linear-gradient(180deg,#FAF7F0_0%,#F1EADC_100%)] px-5 py-4 text-sm leading-6 text-[#245C4F]">
+                <strong className="block text-xs font-semibold uppercase tracking-[0.16em] text-[#0D5C48]">Age</strong>
+                <span className="mt-1 block break-words text-[#063F32]">{profile.age || "Not assigned"}</span>
+              </p>
+              <p className="rounded-[1.5rem] border border-[#2D8A6A]/12 bg-[linear-gradient(180deg,#FAF7F0_0%,#F1EADC_100%)] px-5 py-4 text-sm leading-6 text-[#245C4F]">
+                <strong className="block text-xs font-semibold uppercase tracking-[0.16em] text-[#0D5C48]">Class</strong>
+                <span className="mt-1 block break-words text-[#063F32]">{profile.grade_level || "Not assigned"}</span>
+              </p>
+              <p className="rounded-[1.5rem] border border-[#2D8A6A]/12 bg-[linear-gradient(180deg,#FAF7F0_0%,#F1EADC_100%)] px-5 py-4 text-sm leading-6 text-[#245C4F]">
+                <strong className="block text-xs font-semibold uppercase tracking-[0.16em] text-[#0D5C48]">Course</strong>
+                <span className="mt-1 block break-words text-[#063F32]">{profile.course_title || "Not assigned"}</span>
+              </p>
+              <p className="rounded-[1.5rem] border border-[#2D8A6A]/12 bg-[linear-gradient(180deg,#FAF7F0_0%,#F1EADC_100%)] px-5 py-4 text-sm leading-6 text-[#245C4F]">
+                <strong className="block text-xs font-semibold uppercase tracking-[0.16em] text-[#0D5C48]">Status</strong>
+                <span className="mt-1 block break-words text-[#063F32]">{profile.profile_status || profile.user_status || "Not available"}</span>
+              </p>
+              <p className="rounded-[1.5rem] border border-[#2D8A6A]/12 bg-[linear-gradient(180deg,#FAF7F0_0%,#F1EADC_100%)] px-5 py-4 text-sm leading-6 text-[#245C4F]">
+                <strong className="block text-xs font-semibold uppercase tracking-[0.16em] text-[#0D5C48]">Father name</strong>
+                <span className="mt-1 block break-words text-[#063F32]">{profile.father_name || "Not assigned"}</span>
+              </p>
+              <p className="rounded-[1.5rem] border border-[#2D8A6A]/12 bg-[linear-gradient(180deg,#FAF7F0_0%,#F1EADC_100%)] px-5 py-4 text-sm leading-6 text-[#245C4F]">
+                <strong className="block text-xs font-semibold uppercase tracking-[0.16em] text-[#0D5C48]">Father phone</strong>
+                <span className="mt-1 block break-words text-[#063F32]">{profile.father_phone || "Not assigned"}</span>
+              </p>
+              <p className="rounded-[1.5rem] border border-[#2D8A6A]/12 bg-[linear-gradient(180deg,#FAF7F0_0%,#F1EADC_100%)] px-5 py-4 text-sm leading-6 text-[#245C4F]">
+                <strong className="block text-xs font-semibold uppercase tracking-[0.16em] text-[#0D5C48]">Father email</strong>
+                <span className="mt-1 block break-words text-[#063F32]">{profile.father_email || "Not assigned"}</span>
+              </p>
             </div>
           </motion.section>
         </div>

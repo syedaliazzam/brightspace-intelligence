@@ -28,7 +28,7 @@ export default function StudentClassesPage() {
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap gap-3">
-        <select value={state.range} onChange={(event) => { const next = { ...state, range: event.target.value }; setState(next); load(next); }} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-700 outline-none focus:border-sky-400">
+        <select value={state.range} onChange={(event) => { const next = { ...state, range: event.target.value }; setState(next); load(next); }} className="rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 text-sm font-medium text-[#063F32] outline-none transition focus:border-[#C9A227] focus:ring-4 focus:ring-[#FFF5D6]">
           {ranges.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
         </select>
         <SubjectFilter value={state.subjectId} subjects={state.subjects} onChange={(subjectId) => { const next = { ...state, subjectId }; setState(next); load(next); }} />

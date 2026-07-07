@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { ChevronDown } from "lucide-react";
 import { LeafSpinnerInline, OpenBookLoader } from "@/components/shared/AshShajrahLoaders";
 
@@ -43,9 +44,9 @@ function MessageBubble({ message, mode }) {
 }
 
 function Modal({ title, subtitle, onClose, children, actions, showTopClose = true }) {
-  return (
-    <div className="fixed inset-0 z-[60] flex items-start justify-center bg-[#063F32]/45 px-4 pt-10 pb-8">
-      <div className="w-full max-w-3xl rounded-[2rem] border border-[#2D8A6A]/15 bg-white shadow-[0_24px_80px_-36px_rgba(13,59,46,0.24)]">
+  const content = (
+    <div className="fixed inset-0 z-[9999] isolate flex items-start justify-center bg-[#063F32]/45 px-4 pt-10 pb-8">
+      <div className="relative z-[10000] w-full max-w-3xl rounded-[2rem] border border-[#2D8A6A]/15 bg-white shadow-[0_24px_80px_-36px_rgba(13,59,46,0.24)]">
         <div className="border-b border-[#F1EADC] px-6 py-4">
           <div className="flex items-start justify-between gap-4">
             <div>
@@ -64,6 +65,9 @@ function Modal({ title, subtitle, onClose, children, actions, showTopClose = tru
       </div>
     </div>
   );
+
+  if (typeof document === "undefined") return content;
+  return createPortal(content, document.body);
 }
 
 function SelectField({ value, onChange, onFocus, onBlur, className = "", children, ...props }) {

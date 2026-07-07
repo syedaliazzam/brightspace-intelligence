@@ -71,7 +71,7 @@ export default function StudentPortalNavbar({ profile = {} }) {
     scrollToSection(id);
   }
 
-  const shell = "border-[#2D8A6A]/15 bg-white/85 backdrop-blur-xl";
+  const shell = "border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.92)_0%,rgba(250,247,240,0.96)_100%)] backdrop-blur-xl";
   const activePill = "bg-[linear-gradient(135deg,#C9A227,#E4C766)] text-[#063F32] shadow-[0_10px_24px_-14px_rgba(201,162,39,0.6)]";
   const inactivePill = "bg-[#FAF7F0] text-[#245C4F] hover:bg-[#F1EADC]";
 
@@ -114,7 +114,7 @@ export default function StudentPortalNavbar({ profile = {} }) {
               <button
                 type="button"
                 onClick={() => signOut({ callbackUrl: "/login" })}
-                className="rounded-full border border-[#2D8A6A]/20 bg-white px-4 py-2 text-sm font-semibold text-[#0D5C48] transition hover:border-[#C9A227]/40 hover:bg-[#FFF5D6]"
+                className="rounded-full border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-2 text-sm font-semibold text-[#0D5C48] transition hover:bg-[#0D5C48] hover:text-white"
               >
                 Logout
               </button>
@@ -124,7 +124,7 @@ export default function StudentPortalNavbar({ profile = {} }) {
               <button
                 type="button"
                 onClick={() => setMenuOpen((current) => !current)}
-                className="rounded-full border border-[#2D8A6A]/20 bg-white px-4 py-2 text-sm font-semibold text-[#0D5C48] transition hover:border-[#C9A227]/40 hover:bg-[#FFF5D6]"
+                className="rounded-full border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-2 text-sm font-semibold text-[#0D5C48] transition hover:border-[#C9A227]/40 hover:bg-[#FFF5D6]"
               >
                 Menu
               </button>
@@ -132,9 +132,9 @@ export default function StudentPortalNavbar({ profile = {} }) {
           </div>
 
           {menuOpen ? (
-            <div className="mt-3 rounded-3xl border border-[#2D8A6A]/15 bg-white/95 p-4 shadow-lg min-[1100px]:hidden">
+            <div className="mt-3 rounded-3xl border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(250,247,240,0.98)_100%)] p-4 shadow-lg backdrop-blur-xl min-[1100px]:hidden">
               <div className="grid gap-2">
-                <div className="rounded-2xl bg-[#FAF7F0] p-3 sm:hidden">
+                <div className="rounded-2xl border border-[#2D8A6A]/12 bg-[#FAF7F0] p-3 sm:hidden">
                   <p className="text-sm font-semibold text-[#063F32]">{profile?.full_name || profile?.name || "Student"}</p>
                   <p className="text-xs text-[#245C4F]">{profile?.username || profile?.email || "Student"}</p>
                 </div>
@@ -155,7 +155,7 @@ export default function StudentPortalNavbar({ profile = {} }) {
                 <button
                   type="button"
                   onClick={() => signOut({ callbackUrl: "/login" })}
-                  className="mt-2 rounded-2xl border border-[#2D8A6A]/20 bg-white px-4 py-3 text-left text-sm font-semibold text-[#0D5C48] transition hover:border-[#C9A227]/40 hover:bg-[#FFF5D6]"
+                  className="mt-2 rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 text-left text-sm font-semibold text-[#0D5C48] transition hover:border-[#C9A227]/40 hover:bg-[#FFF5D6]"
                 >
                   Logout
                 </button>

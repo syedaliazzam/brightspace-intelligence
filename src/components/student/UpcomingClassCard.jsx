@@ -7,21 +7,25 @@ export default function UpcomingClassCard({ item }) {
   const displayStatus = item?.display_status || getLectureDisplayStatus(item);
 
   return (
-    <section className="rounded-[1.75rem] border border-white/70 bg-slate-950 p-5 text-white shadow-[0_24px_80px_-36px_rgba(15,23,42,0.45)]">
-      <p className="text-sm font-semibold uppercase tracking-[0.22em] text-sky-200">Next lecture</p>
+    <section className="rounded-[2rem] border border-[#2D8A6A]/15 bg-[linear-gradient(135deg,rgba(255,255,255,0.98),rgba(241,234,220,0.65))] p-5 text-[#063F32] shadow-[0_24px_80px_-36px_rgba(13,59,46,0.18)] backdrop-blur-xl">
+      <p className="text-sm font-semibold uppercase tracking-[0.22em] text-[#C9A227]">Next lecture</p>
       {item ? (
         <div className="mt-4">
-          <h2 className="text-2xl font-semibold">{item.title}</h2>
-          <p className="mt-2 text-sm text-slate-300">{item.subject_name} with {item.teacher_name}</p>
+          <h2 className="font-display text-2xl font-bold tracking-tight text-[#063F32]">{item.title}</h2>
+          <p className="mt-2 text-sm text-[#245C4F]">
+            {item.subject_name} with {item.teacher_name}
+          </p>
           {item.google_meet_link && canJoin ? (
-            <>
-              <a href={item.google_meet_link} target="_blank" rel="noreferrer" className="mt-4 inline-flex rounded-xl bg-white px-4 py-2 text-sm font-semibold text-slate-950">Join Google Meet</a>
-            </>
+            <a href={item.google_meet_link} target="_blank" rel="noreferrer" className="mt-4 inline-flex rounded-xl bg-[linear-gradient(135deg,#C9A227,#E4C766)] px-4 py-2 text-sm font-semibold text-[#063F32]">
+              Join Google Meet
+            </a>
           ) : (
-            <span className="mt-4 inline-flex rounded-xl bg-white/15 px-4 py-2 text-sm font-semibold text-slate-200">{displayStatus}</span>
+            <span className="mt-4 inline-flex rounded-xl border border-[#2D8A6A]/15 bg-white/85 px-4 py-2 text-sm font-semibold text-[#0D5C48]">{displayStatus}</span>
           )}
         </div>
-      ) : <p className="mt-4 text-sm text-slate-300">No upcoming lectures scheduled.</p>}
+      ) : (
+        <p className="mt-4 text-sm text-[#245C4F]">No upcoming lectures scheduled.</p>
+      )}
     </section>
   );
 }

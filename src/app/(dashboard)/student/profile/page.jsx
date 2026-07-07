@@ -5,9 +5,9 @@ import { OpenBookLoader } from "@/components/shared/AshShajrahLoaders";
 
 function DetailRow({ label, value }) {
   return (
-    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{label}</p>
-      <p className="mt-2 text-sm font-semibold text-slate-950">{value || "Not provided"}</p>
+    <div className="rounded-[1.5rem] border border-[#2D8A6A]/12 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(233,248,241,0.72)_100%)] px-5 py-4">
+      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]">{label}</p>
+      <p className="mt-2 break-words text-sm font-semibold text-[#063F32]">{value || "Not provided"}</p>
     </div>
   );
 }
@@ -29,10 +29,12 @@ export default function StudentProfilePage() {
   const profile = state.profile || {};
 
   return (
-    <div className="space-y-6 min-h-screen">
-      <section className="rounded-[2rem] border border-white/70 bg-white/90 p-6 shadow-[0_24px_80px_-36px_rgba(15,23,42,0.25)] sm:p-8">
-        <h1 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">Student profile details</h1>
-        <p className="mt-3 text-sm leading-7 text-slate-600 sm:text-base">
+    <div className="min-h-screen space-y-6 rounded-[2rem] border-0 bg-[#FAF7F0]">
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(201,162,39,0.12),transparent_35%),radial-gradient(circle_at_top_right,rgba(45,138,106,0.12),transparent_32%),linear-gradient(180deg,#FAF7F0_0%,#F7F1E3_100%)]" />
+      <div className="relative mx-auto max-w-7xl space-y-6 px-4 py-4 sm:px-6 lg:px-8">
+      <section className="rounded-[2rem] border border-[#2D8A6A]/15 bg-[linear-gradient(135deg,rgba(13,59,46,0.98),rgba(13,92,72,0.94))] p-6 text-[#FAF7F0] shadow-[0_24px_80px_-36px_rgba(13,59,46,0.32)] sm:p-8">
+        <h1 className="mt-3 font-display text-3xl font-bold tracking-tight text-[#FAF7F0] sm:text-4xl">Student profile details</h1>
+        <p className="mt-3 text-sm leading-7 text-[#F1EADC] sm:text-base">
           View your account, enrollment, and admission details in one place.
         </p>
       </section>
@@ -40,7 +42,7 @@ export default function StudentProfilePage() {
       {state.error ? <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">{state.error}</div> : null}
       {state.loading ? <OpenBookLoader title="Loading profile" subtitle="Fetching your account details..." /> : null}
 
-      <section className="rounded-[1.75rem] border border-white/70 bg-white/90 p-5 shadow-[0_20px_70px_-36px_rgba(15,23,42,0.25)]">
+      <section className="rounded-[2rem] border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(250,247,240,0.98)_100%)] p-5 shadow-[0_20px_70px_-36px_rgba(13,59,46,0.18)] backdrop-blur-xl">
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <DetailRow label="Full name" value={profile.full_name} />
           <DetailRow label="Username" value={profile.username} />
@@ -54,8 +56,8 @@ export default function StudentProfilePage() {
         </div>
       </section>
 
-      <section className="rounded-[1.75rem] border border-white/70 bg-white/90 p-5 shadow-[0_20px_70px_-36px_rgba(15,23,42,0.25)]">
-        <h2 className="text-xl font-semibold text-slate-950">Admission snapshot</h2>
+      <section className="rounded-[2rem] border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(250,247,240,0.98)_100%)] p-5 shadow-[0_20px_70px_-36px_rgba(13,59,46,0.18)] backdrop-blur-xl">
+        <h2 className="font-body text-xl font-semibold text-[#063F32]">Admission snapshot</h2>
         <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <DetailRow label="Father name" value={profile.father_name} />
           <DetailRow label="Father phone" value={profile.father_phone} />
@@ -77,8 +79,8 @@ export default function StudentProfilePage() {
         </div>
       </section>
 
-      <section className="rounded-[1.75rem] border border-white/70 bg-white/90 p-5 shadow-[0_20px_70px_-36px_rgba(15,23,42,0.25)]">
-        <h2 className="text-xl font-semibold text-slate-950">Child profile</h2>
+      <section className="rounded-[2rem] border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(250,247,240,0.98)_100%)] p-5 shadow-[0_20px_70px_-36px_rgba(13,59,46,0.18)] backdrop-blur-xl">
+        <h2 className="font-body text-xl font-semibold text-[#063F32]">Child profile</h2>
         <div className="mt-4 grid gap-4 lg:grid-cols-2">
           <DetailRow label="Profile" value={profile.child_profile} />
           <DetailRow label="Strengths" value={profile.child_strengths} />
@@ -89,6 +91,7 @@ export default function StudentProfilePage() {
           <DetailRow label="Medical conditions" value={profile.medical_conditions} />
         </div>
       </section>
+      </div>
     </div>
   );
 }

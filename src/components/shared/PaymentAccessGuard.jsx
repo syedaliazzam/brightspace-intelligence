@@ -35,7 +35,7 @@ export default function PaymentAccessGuard({ children }) {
 
   if (loading) {
     return (
-      <div className="flex min-h-[88vh] items-center justify-center bg-[#FAF7F0]">
+      <div className="flex min-h-[88vh] items-center justify-center">
         <OpenBookLoader title="Checking access" subtitle="Opening your classroom..." />
       </div>
     );
