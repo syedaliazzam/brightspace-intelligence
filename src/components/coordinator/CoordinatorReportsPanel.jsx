@@ -86,28 +86,28 @@ function ReportCard({ title, description, rows, itemLabel, valueLabel }) {
   const hasMore = visibleCount < rows.length;
 
   return (
-    <section className="rounded-[1.75rem] border border-[#2D8A6A]/15 bg-white/90 p-5 shadow-[0_20px_70px_-36px_rgba(6,63,50,0.18)]">
-      <p className="text-sm font-semibold uppercase tracking-[0.22em] text-[#0D5C48]">{title}</p>
+    <section className="rounded-[2rem] border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(250,247,240,0.98)_100%)] p-5 shadow-[0_20px_70px_-36px_rgba(13,59,46,0.18)] backdrop-blur-xl">
+      <p className="text-sm uppercase tracking-[0.22em] text-[#0D5C48] font-bold">{title}</p>
       <p className="mt-2 text-sm leading-6 text-[#245C4F]">{description}</p>
-      <div className="mt-5 overflow-hidden rounded-2xl border border-[#2D8A6A]/10">
-        <div className="grid grid-cols-[1fr_110px] bg-[#FAF7F0] px-4 py-3 text-xs font-semibold uppercase tracking-[0.16em] text-[#245C4F]">
+      <div className="mt-5 overflow-hidden rounded-[1.5rem] border border-[#2D8A6A]/15">
+        <div className="grid grid-cols-[1fr_110px] bg-[linear-gradient(180deg,#FAF7F0_0%,#F1EADC_100%)] px-4 py-3 text-xs font-semibold uppercase tracking-[0.16em] text-[#0D5C48]">
           <span>{itemLabel}</span>
           <span className="text-right">{valueLabel}</span>
         </div>
         {rows?.length ? (
           <>
             {visibleRows.map((row) => (
-            <div key={`${title}-${row.label}`} className="grid grid-cols-[1fr_110px] border-t border-slate-100 px-4 py-3 text-sm">
+            <div key={`${title}-${row.label}`} className="grid grid-cols-[1fr_110px] border-t border-[#F1EADC] px-4 py-3 text-sm">
               <span className="text-[#245C4F]">{humanize(row.label)}</span>
               <span className="font-semibold text-[#063F32]">{row.total}</span>
             </div>
             ))}
             {canPaginate ? (
-              <div className="border-t border-slate-100 px-4 py-3">
+              <div className="border-t border-[#F1EADC] px-4 py-3">
                 <button
                   type="button"
                   onClick={() => setVisibleCount((current) => (current >= rows.length ? 5 : Math.min(current + 5, rows.length)))}
-                  className="rounded-full border border-[#2D8A6A]/20 bg-white px-4 py-2 text-xs font-semibold text-[#063F32] transition hover:bg-[#FAF7F0]"
+                  className="rounded-full border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-2 text-xs font-semibold text-[#063F32] transition hover:bg-[#F1EADC]"
                 >
                   {hasMore ? "Show more" : "Show less"}
                 </button>
@@ -115,7 +115,7 @@ function ReportCard({ title, description, rows, itemLabel, valueLabel }) {
             ) : null}
           </>
         ) : (
-          <p className="border-t border-slate-100 px-4 py-4 text-sm text-[#245C4F]">No records available for this report.</p>
+          <p className="border-t border-[#F1EADC] px-4 py-4 text-sm text-[#245C4F]">No records available for this report.</p>
         )}
       </div>
     </section>
@@ -141,13 +141,13 @@ export default function CoordinatorReportsPanel({ data }) {
       </div>
 
       <div className="grid gap-6">
-        <section className="rounded-[1.75rem] border border-[#2D8A6A]/15 bg-white/90 p-5 shadow-[0_20px_70px_-36px_rgba(6,63,50,0.18)]">
-          <p className="text-sm font-semibold uppercase tracking-[0.22em] text-[#0D5C48]">Recent Lectures</p>
+        <section className="rounded-[2rem] border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(250,247,240,0.98)_100%)] p-5 shadow-[0_20px_70px_-36px_rgba(13,59,46,0.18)] backdrop-blur-xl">
+          <p className="text-sm font-bold uppercase tracking-[0.22em] text-[#0D5C48]">Recent Lectures</p>
           <p className="mt-2 text-sm leading-6 text-[#245C4F]">Latest scheduled lectures shown in a compact portal table.</p>
-          <div className="mt-5 overflow-x-auto rounded-2xl border border-[#2D8A6A]/10">
+          <div className="mt-5 overflow-x-auto rounded-[1.5rem] border border-[#2D8A6A]/15">
             <div className="min-w-[860px]">
-            <div className="grid grid-cols-[1fr_1fr_1fr_1fr_120px_110px] bg-[#FAF7F0] px-6 py-3 text-xs font-semibold uppercase tracking-[0.16em] text-[#245C4F]">
-              <span>Title</span>
+            <div className="grid grid-cols-[1fr_1fr_1fr_1fr_120px_110px] bg-[linear-gradient(180deg,#FAF7F0_0%,#F1EADC_100%)] px-6 py-3 text-xs font-semibold uppercase tracking-[0.16em] text-[#0D5C48]">
+              <span className="">Title</span>
               <span>Subject</span>
               <span>Teacher</span>
               <span>Class</span>
@@ -155,7 +155,7 @@ export default function CoordinatorReportsPanel({ data }) {
               <span className="text-right">Status</span>
             </div>
             {recentLectures.length ? recentLectures.map((row) => (
-              <div key={row.id} className="grid grid-cols-[1fr_1fr_1fr_1fr_120px_110px] border-t border-slate-100 px-6 py-3 text-sm">
+              <div key={row.id} className="grid grid-cols-[1fr_1fr_1fr_1fr_120px_110px] border-t border-[#F1EADC] px-6 py-3 text-sm">
                 <span className="text-[#245C4F]">{row.title}</span>
                 <span className="text-[#245C4F]">{row.subject_name || "-"}</span>
                 <span className="text-[#245C4F]">{row.teacher_name || "-"}</span>
@@ -167,7 +167,7 @@ export default function CoordinatorReportsPanel({ data }) {
                     : humanize(row.display_status || row.status)}
                 </span>
               </div>
-            )) : <p className="border-t border-slate-100 px-4 py-4 text-sm text-slate-500">No recent lectures found.</p>}
+            )) : <p className="border-t border-[#F1EADC] px-4 py-4 text-sm text-[#245C4F]">No recent lectures found.</p>}
             </div>
           </div>
         </section>

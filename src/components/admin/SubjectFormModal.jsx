@@ -88,7 +88,7 @@ export default function SubjectFormModal({
   return (
     <AnimatePresence>
       {open ? (
-        <div className="fixed inset-0 z-50 flex items-start justify-center bg-[#063F32]/45 px-4 pb-8 pt-24 sm:pt-28">
+        <div className="fixed inset-x-0 top-0 z-50 flex min-h-screen items-start justify-center bg-[#063F32]/45 px-4 pb-8 pt-24 sm:pt-28">
           <motion.div
             initial={{ opacity: 0, y: 18 }}
             animate={{ opacity: 1, y: 0 }}

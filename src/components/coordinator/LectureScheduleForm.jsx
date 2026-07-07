@@ -289,7 +289,7 @@ export default function LectureScheduleForm({ options, onSuccess }) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="grid gap-3 rounded-[1.75rem] border border-[#2D8A6A]/15 bg-white/90 p-5 shadow-[0_20px_70px_-36px_rgba(6,63,50,0.18)] lg:grid-cols-2">
+    <form onSubmit={handleSubmit} className="grid gap-3 rounded-[2rem] border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(250,247,240,0.98)_100%)] p-5 shadow-[0_20px_70px_-36px_rgba(13,59,46,0.18)] backdrop-blur-xl lg:grid-cols-2">
       <div className="relative">
         <select
           value={form.courseId}
@@ -371,7 +371,7 @@ export default function LectureScheduleForm({ options, onSuccess }) {
             { key: "fri", label: "Friday" },
             { key: "sat", label: "Saturday" },
           ].map((weekday) => (
-            <label key={weekday.key} className="inline-flex items-center gap-2 rounded-2xl border border-[#2D8A6A]/15 bg-white px-4 py-3 text-sm text-[#063F32]">
+            <label key={weekday.key} className="inline-flex items-center gap-2 rounded-2xl border border-[#2D8A6A]/15 bg-[#FAF7F0] px-4 py-3 text-sm text-[#063F32]">
               <input
                 type="checkbox"
                 checked={form.days.includes(weekday.key)}

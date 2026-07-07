@@ -29,7 +29,7 @@ function PaginationControls({ page, pageSize, totalItems, hrefBase }) {
         <Link
           href={hrefFor(currentPage - 1)}
           aria-disabled={currentPage <= 1}
-          className={`rounded-full border border-[#2D8A6A]/20 bg-white px-4 py-2 text-sm font-semibold transition ${
+          className={`rounded-full border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-2 text-sm font-semibold transition ${
             currentPage <= 1
               ? "pointer-events-none cursor-not-allowed opacity-50"
               : "text-[#063F32] hover:bg-[#F1EADC]"
@@ -45,7 +45,7 @@ function PaginationControls({ page, pageSize, totalItems, hrefBase }) {
           className={`min-w-10 rounded-full px-4 py-2 text-sm font-semibold transition ${
             number === currentPage
               ? "bg-[linear-gradient(135deg,#C9A227,#E4C766)] text-[#063F32]"
-              : "border border-[#2D8A6A]/20 bg-white text-[#063F32] hover:bg-[#F1EADC]"
+              : "border border-[#2D8A6A]/20 bg-[#FAF7F0] text-[#063F32] hover:bg-[#F1EADC]"
           }`}
         >
           {number}
@@ -55,7 +55,7 @@ function PaginationControls({ page, pageSize, totalItems, hrefBase }) {
         <Link
           href={hrefFor(currentPage + 1)}
           aria-disabled={currentPage >= totalPages}
-          className={`rounded-full border border-[#2D8A6A]/20 bg-white px-4 py-2 text-sm font-semibold transition ${
+          className={`rounded-full border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-2 text-sm font-semibold transition ${
             currentPage >= totalPages
               ? "pointer-events-none cursor-not-allowed opacity-50"
               : "text-[#063F32] hover:bg-[#F1EADC]"
@@ -96,7 +96,7 @@ export default function ShowMoreSectionServer({
           ) : null}
         </>
       ) : (
-        <section className="rounded-[1.75rem] border border-dashed border-[#2D8A6A]/25 bg-white/85 p-10 text-center text-sm text-[#245C4F] shadow-[0_18px_60px_-36px_rgba(13,59,46,0.18)]">
+        <section className="rounded-[1.75rem] border border-dashed border-[#2D8A6A]/25 bg-[#FAF7F0]/80 p-10 text-center text-sm text-[#245C4F] shadow-[0_18px_60px_-36px_rgba(13,59,46,0.18)]">
           {emptyMessage}
         </section>
       )}

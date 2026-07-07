@@ -26,8 +26,8 @@ export default function TeacherAssignmentTable({ items = [], onRefresh }) {
   }
 
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="overflow-hidden rounded-[1.75rem] border border-[#2D8A6A]/15 bg-white/90 shadow-[0_20px_70px_-36px_rgba(6,63,50,0.18)]">
-      <div className="hidden grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_120px] gap-3 border-b border-[#2D8A6A]/10 bg-[#FAF7F0] px-5 py-4 text-xs font-semibold uppercase tracking-[0.18em] text-[#245C4F] lg:grid lg:items-center">
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="overflow-hidden rounded-[1.75rem] border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(250,247,240,0.98)_100%)] shadow-[0_20px_70px_-36px_rgba(6,63,50,0.18)] backdrop-blur-xl">
+      <div className="hidden grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_minmax(0,1fr)_120px] gap-3 border-b border-[#2D8A6A]/10 bg-[linear-gradient(180deg,#FAF7F0_0%,#F1EADC_100%)] px-5 py-4 text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48] lg:grid lg:items-center">
         <span>Teacher</span>
         <span>Class</span>
         <span>Start month</span>
@@ -52,14 +52,14 @@ export default function TeacherAssignmentTable({ items = [], onRefresh }) {
                     window.alert(error.message)
                   )
                 }
-                className="rounded-xl border border-[#2D8A6A]/20 bg-white px-3 py-2 text-xs font-semibold text-[#063F32] transition hover:bg-[#FAF7F0] lg:justify-self-end"
+                className="rounded-xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-3 py-2 text-xs font-semibold text-[#063F32] transition hover:bg-[#F1EADC] lg:justify-self-end"
               >
                 {item.status === "active" ? "Suspend" : "Activate"}
               </button>
             </div>
           ))
         ) : (
-          <div className="px-5 py-10 text-sm text-slate-500">No teacher assignments available.</div>
+          <div className="px-5 py-10 text-sm text-[#245C4F]">No teacher assignments available.</div>
         )}
       </div>
     </motion.div>

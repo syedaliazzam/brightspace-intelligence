@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { ChevronDown } from "lucide-react";
+import ClientPortal from "@/components/shared/ClientPortal";
+import { buildInlinePreviewUrl } from "@/lib/filePreview";
 
 const STATUS_STYLES = {
   new_lead: "bg-[#EAF6EF] text-[#0D5C48]",
@@ -59,7 +61,7 @@ function DocumentLink({ label, href }) {
 
   return (
     <a
-      href={href}
+      href={buildInlinePreviewUrl(href)}
       target="_blank"
       rel="noreferrer"
       className="inline-flex rounded-full border border-[#2D8A6A]/20 bg-[#0D5C48] px-4 py-2 text-sm font-semibold text-white transition hover:bg-[#063F32]"
@@ -69,7 +71,7 @@ function DocumentLink({ label, href }) {
   );
 }
 
-function LeadDetailsModal({ lead, onClose, onCreateVoucher }) {
+function LeadDetailsModal({ lead, onClose, onCreateVoucher, portalTargetId }) {
   if (!lead) return null;
 
   const canCreateVoucher =
@@ -78,7 +80,8 @@ function LeadDetailsModal({ lead, onClose, onCreateVoucher }) {
     lead?.status === "new_lead";
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-[#063F32]/45 px-4 py-8 backdrop-blur-sm">
+    <ClientPortal targetId={portalTargetId}>
+      <div className="absolute inset-x-0 top-0 z-[9999] isolate flex min-h-full items-start justify-center overflow-visible bg-[#063F32]/45 px-4 py-8 backdrop-blur-sm">
       <div className="w-full max-w-6xl rounded-[2rem] border border-[#2D8A6A]/15 bg-[#FAF7F0] shadow-[0_30px_90px_-40px_rgba(13,59,46,0.28)]">
         <div className="sticky top-0 z-10 flex items-center justify-between rounded-t-[2rem] border-b border-[#2D8A6A]/15 bg-[#FAF7F0] px-6 py-5">
           <div>
@@ -110,9 +113,9 @@ function LeadDetailsModal({ lead, onClose, onCreateVoucher }) {
           </div>
         </div>
 
-        <div className="max-h-[calc(100vh-8rem)] overflow-y-auto px-6 py-6">
+        <div className="px-6 py-6">
           <div className="grid gap-6 lg:grid-cols-2">
-            <section className="rounded-[1.5rem] border border-[#2D8A6A]/15 bg-white/90 p-5">
+            <section className="rounded-[1.75rem] border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(250,247,240,0.98)_100%)] p-5 shadow-[0_18px_60px_-40px_rgba(13,59,46,0.12)]">
               <h3 className="text-lg font-semibold text-[#063F32]">Admission overview</h3>
               <dl className="mt-4 grid gap-4 sm:grid-cols-2">
                 <DetailRow label="Programme" value={lead.program_name} />
@@ -129,7 +132,7 @@ function LeadDetailsModal({ lead, onClose, onCreateVoucher }) {
               </dl>
             </section>
 
-            <section className="rounded-[1.5rem] border border-[#2D8A6A]/15 bg-white/90 p-5">
+            <section className="rounded-[1.75rem] border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(250,247,240,0.98)_100%)] p-5 shadow-[0_18px_60px_-40px_rgba(13,59,46,0.12)]">
               <h3 className="text-lg font-semibold text-[#063F32]">Student details</h3>
               <dl className="mt-4 grid gap-4 sm:grid-cols-2">
                 <DetailRow label="Student name" value={lead.student_name} />
@@ -147,7 +150,7 @@ function LeadDetailsModal({ lead, onClose, onCreateVoucher }) {
               </dl>
             </section>
 
-            <section className="rounded-[1.5rem] border border-[#2D8A6A]/15 bg-white/90 p-5">
+            <section className="rounded-[1.75rem] border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(250,247,240,0.98)_100%)] p-5 shadow-[0_18px_60px_-40px_rgba(13,59,46,0.12)]">
               <h3 className="text-lg font-semibold text-[#063F32]">Child profile</h3>
               <dl className="mt-4 grid gap-4">
                 <DetailRow label="Child profile" value={lead.child_profile} />
@@ -160,7 +163,7 @@ function LeadDetailsModal({ lead, onClose, onCreateVoucher }) {
               </dl>
             </section>
 
-            <section className="rounded-[1.5rem] border border-[#2D8A6A]/15 bg-white/90 p-5">
+            <section className="rounded-[1.75rem] border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(250,247,240,0.98)_100%)] p-5 shadow-[0_18px_60px_-40px_rgba(13,59,46,0.12)]">
               <h3 className="text-lg font-semibold text-[#063F32]">Contact summary</h3>
               <dl className="mt-4 grid gap-4 sm:grid-cols-2 break-words">
                 <DetailRow label="Parent name" value={lead.parent_name} />
@@ -174,7 +177,7 @@ function LeadDetailsModal({ lead, onClose, onCreateVoucher }) {
               </dl>
             </section>
 
-            <section className="rounded-[1.5rem] border border-[#2D8A6A]/15 bg-white/90 p-5">
+            <section className="rounded-[1.75rem] border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(250,247,240,0.98)_100%)] p-5 shadow-[0_18px_60px_-40px_rgba(13,59,46,0.12)]">
               <h3 className="text-lg font-semibold text-[#063F32]">Father details</h3>
               <dl className="mt-4 grid gap-4 sm:grid-cols-2 break-words">
                 <DetailRow label="Name English" value={lead.father_name_english} />
@@ -192,7 +195,7 @@ function LeadDetailsModal({ lead, onClose, onCreateVoucher }) {
               </dl>
             </section>
 
-            <section className="rounded-[1.5rem] border border-[#2D8A6A]/15 bg-white/90 p-5">
+            <section className="rounded-[1.75rem] border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(250,247,240,0.98)_100%)] p-5 shadow-[0_18px_60px_-40px_rgba(13,59,46,0.12)]">
               <h3 className="text-lg font-semibold text-[#063F32]">Mother details</h3>
               <dl className="mt-4 grid gap-4 sm:grid-cols-2 break-words">
                 <DetailRow label="Name English" value={lead.mother_name_english} />
@@ -211,7 +214,7 @@ function LeadDetailsModal({ lead, onClose, onCreateVoucher }) {
             </section>
           </div>
 
-          <section className="mt-6 rounded-[1.5rem] border border-[#2D8A6A]/15 bg-white/90 p-5">
+          <section className="mt-6 rounded-[1.75rem] border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(250,247,240,0.98)_100%)] p-5 shadow-[0_18px_60px_-40px_rgba(13,59,46,0.12)]">
             <h3 className="text-lg font-semibold text-[#063F32]">Documents and notes</h3>
             <div className="mt-4 flex flex-wrap gap-3">
               <DocumentLink label="Birth certificate" href={lead.birth_certificate_file_url} />
@@ -228,16 +231,21 @@ function LeadDetailsModal({ lead, onClose, onCreateVoucher }) {
           </section>
         </div>
       </div>
-    </div>
+      </div>
+    </ClientPortal>
   );
 }
 
-export default function RegistrationLeadTable({ leads, onCreateVoucher }) {
+export default function RegistrationLeadTable({
+  leads,
+  onCreateVoucher,
+  portalTargetId = "coordinator-page-portal-root",
+}) {
   const [selectedLead, setSelectedLead] = useState(null);
 
   if (!leads.length) {
     return (
-      <section className="rounded-[1.75rem] border border-dashed border-[#2D8A6A]/25 bg-white/85 p-10 text-center text-sm text-[#245C4F] shadow-[0_18px_60px_-36px_rgba(13,59,46,0.18)]">
+      <section className="rounded-[1.75rem] border border-dashed border-[#2D8A6A]/25 bg-[#FAF7F0]/80 p-10 text-center text-sm text-[#245C4F] shadow-[0_18px_60px_-36px_rgba(13,59,46,0.18)]">
         No registration records match the current filters.
       </section>
     );
@@ -245,11 +253,11 @@ export default function RegistrationLeadTable({ leads, onCreateVoucher }) {
 
   return (
     <section className="space-y-4">
-      <div className="hidden overflow-hidden rounded-[1.75rem] border border-[#2D8A6A]/15 bg-white/90 shadow-[0_20px_70px_-36px_rgba(13,59,46,0.18)] lg:block">
+      <div className="hidden overflow-hidden rounded-[2rem] border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(250,247,240,0.98)_100%)] shadow-[0_20px_70px_-36px_rgba(13,59,46,0.18)] backdrop-blur-xl lg:block">
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-[#F1EADC]">
-            <thead className="bg-[#FAF7F0]/80">
-              <tr className="text-left text-xs font-semibold uppercase tracking-[0.18em] text-[#245C4F]">
+            <thead className="bg-[linear-gradient(180deg,#FAF7F0_0%,#F1EADC_100%)]">
+              <tr className="text-left text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]">
                 <th className="px-6 py-4">Child</th>
                 <th className="px-6 py-4">Parent</th>
                 <th className="px-6 py-4">Class</th>
@@ -299,7 +307,7 @@ export default function RegistrationLeadTable({ leads, onCreateVoucher }) {
                     <td className="px-6 py-5">
                       <span
                         className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${
-                          STATUS_STYLES[displayStatus] || "bg-slate-100 text-slate-700"
+                          STATUS_STYLES[displayStatus] || "bg-[#F1EADC] text-[#245C4F]"
                         }`}
                       >
                         {formatStatus(displayStatus)}
@@ -310,7 +318,7 @@ export default function RegistrationLeadTable({ leads, onCreateVoucher }) {
                         <button
                           type="button"
                           onClick={() => setSelectedLead(lead)}
-                        className="rounded-full border border-[#2D8A6A]/20 bg-white px-4 py-2 text-sm font-semibold text-[#063F32] transition hover:bg-[#F1EADC]"
+                        className="rounded-full border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-2 text-sm font-semibold text-[#063F32] transition hover:bg-[#F1EADC]"
                         >
                           View Details
                         </button>
@@ -343,7 +351,7 @@ export default function RegistrationLeadTable({ leads, onCreateVoucher }) {
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.2, delay: index * 0.02 }}
-              className="rounded-[1.5rem] border border-[#2D8A6A]/15 bg-white/90 p-5 shadow-[0_18px_60px_-36px_rgba(13,59,46,0.18)]"
+              className="rounded-[1.75rem] border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(250,247,240,0.98)_100%)] p-5 shadow-[0_18px_60px_-36px_rgba(13,59,46,0.18)] backdrop-blur-xl"
             >
               <div className="flex items-start justify-between gap-3">
                 <div>
@@ -355,14 +363,14 @@ export default function RegistrationLeadTable({ leads, onCreateVoucher }) {
                 </div>
                 <span
                   className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${
-                    STATUS_STYLES[displayStatus] || "bg-slate-100 text-slate-700"
+                    STATUS_STYLES[displayStatus] || "bg-[#F1EADC] text-[#245C4F]"
                   }`}
                 >
                   {formatStatus(displayStatus)}
                 </span>
               </div>
 
-              <dl className="mt-4 grid gap-3 text-sm text-slate-600 sm:grid-cols-2">
+              <dl className="mt-4 grid gap-3 text-sm text-[#245C4F] sm:grid-cols-2">
                 <div>
                   <dt className="font-medium text-[#245C4F]">Parent</dt>
                   <dd className="mt-1 text-[#063F32]">{lead.parent_name || "Not provided"}</dd>
@@ -385,7 +393,7 @@ export default function RegistrationLeadTable({ leads, onCreateVoucher }) {
                 <button
                   type="button"
                   onClick={() => setSelectedLead(lead)}
-                  className="rounded-full border border-[#2D8A6A]/20 bg-white px-4 py-2 text-sm font-semibold text-[#063F32] transition hover:bg-[#F1EADC]"
+                  className="rounded-full border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-2 text-sm font-semibold text-[#063F32] transition hover:bg-[#F1EADC]"
                 >
                   View Details
                 </button>
@@ -404,7 +412,12 @@ export default function RegistrationLeadTable({ leads, onCreateVoucher }) {
         })}
       </div>
 
-      <LeadDetailsModal lead={selectedLead} onClose={() => setSelectedLead(null)} onCreateVoucher={onCreateVoucher} />
+      <LeadDetailsModal
+        lead={selectedLead}
+        onClose={() => setSelectedLead(null)}
+        onCreateVoucher={onCreateVoucher}
+        portalTargetId={portalTargetId}
+      />
     </section>
   );
 }

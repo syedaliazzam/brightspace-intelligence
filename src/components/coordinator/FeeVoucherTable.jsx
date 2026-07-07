@@ -333,16 +333,16 @@ export default function FeeVoucherTable({ vouchers }) {
   return (
     <>
       {toast ? (
-        <div className="fixed right-6 top-6 z-[80] rounded-2xl border border-[#2D8A6A]/20 bg-white px-4 py-3 text-sm font-semibold text-[#063F32] shadow-[0_18px_60px_-36px_rgba(13,59,46,0.22)]">
+        <div className="fixed right-6 top-6 z-[80] rounded-2xl border border-[#2D8A6A]/20 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(250,247,240,0.98)_100%)] px-4 py-3 text-sm font-semibold text-[#063F32] shadow-[0_18px_60px_-36px_rgba(13,59,46,0.22)] backdrop-blur-xl">
           {toast}
         </div>
       ) : null}
       <section className="space-y-4">
-        <div className="hidden overflow-hidden rounded-[1.75rem] border border-[#2D8A6A]/15 bg-white/90 shadow-[0_20px_70px_-36px_rgba(13,59,46,0.18)] lg:block">
+        <div className="hidden overflow-hidden rounded-[2rem] border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(250,247,240,0.98)_100%)] shadow-[0_20px_70px_-36px_rgba(13,59,46,0.18)] backdrop-blur-xl lg:block">
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-[#F1EADC]">
-              <thead className="bg-[#FAF7F0]/80">
-                <tr className="text-left text-xs font-semibold uppercase tracking-[0.18em] text-[#245C4F]">
+              <thead className="bg-[linear-gradient(180deg,#FAF7F0_0%,#F1EADC_100%)]">
+                <tr className="text-left text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]">
                   <th className="px-6 py-4">Voucher</th>
                   <th className="px-6 py-4">Student</th>
                   <th className="px-6 py-4">Amount</th>
@@ -351,7 +351,7 @@ export default function FeeVoucherTable({ vouchers }) {
                   <th className="px-6 py-4">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-[#F1EADC]">
                 {vouchers.map((voucher, index) => (
                   (() => {
                     const displayStatus = getDisplayStatus(voucher);
@@ -406,7 +406,7 @@ export default function FeeVoucherTable({ vouchers }) {
                         <button
                           type="button"
                           onClick={() => downloadVoucherPdf(voucher)}
-                          className="rounded-xl border border-[#2D8A6A]/20 bg-white px-3 py-2 text-xs font-semibold text-[#063F32] transition hover:bg-[#F1EADC]"
+                          className="rounded-xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-3 py-2 text-xs font-semibold text-[#063F32] transition hover:bg-[#F1EADC]"
                         >
                           Download PDF
                         </button>
@@ -431,7 +431,7 @@ export default function FeeVoucherTable({ vouchers }) {
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.18, delay: index * 0.02 }}
-              className="rounded-[1.5rem] border border-[#2D8A6A]/15 bg-white/90 p-5 shadow-[0_18px_60px_-36px_rgba(13,59,46,0.18)]"
+              className="rounded-[1.75rem] border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(250,247,240,0.98)_100%)] p-5 shadow-[0_18px_60px_-36px_rgba(13,59,46,0.18)] backdrop-blur-xl"
             >
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
@@ -478,7 +478,7 @@ export default function FeeVoucherTable({ vouchers }) {
                 <button
                   type="button"
                   onClick={() => downloadVoucherPdf(voucher)}
-                  className="rounded-xl border border-[#2D8A6A]/20 bg-white px-3 py-2 text-xs font-semibold text-[#063F32] transition hover:bg-[#F1EADC]"
+                  className="rounded-xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-3 py-2 text-xs font-semibold text-[#063F32] transition hover:bg-[#F1EADC]"
                 >
                   Download PDF
                 </button>

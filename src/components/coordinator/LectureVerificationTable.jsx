@@ -41,7 +41,7 @@ export default function LectureVerificationTable({ items = [], onRefresh }) {
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-4">
       {items.length ? (
         items.map((item) => (
-          <article key={item.id} className="rounded-[1.75rem] border border-[#2D8A6A]/15 bg-white/90 p-5 shadow-[0_20px_70px_-36px_rgba(6,63,50,0.18)]">
+          <article key={item.id} className="rounded-[1.75rem] border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(250,247,240,0.98)_100%)] p-5 shadow-[0_20px_70px_-36px_rgba(6,63,50,0.18)] backdrop-blur-xl">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
               <div>
                 <p className="text-lg font-semibold text-[#063F32]">{item.title}</p>
@@ -53,7 +53,7 @@ export default function LectureVerificationTable({ items = [], onRefresh }) {
               </div>
 
               <div className="flex flex-wrap gap-2">
-                <button type="button" onClick={() => syncMeetAttendance(item.id).catch((error) => window.alert(error.message))} className="rounded-xl border border-[#2D8A6A]/20 bg-[#EAF6EF] px-3 py-2 text-xs font-semibold text-[#0D5C48]">
+                <button type="button" onClick={() => syncMeetAttendance(item.id).catch((error) => window.alert(error.message))} className="rounded-xl border border-[#2D8A6A]/20 bg-[#EAF6EF] px-3 py-2 text-xs font-semibold text-[#0D5C48] transition hover:bg-[#DFF1E7] focus:outline-none focus:ring-4 focus:ring-[#C9A227]/20">
                   Sync Meet Attendance
                 </button>
                 {['completed_by_teacher', 'live', 'scheduled', 'upcoming'].includes(String(item.display_status || item.status || '').toLowerCase()) ? (
@@ -67,7 +67,7 @@ export default function LectureVerificationTable({ items = [], onRefresh }) {
                         if (!item.summary && !item.topic_covered && !manualConfirm) return;
                         updateVerification(item.id, { action: "approve", manualConfirm }).catch((error) => window.alert(error.message));
                       }}
-                      className="rounded-xl bg-[#0D5C48] px-3 py-2 text-xs font-semibold text-[#FAF7F0]"
+                      className="rounded-xl bg-[#0D5C48] px-3 py-2 text-xs font-semibold text-[#FAF7F0] transition hover:bg-[#063F32] hover:shadow-sm focus:outline-none focus:ring-4 focus:ring-[#C9A227]/20"
                     >
                       Approve
                     </button>
@@ -78,11 +78,11 @@ export default function LectureVerificationTable({ items = [], onRefresh }) {
                         if (remarks === null) return;
                         updateVerification(item.id, { action: "reject", remarks }).catch((error) => window.alert(error.message));
                       }}
-                      className="rounded-xl border border-[#2D8A6A]/20 bg-white px-3 py-2 text-xs font-semibold text-[#063F32]"
+                      className="rounded-xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-3 py-2 text-xs font-semibold text-[#063F32] transition hover:bg-[#F1EADC] focus:outline-none focus:ring-4 focus:ring-[#C9A227]/20"
                     >
                       Reject
                     </button>
-                    <button type="button" onClick={() => updateVerification(item.id, { action: "mark_missed" }).catch((error) => window.alert(error.message))} className="rounded-xl border border-[#2D8A6A]/20 bg-white px-3 py-2 text-xs font-semibold text-[#063F32]">
+                    <button type="button" onClick={() => updateVerification(item.id, { action: "mark_missed" }).catch((error) => window.alert(error.message))} className="rounded-xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-3 py-2 text-xs font-semibold text-[#063F32] transition hover:bg-[#F1EADC] focus:outline-none focus:ring-4 focus:ring-[#C9A227]/20">
                       Mark missed
                     </button>
                   </>
@@ -143,7 +143,7 @@ export default function LectureVerificationTable({ items = [], onRefresh }) {
           </article>
         ))
       ) : (
-        <div className="rounded-[1.75rem] border border-[#2D8A6A]/15 bg-white/90 px-5 py-10 text-sm text-[#245C4F] shadow-[0_20px_70px_-36px_rgba(6,63,50,0.18)]">
+        <div className="rounded-[1.75rem] border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(250,247,240,0.98)_100%)] px-5 py-10 text-sm text-[#245C4F] shadow-[0_20px_70px_-36px_rgba(6,63,50,0.18)] backdrop-blur-xl">
           No lecture verification records available.
         </div>
       )}

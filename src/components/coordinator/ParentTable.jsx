@@ -2,6 +2,7 @@
 
 import { ChevronDown } from "lucide-react";
 import { useState } from "react";
+import ClientPortal from "@/components/shared/ClientPortal";
 
 const EMPTY_FORM = {
   id: "",
@@ -22,8 +23,8 @@ function formatDate(value) {
 function DetailRow({ label, value }) {
   return (
     <div>
-      <dt className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">{label}</dt>
-      <dd className="mt-1 text-sm leading-6 text-slate-800">{value || "Not provided"}</dd>
+      <dt className="text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]">{label}</dt>
+      <dd className="mt-1 text-sm leading-6 text-[#245C4F]">{value || "Not provided"}</dd>
     </div>
   );
 }
@@ -100,15 +101,15 @@ export default function ParentTable({ items = [], onRefresh }) {
   }
 
   return (
-    <div className="overflow-hidden rounded-[1.75rem] border border-[#2D8A6A]/15 bg-white/90 shadow-[0_20px_70px_-36px_rgba(6,63,50,0.18)]">
-      <div className="hidden grid-cols-[1.4fr_1fr_1.2fr_0.8fr_220px] gap-4 border-b border-[#2D8A6A]/10 bg-[#FAF7F0] px-5 py-4 text-xs font-semibold uppercase tracking-[0.2em] text-[#245C4F] lg:grid">
+    <div className="overflow-hidden rounded-[2rem] border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(250,247,240,0.98)_100%)] shadow-[0_20px_70px_-36px_rgba(13,59,46,0.18)] backdrop-blur-xl">
+      <div className="hidden grid-cols-[1.4fr_1fr_1.2fr_0.8fr_220px] gap-4 border-b border-[#F1EADC] bg-[linear-gradient(180deg,#FAF7F0_0%,#F1EADC_100%)] px-6 py-4 text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48] lg:grid">
         <span>Parent</span>
         <span>Relation</span>
         <span>Students</span>
         <span>Status</span>
         <span className="text-right">Actions</span>
       </div>
-      <div className="divide-y divide-[#2D8A6A]/10">
+      <div className="divide-y divide-[#F1EADC]">
         {items.length ? (
           items.map((item) => (
             <div key={item.id} className="grid gap-3 px-5 py-4 lg:grid-cols-[1.4fr_1fr_1.2fr_0.8fr_220px] lg:items-center lg:gap-4">
@@ -121,21 +122,21 @@ export default function ParentTable({ items = [], onRefresh }) {
               <p className="text-sm text-[#245C4F]">{item.relation || "-"}</p>
               <div className="text-sm text-[#245C4F]">
                 <p>{item.student_names || "-"}</p>
-                <p className="mt-1 text-xs text-slate-500">{item.class_levels || item.course_titles || ""}</p>
+                <p className="mt-1 text-xs text-[#245C4F]/80">{item.class_levels || item.course_titles || ""}</p>
               </div>
               <p className="text-sm font-medium text-[#245C4F]">{item.status || "-"}</p>
               <div className="flex flex-wrap gap-2 lg:justify-end">
                 <button
                   type="button"
                   onClick={() => setDetailItem(item)}
-                  className="rounded-xl border border-[#2D8A6A]/20 bg-white px-3 py-2 text-xs font-semibold text-[#063F32] transition hover:bg-[#FAF7F0]"
+                  className="rounded-xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-3 py-2 text-xs font-semibold text-[#063F32] transition hover:bg-[#F1EADC]"
                 >
                   View
                 </button>
                 <button
                   type="button"
                   onClick={() => openEdit(item)}
-                  className="rounded-xl border border-[#2D8A6A]/20 bg-white px-3 py-2 text-xs font-semibold text-[#063F32] transition hover:bg-[#FAF7F0]"
+                  className="rounded-xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-3 py-2 text-xs font-semibold text-[#063F32] transition hover:bg-[#F1EADC]"
                 >
                   Edit
                 </button>
@@ -146,12 +147,13 @@ export default function ParentTable({ items = [], onRefresh }) {
             </div>
           ))
         ) : (
-          <div className="px-5 py-10 text-sm text-slate-500">No parent records available.</div>
+          <div className="px-6 py-10 text-sm text-[#245C4F]">No parent records available.</div>
         )}
       </div>
 
       {detailItem ? (
-        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-[#063F32]/45 px-4 py-10 backdrop-blur-sm">
+        <ClientPortal targetId="coordinator-page-portal-root">
+        <div className="absolute inset-x-0 top-0 z-[9999] isolate flex min-h-full items-start justify-center overflow-visible bg-[#063F32]/45 px-4 py-10 backdrop-blur-sm">
           <div className="w-full max-w-5xl rounded-[2rem] border border-[#2D8A6A]/20 bg-[#FAF7F0] shadow-[0_30px_90px_-40px_rgba(6,63,50,0.24)]">
             <div className="flex items-center justify-between border-b border-[#2D8A6A]/10 px-6 py-5">
               <div>
@@ -161,14 +163,14 @@ export default function ParentTable({ items = [], onRefresh }) {
               <button
                 type="button"
                 onClick={() => setDetailItem(null)}
-                className="rounded-full border border-[#2D8A6A]/20 bg-white px-3 py-2 text-sm font-semibold text-[#063F32] transition hover:bg-[#FAF7F0]"
+                className="rounded-full border border-[#2D8A6A]/20 bg-[#FAF7F0] px-3 py-2 text-sm font-semibold text-[#063F32] transition hover:bg-[#F1EADC]"
               >
                 Close
               </button>
             </div>
-            <div className="max-h-[calc(100vh-10rem)] overflow-y-auto px-6 py-6">
+            <div className="px-6 py-6">
               <div className="grid gap-6 lg:grid-cols-2">
-                <section className="rounded-[1.5rem] border border-[#2D8A6A]/15 bg-white p-5">
+                <section className="rounded-[1.75rem] border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(250,247,240,0.98)_100%)] p-5 shadow-[0_20px_70px_-40px_rgba(13,59,46,0.12)]">
                   <h3 className="text-lg font-semibold text-[#063F32]">Parent profile</h3>
                   <dl className="mt-4 grid gap-4 sm:grid-cols-2 break-words">
                     <DetailRow label="Parent name" value={detailItem.full_name} />
@@ -180,7 +182,7 @@ export default function ParentTable({ items = [], onRefresh }) {
                   </dl>
                 </section>
 
-                <section className="rounded-[1.5rem] border border-[#2D8A6A]/15 bg-white p-5">
+                <section className="rounded-[1.75rem] border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(250,247,240,0.98)_100%)] p-5 shadow-[0_20px_70px_-40px_rgba(13,59,46,0.12)]">
                   <h3 className="text-lg font-semibold text-[#063F32]">Linked students</h3>
                   <dl className="mt-4 grid gap-4 sm:grid-cols-2">
                     <DetailRow label="Student names" value={detailItem.student_names} />
@@ -190,7 +192,7 @@ export default function ParentTable({ items = [], onRefresh }) {
                   </dl>
                 </section>
 
-                <section className="rounded-[1.5rem] border border-[#2D8A6A]/15 bg-white p-5 lg:col-span-2">
+                <section className="rounded-[1.75rem] border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(250,247,240,0.98)_100%)] p-5 shadow-[0_20px_70px_-40px_rgba(13,59,46,0.12)] lg:col-span-2">
                   <h3 className="text-lg font-semibold text-[#063F32]">Admission-linked details</h3>
                   <dl className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                     <DetailRow label="City" value={detailItem.city_country} />
@@ -203,10 +205,12 @@ export default function ParentTable({ items = [], onRefresh }) {
             </div>
           </div>
         </div>
+        </ClientPortal>
       ) : null}
 
       {editingItem ? (
-        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-[#063F32]/45 px-4 py-10 backdrop-blur-sm">
+        <ClientPortal targetId="coordinator-page-portal-root">
+        <div className="absolute inset-x-0 top-0 z-[9999] isolate flex min-h-full items-start justify-center overflow-visible bg-[#063F32]/45 px-4 py-10 backdrop-blur-sm">
           <div className="w-full max-w-3xl rounded-[2rem] border border-[#2D8A6A]/20 bg-[#FAF7F0] shadow-[0_30px_90px_-40px_rgba(6,63,50,0.24)]">
             <div className="flex items-center justify-between border-b border-[#2D8A6A]/10 px-6 py-5">
               <div>
@@ -216,13 +220,13 @@ export default function ParentTable({ items = [], onRefresh }) {
               <button
                 type="button"
                 onClick={closeEdit}
-                className="rounded-full border border-[#2D8A6A]/20 bg-white px-3 py-2 text-sm font-semibold text-[#063F32] transition hover:bg-[#FAF7F0]"
+                className="rounded-full border border-[#2D8A6A]/20 bg-[#FAF7F0] px-3 py-2 text-sm font-semibold text-[#063F32] transition hover:bg-[#F1EADC]"
               >
                 Close
               </button>
             </div>
 
-            <form onSubmit={submitEdit} className="max-h-[calc(100vh-10rem)] overflow-y-auto px-6 py-6">
+            <form onSubmit={submitEdit} className="px-6 py-6">
               <div className="grid gap-4 md:grid-cols-2">
                 <label className="space-y-2">
                   <span className="text-sm font-medium text-[#245C4F]">Parent Name</span>
@@ -291,7 +295,7 @@ export default function ParentTable({ items = [], onRefresh }) {
                 <button
                   type="button"
                   onClick={closeEdit}
-                  className="rounded-2xl border border-[#2D8A6A]/20 bg-white px-5 py-3 text-sm font-semibold text-[#063F32] transition hover:bg-[#FAF7F0]"
+                  className="rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-5 py-3 text-sm font-semibold text-[#063F32] transition hover:bg-[#F1EADC]"
                 >
                   Cancel
                 </button>
@@ -306,10 +310,12 @@ export default function ParentTable({ items = [], onRefresh }) {
             </form>
           </div>
         </div>
+        </ClientPortal>
       ) : null}
 
       {deleteItem ? (
-        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-[#063F32]/45 px-4 py-10 backdrop-blur-sm">
+        <ClientPortal targetId="coordinator-page-portal-root">
+        <div className="absolute inset-x-0 top-0 z-[9999] isolate flex min-h-full items-start justify-center overflow-visible bg-[#063F32]/45 px-4 py-10 backdrop-blur-sm">
           <div className="w-full max-w-2xl rounded-[2rem] border border-[#2D8A6A]/20 bg-[#FAF7F0] shadow-[0_30px_90px_-40px_rgba(6,63,50,0.24)]">
             <div className="border-b border-[#2D8A6A]/10 px-6 py-5">
               <p className="text-sm font-semibold uppercase tracking-[0.24em] text-rose-700">Delete Parent</p>
@@ -319,7 +325,7 @@ export default function ParentTable({ items = [], onRefresh }) {
               </p>
             </div>
             <div className="flex flex-wrap justify-end gap-3 px-6 py-5">
-              <button type="button" onClick={() => setDeleteItem(null)} className="rounded-2xl border border-[#2D8A6A]/20 bg-white px-4 py-3 text-sm font-semibold text-[#063F32] transition hover:bg-[#FAF7F0]">
+              <button type="button" onClick={() => setDeleteItem(null)} className="rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 text-sm font-semibold text-[#063F32] transition hover:bg-[#F1EADC]">
                 Cancel
               </button>
               <button type="button" onClick={() => confirmArchive().catch((error) => window.alert(error.message))} className="rounded-2xl bg-rose-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-rose-700">
@@ -328,6 +334,7 @@ export default function ParentTable({ items = [], onRefresh }) {
             </div>
           </div>
         </div>
+        </ClientPortal>
       ) : null}
     </div>
   );

@@ -36,7 +36,7 @@ export default function TeacherClassesPage() {
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(228,198,102,0.12),transparent_28%),radial-gradient(circle_at_bottom_left,rgba(101,184,145,0.14),transparent_30%)]" />
         <div className="relative max-w-6xl">
           <p className="inline-flex rounded-full border border-[#FFF5D6]/30 bg-[#FFF5D6]/10 px-3 py-1 text-[0.65rem] font-semibold uppercase tracking-[0.24em] text-[#FFF5D6]">Lectures</p>
-          <h1 className="mb-3 mt-4 text-3xl font-bold text-[#FAF7F0] sm:text-4xl lg:text-5xl font-display">Assigned lecture history</h1>
+          <h1 className="mb-3 mt-4 text-3xl font-bold text-[#FAF7F0] sm:text-4xl lg:text-4xl font-display">Assigned lecture history</h1>
         </div>
       </section>
       <div className="flex flex-wrap gap-2">{FILTERS.map((item) => <button key={item.value || "all"} onClick={() => load(item.value).catch((error) => setState((current) => ({ ...current, error: error.message })))} className={`rounded-2xl px-4 py-2 text-sm font-semibold transition ${state.status === item.value ? "bg-[linear-gradient(135deg,#C9A227,#E4C766)] text-[#063F32] shadow-[0_10px_28px_-18px_rgba(13,59,46,0.45)]" : "border border-[#2D8A6A]/20 bg-[#FAF7F0] text-[#063F32] hover:bg-[#F1EADC]"}`}>{item.label}</button>)}</div>

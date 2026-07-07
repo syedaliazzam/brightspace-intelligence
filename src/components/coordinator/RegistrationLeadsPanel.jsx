@@ -4,7 +4,10 @@ import { useState } from "react";
 import FeeVoucherForm from "@/components/coordinator/FeeVoucherForm";
 import RegistrationLeadTable from "@/components/coordinator/RegistrationLeadTable";
 
-export default function RegistrationLeadsPanel({ leads }) {
+export default function RegistrationLeadsPanel({
+  leads,
+  portalTargetId = "coordinator-page-portal-root",
+}) {
   const [selectedLeadId, setSelectedLeadId] = useState("");
 
   return (
@@ -12,6 +15,7 @@ export default function RegistrationLeadsPanel({ leads }) {
       <RegistrationLeadTable
         leads={leads}
         onCreateVoucher={(lead) => setSelectedLeadId(lead?.id || "")}
+        portalTargetId={portalTargetId}
       />
 
       <FeeVoucherForm

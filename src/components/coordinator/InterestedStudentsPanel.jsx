@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import ClientPortal from "@/components/shared/ClientPortal";
 
 function formatDate(value) {
   if (!value) return "No date";
@@ -86,16 +87,16 @@ export default function InterestedStudentsPanel({ items = [], onRefresh }) {
   }
 
   if (!items.length) {
-    return <section className="rounded-[1.75rem] border border-dashed border-[#2D8A6A]/25 bg-white/85 p-10 text-center text-sm text-[#245C4F] shadow-[0_18px_60px_-36px_rgba(13,59,46,0.18)]">No interested students found.</section>;
+    return <section className="rounded-[1.75rem] border border-dashed border-[#2D8A6A]/25 bg-[#FAF7F0]/80 p-10 text-center text-sm text-[#245C4F] shadow-[0_18px_60px_-36px_rgba(13,59,46,0.18)]">No interested students found.</section>;
   }
 
   return (
     <>
-      <section className="overflow-hidden rounded-[1.75rem] border border-[#2D8A6A]/15 bg-white/90 shadow-[0_20px_70px_-36px_rgba(13,59,46,0.18)]">
+      <section className="overflow-hidden rounded-[2rem] border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(250,247,240,0.98)_100%)] shadow-[0_20px_70px_-36px_rgba(13,59,46,0.18)] backdrop-blur-xl">
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-[#F1EADC]">
-            <thead className="bg-[#FAF7F0]/80">
-              <tr className="text-left text-xs font-semibold uppercase tracking-[0.18em] text-[#245C4F]">
+            <thead className="bg-[linear-gradient(180deg,#FAF7F0_0%,#F1EADC_100%)]">
+              <tr className="text-left text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]">
                 <th className="px-6 py-4">Student Name</th>
                 <th className="px-6 py-4">Parent Name</th>
                 <th className="px-6 py-4">Email</th>
@@ -137,8 +138,9 @@ export default function InterestedStudentsPanel({ items = [], onRefresh }) {
       </section>
 
       {selected ? (
-        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-hidden bg-[#063F32]/45 px-4 pt-10 pb-10">
-          <div className="w-full max-w-2xl max-h-[calc(100vh-6.5rem)] overflow-y-auto rounded-[2rem] border border-[#2D8A6A]/15 bg-[#FAF7F0] p-6 shadow-[0_24px_80px_-32px_rgba(13,59,46,0.24)]">
+        <ClientPortal targetId="coordinator-page-portal-root">
+        <div className="absolute inset-x-0 top-0 z-[9999] isolate flex min-h-full items-start justify-center overflow-visible bg-[#063F32]/45 px-4 pt-10 pb-10">
+          <div className="w-full max-w-2xl rounded-[2rem] border border-[#2D8A6A]/15 bg-[#FAF7F0] p-6 shadow-[0_24px_80px_-32px_rgba(13,59,46,0.24)]">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <p className="text-sm font-semibold uppercase tracking-[0.24em] text-[#C9A227]">Interested student</p>
@@ -178,7 +180,7 @@ export default function InterestedStudentsPanel({ items = [], onRefresh }) {
             </dl>
 
             {linkMessage ? (
-              <div className="mt-5 rounded-2xl border border-[#2D8A6A]/15 bg-white/90 px-4 py-4 text-sm text-[#245C4F]">
+              <div className="mt-5 rounded-2xl border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(250,247,240,0.98)_100%)] px-4 py-4 text-sm text-[#245C4F]">
                 <div className="flex items-start justify-between gap-3">
                   <div className="space-y-1">
                     <p className="font-semibold text-[#063F32]">Registration message</p>
@@ -214,6 +216,7 @@ export default function InterestedStudentsPanel({ items = [], onRefresh }) {
             </div>
           </div>
         </div>
+        </ClientPortal>
       ) : null}
     </>
   );

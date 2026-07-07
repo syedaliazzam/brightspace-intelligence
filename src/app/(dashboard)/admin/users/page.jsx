@@ -110,18 +110,13 @@ export default function AdminUsersPage() {
     status: "",
     classLevel: "",
   });
-  const [state, setState] = useState(() => {
-    const cached = readCache(getCacheKey({ ...DEFAULT_FILTERS, role: rolePreset }));
-    const overviewCached = readCache(getOverviewCacheKey(view));
-
-    return {
-      loading: !cached,
-      overviewLoading: !overviewCached,
-      error: "",
-      items: cached?.items || [],
-      overviewItems: overviewCached?.items || [],
-      summary: overviewCached?.summary || null,
-    };
+  const [state, setState] = useState({
+    loading: true,
+    overviewLoading: true,
+    error: "",
+    items: [],
+    overviewItems: [],
+    summary: null,
   });
   const [modal, setModal] = useState({ open: false, record: null });
   const [detailModal, setDetailModal] = useState({ open: false, record: null });
@@ -586,7 +581,7 @@ export default function AdminUsersPage() {
               <p className="inline-flex rounded-full border border-[#FFF5D6]/30 bg-[#FFF5D6]/10 px-3 py-1 text-[0.65rem] font-semibold uppercase tracking-[0.24em] text-[#FFF5D6]">
                 User management
               </p>
-              <h1 className="mb-3 mt-4 text-3xl font-bold text-white-deep sm:text-4xl lg:text-5xl font-display">
+              <h1 className="mb-3 mt-4 text-3xl font-bold text-white-deep sm:text-4xl lg:text-4xl font-display">
               {view === "students"
                 ? "Students management"
                 : view === "parents"
@@ -946,7 +941,7 @@ export default function AdminUsersPage() {
       ) : null}
 
       {detailModal.open && detailModal.record ? (
-        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-[#063F32]/45 px-4 py-10 backdrop-blur-sm">
+        <div className="fixed inset-x-0 top-0 z-50 flex min-h-screen items-start justify-center overflow-visible bg-[#063F32]/45 px-4 py-10 backdrop-blur-sm">
           <div className="w-full max-w-5xl rounded-[2rem] border border-[#2D8A6A]/15 bg-white shadow-[0_30px_90px_-40px_rgba(13,59,46,0.24)]">
             <div className="flex items-center justify-between border-b border-[#2D8A6A]/15 px-6 py-5">
               <div>
@@ -961,7 +956,7 @@ export default function AdminUsersPage() {
                 Close
               </button>
             </div>
-            <div className="max-h-[calc(100vh-10rem)] overflow-y-auto px-6 py-6">
+            <div className="px-6 py-6">
               <div className="grid gap-6 lg:grid-cols-2">
                 <section className="rounded-[1.5rem] border border-[#2D8A6A]/15 bg-[#FAF7F0] p-5">
                   <h3 className="text-lg font-semibold text-[#063F32]">Account</h3>
@@ -1017,7 +1012,7 @@ export default function AdminUsersPage() {
       ) : null}
 
       {resetModal.open && resetModal.record ? (
-        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-[#063F32]/45 px-4 pt-24 pb-10 backdrop-blur-sm">
+        <div className="fixed inset-x-0 top-0 z-50 flex min-h-screen items-start justify-center overflow-visible bg-[#063F32]/45 px-4 pt-10 pb-10 backdrop-blur-sm">
           <div className="w-full max-w-lg rounded-[2rem] border border-[#2D8A6A]/18 bg-[#FAF7F0] shadow-[0_30px_90px_-40px_rgba(13,59,46,0.28)]">
             <div className="flex items-center justify-between border-b border-[#2D8A6A]/15 px-6 py-5">
               <div>

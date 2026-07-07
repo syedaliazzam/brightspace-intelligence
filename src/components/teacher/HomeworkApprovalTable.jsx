@@ -7,7 +7,7 @@ function HomeworkSubmissionModal({ item, onClose, onAction }) {
   if (!item) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center bg-[#063F32]/45 px-4 pt-28 pb-8">
+    <div className="fixed inset-x-0 top-0 z-50 flex min-h-screen items-start justify-center bg-[#063F32]/45 px-4 pt-14 pb-8">
       <div className="w-full max-w-3xl overflow-hidden rounded-[2rem] border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(250,247,240,0.98)_100%)] shadow-[0_24px_80px_-36px_rgba(13,59,46,0.32)]">
         <div className="flex items-start justify-between gap-4 border-b border-[#2D8A6A]/10 px-6 py-4">
           <div>
@@ -67,7 +67,7 @@ function RejectHomeworkModal({ onClose, onSubmit }) {
   const [remarks, setRemarks] = useState("");
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-start justify-center bg-[#063F32]/45 px-4 pt-28 pb-8">
+    <div className="fixed inset-x-0 top-0 z-[60] flex min-h-screen items-start justify-center bg-[#063F32]/45 px-4 pt-14 pb-8">
       <div className="w-full max-w-xl rounded-[2rem] border border-rose-200 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(250,247,240,0.98)_100%)] shadow-[0_24px_80px_-36px_rgba(13,59,46,0.32)]">
         <div className="border-b border-[#2D8A6A]/10 px-6 py-4">
           <p className="text-sm font-semibold uppercase tracking-[0.24em] text-rose-700">Reject homework</p>

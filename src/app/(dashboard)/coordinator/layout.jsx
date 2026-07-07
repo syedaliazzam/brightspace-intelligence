@@ -10,5 +10,5 @@ export default async function CoordinatorLayout({ children }) {
     redirect("/login");
   }
 
-  return children;
+  return <div id="coordinator-page-portal-root" className="relative min-h-screen">{children}</div>;
 }

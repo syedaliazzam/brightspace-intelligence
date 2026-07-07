@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { ChevronDown } from "lucide-react";
 import AdminDashboardCards from "@/components/admin/AdminDashboardCards";
 import AdminDataTable from "@/components/admin/AdminDataTable";
+import { buildInlinePreviewUrl } from "@/lib/filePreview";
 
 const CACHE_TTL = 60 * 1000;
 
@@ -154,7 +155,7 @@ export default function AdminPaymentsPage() {
             <p className="inline-flex rounded-full border border-[#FFF5D6]/30 bg-[#FFF5D6]/10 px-3 py-1 text-[0.65rem] font-semibold uppercase tracking-[0.24em] text-[#FFF5D6]">
               Payments
             </p>
-            <h1 className="mb-3 mt-4 text-3xl font-bold text-white-deep sm:text-4xl lg:text-5xl font-display">
+            <h1 className="mb-3 mt-4 text-3xl font-bold text-white-deep sm:text-4xl lg:text-4xl font-display">
               Review payment records
             </h1>
             <p className="mt-3 max-w-2xl text-sm leading-7 text-[#EAF6EF] sm:text-base">
@@ -314,7 +315,7 @@ export default function AdminPaymentsPage() {
                 render: (row) =>
                   row.proof_file_url ? (
                     <a
-                      href={row.proof_file_url}
+                      href={buildInlinePreviewUrl(row.proof_file_url)}
                       target="_blank"
                       rel="noreferrer"
                       className="text-sm font-semibold text-[#0D5C48] hover:text-[#063F32]"

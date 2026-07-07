@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { ChevronDown } from "lucide-react";
-import { motion } from "framer-motion";
+import ClientPortal from "@/components/shared/ClientPortal";
 
 function formatDate(value) {
   if (!value) return "-";
@@ -16,7 +16,7 @@ function formatMoney(value) {
 }
 
 const STATUS_STYLES = {
-  not_submitted: "bg-slate-100 text-slate-700",
+  not_submitted: "bg-[#F1EADC] text-[#245C4F]",
   submitted: "bg-amber-50 text-amber-700",
   verified: "bg-emerald-50 text-emerald-700",
   rejected: "bg-rose-50 text-rose-700",
@@ -65,6 +65,10 @@ export default function RegularFeeVouchersPage() {
 
   const selectedClass = useMemo(() => classes.find((item) => item.id === form.classId), [classes, form.classId]);
 
+  function closeSelectState(setter) {
+    window.setTimeout(() => setter(false), 0);
+  }
+
   function handleClassChange(value) {
     const nextClass = classes.find((item) => item.id === value) || null;
     setForm((current) => ({
@@ -96,22 +100,28 @@ export default function RegularFeeVouchersPage() {
   }
 
   return (
-    <div className="min-h-screen rounded-[2rem] bg-[#FAF7F0]">
-      <div className="pointer-events-none absolute inset-0 rounded-[2rem] bg-[radial-gradient(circle_at_top_left,rgba(201,162,39,0.12),transparent_35%),radial-gradient(circle_at_top_right,rgba(45,138,106,0.12),transparent_32%),linear-gradient(180deg,#FAF7F0_0%,#F7F1E3_100%)]" />
+    <div className="min-h-screen bg-[#FAF7F0]">
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(201,162,39,0.12),transparent_35%),radial-gradient(circle_at_top_right,rgba(45,138,106,0.12),transparent_32%),linear-gradient(180deg,#FAF7F0_0%,#F7F1E3_100%)]" />
       <div className="relative mx-auto max-w-7xl space-y-6 px-4 py-4 sm:px-6 lg:px-8">
-      <section className="rounded-[2rem] border border-[#2D8A6A]/15 bg-[linear-gradient(135deg,rgba(13,59,46,0.98),rgba(13,92,72,0.94))] p-6 text-[#FAF7F0] shadow-[0_24px_80px_-36px_rgba(13,59,46,0.32)] sm:p-8">
-        <h1 className="mt-3 font-serif text-3xl font-semibold tracking-tight text-[#FAF7F0] sm:text-4xl">Regular fee vouchers</h1>
-        <p className="mt-3 text-sm leading-7 text-[#EAF6EF] sm:text-base">Generate monthly vouchers for one class and keep batch history in one place.</p>
+      <section className="relative overflow-hidden rounded-[2rem] border border-[#2D8A6A]/15 bg-[linear-gradient(135deg,rgba(13,59,46,0.98),rgba(13,92,72,0.94))] p-6 text-[#FAF7F0] shadow-[0_24px_80px_-36px_rgba(13,59,46,0.32)] sm:p-8">
+        <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(135deg,rgba(13,59,46,0.98),rgba(13,92,72,0.94))]" />
+        <div className="relative">
+          <p className="inline-flex rounded-full border border-[#E4C766]/30 bg-[#FFF5D6]/12 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.28em] text-[#FFF5D6]">
+            Coordinator portal
+          </p>
+          <h1 className="mt-4 font-display text-3xl font-bold tracking-tight text-[#FAF7F0] sm:text-4xl">Regular fee vouchers</h1>
+          <p className="mt-3 text-sm leading-7 text-[#EAF6EF] sm:text-base">Generate monthly vouchers for one class and keep batch history in one place.</p>
+        </div>
       </section>
 
       {error ? <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">{error}</div> : null}
 
-      <section className="rounded-[2rem] border border-[#2D8A6A]/15 bg-white/90 p-5 shadow-[0_20px_70px_-36px_rgba(13,59,46,0.18)] sm:p-6">
+      <section className="rounded-[2rem] border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(250,247,240,0.98)_100%)] p-5 shadow-[0_20px_70px_-36px_rgba(13,59,46,0.18)] backdrop-blur-xl sm:p-6">
         <form className="grid gap-4 md:grid-cols-2" onSubmit={submit}>
           <label className="block">
             <span className="mb-2 block text-sm font-medium text-[#245C4F]">Class</span>
             <div className="relative">
-              <select value={form.classId} onFocus={() => setClassOpen(true)} onBlur={() => setClassOpen(false)} onChange={(e) => handleClassChange(e.target.value)} className="w-full appearance-none rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 pr-11 text-sm text-[#063F32] outline-none transition focus:border-[#2D8A6A] focus:bg-white focus:ring-4 focus:ring-[#FFF5D6]" required>
+              <select value={form.classId} onMouseDown={() => setClassOpen((current) => !current)} onFocus={() => setClassOpen(true)} onBlur={() => closeSelectState(setClassOpen)} onChange={(e) => handleClassChange(e.target.value)} className="w-full appearance-none rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 pr-11 text-sm text-[#063F32] outline-none transition focus:border-[#2D8A6A] focus:bg-white focus:ring-4 focus:ring-[#FFF5D6]" required>
                 <option value="">Select class</option>
                 {classes.map((item) => (
                   <option key={item.id} value={item.id}>
@@ -144,8 +154,9 @@ export default function RegularFeeVouchersPage() {
             <div className="relative">
               <select
                 value={form.paymentMethodId}
+                onMouseDown={() => setPaymentOpen((current) => !current)}
                 onFocus={() => setPaymentOpen(true)}
-                onBlur={() => setPaymentOpen(false)}
+                onBlur={() => closeSelectState(setPaymentOpen)}
                 onChange={(e) => setForm((c) => ({ ...c, paymentMethodId: e.target.value }))}
                 className="w-full appearance-none rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 pr-11 text-sm text-[#063F32] outline-none transition focus:border-[#2D8A6A] focus:bg-white focus:ring-4 focus:ring-[#FFF5D6]"
                 required
@@ -172,37 +183,40 @@ export default function RegularFeeVouchersPage() {
         </form>
       </section>
 
-      <section className="rounded-[2rem] border border-[#2D8A6A]/15 bg-white/90 p-5 shadow-[0_20px_70px_-36px_rgba(13,59,46,0.18)] sm:p-6">
+      <section className="rounded-[2rem] border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(250,247,240,0.98)_100%)] p-5 shadow-[0_20px_70px_-36px_rgba(13,59,46,0.18)] backdrop-blur-xl sm:p-6">
         <h2 className="text-xl font-semibold text-[#063F32]">Batch history</h2>
-        <div className="mt-4 overflow-x-auto">
+        <div className="mt-4 overflow-hidden rounded-[1.75rem] border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(250,247,240,0.98)_100%)]">
+          <div className="overflow-x-auto">
           <table className="min-w-full text-left text-sm">
-            <thead className="bg-[#FAF7F0] text-xs uppercase tracking-[0.18em] text-[#245C4F]">
-              <tr><th className="px-3 py-3">Batch</th><th className="px-3 py-3">Class</th><th className="px-3 py-3">Month</th><th className="px-3 py-3">Due</th><th className="px-3 py-3">Students</th><th className="px-3 py-3">Total</th><th className="px-3 py-3">Status</th><th className="px-3 py-3">Action</th></tr>
+            <thead className="bg-[linear-gradient(180deg,#FAF7F0_0%,#F1EADC_100%)] text-xs uppercase tracking-[0.18em] text-[#0D5C48]">
+              <tr><th className="px-6 py-4">Batch</th><th className="px-6 py-4">Class</th><th className="px-6 py-4">Month</th><th className="px-6 py-4">Due</th><th className="px-6 py-4">Students</th><th className="px-6 py-4">Total</th><th className="px-6 py-4">Status</th><th className="px-6 py-4">Action</th></tr>
             </thead>
             <tbody className="divide-y divide-[#F1EADC]">
               {history.length ? history.map((item) => (
                 <tr key={item.id}>
-                  <td className="px-3 py-4 font-semibold text-[#063F32]">{item.batch_no}</td>
-                  <td className="px-3 py-4 text-[#245C4F]">{item.class_title}</td>
-                  <td className="px-3 py-4 text-[#245C4F]">{item.month_label || "-"}</td>
-                  <td className="px-3 py-4 text-[#245C4F]">{formatDate(item.due_date)}</td>
-                  <td className="px-3 py-4 text-[#245C4F]">{item.student_count}</td>
-                  <td className="px-3 py-4 text-[#245C4F]">{formatMoney(item.total_amount)}</td>
-                  <td className="px-3 py-4 text-[#245C4F]">{item.status}</td>
-                  <td className="px-3 py-4"><button type="button" onClick={() => setDetailItem(item)} className="rounded-xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-3 py-2 text-xs font-semibold text-[#063F32] transition hover:bg-[#F1EADC]">View</button></td>
+                  <td className="px-6 py-4 font-semibold text-[#063F32]">{item.batch_no}</td>
+                  <td className="px-6 py-4 text-[#245C4F]">{item.class_title}</td>
+                  <td className="px-6 py-4 text-[#245C4F]">{item.month_label || "-"}</td>
+                  <td className="px-6 py-4 text-[#245C4F]">{formatDate(item.due_date)}</td>
+                  <td className="px-6 py-4 text-[#245C4F]">{item.student_count}</td>
+                  <td className="px-6 py-4 text-[#245C4F]">{formatMoney(item.total_amount)}</td>
+                  <td className="px-6 py-4 text-[#245C4F]">{item.status}</td>
+                  <td className="px-6 py-4"><button type="button" onClick={() => setDetailItem(item)} className="rounded-xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-3 py-2 text-xs font-semibold text-[#063F32] transition hover:bg-[#F1EADC]">View</button></td>
                 </tr>
-              )) : <tr><td className="px-3 py-8 text-center text-[#245C4F]" colSpan={8}>{loading ? "Loading..." : "No regular fee voucher batches found."}</td></tr>}
+              )) : <tr><td className="px-6 py-8 text-center text-[#245C4F]" colSpan={8}>{loading ? "Loading..." : "No regular fee voucher batches found."}</td></tr>}
             </tbody>
           </table>
+          </div>
         </div>
       </section>
 
       {detailItem ? (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-[#063F32]/45 px-4 py-10">
+        <ClientPortal targetId="coordinator-page-portal-root">
+        <div className="absolute inset-x-0 top-0 z-[9999] isolate min-h-full overflow-visible bg-[#063F32]/45 px-4 py-10">
           <div className="mx-auto max-w-4xl rounded-[2rem] border border-[#2D8A6A]/15 bg-[#FAF7F0] p-6 shadow-[0_24px_80px_-36px_rgba(13,59,46,0.24)]">
             <div className="flex items-center justify-between">
               <div><h3 className="text-2xl font-semibold text-[#063F32]">{detailItem.batch_no}</h3><p className="text-sm text-[#245C4F]">{detailItem.class_title}</p></div>
-              <button type="button" onClick={() => setDetailItem(null)} className="rounded-xl border border-[#2D8A6A]/20 bg-white px-3 py-2 text-sm font-semibold text-[#063F32] transition hover:bg-[#F1EADC]">Close</button>
+              <button type="button" onClick={() => setDetailItem(null)} className="rounded-xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-3 py-2 text-sm font-semibold text-[#063F32] transition hover:bg-[#F1EADC]">Close</button>
             </div>
             <div className="mt-4 grid gap-3 md:grid-cols-4 text-sm">
               <div><p className="text-[#245C4F]">Month</p><p className="font-semibold text-[#063F32]">{detailItem.month_label || "-"}</p></div>
@@ -211,9 +225,9 @@ export default function RegularFeeVouchersPage() {
               <div><p className="text-[#245C4F]">Total</p><p className="font-semibold text-[#063F32]">{formatMoney(detailItem.total_amount)}</p></div>
             </div>
             <p className="mt-5 text-sm font-semibold text-[#063F32]">Student voucher details</p>
-            <div className="mt-4 overflow-x-auto rounded-2xl border border-[#2D8A6A]/15 bg-white/90">
+            <div className="mt-4 overflow-x-auto rounded-[1.75rem] border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(250,247,240,0.98)_100%)]">
               <table className="min-w-full text-left text-sm">
-                <thead className="bg-[#FAF7F0] text-xs uppercase tracking-[0.18em] text-[#245C4F]">
+                <thead className="bg-[linear-gradient(180deg,#FAF7F0_0%,#F1EADC_100%)] text-xs uppercase tracking-[0.18em] text-[#0D5C48]">
                   <tr>
                     <th className="px-4 py-3">Student</th>
                     <th className="px-4 py-3">Voucher No</th>
@@ -254,6 +268,7 @@ export default function RegularFeeVouchersPage() {
             </div>
           </div>
         </div>
+        </ClientPortal>
       ) : null}
       </div>
     </div>

@@ -21,18 +21,18 @@ import {
 } from "lucide-react";
 
 const NAV_ITEMS = [
-  { label: "Dashboard / Overview", href: "/coordinator/dashboard", icon: LayoutDashboard, tone: "bg-slate-100 text-slate-700" },
-  { label: "Interested Students", href: "/coordinator/interested-students", icon: Users, tone: "bg-emerald-100 text-emerald-700" },
-  { label: "Registration Leads", href: "/coordinator/registration-leads", icon: UserCog, tone: "bg-sky-100 text-sky-700" },
-  { label: "Fee Vouchers", href: "/coordinator/fee-vouchers", icon: ReceiptText, tone: "bg-amber-100 text-amber-700" },
-  { label: "Regular Fee Vouchers", href: "/coordinator/regular-fee-vouchers", icon: BadgeDollarSign, tone: "bg-emerald-100 text-emerald-700" },
-  { label: "Payments", href: "/coordinator/payments", icon: CreditCard, tone: "bg-violet-100 text-violet-700" },
-  { label: "Students", href: "/coordinator/students", icon: GraduationCap, tone: "bg-teal-100 text-teal-700" },
-  { label: "Parents", href: "/coordinator/parents", icon: UserRound, tone: "bg-fuchsia-100 text-fuchsia-700" },
-  { label: "Teacher Assignments", href: "/coordinator/teacher-assignments", icon: UserCog, tone: "bg-orange-100 text-orange-700" },
-  { label: "Lecture Scheduler", href: "/coordinator/lecture-schedules", icon: CalendarDays, tone: "bg-indigo-100 text-indigo-700" },
-  { label: "Lecture Verification", href: "/coordinator/lecture-verifications", icon: ClipboardCheck, tone: "bg-rose-100 text-rose-700" },
-  { label: "Reports", href: "/coordinator/reports", icon: FileText, tone: "bg-lime-100 text-lime-700" },
+  { label: "Dashboard / Overview", href: "/coordinator/dashboard", icon: LayoutDashboard, tone: "bg-[#FAF7F0] text-[#245C4F]" },
+  { label: "Interested Students", href: "/coordinator/interested-students", icon: Users, tone: "bg-[#EAF6EF] text-[#0D5C48]" },
+  { label: "Registration Leads", href: "/coordinator/registration-leads", icon: UserCog, tone: "bg-[#FFF5D6] text-[#8A6B00]" },
+  { label: "Fee Vouchers", href: "/coordinator/fee-vouchers", icon: ReceiptText, tone: "bg-[#FFF5D6] text-[#8A6B00]" },
+  { label: "Regular Fee Vouchers", href: "/coordinator/regular-fee-vouchers", icon: BadgeDollarSign, tone: "bg-[#EAF6EF] text-[#0D5C48]" },
+  { label: "Payments", href: "/coordinator/payments", icon: CreditCard, tone: "bg-[#FAF7F0] text-[#245C4F]" },
+  { label: "Students", href: "/coordinator/students", icon: GraduationCap, tone: "bg-[#EAF6EF] text-[#0D5C48]" },
+  { label: "Parents", href: "/coordinator/parents", icon: UserRound, tone: "bg-[#FAF7F0] text-[#245C4F]" },
+  { label: "Teacher Assignments", href: "/coordinator/teacher-assignments", icon: UserCog, tone: "bg-[#FFF5D6] text-[#8A6B00]" },
+  { label: "Lecture Scheduler", href: "/coordinator/lecture-schedules", icon: CalendarDays, tone: "bg-[#FAF7F0] text-[#245C4F]" },
+  { label: "Lecture Verification", href: "/coordinator/lecture-verifications", icon: ClipboardCheck, tone: "bg-[#EAF6EF] text-[#0D5C48]" },
+  { label: "Reports", href: "/coordinator/reports", icon: FileText, tone: "bg-[#FAF7F0] text-[#245C4F]" },
 ];
 
 function isActive(pathname, href) {
@@ -49,7 +49,7 @@ function getInitials(value) {
 }
 
 function NavIcon({ Icon, active, tone }) {
-  const className = active ? "h-4 w-4 text-white" : `h-4 w-4 ${tone?.split(" ").slice(1).join(" ") || "text-slate-700"}`;
+  const className = active ? "h-4 w-4 text-[#063F32]" : `h-4 w-4 ${tone?.split(" ").slice(1).join(" ") || "text-[#245C4F]"}`;
   return <Icon className={className} strokeWidth={2} />;
 }
 
@@ -68,15 +68,15 @@ export default function CoordinatorDashboardSidebar({ profile }) {
   }, []);
 
   const shell = (
-    <aside className="flex h-full w-72 flex-col border-r border-slate-200 bg-white/95 shadow-[0_18px_60px_-40px_rgba(15,23,42,0.45)] backdrop-blur-xl">
-      <div className="border-b border-slate-200 px-5 py-4">
+    <aside className="flex h-full w-72 flex-col border-r border-[#2D8A6A]/12 bg-[linear-gradient(180deg,rgba(255,255,255,0.95)_0%,rgba(250,247,240,0.98)_100%)] shadow-[0_18px_60px_-40px_rgba(13,59,46,0.28)] backdrop-blur-xl">
+      <div className="border-b border-[#2D8A6A]/10 px-5 py-4">
         <div className="flex items-center gap-3">
           <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-transparent">
             <Image src="/ash-shajrah-logo.webp" alt="Ash-Shajrah Learning Hub" width={44} height={44} className="h-full w-full object-contain" priority />
           </div>
           <div className="min-w-0">
-            <p className="truncate text-sm font-semibold text-slate-950">Coordinator Portal</p>
-            <p className="truncate text-xs text-slate-500">{profile?.email || "coordinator@lms.local"}</p>
+            <p className="truncate text-sm font-semibold text-[#063F32]">Coordinator Portal</p>
+            <p className="truncate text-xs text-[#245C4F]">{profile?.email || "coordinator@lms.local"}</p>
           </div>
         </div>
       </div>
@@ -91,13 +91,13 @@ export default function CoordinatorDashboardSidebar({ profile }) {
               onClick={() => setMobileOpen(false)}
               className={`flex items-center gap-3 rounded-2xl px-3 py-3 text-sm font-medium transition ${
                 active
-                  ? "bg-sky-50 text-sky-700 ring-1 ring-inset ring-sky-200"
-                  : "text-slate-600 hover:bg-slate-100 hover:text-slate-950"
+                  ? "bg-[linear-gradient(135deg,#C9A227,#E4C766)] text-[#063F32] ring-1 ring-inset ring-[#E4C766]/40"
+                  : "text-[#245C4F] hover:bg-[#FAF7F0] hover:text-[#063F32]"
               }`}
             >
               <span
                 className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl transition ${
-                  active ? "bg-slate-950 text-white" : item.tone
+                  active ? "bg-[#FFF5D6] text-[#063F32]" : item.tone
                 }`}
               >
                 <NavIcon Icon={item.icon} active={active} tone={item.tone} />
@@ -108,11 +108,11 @@ export default function CoordinatorDashboardSidebar({ profile }) {
         })}
       </nav>
 
-      <div className="border-t border-slate-200 p-4">
+      <div className="border-t border-[#2D8A6A]/10 p-4">
         <button
           type="button"
           onClick={() => signOut({ callbackUrl: "/login" })}
-          className="flex w-full items-center justify-center rounded-2xl bg-slate-950 px-4 py-3 text-sm font-semibold text-white transition hover:bg-slate-800"
+          className="flex w-full items-center justify-center rounded-2xl bg-[linear-gradient(135deg,#0D3B2E,#0D5C48)] px-4 py-3 text-sm font-semibold text-[#FAF7F0] transition hover:bg-[#063F32]"
         >
           Logout
         </button>
@@ -124,7 +124,7 @@ export default function CoordinatorDashboardSidebar({ profile }) {
     <>
       <div className="hidden lg:fixed lg:inset-y-0 lg:left-0 lg:z-30 lg:block">{shell}</div>
 
-      <div className="sticky top-0 z-30 border-b border-white/70 bg-white/80 backdrop-blur-xl lg:hidden">
+      <div className="sticky top-0 z-30 border-b border-[#2D8A6A]/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.92)_0%,rgba(250,247,240,0.96)_100%)] backdrop-blur-xl lg:hidden">
         <div className="flex items-center justify-between px-4 py-3 sm:px-6">
           <Link
             href="/coordinator/dashboard"
@@ -135,15 +135,15 @@ export default function CoordinatorDashboardSidebar({ profile }) {
               <Image src="/ash-shajrah-logo.webp" alt="Ash-Shajrah Learning Hub" width={44} height={44} className="h-full w-full object-contain" priority />
             </div>
             <div>
-              <p className="text-sm font-semibold text-slate-950">Coordinator Portal</p>
-              <p className="text-xs text-slate-500">{profile?.email || "coordinator@lms.local"}</p>
+              <p className="text-sm font-semibold text-[#063F32]">Coordinator Portal</p>
+              <p className="text-xs text-[#245C4F]">{profile?.email || "coordinator@lms.local"}</p>
             </div>
           </Link>
 
           <button
             type="button"
             onClick={() => setMobileOpen((current) => !current)}
-            className="rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-100"
+            className="rounded-full border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-2 text-sm font-semibold text-[#245C4F] transition hover:bg-[#F1EADC]"
           >
             Menu
           </button>
@@ -156,7 +156,7 @@ export default function CoordinatorDashboardSidebar({ profile }) {
             <motion.button
               type="button"
               aria-label="Close menu"
-              className="fixed inset-0 z-40 bg-slate-950/40 lg:hidden"
+              className="fixed inset-0 z-40 bg-[#063F32]/40 lg:hidden"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}

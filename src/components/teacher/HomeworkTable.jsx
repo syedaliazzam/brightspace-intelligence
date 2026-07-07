@@ -23,8 +23,8 @@ function HomeworkDetailsModal({ item, onClose }) {
   const dueDateLabel = formatDate(item.due_date);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center bg-[#063F32]/45 px-4 pt-10 pb-8">
-      <div className="max-h-[calc(100vh-8rem)] w-full max-w-4xl overflow-hidden rounded-[2rem] border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(250,247,240,0.98)_100%)] shadow-[0_24px_80px_-36px_rgba(13,59,46,0.32)]">
+    <div className="fixed inset-x-0 top-0 z-50 flex min-h-screen items-start justify-center bg-[#063F32]/45 px-4 pt-10 pb-8">
+      <div className="w-full max-w-4xl overflow-hidden rounded-[2rem] border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(250,247,240,0.98)_100%)] shadow-[0_24px_80px_-36px_rgba(13,59,46,0.32)]">
         <div className="flex items-start justify-between gap-4 border-b border-[#2D8A6A]/10 px-6 py-4">
           <div>
             <p className="text-sm font-semibold uppercase tracking-[0.24em] text-[#0D5C48]">Homework details</p>
@@ -34,7 +34,7 @@ function HomeworkDetailsModal({ item, onClose }) {
             <button type="button" onClick={onClose} className="rounded-xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-2 text-sm font-semibold text-[#063F32] hover:bg-[#F1EADC]">Close</button>
           </div>
         </div>
-        <div className="max-h-[calc(100vh-8rem-92px)] overflow-y-auto p-6">
+        <div className="p-6">
           <div className="grid gap-4 md:grid-cols-2">
             <div className="rounded-[1.5rem] border border-[#2D8A6A]/12 bg-[#FAF7F0] p-4 text-sm text-[#245C4F]">
               <p className="font-semibold text-[#063F32]">Homework info</p>
@@ -201,8 +201,8 @@ function EditHomeworkModal({ item, onClose, onSaved }) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center bg-[#063F32]/45 px-4 pt-28 pb-8">
-      <div className="max-h-[calc(100vh-8rem)] w-full max-w-4xl overflow-hidden rounded-[2rem] border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(250,247,240,0.98)_100%)] shadow-[0_24px_80px_-36px_rgba(13,59,46,0.32)]">
+    <div className="fixed inset-x-0 top-0 z-50 flex min-h-screen items-start justify-center bg-[#063F32]/45 px-4 pt-28 pb-8">
+      <div className="w-full max-w-4xl overflow-hidden rounded-[2rem] border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(250,247,240,0.98)_100%)] shadow-[0_24px_80px_-36px_rgba(13,59,46,0.32)]">
         <div className="flex items-start justify-between gap-4 border-b border-[#2D8A6A]/10 px-6 py-4">
           <div>
             <p className="text-sm font-semibold uppercase tracking-[0.24em] text-[#0D5C48]">Edit homework</p>
@@ -212,7 +212,7 @@ function EditHomeworkModal({ item, onClose, onSaved }) {
             Close
           </button>
         </div>
-        <form onSubmit={submit} className="max-h-[calc(100vh-8rem-92px)] overflow-y-auto p-6">
+        <form onSubmit={submit} className="p-6">
           <div className="grid gap-3 md:grid-cols-3">
             <input value={form.title} onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))} placeholder="Homework title" className="rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 text-sm text-[#063F32] outline-none focus:border-[#2D8A6A] focus:ring-2 focus:ring-[#2D8A6A]/20" required />
             <input type="date" value={form.dueDate} onChange={(event) => setForm((current) => ({ ...current, dueDate: event.target.value }))} className="rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 text-sm text-[#063F32] outline-none focus:border-[#2D8A6A] focus:ring-2 focus:ring-[#2D8A6A]/20" />

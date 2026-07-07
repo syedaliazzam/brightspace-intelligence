@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { ChevronDown } from "lucide-react";
 import { useRouter } from "next/navigation";
+import ClientPortal from "@/components/shared/ClientPortal";
 
 export default function FeeVoucherForm({ leads, initialLeadId = "", showTrigger = true, onCreated, onClose }) {
   const router = useRouter();
@@ -252,12 +253,13 @@ export default function FeeVoucherForm({ leads, initialLeadId = "", showTrigger 
       ) : null}
 
       {open ? (
-        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-hidden bg-[#063F32]/45 px-4 pt-10 pb-10">
+        <ClientPortal targetId="coordinator-page-portal-root">
+        <div className="absolute inset-x-0 top-0 z-[9999] isolate flex min-h-full items-start justify-center overflow-visible bg-[#063F32]/45 px-4 pt-10 pb-10">
           <motion.div
             initial={{ opacity: 0, y: 18 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.2 }}
-            className="w-full max-w-3xl max-h-[calc(100vh-6.5rem)] overflow-y-auto rounded-[2rem] border border-[#2D8A6A]/15 bg-[#FAF7F0] p-6 shadow-[0_24px_80px_-36px_rgba(13,59,46,0.24)] sm:p-8"
+            className="w-full max-w-3xl rounded-[2rem] border border-[#2D8A6A]/15 bg-[#FAF7F0] p-6 shadow-[0_24px_80px_-36px_rgba(13,59,46,0.24)] sm:p-8"
           >
             <div className="flex items-start justify-between gap-4">
               <div>
@@ -275,7 +277,7 @@ export default function FeeVoucherForm({ leads, initialLeadId = "", showTrigger 
                   setOpen(false);
                   onClose?.();
                 }}
-                className="rounded-xl border border-[#2D8A6A]/20 bg-white px-3 py-2 text-sm font-semibold text-[#063F32] transition hover:bg-[#F1EADC]"
+                className="rounded-xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-3 py-2 text-sm font-semibold text-[#063F32] transition hover:bg-[#F1EADC]"
               >
                 Close
               </button>
@@ -283,7 +285,7 @@ export default function FeeVoucherForm({ leads, initialLeadId = "", showTrigger 
 
             <form className="mt-6 grid gap-4 md:grid-cols-2" onSubmit={handleSubmit}>
               {initialLeadId && selectedLead ? (
-                <div className="overflow-hidden rounded-2xl border border-[#2D8A6A]/15 bg-white/90 md:col-span-2">
+                <div className="overflow-hidden rounded-[1.75rem] border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(250,247,240,0.98)_100%)] shadow-[0_18px_60px_-36px_rgba(13,59,46,0.14)] md:col-span-2">
                   <div className="border-b border-[#2D8A6A]/15 bg-[#FAF7F0] px-4 py-3">
                     <div className="flex items-center justify-between gap-3">
                       <span className="text-sm font-semibold text-[#063F32]">Selected registration lead</span>
@@ -339,7 +341,7 @@ export default function FeeVoucherForm({ leads, initialLeadId = "", showTrigger 
                 </label>
               )}
 
-              <label className="flex items-center gap-3 rounded-2xl border border-[#2D8A6A]/15 bg-white/90 px-4 py-3 md:col-span-2">
+              <label className="flex items-center gap-3 rounded-2xl border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(250,247,240,0.98)_100%)] px-4 py-3 md:col-span-2">
                 <input
                   type="checkbox"
                   checked={form.regularFeeApplied}
@@ -452,7 +454,7 @@ export default function FeeVoucherForm({ leads, initialLeadId = "", showTrigger 
               </label>
 
               {selectedPaymentMethod ? (
-                <div className="rounded-2xl border border-[#2D8A6A]/15 bg-white/90 px-4 py-4 text-sm text-[#245C4F] md:col-span-2">
+                <div className="rounded-2xl border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(250,247,240,0.98)_100%)] px-4 py-4 text-sm text-[#245C4F] md:col-span-2">
                   <p className="font-semibold text-[#063F32]">{selectedPaymentMethod.name}</p>
                   <div className="mt-3 grid gap-2 sm:grid-cols-2">
                     {selectedPaymentMethod.bank_name ? <p><span className="font-medium text-[#063F32]">Bank Name:</span> {selectedPaymentMethod.bank_name}</p> : null}
@@ -501,7 +503,7 @@ export default function FeeVoucherForm({ leads, initialLeadId = "", showTrigger 
                 />
               </label>
 
-              <div className="grid gap-3 rounded-2xl border border-[#2D8A6A]/15 bg-white/90 px-4 py-4 text-sm text-[#245C4F] md:col-span-2 sm:grid-cols-3">
+              <div className="grid gap-3 rounded-2xl border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(250,247,240,0.98)_100%)] px-4 py-4 text-sm text-[#245C4F] md:col-span-2 sm:grid-cols-3">
                 <p>Regular Fee: <span className="font-semibold text-[#063F32]">PKR {regularFeeAmount.toFixed(2)}</span></p>
                 <p>Other Fee: <span className="font-semibold text-[#063F32]">PKR {admissionFeeAmount.toFixed(2)}</span></p>
                 <p>Discount on Regular Fee: <span className="font-semibold text-[#063F32]">PKR {discountAmount.toFixed(2)}</span></p>
@@ -545,15 +547,17 @@ export default function FeeVoucherForm({ leads, initialLeadId = "", showTrigger 
             </form>
           </motion.div>
         </div>
+        </ClientPortal>
       ) : null}
 
       {successEmail ? (
-        <div className="fixed inset-0 z-[60] flex items-start justify-center overflow-hidden bg-[#063F32]/45 px-4 pt-10 pb-10">
-          <div className="w-full max-w-2xl max-h-[calc(100vh-6.5rem)] overflow-y-auto rounded-[2rem] border border-[#2D8A6A]/15 bg-[#FAF7F0] p-6 shadow-[0_24px_80px_-36px_rgba(13,59,46,0.24)] sm:p-8">
+        <ClientPortal targetId="coordinator-page-portal-root">
+        <div className="absolute inset-x-0 top-0 z-[10000] isolate flex min-h-full items-start justify-center overflow-visible bg-[#063F32]/45 px-4 pt-10 pb-10">
+          <div className="w-full max-w-2xl rounded-[2rem] border border-[#2D8A6A]/15 bg-[#FAF7F0] p-6 shadow-[0_24px_80px_-36px_rgba(13,59,46,0.24)] sm:p-8">
             <p className="text-sm font-semibold uppercase tracking-[0.24em] text-[#C9A227]">
               Voucher Created Successfully
             </p>
-            <div className="mt-4 space-y-3 rounded-2xl border border-[#2D8A6A]/15 bg-white/85 p-4 text-sm text-[#245C4F]">
+            <div className="mt-4 space-y-3 rounded-2xl border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(250,247,240,0.98)_100%)] p-4 text-sm text-[#245C4F]">
               <p><span className="font-semibold text-[#063F32]">Recipient:</span> {successEmail.recipient_email || "â€”"}</p>
               <p><span className="font-semibold text-[#063F32]">Subject:</span> {successEmail.subject || "â€”"}</p>
               <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-[#2D8A6A]/15 bg-[#FAF7F0] px-4 py-3">
@@ -602,7 +606,7 @@ export default function FeeVoucherForm({ leads, initialLeadId = "", showTrigger 
                   href={successEmail.payment_submit_url}
                   target="_blank"
                   rel="noreferrer"
-                  className="rounded-2xl border border-[#2D8A6A]/20 bg-white px-4 py-3 text-sm font-semibold text-[#0D5C48] transition hover:bg-[#FAF7F0]"
+                  className="rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 text-sm font-semibold text-[#0D5C48] transition hover:bg-[#F1EADC]"
                 >
                   Open Payment Page
                 </a>
@@ -614,13 +618,14 @@ export default function FeeVoucherForm({ leads, initialLeadId = "", showTrigger 
                     setOpen(false);
                     onClose?.();
                   }}
-                  className="rounded-2xl border border-[#2D8A6A]/20 bg-white px-4 py-3 text-sm font-semibold text-[#0D5C48] transition hover:bg-[#FAF7F0]"
+                  className="rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 text-sm font-semibold text-[#0D5C48] transition hover:bg-[#F1EADC]"
                 >
                   Close
               </button>
             </div>
           </div>
         </div>
+        </ClientPortal>
       ) : null}
     </>
   );

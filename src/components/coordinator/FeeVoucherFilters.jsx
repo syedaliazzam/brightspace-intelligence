@@ -1,5 +1,6 @@
 "use client";
 
+import { ChevronDown } from "lucide-react";
 import { useEffect, useState, useTransition } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
@@ -62,11 +63,11 @@ export default function FeeVoucherFilters({ initialSearch, initialStatus = "", o
   }
 
   function closeSelectState(setter) {
-    setter(false);
+    window.setTimeout(() => setter(false), 0);
   }
 
   return (
-    <section className="rounded-[2rem] border border-[#2D8A6A]/15 bg-white/90 p-4 shadow-[0_20px_70px_-36px_rgba(13,59,46,0.18)] backdrop-blur-xl sm:p-5">
+    <section className="rounded-[2rem] border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(250,247,240,0.98)_100%)] p-4 shadow-[0_20px_70px_-36px_rgba(13,59,46,0.18)] backdrop-blur-xl sm:p-5">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div className="grid flex-1 gap-3 md:grid-cols-[minmax(0,1fr)_minmax(180px,0.45fr)_auto]">
           <label className="block">
@@ -94,8 +95,9 @@ export default function FeeVoucherFilters({ initialSearch, initialStatus = "", o
             <div className="relative">
               <select
                 value={status}
+                onMouseDown={() => setStatusOpen((current) => !current)}
                 onFocus={() => setStatusOpen(true)}
-                onBlur={() => setStatusOpen(false)}
+                onBlur={() => closeSelectState(setStatusOpen)}
                 onChange={(event) => {
                   const nextStatus = event.target.value;
                   setStatus(nextStatus);
@@ -126,4 +128,3 @@ export default function FeeVoucherFilters({ initialSearch, initialStatus = "", o
     </section>
   );
 }
-import { ChevronDown } from "lucide-react";

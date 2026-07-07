@@ -24,7 +24,7 @@ function PaginationControls({ page, pageSize, totalItems, onPageChange }) {
           type="button"
           onClick={() => onPageChange(currentPage - 1)}
           disabled={currentPage <= 1}
-          className="rounded-full border border-[#2D8A6A]/20 bg-white px-4 py-2 text-sm font-semibold text-[#063F32] transition hover:bg-[#FAF7F0] disabled:cursor-not-allowed disabled:opacity-50"
+          className="rounded-full border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-2 text-sm font-semibold text-[#063F32] transition hover:bg-[#F1EADC] disabled:cursor-not-allowed disabled:opacity-50"
         >
           Previous
         </button>
@@ -37,7 +37,7 @@ function PaginationControls({ page, pageSize, totalItems, onPageChange }) {
             className={`min-w-10 rounded-full px-4 py-2 text-sm font-semibold transition ${
               number === currentPage
                 ? "bg-[linear-gradient(135deg,#C9A227,#E4C766)] text-[#063F32]"
-                : "border border-[#2D8A6A]/20 bg-white text-[#063F32] hover:bg-[#FAF7F0]"
+                : "border border-[#2D8A6A]/20 bg-[#FAF7F0] text-[#063F32] hover:bg-[#F1EADC]"
             }`}
           >
             {number}
@@ -48,7 +48,7 @@ function PaginationControls({ page, pageSize, totalItems, onPageChange }) {
           type="button"
           onClick={() => onPageChange(currentPage + 1)}
           disabled={currentPage >= totalPages}
-          className="rounded-full border border-[#2D8A6A]/20 bg-white px-4 py-2 text-sm font-semibold text-[#063F32] transition hover:bg-[#FAF7F0] disabled:cursor-not-allowed disabled:opacity-50"
+          className="rounded-full border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-2 text-sm font-semibold text-[#063F32] transition hover:bg-[#F1EADC] disabled:cursor-not-allowed disabled:opacity-50"
         >
           Next
         </button>
@@ -83,7 +83,7 @@ export default function ShowMoreSection({
   return (
     <section className={`space-y-4 ${wrapperClassName}`}>
       {(title || description) && (
-        <div className="rounded-[1.75rem] border border-[#2D8A6A]/15 bg-white/90 p-5 shadow-[0_20px_70px_-36px_rgba(6,63,50,0.18)]">
+        <div className="rounded-[2rem] border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(250,247,240,0.98)_100%)] p-5 shadow-[0_20px_70px_-36px_rgba(13,59,46,0.18)] backdrop-blur-xl">
           {title ? (
             <p className="text-sm font-semibold uppercase tracking-[0.22em] text-[#0D5C48]">
               {title}

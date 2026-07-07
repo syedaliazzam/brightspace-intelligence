@@ -49,17 +49,23 @@ export default function CoordinatorStudentsPage() {
   }, [state.items, search, classLevel]);
 
   return (
-    <div className="min-h-screen space-y-6 bg-[#FAF7F0] rounded-[2rem] px-4 py-6 sm:px-6 lg:px-8">
+    <div className="min-h-screen space-y-6 bg-[#FAF7F0] px-4 py-6 sm:px-6 lg:px-8">
       <div className="mx-auto w-full max-w-7xl space-y-6">
-      <section className="rounded-[2rem] border border-[#2D8A6A]/20 bg-[linear-gradient(135deg,rgba(13,59,46,0.96),rgba(13,92,72,0.95))] p-6 text-[#FAF7F0] shadow-[0_24px_80px_-36px_rgba(6,63,50,0.45)] sm:p-8">
-        <h1 className="mt-3 text-3xl font-semibold tracking-tight text-[#FAF7F0] sm:text-4xl">Learner registry</h1>
-        <p className="mt-3 text-sm leading-7 text-[#FAF7F0] sm:text-base">
-          Review active student accounts, class placement, and parent links.
-        </p>
+      <section className="relative overflow-hidden rounded-[2rem] border border-[#2D8A6A]/15 bg-[linear-gradient(135deg,rgba(13,59,46,0.98),rgba(13,92,72,0.94))] p-6 text-[#FAF7F0] shadow-[0_24px_80px_-36px_rgba(13,59,46,0.32)] sm:p-8">
+        <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(135deg,rgba(13,59,46,0.98),rgba(13,92,72,0.94))]" />
+        <div className="relative">
+          <p className="inline-flex rounded-full border border-[#E4C766]/30 bg-[#FFF5D6]/12 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.28em] text-[#FFF5D6]">
+            Coordinator portal
+          </p>
+          <h1 className="mt-4 font-display text-3xl font-bold tracking-tight text-[#FAF7F0] sm:text-4xl">Learner registry</h1>
+          <p className="mt-3 text-sm leading-7 text-[#FAF7F0] sm:text-base">
+            Review active student accounts, class placement, and parent links.
+          </p>
+        </div>
       </section>
 
-      <div className="grid gap-3 md:grid-cols-[minmax(0,1.4fr)_220px]">
-        <label className="space-y-2 rounded-[1.5rem] border border-[#2D8A6A]/15 bg-white/90 p-4 shadow-[0_20px_70px_-36px_rgba(6,63,50,0.12)]">
+      <div className="grid gap-3 rounded-[2rem] border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(250,247,240,0.98)_100%)] p-4 shadow-[0_20px_70px_-36px_rgba(13,59,46,0.18)] backdrop-blur-xl md:grid-cols-[minmax(0,1.4fr)_220px]">
+        <label className="space-y-2">
           <span className="text-xs font-semibold uppercase tracking-[0.2em] text-[#245C4F]">Search student name</span>
           <input
             value={search}
@@ -68,7 +74,7 @@ export default function CoordinatorStudentsPage() {
             className="w-full rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 text-sm text-[#063F32] outline-none transition focus:border-[#2D8A6A] focus:ring-4 focus:ring-[#C9A227]/20"
           />
         </label>
-        <label className="space-y-2 rounded-[1.5rem] border border-[#2D8A6A]/15 bg-white/90 p-4 shadow-[0_20px_70px_-36px_rgba(6,63,50,0.12)]">
+        <label className="space-y-2">
           <span className="text-xs font-semibold uppercase tracking-[0.2em] text-[#245C4F]">Class filter</span>
           <div className="relative">
             <select

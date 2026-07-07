@@ -171,7 +171,7 @@ export default function AdminCoursesPage() {
               <p className="inline-flex rounded-full border border-[#FFF5D6]/30 bg-[#FFF5D6]/10 px-3 py-1 text-[0.65rem] font-semibold uppercase tracking-[0.24em] text-[#FFF5D6]">
                 Class management
               </p>
-              <h1 className="mb-3 mt-4 text-3xl font-bold text-white-deep sm:text-4xl lg:text-5xl font-display">
+              <h1 className="mb-3 mt-4 text-3xl font-bold text-white-deep sm:text-4xl lg:text-4xl font-display">
                 Manage Academic Classes
               </h1>
               <p className="mt-3 text-sm leading-7 text-[#EAF6EF] sm:text-base">

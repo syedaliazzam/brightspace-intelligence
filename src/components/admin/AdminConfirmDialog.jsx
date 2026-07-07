@@ -22,13 +22,13 @@ export default function AdminConfirmDialog({
   return (
     <AnimatePresence>
       {open ? (
-        <div className="fixed inset-0 z-50 flex items-start justify-center bg-[#063F32]/45 px-4 py-8 pt-24">
+        <div className="fixed inset-x-0 top-0 z-50 flex min-h-screen items-start justify-center bg-[#063F32]/45 px-4 py-8 pt-24">
           <motion.div
             initial={{ opacity: 0, y: 18 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 18 }}
             transition={{ duration: 0.2 }}
-            className="max-h-[calc(100vh-7rem)] w-full max-w-lg overflow-y-auto rounded-[2rem] border border-[#2D8A6A]/15 bg-white p-6 shadow-[0_24px_80px_-36px_rgba(13,59,46,0.22)] sm:p-8"
+            className="w-full max-w-lg overflow-hidden rounded-[2rem] border border-[#2D8A6A]/15 bg-white p-6 shadow-[0_24px_80px_-36px_rgba(13,59,46,0.22)] sm:p-8"
           >
             <p className="text-sm font-semibold uppercase tracking-[0.24em] text-[#0D5C48]">
               Admin confirmation

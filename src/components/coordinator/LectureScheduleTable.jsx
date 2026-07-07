@@ -40,8 +40,8 @@ export default function LectureScheduleTable({ items = [], onRefresh }) {
   }
 
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="overflow-hidden rounded-[1.75rem] border border-[#2D8A6A]/15 bg-white/90 shadow-[0_20px_70px_-36px_rgba(6,63,50,0.18)]">
-      <div className="hidden grid-cols-[minmax(0,1.2fr)_minmax(0,0.9fr)_minmax(0,0.8fr)_minmax(0,0.8fr)_minmax(0,0.8fr)_minmax(0,0.8fr)_minmax(0,0.8fr)_minmax(0,1.15fr)_minmax(0,1.35fr)_180px] gap-3 border-b border-[#2D8A6A]/10 bg-[#FAF7F0] px-5 py-4 text-xs font-semibold uppercase tracking-[0.18em] text-[#245C4F] lg:grid lg:items-center">
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="overflow-hidden rounded-[1.75rem] border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(250,247,240,0.98)_100%)] shadow-[0_20px_70px_-36px_rgba(6,63,50,0.18)] backdrop-blur-xl">
+      <div className="hidden grid-cols-[minmax(0,1.2fr)_minmax(0,0.9fr)_minmax(0,0.8fr)_minmax(0,0.8fr)_minmax(0,0.8fr)_minmax(0,0.8fr)_minmax(0,0.8fr)_minmax(0,1.15fr)_minmax(0,1.35fr)_180px] gap-3 border-b border-[#2D8A6A]/10 bg-[linear-gradient(180deg,#FAF7F0_0%,#F1EADC_100%)] px-5 py-4 text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48] lg:grid lg:items-center">
         <span>Lecture</span>
         <span>Subject</span>
         <span>Start date</span>
@@ -76,7 +76,7 @@ export default function LectureScheduleTable({ items = [], onRefresh }) {
                 <p className="min-w-0 text-sm leading-6 text-[#245C4F] break-words">{item.display_status || item.status || getLectureDisplayStatus(item)}</p>
                 <div className="min-w-0 text-sm leading-6 text-[#245C4F] break-words">
                   <p>{item.course_title}</p>
-                  {item.meet_link_source ? <p className="mt-1 text-xs text-slate-500">Link source: {item.meet_link_source}</p> : null}
+                  {item.meet_link_source ? <p className="mt-1 text-xs text-[#245C4F]">Link source: {item.meet_link_source}</p> : null}
                   {item.google_meet_link && !isFinal && !["ended", "completed", "verified", "missed", "cancelled", "rescheduled", "disputed"].includes(String(item.display_status || getLectureDisplayStatus(item)).toLowerCase()) ? (
                     <a href={item.google_meet_link} target="_blank" rel="noreferrer" className="mt-1 inline-flex text-xs font-semibold text-[#0D5C48]">
                       Open Meet link
@@ -86,14 +86,14 @@ export default function LectureScheduleTable({ items = [], onRefresh }) {
                   )}
                 </div>
                 <div className="flex flex-wrap gap-2 lg:justify-end">
-                  <button type="button" disabled={isFinal} onClick={() => patchSchedule(item.id, { action: "cancel" }).catch((error) => window.alert(error.message))} className="rounded-xl border border-[#2D8A6A]/20 bg-white px-3 py-2 text-xs font-semibold text-[#063F32] transition hover:bg-[#FAF7F0] disabled:cursor-not-allowed disabled:opacity-50">
+                  <button type="button" disabled={isFinal} onClick={() => patchSchedule(item.id, { action: "cancel" }).catch((error) => window.alert(error.message))} className="rounded-xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-3 py-2 text-xs font-semibold text-[#063F32] transition hover:bg-[#F1EADC] disabled:cursor-not-allowed disabled:opacity-50">
                     Cancel
                   </button>
                   <button
                     type="button"
                     disabled={isFinal}
                     onClick={() => promptReschedule(item)}
-                    className="rounded-xl border border-[#2D8A6A]/20 bg-white px-3 py-2 text-xs font-semibold text-[#063F32] transition hover:bg-[#FAF7F0] disabled:cursor-not-allowed disabled:opacity-50"
+                    className="rounded-xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-3 py-2 text-xs font-semibold text-[#063F32] transition hover:bg-[#F1EADC] disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     Reschedule
                   </button>
@@ -102,7 +102,7 @@ export default function LectureScheduleTable({ items = [], onRefresh }) {
             );
           })
         ) : (
-          <div className="px-5 py-10 text-sm text-slate-500">No lecture schedules available.</div>
+          <div className="px-5 py-10 text-sm text-[#245C4F]">No lecture schedules available.</div>
         )}
       </div>
     </motion.div>
