@@ -5,7 +5,7 @@ import { canShowJoinMeet, getLectureDisplayStatus } from "@/lib/lectureStatus";
 
 export default function UpcomingClassesCard({ items = [] }) {
   return (
-    <section className="rounded-[1.75rem] border border-[#2D8A6A]/15 bg-white/90 p-5 shadow-[0_20px_70px_-36px_rgba(13,59,46,0.18)]">
+    <section className="rounded-[2rem] border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(250,247,240,0.98)_100%)] p-5 shadow-[0_20px_70px_-36px_rgba(13,59,46,0.18)] backdrop-blur-xl">
       <div className="mb-4">
         <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-[#0D5C48]">
           Upcoming lectures
@@ -17,7 +17,7 @@ export default function UpcomingClassesCard({ items = [] }) {
 
       <div className="space-y-3">
         {items.length ? items.map((item, index) => (
-          <article key={`${item.id || "upcoming"}-${index}`} className="rounded-2xl border border-[#2D8A6A]/15 bg-[#FAF7F0] p-4">
+          <article key={`${item.id || "upcoming"}-${index}`} className="rounded-[1.75rem] border border-[#2D8A6A]/15 bg-[#FAF7F0] p-4">
             <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
               <div>
                 <p className="font-semibold text-[#063F32]">{item.title}</p>

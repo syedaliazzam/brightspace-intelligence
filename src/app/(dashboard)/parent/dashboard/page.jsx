@@ -99,16 +99,16 @@ export default function ParentDashboardPage() {
 
   return (
     <PaymentAccessGuard>
-      <div className="relative rounded-[2rem] min-h-screen overflow-hidden bg-[#FAF7F0]">
+      <div className="relative min-h-screen overflow-hidden bg-[#FAF7F0]">
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(201,162,39,0.12),transparent_35%),radial-gradient(circle_at_top_right,rgba(45,138,106,0.12),transparent_32%),linear-gradient(180deg,#FAF7F0_0%,#F7F1E3_100%)]" />
-        <div className="relative mx-auto max-w-7xl space-y-6 overflow-hidden rounded-[2rem] px-4 py-4 sm:px-6 lg:px-8">
+      <div className="relative mx-auto max-w-7xl space-y-6 overflow-hidden rounded-[2rem] px-4 py-4 sm:px-6 lg:px-8">
       {state.monthlyFee && hasUnpaidMonthlyChildren ? (
-        <section className={`w-full rounded-[1.75rem] border px-4 py-3 text-sm shadow-[0_14px_40px_-26px_rgba(13,59,46,0.22)] ${
+        <section className={`w-full rounded-[2rem] border px-5 py-4 text-sm shadow-[0_20px_70px_-36px_rgba(13,59,46,0.18)] backdrop-blur-xl ${
           state.monthlyFee.overdue
             ? "border-rose-200 bg-rose-50 text-rose-700"
             : state.monthlyFee.due_soon
               ? "border-[#E4C766]/70 bg-[#FFF5D6] text-[#8A6B00]"
-              : "border-[#2D8A6A]/20 bg-white/85 text-[#0D5C48]"
+              : "border-[#2D8A6A]/20 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(250,247,240,0.98)_100%)] text-[#0D5C48]"
         }`}>
           <div className="flex flex-col gap-4">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -126,9 +126,9 @@ export default function ParentDashboardPage() {
               </div>
           </div>
             {Array.isArray(state.monthlyFee.children) && state.monthlyFee.children.length ? (
-              <div className="overflow-x-auto rounded-2xl border border-white/70 bg-white/70">
-                <table className="min-w-full text-left text-sm">
-                  <thead className="bg-white/70 text-xs uppercase tracking-[0.18em] text-slate-500">
+              <div className="overflow-hidden rounded-[1.75rem] border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.94)_0%,rgba(250,247,240,0.96)_100%)]">
+                <table className="min-w-full divide-y divide-[#F1EADC] text-left text-sm">
+                  <thead className="bg-[linear-gradient(180deg,#FAF7F0_0%,#F1EADC_100%)] text-xs uppercase tracking-[0.18em] text-[#0D5C48]">
                     <tr>
                       <th className="px-4 py-3">Child</th>
                       <th className="px-4 py-3">Class</th>
@@ -138,21 +138,21 @@ export default function ParentDashboardPage() {
                       <th className="px-4 py-3">Payment Status</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-100">
+                  <tbody className="divide-y divide-[#F1EADC]">
                     {visibleMonthlyChildren.map((child) => (
                       <tr key={child.student_id || child.voucher_no}>
-                        <td className="px-4 py-4 font-semibold text-slate-950">{child.student_name || "Not available"}</td>
-                        <td className="px-4 py-4 text-slate-600">{child.class_title || "Not assigned"}</td>
-                        <td className="px-4 py-4 text-slate-600">{child.voucher_no || "-"}</td>
-                        <td className="px-4 py-4 text-slate-600">{child.due_date ? new Date(child.due_date).toLocaleDateString() : "-"}</td>
-                        <td className="px-4 py-4 text-slate-600">
+                        <td className="px-4 py-4 font-semibold text-[#063F32]">{child.student_name || "Not available"}</td>
+                        <td className="px-4 py-4 text-[#245C4F]">{child.class_title || "Not assigned"}</td>
+                        <td className="px-4 py-4 text-[#245C4F]">{child.voucher_no || "-"}</td>
+                        <td className="px-4 py-4 text-[#245C4F]">{child.due_date ? new Date(child.due_date).toLocaleDateString() : "-"}</td>
+                        <td className="px-4 py-4 text-[#245C4F]">
                           {typeof child.days_left === "number"
                             ? child.days_left >= 0
                               ? `${child.days_left} day${child.days_left === 1 ? "" : "s"} left`
                               : `${Math.abs(child.days_left)} day${Math.abs(child.days_left) === 1 ? "" : "s"} overdue`
                             : "-"}
                         </td>
-                        <td className="px-4 py-4 text-slate-600">
+                        <td className="px-4 py-4 text-[#245C4F]">
                           {child.is_paid
                             ? "Verified"
                             : child.overdue
@@ -166,11 +166,11 @@ export default function ParentDashboardPage() {
                   </tbody>
                 </table>
                 {state.monthlyFee.children.length > 4 ? (
-                  <div className="border-t border-slate-200 px-4 py-3">
+                  <div className="border-t border-[#F1EADC] px-4 py-3">
                     <button
                       type="button"
                       onClick={() => setShowAllMonthlyChildren((current) => !current)}
-                      className="inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
+                      className="inline-flex items-center justify-center rounded-xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-2 text-xs font-semibold text-[#063F32] transition hover:bg-[#F1EADC]"
                     >
                       {showAllMonthlyChildren ? "Show less" : `Show more (${state.monthlyFee.children.length - 4} more)`}
                     </button>
@@ -183,12 +183,15 @@ export default function ParentDashboardPage() {
       ) : null}
 
       <ActiveHeadlinesBanner items={state.headlines} />
-      <section className="rounded-[2rem] border border-[#2D8A6A]/15 bg-[linear-gradient(135deg,rgba(13,59,46,0.98),rgba(13,92,72,0.94))] p-6 text-[#FAF7F0] shadow-[0_24px_80px_-36px_rgba(13,59,46,0.32)] sm:p-8">
-        <p className="text-[11px] font-bold uppercase tracking-[0.24em]">Parent dashboard</p>
-        <h1 className="mt-3 font-serif text-3xl font-semibold tracking-tight sm:text-4xl">Child learning overview</h1>
+      <section className="relative overflow-hidden rounded-[2rem] border border-[#2D8A6A]/15 bg-[linear-gradient(135deg,rgba(13,59,46,0.98),rgba(13,92,72,0.94))] p-6 text-[#FAF7F0] shadow-[0_24px_80px_-36px_rgba(13,59,46,0.32)] sm:p-8">
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(228,198,102,0.12),transparent_28%),radial-gradient(circle_at_bottom_left,rgba(101,184,145,0.14),transparent_30%)]" />
+        <div className="relative max-w-6xl">
+        <p className="inline-flex rounded-full border border-[#FFF5D6]/30 bg-[#FFF5D6]/10 px-3 py-1 text-[0.65rem] font-semibold uppercase tracking-[0.24em] text-[#FFF5D6]">Parent dashboard</p>
+        <h1 className="mb-3 mt-4 text-2xl font-bold text-[#FAF7F0] sm:text-4xl lg:text-4xl font-display">Child learning overview</h1>
         <p className="mt-3 max-w-3xl text-sm leading-7 sm:text-base">
           Monitor classes, homework, attendance, fee status, and upcoming Google Meet sessions in one place.
         </p>
+        </div>
       </section>
 
       <ParentStatsCards
@@ -208,7 +211,7 @@ export default function ParentDashboardPage() {
       {state.error ? <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">{state.error}</div> : null}
 
       {!state.selectedChildId ? (
-        <div className="rounded-[1.75rem] border border-dashed border-[#2D8A6A]/20 bg-[#FAF7F0] p-8 text-center text-sm text-[#245C4F] shadow-[0_18px_60px_-36px_rgba(13,59,46,0.16)]">
+        <div className="rounded-[2rem] border border-dashed border-[#2D8A6A]/20 bg-[#FAF7F0] p-8 text-center text-sm text-[#245C4F] shadow-[0_18px_60px_-36px_rgba(13,59,46,0.16)]">
           Please select a child first.
         </div>
       ) : (

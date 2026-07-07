@@ -18,13 +18,13 @@ export default function PaginationControls({ page, pageSize, totalItems, onPageC
   };
 
   const navButton =
-    "rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-50";
+    "rounded-full border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-2 text-sm font-semibold text-[#063F32] transition hover:bg-[#F1EADC] disabled:cursor-not-allowed disabled:opacity-50";
 
   return (
-    <div className="flex flex-col gap-3 border-t border-slate-200 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
-      <p className="text-sm text-slate-600">
-        Showing <span className="font-semibold text-slate-950">{start}-{end}</span> of{" "}
-        <span className="font-semibold text-slate-950">{totalItems}</span>
+    <div className="flex flex-col gap-3 border-t border-[#F1EADC] px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
+      <p className="text-sm text-[#245C4F]">
+        Showing <span className="font-semibold text-[#063F32]">{start}-{end}</span> of{" "}
+        <span className="font-semibold text-[#063F32]">{totalItems}</span>
       </p>
 
       <div className="flex flex-wrap items-center gap-2">
@@ -32,7 +32,7 @@ export default function PaginationControls({ page, pageSize, totalItems, onPageC
           <Link
             href={pageHref(currentPage - 1)}
             aria-disabled={currentPage <= 1}
-            className={`${navButton} ${currentPage <= 1 ? "pointer-events-none" : "text-slate-700"}`}
+            className={`${navButton} ${currentPage <= 1 ? "pointer-events-none" : ""}`}
           >
             Previous
           </Link>
@@ -45,8 +45,8 @@ export default function PaginationControls({ page, pageSize, totalItems, onPageC
         {pages.map((number) => {
           const buttonClass =
             number === currentPage
-              ? "bg-slate-950 text-white"
-              : "border border-slate-200 bg-white text-slate-700 hover:bg-slate-100";
+              ? "bg-[linear-gradient(135deg,#C9A227,#E4C766)] text-[#063F32] shadow-[0_10px_28px_-18px_rgba(13,59,46,0.45)]"
+              : "border border-[#2D8A6A]/20 bg-[#FAF7F0] text-[#063F32] hover:bg-[#F1EADC]";
           return hrefBase ? (
             <Link key={number} href={pageHref(number)} className={`min-w-10 rounded-full px-4 py-2 text-sm font-semibold transition ${buttonClass}`}>
               {number}
@@ -67,7 +67,7 @@ export default function PaginationControls({ page, pageSize, totalItems, onPageC
           <Link
             href={pageHref(currentPage + 1)}
             aria-disabled={currentPage >= totalPages}
-            className={`${navButton} ${currentPage >= totalPages ? "pointer-events-none" : "text-slate-700"}`}
+            className={`${navButton} ${currentPage >= totalPages ? "pointer-events-none" : ""}`}
           >
             Next
           </Link>

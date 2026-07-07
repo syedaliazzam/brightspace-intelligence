@@ -181,10 +181,10 @@ export default function LMSCalendar({ apiUrl, filters = {}, extraParams = {}, on
   }
 
   return (
-    <div className="rounded-[1.75rem] border border-[#2D8A6A]/15 bg-[#FAF7F0] p-4 shadow-[0_20px_70px_-36px_rgba(13,59,46,0.18)]">
+    <div className="rounded-[1.75rem] border border-[#2D8A6A]/15 bg-[#FAF7F0] p-4 px-6 shadow-[0_20px_70px_-36px_rgba(13,59,46,0.18)]">
       <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <h3 className="mt-1 text-xl font-semibold tracking-tight text-[#063F32]">{title || "Month, week and day view"}</h3>
+          <h3 className="mt-0 text-xl font-semibold tracking-tight text-[#063F32]">{title || "Month, week and day view"}</h3>
         </div>
         <div className="flex flex-wrap gap-2">
           {[

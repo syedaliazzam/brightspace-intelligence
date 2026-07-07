@@ -20,7 +20,7 @@ export default function ParentClassesTable({ items = [] }) {
   }, [items, page]);
 
   return (
-    <section className="rounded-[1.75rem] border border-[#2D8A6A]/15 bg-white/90 p-5 shadow-[0_20px_70px_-36px_rgba(13,59,46,0.18)]">
+    <section className="overflow-hidden rounded-[2rem] border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(250,247,240,0.98)_100%)] shadow-[0_20px_70px_-36px_rgba(13,59,46,0.18)] backdrop-blur-xl">
       <div className="mb-4">
         <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-[#0D5C48]">
           Lecture records
@@ -30,8 +30,8 @@ export default function ParentClassesTable({ items = [] }) {
         </h2>
       </div>
       <div className="overflow-x-auto">
-        <table className="min-w-full text-left text-sm">
-          <thead className="text-xs uppercase tracking-[0.18em] text-[#0D5C48]">
+        <table className="min-w-full divide-y divide-[#F1EADC] text-left text-sm">
+          <thead className="bg-[linear-gradient(180deg,#FAF7F0_0%,#F1EADC_100%)] text-xs uppercase tracking-[0.18em] text-[#0D5C48]">
             <tr>
               <th className="px-3 py-3">Lecture</th>
               <th className="px-3 py-3">Subject</th>

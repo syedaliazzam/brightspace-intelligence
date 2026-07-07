@@ -14,7 +14,7 @@ export default function ChildSwitcher({ childrenList = [], value = "", onChange 
   }
 
   return (
-    <label className="block rounded-[1.5rem] border border-[#2D8A6A]/15 bg-white/90 p-4 shadow-[0_16px_50px_-34px_rgba(13,59,46,0.16)]">
+    <label className="block rounded-[2rem] border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(250,247,240,0.98)_100%)] p-4 px-6 shadow-[0_16px_50px_-34px_rgba(13,59,46,0.16)] backdrop-blur-xl">
       <span className="mb-2 block text-[11px] font-bold uppercase tracking-[0.22em] text-[#0D5C48]">
         Viewing child
       </span>

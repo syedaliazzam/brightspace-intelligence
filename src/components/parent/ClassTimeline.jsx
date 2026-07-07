@@ -34,7 +34,7 @@ function formatStatus(status) {
 
 export default function ClassTimeline({ items = [] }) {
   return (
-    <section className="rounded-[2rem] border border-[#2D8A6A]/15 bg-[#FAF7F0] p-4 shadow-[0_30px_80px_-40px_rgba(13,59,46,0.16)]">
+    <section className="rounded-[2rem] border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(250,247,240,0.98)_100%)] p-4 shadow-[0_20px_70px_-36px_rgba(13,59,46,0.18)] backdrop-blur-xl">
       <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-[#0D5C48]">Learning timeline</p>
@@ -57,7 +57,7 @@ export default function ClassTimeline({ items = [] }) {
                   initial={{ opacity: 0, x: -10 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ duration: 0.2, delay: index * 0.025 }}
-                  className="relative overflow-hidden rounded-[1.5rem] border border-white bg-white p-4 pl-16 shadow-sm shadow-[rgba(13,59,46,0.08)] transition duration-200 hover:shadow-md"
+                className="relative overflow-hidden rounded-[1.75rem] border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(250,247,240,0.98)_100%)] p-4 pl-16 shadow-[0_14px_40px_-28px_rgba(13,59,46,0.18)] transition duration-200 hover:shadow-[0_18px_50px_-32px_rgba(13,59,46,0.22)] backdrop-blur-xl"
                 >
                   <div className="absolute left-4 top-5 flex h-8 w-8 items-center justify-center rounded-full bg-white shadow ring-1 ring-[#F1EADC]">
                     <span className={`h-2.5 w-2.5 rounded-full ${markerClass}`} />
@@ -65,7 +65,7 @@ export default function ClassTimeline({ items = [] }) {
 
                   <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                     <div className="space-y-1">
-                      <h3 className="text-base font-semibold tracking-tight text-[#063F32]">{item.title || "Untitled event"}</h3>
+                      <h3 className="font-body text-base font-semibold tracking-tight text-[#063F32]">{item.title || "Untitled event"}</h3>
                       <p className="text-sm text-[#245C4F]">
                         {item.subject_name || "Unknown subject"}
                         {item.teacher_name ? ` - Teacher: ${item.teacher_name}` : ""}
