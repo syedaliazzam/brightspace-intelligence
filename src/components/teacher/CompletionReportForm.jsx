@@ -1,11 +1,46 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { LeafSpinnerInline } from "@/components/shared/AshShajrahLoaders";
 
 export default function CompletionReportForm({ lecture, onSaved }) {
   const [form, setForm] = useState({ topicCovered: "", summary: "", homeworkGiven: "", studentPerformance: "" });
   const [pending, setPending] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadReport() {
+      if (!lecture?.id) {
+        setForm({ topicCovered: "", summary: "", homeworkGiven: "", studentPerformance: "" });
+        return;
+      }
+
+      try {
+        const response = await fetch(`/api/teacher/lectures/${lecture.id}`, { cache: "no-store" });
+        const data = await response.json();
+        if (!response.ok) return;
+        if (active && data?.item) {
+          setForm({
+            topicCovered: data.item.topic_covered || "",
+            summary: data.item.summary || "",
+            homeworkGiven: data.item.homework_given || "",
+            studentPerformance: data.item.student_performance || "",
+          });
+        }
+      } catch {
+        if (active) {
+          setForm({ topicCovered: "", summary: "", homeworkGiven: "", studentPerformance: "" });
+        }
+      }
+    }
+
+    void loadReport();
+
+    return () => {
+      active = false;
+    };
+  }, [lecture?.id]);
 
   async function submit(event) {
     event.preventDefault();

@@ -15,6 +15,13 @@ function normalizeText(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 
+async function ensureLectureVerificationColumns() {
+  await prisma.$executeRaw`
+    ALTER TABLE lecture_schedules
+    ADD COLUMN IF NOT EXISTS google_meet_sync_meta JSONB
+  `;
+}
+
 async function getLectureDetails(id) {
   const [lecture] = await prisma.$queryRaw`
     SELECT
@@ -31,8 +38,13 @@ async function getLectureDetails(id) {
       ls.scheduled_end::text AS scheduled_end,
       ls.status::text AS status,
       ls.google_meet_link,
+      ls.recording_drive_url,
+      ls.google_meet_sync_meta,
       COALESCE(NULLIF(c.class_level, ''), NULLIF(c.title, ''), 'Class') AS course_title,
       sub.name AS subject_name,
+      cu.id::text AS coordinator_user_id,
+      cu.full_name AS coordinator_name,
+      cu.email AS coordinator_email,
       tu.id::text AS teacher_user_id,
       tu.full_name AS teacher_name,
       tu.email AS teacher_email,
@@ -53,6 +65,10 @@ async function getLectureDetails(id) {
       teacher_att.left_at AS teacher_left_at,
       COALESCE(teacher_att.duration_minutes, 0) AS teacher_duration_minutes,
       COALESCE(teacher_att.status::text, 'absent') AS teacher_attendance_status,
+      coordinator_att.joined_at AS coordinator_joined_at,
+      coordinator_att.left_at AS coordinator_left_at,
+      COALESCE(coordinator_att.duration_minutes, 0) AS coordinator_duration_minutes,
+      COALESCE(coordinator_att.status::text, 'absent') AS coordinator_attendance_status,
       student_att.joined_at AS student_joined_at,
       student_att.left_at AS student_left_at,
       COALESCE(student_att.duration_minutes, 0) AS student_duration_minutes,
@@ -63,6 +79,7 @@ async function getLectureDetails(id) {
     INNER JOIN enrollments e ON e.id = ls.enrollment_id
     INNER JOIN courses c ON c.id = e.course_id
     INNER JOIN subjects sub ON sub.id = ls.subject_id
+    LEFT JOIN users cu ON cu.id = ls.scheduled_by
     INNER JOIN teacher_profiles tp ON tp.id = ls.teacher_id
     INNER JOIN users tu ON tu.id = tp.user_id
     INNER JOIN student_profiles sp ON sp.id = ls.student_id
@@ -70,6 +87,7 @@ async function getLectureDetails(id) {
     LEFT JOIN lecture_completion_reports lcr ON lcr.lecture_id = ls.id
     LEFT JOIN lecture_verifications lv ON lv.lecture_id = ls.id
     LEFT JOIN lecture_attendance teacher_att ON teacher_att.lecture_id = ls.id AND teacher_att.user_id = tu.id
+    LEFT JOIN lecture_attendance coordinator_att ON coordinator_att.lecture_id = ls.id AND coordinator_att.user_id = cu.id
     LEFT JOIN lecture_attendance student_att ON student_att.lecture_id = ls.id AND student_att.user_id = su.id
     WHERE ls.id = ${id}::uuid
     LIMIT 1
@@ -134,6 +152,12 @@ async function getLectureDetails(id) {
       left_at: teacherRows?.[0]?.left_at || lecture.teacher_left_at,
       duration_minutes: teacherRows?.[0]?.duration_minutes || lecture.teacher_duration_minutes,
       status: teacherRows?.[0]?.status || lecture.teacher_attendance_status,
+    },
+    coordinator_attendance: {
+      joined_at: lecture.coordinator_joined_at,
+      left_at: lecture.coordinator_left_at,
+      duration_minutes: lecture.coordinator_duration_minutes,
+      status: lecture.coordinator_attendance_status,
     },
     student_attendance_rows: roster || [],
     total_students_count: roster.length || 0,
@@ -205,6 +229,7 @@ async function upsertVerification(tx, payload) {
 export async function PATCH(request, context) {
   try {
     const session = await requireRole(ALLOWED_ROLES);
+    await ensureLectureVerificationColumns();
     const { id } = await context.params;
     const body = await request.json();
     const action = normalizeText(body?.action).toLowerCase();
@@ -421,6 +446,7 @@ export async function PATCH(request, context) {
 export async function GET(_request, context) {
   try {
     await requireRole(ALLOWED_ROLES);
+    await ensureLectureVerificationColumns();
     const { id } = await context.params;
     const lecture = await getLectureDetails(id);
 

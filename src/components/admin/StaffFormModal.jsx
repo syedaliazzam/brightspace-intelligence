@@ -146,7 +146,7 @@ export default function StaffFormModal({
   return (
     <AnimatePresence>
       {open ? (
-        <div className="fixed inset-x-0 top-0 z-50 flex min-h-screen items-start justify-center bg-[#063F32]/45 px-4 py-8 pt-24">
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-[#063F32]/45 px-4 py-8 pt-24 backdrop-blur-sm">
           <motion.div
             initial={{ opacity: 0, y: 18 }}
             animate={{ opacity: 1, y: 0 }}
@@ -335,7 +335,7 @@ export default function StaffFormModal({
                 ) : mode !== "edit" ? (
                   <label className="block">
                     <span className="mb-2 block text-sm font-medium text-[#245C4F]">
-                      Temporary password
+                      Password
                     </span>
                     <div className="relative">
                       <input

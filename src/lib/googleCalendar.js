@@ -42,6 +42,25 @@ function assertValidMeetLink(value) {
   }
 }
 
+export function extractMeetCodeFromLink(value) {
+  const meetLink = assertValidMeetLink(value);
+
+  if (!meetLink) {
+    return "";
+  }
+
+  try {
+    const url = new URL(meetLink);
+    return String(url.pathname || "")
+      .replace(/^\/+/, "")
+      .split("/")[0]
+      .trim()
+      .toLowerCase();
+  } catch {
+    return "";
+  }
+}
+
 function base64UrlEncode(value) {
   return Buffer.from(value)
     .toString("base64")
@@ -50,7 +69,7 @@ function base64UrlEncode(value) {
     .replace(/=+$/g, "");
 }
 
-async function getGoogleAccessToken() {
+async function getGoogleAccessToken(impersonateUserEmail) {
   const clientEmail = getRequiredEnv("GOOGLE_SERVICE_ACCOUNT_EMAIL");
   const privateKey = getRequiredEnv("GOOGLE_PRIVATE_KEY").replace(/\\n/g, "\n");
   const now = Math.floor(Date.now() / 1000);
@@ -63,6 +82,10 @@ async function getGoogleAccessToken() {
     exp: now + 3600,
     iat: now,
   };
+
+  if (impersonateUserEmail) {
+    payload.sub = impersonateUserEmail;
+  }
 
   const encodedHeader = base64UrlEncode(JSON.stringify(header));
   const encodedPayload = base64UrlEncode(JSON.stringify(payload));
@@ -98,7 +121,7 @@ async function getGoogleAccessToken() {
 }
 
 async function calendarRequest(path, options = {}) {
-  const accessToken = await getGoogleAccessToken();
+  const accessToken = await getGoogleAccessToken(options.impersonateUserEmail);
   const response = await fetch(`${GOOGLE_CALENDAR_BASE_URL}${path}`, {
     ...options,
     headers: {
@@ -128,13 +151,15 @@ async function calendarRequest(path, options = {}) {
   return response.json();
 }
 
-async function getCalendarConferenceTypes(calendarId) {
-  const calendar = await calendarRequest(`/calendars/${calendarId}`);
+async function getCalendarConferenceTypes(calendarId, impersonateUserEmail) {
+  const calendar = await calendarRequest(`/calendars/${calendarId}`, {
+    impersonateUserEmail,
+  });
   return calendar?.conferenceProperties?.allowedConferenceSolutionTypes || [];
 }
 
 function buildEventPayload(payload, includeConferenceData = true) {
-  const attendees = shouldUseCalendarAttendees() && Array.isArray(payload?.attendees)
+  const attendees = Array.isArray(payload?.attendees)
     ? payload.attendees
         .filter((item) => item?.email && String(item.email).includes("@"))
         .map((item) => ({ email: String(item.email).trim(), displayName: item.name || undefined }))
@@ -169,8 +194,9 @@ function buildEventPayload(payload, includeConferenceData = true) {
 }
 
 export async function createCalendarLectureEvent(payload) {
-  const calendarId = encodeURIComponent(getCalendarId());
-  const allowedTypes = await getCalendarConferenceTypes(calendarId);
+  const organizerEmail = String(payload?.organizerEmail || "").trim();
+  const calendarId = encodeURIComponent(organizerEmail || getCalendarId());
+  const allowedTypes = await getCalendarConferenceTypes(calendarId, organizerEmail || undefined);
   const canCreateMeet = allowedTypes.includes("hangoutsMeet");
   const fallbackMeetLink = assertValidMeetLink(getFallbackMeetLink());
 
@@ -185,6 +211,7 @@ export async function createCalendarLectureEvent(payload) {
     {
       method: "POST",
       body: JSON.stringify(buildEventPayload(payload, canCreateMeet)),
+      impersonateUserEmail: organizerEmail || undefined,
     }
   );
 
@@ -193,7 +220,9 @@ export async function createCalendarLectureEvent(payload) {
   return {
     eventId: data?.id || "",
     meetLink: data?.hangoutLink || videoEntryPoint?.uri || fallbackMeetLink,
-    meetSpaceId: data?.conferenceData?.conferenceId || "",
+    meetSpaceId:
+      data?.conferenceData?.conferenceId ||
+      extractMeetCodeFromLink(data?.hangoutLink || videoEntryPoint?.uri || fallbackMeetLink),
     eventHtmlLink: data?.htmlLink || "",
   };
 }
@@ -203,13 +232,15 @@ export async function updateCalendarLectureEvent(eventId, payload) {
     return null;
   }
 
-  const calendarId = encodeURIComponent(getCalendarId());
+  const organizerEmail = String(payload?.organizerEmail || "").trim();
+  const calendarId = encodeURIComponent(organizerEmail || getCalendarId());
   const fallbackMeetLink = assertValidMeetLink(getFallbackMeetLink());
   const data = await calendarRequest(
     `/calendars/${calendarId}/events/${encodeURIComponent(eventId)}?conferenceDataVersion=1&sendUpdates=none`,
     {
       method: "PATCH",
       body: JSON.stringify(buildEventPayload(payload, false)),
+      impersonateUserEmail: organizerEmail || undefined,
     }
   );
 
@@ -218,19 +249,22 @@ export async function updateCalendarLectureEvent(eventId, payload) {
   return {
     eventId: data?.id || eventId,
     meetLink: data?.hangoutLink || videoEntryPoint?.uri || fallbackMeetLink,
-    meetSpaceId: data?.conferenceData?.conferenceId || "",
+    meetSpaceId:
+      data?.conferenceData?.conferenceId ||
+      extractMeetCodeFromLink(data?.hangoutLink || videoEntryPoint?.uri || fallbackMeetLink),
     eventHtmlLink: data?.htmlLink || "",
   };
 }
 
-export async function cancelCalendarLectureEvent(eventId) {
+export async function cancelCalendarLectureEvent(eventId, organizerEmail) {
   if (!eventId) {
     return null;
   }
 
-  const calendarId = encodeURIComponent(getCalendarId());
+  const calendarId = encodeURIComponent(String(organizerEmail || "").trim() || getCalendarId());
 
   return calendarRequest(`/calendars/${calendarId}/events/${encodeURIComponent(eventId)}`, {
     method: "DELETE",
+    impersonateUserEmail: organizerEmail || undefined,
   });
 }

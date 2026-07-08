@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { formatDateTimeRange } from "@/lib/dateTime";
-import { canShowJoinMeet, getLectureDisplayStatus } from "@/lib/lectureStatus";
+import { getLectureDisplayStatus, getTeacherLectureActionLink } from "@/lib/lectureStatus";
 import PaginationControls from "@/components/teacher/PaginationControls";
 
 export default function TeacherClassTable({ items = [], onOpen }) {
@@ -31,11 +31,11 @@ export default function TeacherClassTable({ items = [], onOpen }) {
             {visibleItems.length ? visibleItems.map((item) => (
               <tr key={item.id}>
                 <td className="px-3 py-4 font-semibold text-[#063F32]">{item.title}</td>
-                <td className="px-3 py-4 text-[#245C4F]">{item.student_name}</td>
-                <td className="px-3 py-4 text-[#245C4F]">{item.subject_name}</td>
+              <td className="px-3 py-4 text-[#245C4F]">{item.student_name}</td>
+              <td className="px-3 py-4 text-[#245C4F]">{item.subject_name}</td>
               <td className="px-3 py-4 text-[#245C4F]">{formatDateTimeRange(item.scheduled_start, item.scheduled_end)}</td>
               <td className="px-3 py-4 text-[#245C4F]">
-                {canShowJoinMeet(item) ? <a href={item.google_meet_link} target="_blank" rel="noreferrer" className="font-semibold text-[#0D5C48]">Open</a> : "-"}
+                {getTeacherLectureActionLink(item) ? <a href={getTeacherLectureActionLink(item).href} target="_blank" rel="noreferrer" className="font-semibold text-[#0D5C48]">{getTeacherLectureActionLink(item).label}</a> : "-"}
               </td>
               <td className="px-3 py-4 text-[#245C4F]">{item.display_status || getLectureDisplayStatus(item)}</td>
                 <td className="px-3 py-4">

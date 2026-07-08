@@ -480,7 +480,7 @@ export default function AdminUsersPage() {
         throw new Error(data?.message || "Unable to reset password.");
       }
 
-      window.alert(`Temporary password: ${data.temporaryPassword}`);
+      window.alert(`Password: ${data.temporaryPassword}`);
       setResetModal({
         open: false,
         record: null,
@@ -534,16 +534,15 @@ export default function AdminUsersPage() {
 
     try {
       const isArchiveAction = confirmState.action === "archive";
-      const endpoint = isArchiveAction
-        ? `/api/admin/users/${confirmState.record.id}`
-        : `/api/admin/users/${confirmState.record.id}`;
+      const isSuspendAction = confirmState.action === "suspend";
+      const endpoint = `/api/admin/users/${confirmState.record.id}`;
       const response = await fetch(endpoint, {
         method: isArchiveAction ? "DELETE" : "PATCH",
         headers: isArchiveAction ? undefined : { "Content-Type": "application/json" },
         body: isArchiveAction
           ? undefined
           : JSON.stringify({
-              status: "active",
+              status: isSuspendAction ? "suspended" : "active",
             }),
       });
       const data = await response.json();
@@ -851,6 +850,7 @@ export default function AdminUsersPage() {
                   setConfirmState({
                     open: true,
                     record: row,
+                    action: row.status === "suspended" ? "activate" : "suspend",
                     status: row.status === "suspended" ? "active" : "suspended",
                     pending: false,
                   })
@@ -941,7 +941,7 @@ export default function AdminUsersPage() {
       ) : null}
 
       {detailModal.open && detailModal.record ? (
-        <div className="fixed inset-x-0 top-0 z-50 flex min-h-screen items-start justify-center overflow-visible bg-[#063F32]/45 px-4 py-10 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-[#063F32]/45 px-4 py-10 backdrop-blur-sm">
           <div className="w-full max-w-5xl rounded-[2rem] border border-[#2D8A6A]/15 bg-white shadow-[0_30px_90px_-40px_rgba(13,59,46,0.24)]">
             <div className="flex items-center justify-between border-b border-[#2D8A6A]/15 px-6 py-5">
               <div>
@@ -1012,7 +1012,7 @@ export default function AdminUsersPage() {
       ) : null}
 
       {resetModal.open && resetModal.record ? (
-        <div className="fixed inset-x-0 top-0 z-50 flex min-h-screen items-start justify-center overflow-visible bg-[#063F32]/45 px-4 pt-10 pb-10 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-[#063F32]/45 px-4 pt-10 pb-10 backdrop-blur-sm">
           <div className="w-full max-w-lg rounded-[2rem] border border-[#2D8A6A]/18 bg-[#FAF7F0] shadow-[0_30px_90px_-40px_rgba(13,59,46,0.28)]">
             <div className="flex items-center justify-between border-b border-[#2D8A6A]/15 px-6 py-5">
               <div>
@@ -1040,9 +1040,6 @@ export default function AdminUsersPage() {
               </button>
             </div>
             <div className="space-y-5 px-6 py-6">
-              <p className="text-sm leading-6 text-[#245C4F]">
-                Leave the password blank to auto-generate a temporary password, or enter a new one to set it manually.
-              </p>
               <label className="block">
                 <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-[#245C4F]">
                   New password
@@ -1057,7 +1054,7 @@ export default function AdminUsersPage() {
                       error: "",
                     }))
                   }
-                  placeholder="Leave blank for auto-generated password"
+                  placeholder="Enter new password"
                   required
                   className="h-12 w-full rounded-2xl border border-[#2D8A6A]/18 bg-white px-4 text-sm text-[#063F32] outline-none transition placeholder:text-[#7A938B] focus:border-[#2D8A6A] focus:ring-4 focus:ring-[#2D8A6A]/10"
                 />
@@ -1108,14 +1105,27 @@ export default function AdminUsersPage() {
         open={confirmState.open}
         pending={confirmState.pending}
         title={`${
-          confirmState.action === "archive" ? "Archive" : "Activate"
+          confirmState.action === "archive"
+            ? "Archive"
+            : confirmState.action === "suspend"
+              ? "Suspend"
+              : "Activate"
         } ${confirmState.record?.name || "user"}?`}
         description={
           confirmState.action === "archive"
             ? "This will move the record to archived status."
-            : "This will restore the record back to active status."
+            : confirmState.action === "suspend"
+              ? "This will move the record to suspended status."
+              : "This will restore the record back to active status."
         }
-        confirmLabel={confirmState.action === "archive" ? "Archive" : "Activate"}
+        confirmLabel={
+          confirmState.action === "archive"
+            ? "Archive"
+            : confirmState.action === "suspend"
+              ? "Suspend"
+              : "Activate"
+        }
+        tone={confirmState.action === "activate" ? "success" : "danger"}
         onClose={() =>
           setConfirmState({ open: false, record: null, action: "", status: "", pending: false })
         }

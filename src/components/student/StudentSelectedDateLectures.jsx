@@ -2,7 +2,7 @@
 
 import { motion } from "framer-motion";
 import { formatDateTimeRange } from "@/lib/dateTime";
-import { canShowJoinMeet, getLectureDisplayStatus } from "@/lib/lectureStatus";
+import { getLectureDisplayStatus, getLecturePrimaryLink } from "@/lib/lectureStatus";
 import { OpenBookLoader } from "@/components/shared/AshShajrahLoaders";
 
 export default function StudentSelectedDateLectures({ items = [], loading }) {
@@ -18,8 +18,8 @@ export default function StudentSelectedDateLectures({ items = [], loading }) {
       {loading ? <OpenBookLoader title="Loading lectures" subtitle="Preparing the selected day..." /> : null}
       <div className="mt-5 grid gap-3">
         {items.length ? items.map((item, index) => {
-          const canJoin = canShowJoinMeet(item);
           const displayStatus = item.display_status || getLectureDisplayStatus(item);
+          const primaryLink = getLecturePrimaryLink(item);
 
           return (
           <motion.article key={`${item.id}-${index}`} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.16, delay: index * 0.02 }} className="rounded-[1.75rem] border border-[#2D8A6A]/15 bg-[#FAF7F0] p-4">
@@ -32,12 +32,7 @@ export default function StudentSelectedDateLectures({ items = [], loading }) {
               </div>
                 <div className="flex flex-wrap gap-2">
                 <span className="rounded-full bg-[#FFF5D6] px-3 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-[#8A6B00]">{displayStatus}</span>
-                {item.google_meet_link && canJoin ? (
-                  <>
-                    <a href={item.google_meet_link} target="_blank" rel="noreferrer" className="rounded-xl bg-[#0D5C48] px-4 py-2 text-sm font-semibold text-[#FAF7F0]">Join Meet</a>
-                  </>
-                ) : null}
-                {displayStatus === "verified" && item.recording_drive_url ? <a href={item.recording_drive_url} target="_blank" rel="noreferrer" className="rounded-xl border border-[#2D8A6A]/15 bg-[#FAF7F0] px-4 py-2 text-sm font-semibold text-[#0D5C48]">Recording</a> : null}
+                {primaryLink ? <a href={primaryLink.href} target="_blank" rel="noreferrer" className={`rounded-xl px-4 py-2 text-sm font-semibold ${primaryLink.kind === "recording" ? "border border-[#2D8A6A]/15 bg-[#FAF7F0] text-[#0D5C48]" : "bg-[#0D5C48] text-[#FAF7F0]"}`}>{primaryLink.label}</a> : null}
               </div>
             </div>
           </motion.article>

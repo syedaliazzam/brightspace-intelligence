@@ -1,6 +1,7 @@
 import crypto from "crypto";
 import { NextResponse } from "next/server";
 import { getMeetAttendanceRecords } from "@/lib/googleMeet";
+import { extractMeetCodeFromLink } from "@/lib/googleCalendar";
 import prisma from "@/lib/prisma";
 import { requireRole, roleGuardResponse } from "@/lib/roleGuard";
 
@@ -20,6 +21,11 @@ async function ensureAttendanceColumns() {
     ADD COLUMN IF NOT EXISTS google_session_id VARCHAR(255),
     ADD COLUMN IF NOT EXISTS meet_raw JSONB
   `;
+
+  await prisma.$executeRaw`
+    ALTER TABLE lecture_schedules
+    ADD COLUMN IF NOT EXISTS google_meet_sync_meta JSONB
+  `;
 }
 
 function attendanceStatus(duration) {
@@ -35,8 +41,15 @@ export async function POST(_request, { params }) {
     const [lecture] = await prisma.$queryRaw`
       SELECT
         ls.id::text AS id,
+        ls.google_meet_link,
         ls.google_meet_space_id,
         ls.google_calendar_event_id,
+        ls.recording_drive_url,
+        ls.scheduled_start,
+        ls.scheduled_end,
+        ls.scheduled_by::text AS coordinator_user_id,
+        cu.email AS coordinator_email,
+        cu.full_name AS coordinator_name,
         tu.id::text AS teacher_user_id,
         tu.email AS teacher_email,
         tu.full_name AS teacher_name,
@@ -49,6 +62,7 @@ export async function POST(_request, { params }) {
       FROM lecture_schedules ls
       INNER JOIN teacher_profiles tp ON tp.id = ls.teacher_id
       INNER JOIN users tu ON tu.id = tp.user_id
+      LEFT JOIN users cu ON cu.id = ls.scheduled_by
       INNER JOIN student_profiles sp ON sp.id = ls.student_id
       INNER JOIN users su ON su.id = sp.user_id
       LEFT JOIN student_parents spp ON spp.student_id = sp.id AND spp.is_primary = TRUE
@@ -62,13 +76,20 @@ export async function POST(_request, { params }) {
       return json("Lecture schedule not found.", 404);
     }
 
+    const meetSpaceId =
+      lecture.google_meet_space_id || extractMeetCodeFromLink(lecture.google_meet_link);
     const meetData = await getMeetAttendanceRecords({
-      meetSpaceId: lecture.google_meet_space_id,
-      calendarEventId: lecture.google_calendar_event_id,
+      meetSpaceId,
+      scheduledStart: lecture.scheduled_start,
+      scheduledEnd: lecture.scheduled_end,
+      impersonateUserEmail: lecture.coordinator_email || lecture.teacher_email || "",
     });
 
     if (!meetData.available) {
-      return json("Meet attendance may be available only after Google finishes processing the conference record.", 200, {
+      const pendingMessage = lecture.recording_drive_url
+        ? "Recording is available, but Google Meet attendance is still being processed. Please try syncing again shortly."
+        : "Meet attendance may be available only after Google finishes processing the conference record.";
+      return json(pendingMessage, 200, {
         synced: 0,
         unmatched_participants: [],
         available: false,
@@ -84,22 +105,16 @@ export async function POST(_request, { params }) {
     };
 
     addExpectedParticipant({
+      email: lecture.coordinator_email,
+      name: lecture.coordinator_name,
+      attendanceUserId: lecture.coordinator_user_id,
+      roleType: "coordinator",
+    });
+    addExpectedParticipant({
       email: lecture.teacher_email,
       name: lecture.teacher_name,
       attendanceUserId: lecture.teacher_user_id,
       roleType: "teacher",
-    });
-    addExpectedParticipant({
-      email: lecture.student_email,
-      name: lecture.student_name,
-      attendanceUserId: lecture.student_user_id,
-      roleType: "student",
-    });
-    addExpectedParticipant({
-      email: lecture.parent_email,
-      name: lecture.parent_name,
-      attendanceUserId: lecture.student_user_id,
-      roleType: "student",
     });
     const unmatched = [];
     let synced = 0;
@@ -164,10 +179,105 @@ export async function POST(_request, { params }) {
       synced += 1;
     }
 
+    const [coordinatorAttendance, teacherAttendance] = await Promise.all([
+      lecture.coordinator_user_id
+        ? prisma.$queryRaw`
+            SELECT
+              la.joined_at,
+              la.left_at,
+              COALESCE(la.duration_minutes, 0) AS duration_minutes,
+              COALESCE(la.status::text, 'absent') AS status,
+              la.participant_email,
+              la.participant_name
+            FROM lecture_attendance la
+            WHERE la.lecture_id = ${id}::uuid
+              AND la.user_id = ${lecture.coordinator_user_id}::uuid
+            LIMIT 1
+          `
+        : Promise.resolve([]),
+      prisma.$queryRaw`
+        SELECT
+          la.joined_at,
+          la.left_at,
+          COALESCE(la.duration_minutes, 0) AS duration_minutes,
+          COALESCE(la.status::text, 'absent') AS status,
+          la.participant_email,
+          la.participant_name
+        FROM lecture_attendance la
+        WHERE la.lecture_id = ${id}::uuid
+          AND la.user_id = ${lecture.teacher_user_id}::uuid
+        LIMIT 1
+      `,
+    ]);
+
+    const latestRecording =
+      [...(meetData.recordings || [])]
+        .sort((left, right) => {
+          const leftTime = new Date(left.endTime || left.startTime || 0).getTime();
+          const rightTime = new Date(right.endTime || right.startTime || 0).getTime();
+          return rightTime - leftTime;
+        })[0] || null;
+
+    const syncMeta = {
+      synced_at: new Date().toISOString(),
+      meet_space_id: meetSpaceId || "",
+      conference_record_name: meetData.conferenceRecord?.name || "",
+      host: {
+        role: "coordinator",
+        name: lecture.coordinator_name || "",
+        email: lecture.coordinator_email || "",
+        joined: Boolean(coordinatorAttendance?.[0]?.joined_at),
+        status: coordinatorAttendance?.[0]?.status || "absent",
+        joined_at: coordinatorAttendance?.[0]?.joined_at || null,
+        left_at: coordinatorAttendance?.[0]?.left_at || null,
+        duration_minutes: Number(coordinatorAttendance?.[0]?.duration_minutes || 0),
+      },
+      cohost: {
+        role: "teacher",
+        name: lecture.teacher_name || "",
+        email: lecture.teacher_email || "",
+        joined: Boolean(teacherAttendance?.[0]?.joined_at),
+        status: teacherAttendance?.[0]?.status || "absent",
+        joined_at: teacherAttendance?.[0]?.joined_at || null,
+        left_at: teacherAttendance?.[0]?.left_at || null,
+        duration_minutes: Number(teacherAttendance?.[0]?.duration_minutes || 0),
+      },
+      others: unmatched.map((record) => ({
+        name: record.participantName || "",
+        email: record.participantEmail || "",
+        joined_at: record.joinedAt || null,
+        left_at: record.leftAt || null,
+        duration_minutes: Number(record.durationMinutes || 0),
+      })),
+      recording: latestRecording
+        ? {
+            file_id: latestRecording.driveFileId || "",
+            url: latestRecording.driveExportUri || "",
+            state: latestRecording.state || "",
+            start_time: latestRecording.startTime || null,
+            end_time: latestRecording.endTime || null,
+          }
+        : null,
+    };
+
+    await prisma.$executeRaw`
+      UPDATE lecture_schedules
+      SET google_meet_space_id = COALESCE(${meetSpaceId || null}, google_meet_space_id),
+          recording_drive_file_id = COALESCE(${latestRecording?.driveFileId || null}, recording_drive_file_id),
+          recording_drive_url = COALESCE(${latestRecording?.driveExportUri || null}, recording_drive_url),
+          google_meet_sync_meta = ${JSON.stringify(syncMeta)}::jsonb,
+          updated_at = NOW()
+      WHERE id = ${id}::uuid
+    `;
+
     return json("Meet attendance synced.", 200, {
       synced,
       unmatched_participants: unmatched,
       available: true,
+      host: syncMeta.host,
+      cohost: syncMeta.cohost,
+      others: syncMeta.others,
+      recording: syncMeta.recording,
     });
   } catch (error) {
     const guard = roleGuardResponse(error);

@@ -12,9 +12,17 @@ function normalizeText(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 
+async function ensureLectureVerificationColumns() {
+  await prisma.$executeRaw`
+    ALTER TABLE lecture_schedules
+    ADD COLUMN IF NOT EXISTS google_meet_sync_meta JSONB
+  `;
+}
+
 export async function GET(request) {
   try {
     await requireRole(ALLOWED_ROLES);
+    await ensureLectureVerificationColumns();
 
     const { searchParams } = new URL(request.url);
     const filter = normalizeText(searchParams.get("status")).toLowerCase();
@@ -88,6 +96,10 @@ export async function GET(request) {
           ls.scheduled_start::text AS scheduled_start,
           ls.scheduled_end::text AS scheduled_end,
           ls.google_meet_link,
+          ls.recording_drive_url,
+          ls.google_meet_sync_meta,
+          cu.full_name AS coordinator_name,
+          cu.email AS coordinator_email,
           tu.full_name AS teacher_name,
           tu.email AS teacher_email,
           sub.name AS subject_name,
@@ -108,6 +120,11 @@ export async function GET(request) {
           teacher_att.joined_at AS teacher_joined_at,
           teacher_att.left_at AS teacher_left_at,
           CASE WHEN teacher_att.joined_at IS NOT NULL THEN TRUE ELSE FALSE END AS teacher_joined,
+          COALESCE(coordinator_att.status::text, 'absent') AS coordinator_attendance_status,
+          COALESCE(coordinator_att.duration_minutes, 0) AS coordinator_duration_minutes,
+          coordinator_att.joined_at AS coordinator_joined_at,
+          coordinator_att.left_at AS coordinator_left_at,
+          CASE WHEN coordinator_att.joined_at IS NOT NULL THEN TRUE ELSE FALSE END AS coordinator_joined,
           FALSE AS student_joined,
           GREATEST(
             COALESCE(teacher_att.updated_at, teacher_att.created_at),
@@ -118,10 +135,12 @@ export async function GET(request) {
         INNER JOIN courses c ON c.id = e.course_id
         INNER JOIN teacher_profiles tp ON tp.id = ls.teacher_id
         INNER JOIN users tu ON tu.id = tp.user_id
+        LEFT JOIN users cu ON cu.id = ls.scheduled_by
         INNER JOIN subjects sub ON sub.id = ls.subject_id
           LEFT JOIN lecture_completion_reports lcr ON lcr.lecture_id = ls.id
           LEFT JOIN lecture_verifications lv ON lv.lecture_id = ls.id
           LEFT JOIN lecture_attendance teacher_att ON teacher_att.lecture_id = ls.id AND teacher_att.user_id = tu.id
+          LEFT JOIN lecture_attendance coordinator_att ON coordinator_att.lecture_id = ls.id AND coordinator_att.user_id = cu.id
           LEFT JOIN LATERAL (
             SELECT
             jsonb_agg(

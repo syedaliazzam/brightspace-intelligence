@@ -85,7 +85,7 @@ export default function CreateStaffModal() {
       </button>
 
       {open ? (
-        <div className="fixed inset-x-0 top-0 z-50 flex min-h-screen items-center justify-center bg-[#063F32]/45 px-4 py-8">
+        <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-[#063F32]/45 px-4 py-8 backdrop-blur-sm">
           <div className="w-full max-w-2xl rounded-[2rem] border border-[#2D8A6A]/15 bg-white p-6 shadow-[0_24px_80px_-36px_rgba(13,59,46,0.22)] sm:p-8">
             <div className="flex items-start justify-between gap-4">
               <div>

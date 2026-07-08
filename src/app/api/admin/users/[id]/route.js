@@ -162,8 +162,8 @@ export async function PATCH(request, { params }) {
           UPDATE users
           SET
             full_name = ${fullName || existing.full_name || existing.name},
-            email = ${email || null},
-            phone = ${phone || null},
+            email = ${email || existing.email || null},
+            phone = ${phone || existing.phone || null},
             status = ${nextStatus}::user_status,
             updated_at = NOW()
           WHERE id = ${id}::uuid

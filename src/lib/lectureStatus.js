@@ -90,6 +90,106 @@ export function canShowJoinMeet(lecture) {
   return now.getTime() >= start.getTime() - openBefore && now.getTime() <= end.getTime();
 }
 
+export function getLecturePrimaryLink(lecture) {
+  const recordingUrl = lecture?.recording_drive_url || lecture?.recording?.url || "";
+  const displayStatus = getLectureDisplayStatus(lecture);
+  const dbStatus = getDbStatus(lecture);
+  const hasEnded = displayStatus === "ended" || FINAL_DB_STATUSES.has(dbStatus);
+
+  if (hasEnded && recordingUrl) {
+    return {
+      href: recordingUrl,
+      label: "View recording",
+      kind: "recording",
+    };
+  }
+
+  if (canShowJoinMeet(lecture)) {
+    return {
+      href: lecture?.google_meet_link,
+      label: "Join Meet",
+      kind: "meet",
+    };
+  }
+
+  if (recordingUrl) {
+    return {
+      href: recordingUrl,
+      label: "View recording",
+      kind: "recording",
+    };
+  }
+
+  return null;
+}
+
+export function getLectureEventDetailLink(lecture) {
+  const recordingUrl = lecture?.recording_drive_url || lecture?.recording?.url || "";
+  const dbStatus = getDbStatus(lecture);
+  const end = parseDate(lecture?.scheduled_end);
+  const now = new Date();
+  const hasEnded = Boolean(end && now.getTime() > end.getTime()) || FINAL_DB_STATUSES.has(dbStatus);
+
+  if (hasEnded && recordingUrl) {
+    return {
+      href: recordingUrl,
+      label: "View recording",
+      kind: "recording",
+    };
+  }
+
+  if (!hasEnded && lecture?.google_meet_link) {
+    return {
+      href: lecture.google_meet_link,
+      label: "Join Meet",
+      kind: "meet",
+    };
+  }
+
+  return null;
+}
+
+export function getTeacherLectureActionLink(lecture) {
+  const recordingUrl = lecture?.recording_drive_url || lecture?.recording?.url || "";
+  const displayStatus = getLectureDisplayStatus(lecture);
+  const dbStatus = getDbStatus(lecture);
+  const hasEnded = displayStatus === "ended" || FINAL_DB_STATUSES.has(dbStatus);
+
+  if (hasEnded && recordingUrl) {
+    return {
+      href: recordingUrl,
+      label: "View recording",
+      kind: "recording",
+    };
+  }
+
+  if (["upcoming", "live", "scheduled"].includes(displayStatus) && lecture?.google_meet_link) {
+    return {
+      href: lecture.google_meet_link,
+      label: "Join Meet",
+      kind: "meet",
+    };
+  }
+
+  if (lecture?.google_meet_link && canShowJoinMeet(lecture)) {
+    return {
+      href: lecture.google_meet_link,
+      label: "Join Meet",
+      kind: "meet",
+    };
+  }
+
+  if (recordingUrl) {
+    return {
+      href: recordingUrl,
+      label: "View recording",
+      kind: "recording",
+    };
+  }
+
+  return null;
+}
+
 export function canShowMarkConducted(lecture) {
   const dbStatus = getDbStatus(lecture);
   const displayStatus = getLectureDisplayStatus(lecture);

@@ -2,7 +2,7 @@
 
 import { motion } from "framer-motion";
 import { formatDateTimeRange } from "@/lib/dateTime";
-import { canShowJoinMeet, getLectureDisplayStatus } from "@/lib/lectureStatus";
+import { getLectureDisplayStatus, getLecturePrimaryLink } from "@/lib/lectureStatus";
 
 const STATUS_BADGES = {
   scheduled: "bg-[#FAF7F0] text-[#245C4F] ring-1 ring-[#2D8A6A]/15",
@@ -46,6 +46,7 @@ export default function StudentClassTimeline({ items = [] }) {
             const statusKey = String(displayStatus || item.status || "").toLowerCase();
             const badgeClass = STATUS_BADGES[statusKey] || "bg-[#FAF7F0] text-[#245C4F] ring-1 ring-[#2D8A6A]/15";
             const markerClass = STATUS_MARKERS[statusKey] || "bg-[#9ca3af]";
+            const primaryLink = getLecturePrimaryLink(item);
 
             return (
               <motion.article
@@ -89,14 +90,18 @@ export default function StudentClassTimeline({ items = [] }) {
                 {item.description ? <p className="mt-2 text-sm leading-6 text-[#245C4F]">{item.description}</p> : null}
 
                 <div className="mt-2 flex flex-wrap gap-2 text-sm">
-                  {item.recording_drive_url ? (
-                    <a href={item.recording_drive_url} target="_blank" rel="noreferrer" className="rounded-full bg-white/90 px-3 py-1.5 font-semibold text-[#063F32] transition hover:bg-[#E9F8F1]">
-                      View recording
-                    </a>
-                  ) : null}
-                  {canShowJoinMeet(item) ? (
-                    <a href={item.google_meet_link} target="_blank" rel="noreferrer" className="rounded-full bg-white/90 px-3 py-1.5 font-semibold text-[#063F32] transition hover:bg-[#E9F8F1]">
-                      Join meeting
+                  {primaryLink ? (
+                    <a
+                      href={primaryLink.href}
+                      target="_blank"
+                      rel="noreferrer"
+                      className={`rounded-full px-3 py-1.5 font-semibold transition ${
+                        primaryLink.kind === "recording"
+                          ? "bg-[#FAF7F0] text-[#0D5C48] ring-1 ring-[#2D8A6A]/15 hover:bg-[#F1EADC]"
+                          : "bg-white/90 text-[#063F32] hover:bg-[#E9F8F1]"
+                      }`}
+                    >
+                      {primaryLink.label}
                     </a>
                   ) : null}
                 </div>

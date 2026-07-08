@@ -21,7 +21,7 @@ function base64UrlEncode(value) {
     .replace(/=+$/g, "");
 }
 
-async function getGoogleMeetAccessToken() {
+async function getGoogleMeetAccessToken(impersonateUserEmail) {
   const clientEmail = getRequiredEnv("GOOGLE_SERVICE_ACCOUNT_EMAIL");
   const privateKey = getRequiredEnv("GOOGLE_PRIVATE_KEY").replace(/\\n/g, "\n");
   const now = Math.floor(Date.now() / 1000);
@@ -33,6 +33,9 @@ async function getGoogleMeetAccessToken() {
     exp: now + 3600,
     iat: now,
   };
+  if (impersonateUserEmail) {
+    payload.sub = String(impersonateUserEmail).trim();
+  }
   const encodedHeader = base64UrlEncode(JSON.stringify(header));
   const encodedPayload = base64UrlEncode(JSON.stringify(payload));
   const unsignedToken = `${encodedHeader}.${encodedPayload}`;
@@ -66,8 +69,8 @@ async function getGoogleMeetAccessToken() {
   return data.access_token;
 }
 
-async function meetRequest(path) {
-  const accessToken = await getGoogleMeetAccessToken();
+async function meetRequest(path, options = {}) {
+  const accessToken = await getGoogleMeetAccessToken(options.impersonateUserEmail);
   const response = await fetch(`${GOOGLE_MEET_BASE_URL}${path}`, {
     headers: { Authorization: `Bearer ${accessToken}` },
     cache: "no-store",
@@ -137,25 +140,132 @@ function aggregateRecords(records) {
   return [...grouped.values()];
 }
 
-export async function getMeetAttendanceRecords({ meetSpaceId }) {
-  if (!meetSpaceId) {
-    return { available: false, records: [], conferenceRecord: null };
+async function getConferenceRecordings(conferenceRecordName, impersonateUserEmail) {
+  if (!conferenceRecordName) {
+    return [];
   }
 
-  const filter = encodeURIComponent(`space.meeting_code = "${meetSpaceId}"`);
-  const conferences = await meetRequest(`/conferenceRecords?filter=${filter}`);
-  const conferenceRecord = conferences?.conferenceRecords?.[0];
+  try {
+    const payload = await meetRequest(`/${conferenceRecordName}/recordings`, {
+      impersonateUserEmail,
+    });
+    const recordings = payload?.recordings || [];
+
+    return recordings.map((recording) => ({
+      name: recording?.name || "",
+      state: recording?.state || "",
+      startTime: recording?.startTime || null,
+      endTime: recording?.endTime || null,
+      driveFileId:
+        recording?.driveDestination?.file ||
+        recording?.destination?.driveDestination?.file ||
+        "",
+      driveExportUri:
+        recording?.driveDestination?.exportUri ||
+        recording?.destination?.driveDestination?.exportUri ||
+        "",
+      raw: recording,
+    }));
+  } catch {
+    return [];
+  }
+}
+
+function normalizeMeetIdentifiers(value) {
+  const raw = String(value || "").trim().toLowerCase();
+  if (!raw) {
+    return { meetingCode: "", spaceName: "" };
+  }
+
+  if (raw.startsWith("spaces/")) {
+    return {
+      meetingCode: raw.split("/").pop() || "",
+      spaceName: raw,
+    };
+  }
+
+  return {
+    meetingCode: raw,
+    spaceName: `spaces/${raw}`,
+  };
+}
+
+function conferenceTimeValue(record) {
+  return Math.max(
+    new Date(record?.endTime || 0).getTime() || 0,
+    new Date(record?.startTime || 0).getTime() || 0
+  );
+}
+
+function selectBestConferenceRecord(records, scheduledStart, scheduledEnd) {
+  const list = Array.isArray(records) ? records.filter(Boolean) : [];
+  if (!list.length) return null;
+
+  const targetStart = new Date(scheduledStart || 0).getTime();
+  const targetEnd = new Date(scheduledEnd || 0).getTime();
+
+  if (targetStart || targetEnd) {
+    const target = targetStart || targetEnd;
+    return [...list].sort((left, right) => {
+      const leftDiff = Math.abs(conferenceTimeValue(left) - target);
+      const rightDiff = Math.abs(conferenceTimeValue(right) - target);
+      if (leftDiff !== rightDiff) return leftDiff - rightDiff;
+      return conferenceTimeValue(right) - conferenceTimeValue(left);
+    })[0];
+  }
+
+  return [...list].sort((left, right) => conferenceTimeValue(right) - conferenceTimeValue(left))[0];
+}
+
+export async function getMeetAttendanceRecords({
+  meetSpaceId,
+  scheduledStart,
+  scheduledEnd,
+  impersonateUserEmail,
+}) {
+  if (!meetSpaceId) {
+    return { available: false, records: [], conferenceRecord: null, recordings: [] };
+  }
+
+  const identifiers = normalizeMeetIdentifiers(meetSpaceId);
+  const filters = [
+    identifiers.meetingCode ? `space.meeting_code = "${identifiers.meetingCode}"` : "",
+    identifiers.spaceName ? `space.name = "${identifiers.spaceName}"` : "",
+  ].filter(Boolean);
+
+  let conferenceRecords = [];
+  for (const filter of filters) {
+    try {
+      const payload = await meetRequest(`/conferenceRecords?filter=${encodeURIComponent(filter)}`, {
+        impersonateUserEmail,
+      });
+      if (Array.isArray(payload?.conferenceRecords) && payload.conferenceRecords.length) {
+        conferenceRecords = payload.conferenceRecords;
+        break;
+      }
+    } catch {}
+  }
+
+  const conferenceRecord = selectBestConferenceRecord(
+    conferenceRecords,
+    scheduledStart,
+    scheduledEnd
+  );
 
   if (!conferenceRecord?.name) {
-    return { available: false, records: [], conferenceRecord: null };
+    return { available: false, records: [], conferenceRecord: null, recordings: [] };
   }
 
-  const participantsPayload = await meetRequest(`/${conferenceRecord.name}/participants`);
+  const participantsPayload = await meetRequest(`/${conferenceRecord.name}/participants`, {
+    impersonateUserEmail,
+  });
   const participants = participantsPayload?.participants || [];
   const records = [];
 
   for (const participant of participants) {
-    const sessionsPayload = await meetRequest(`/${participant.name}/participantSessions`);
+    const sessionsPayload = await meetRequest(`/${participant.name}/participantSessions`, {
+      impersonateUserEmail,
+    });
     const sessions = sessionsPayload?.participantSessions || [];
 
     for (const session of sessions) {
@@ -172,5 +282,10 @@ export async function getMeetAttendanceRecords({ meetSpaceId }) {
     }
   }
 
-  return { available: true, records: aggregateRecords(records), conferenceRecord };
+  return {
+    available: true,
+    records: aggregateRecords(records),
+    conferenceRecord,
+    recordings: await getConferenceRecordings(conferenceRecord.name, impersonateUserEmail),
+  };
 }

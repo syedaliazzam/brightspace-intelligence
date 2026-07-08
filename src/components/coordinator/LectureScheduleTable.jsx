@@ -26,12 +26,8 @@ export default function LectureScheduleTable({ items = [], onRefresh }) {
     const scheduledStart = window.prompt("New start (YYYY-MM-DDTHH:mm)", item.scheduled_start?.replace(" ", "T").slice(0, 16) || "");
     const scheduledEnd = window.prompt("New end (YYYY-MM-DDTHH:mm)", item.scheduled_end?.replace(" ", "T").slice(0, 16) || "");
     if (!scheduledStart || !scheduledEnd) return;
-    const googleMeetLink = window.prompt("New Google Meet Link", item.google_meet_link || "") || "";
-    if (!googleMeetLink.trim()) {
-      window.alert("Google Meet link is required.");
-      return;
-    }
-    if (!googleMeetLink.trim().startsWith("https://meet.google.com/")) {
+    const googleMeetLink = window.prompt("New Google Meet Link (optional fallback)", item.google_meet_link || "") || "";
+    if (googleMeetLink.trim() && !googleMeetLink.trim().startsWith("https://meet.google.com/")) {
       window.alert("Google Meet link must start with https://meet.google.com/.");
       return;
     }

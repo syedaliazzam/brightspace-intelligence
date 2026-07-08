@@ -4,7 +4,7 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { createAuditLog } from "@/lib/auditLog";
 import { buildLectureJoinEmailHtml, getAppUrl, sendEmail } from "@/lib/email";
-import { createCalendarLectureEvent } from "@/lib/googleCalendar";
+import { createCalendarLectureEvent, extractMeetCodeFromLink } from "@/lib/googleCalendar";
 import { requireRole, roleGuardResponse } from "@/lib/roleGuard";
 import { CLASS_SUBJECTS } from "@/lib/academicCatalog";
 
@@ -473,8 +473,8 @@ export async function POST(request) {
       return json("Class, teacher, subject, title, date range, times, and lecture days are required.", 400);
     }
 
-    if (!isValidGoogleMeetLink(manualMeetLink)) {
-      return json("Google Meet link is required.", 400);
+    if (manualMeetLink && !isValidGoogleMeetLink(manualMeetLink)) {
+      return json("Google Meet link must start with https://meet.google.com/.", 400);
     }
 
     const startDateValue = parseScheduleDate(startDate);
@@ -507,9 +507,7 @@ export async function POST(request) {
       return json("Please provide valid lecture start and end times.", 400);
     }
 
-    if (startHours > endHours || (startHours === endHours && startMinutes >= endMinutes)) {
-      return json("Lecture end time must be later than the start time.", 400);
-    }
+    const isOvernight = startHours > endHours || (startHours === endHours && startMinutes >= endMinutes);
 
     const weekdayMap = {
       sun: 0,
@@ -553,6 +551,18 @@ export async function POST(request) {
 
     function formatScheduleDate(date, hours, minutes) {
       const scheduled = new Date(date);
+      scheduled.setHours(hours, minutes, 0, 0);
+      const year = scheduled.getFullYear();
+      const month = String(scheduled.getMonth() + 1).padStart(2, "0");
+      const day = String(scheduled.getDate()).padStart(2, "0");
+      const hour = String(scheduled.getHours()).padStart(2, "0");
+      const minute = String(scheduled.getMinutes()).padStart(2, "0");
+      return `${year}-${month}-${day} ${hour}:${minute}:00`;
+    }
+
+    function formatScheduleDateWithOffset(date, hours, minutes, dayOffset = 0) {
+      const scheduled = new Date(date);
+      scheduled.setDate(scheduled.getDate() + dayOffset);
       scheduled.setHours(hours, minutes, 0, 0);
       const year = scheduled.getFullYear();
       const month = String(scheduled.getMonth() + 1).padStart(2, "0");
@@ -652,18 +662,58 @@ export async function POST(request) {
       return json("No active students found for this class.", 400);
     }
 
-    const calendarData = { eventId: "", meetSpaceId: "", meetLink: manualMeetLink };
-    const resolvedMeetLink = manualMeetLink;
-    const resolvedMeetSource = "manual";
-
-    const firstOccurrenceStart = formatScheduleDate(occurrenceDates[0], startHours, startMinutes);
-    const firstOccurrenceEnd = formatScheduleDate(occurrenceDates[0], endHours, endMinutes);
-
     const representativeEnrollment = enrollmentRows[0];
     const lectureInsertRows = [];
+    const meetingAttendees = [
+      teacher.email ? { email: teacher.email, name: teacher.full_name } : null,
+    ].filter(Boolean);
+    const firstOccurrenceStart = formatScheduleDate(occurrenceDates[0], startHours, startMinutes);
+    const firstOccurrenceEnd = isOvernight
+      ? formatScheduleDateWithOffset(occurrenceDates[0], endHours, endMinutes, 1)
+      : formatScheduleDate(occurrenceDates[0], endHours, endMinutes);
+    let firstResolvedMeetLink = manualMeetLink;
+
     for (const date of occurrenceDates) {
       const scheduledStart = formatScheduleDate(date, startHours, startMinutes);
-      const scheduledEnd = formatScheduleDate(date, endHours, endMinutes);
+      const scheduledEnd = isOvernight
+        ? formatScheduleDateWithOffset(date, endHours, endMinutes, 1)
+        : formatScheduleDate(date, endHours, endMinutes);
+
+      let calendarData = {
+        eventId: "",
+        meetSpaceId: extractMeetCodeFromLink(manualMeetLink),
+        meetLink: manualMeetLink,
+      };
+      let resolvedMeetLink = manualMeetLink;
+      let resolvedMeetSource = manualMeetLink ? "manual" : "google_workspace";
+
+      try {
+        calendarData = await createCalendarLectureEvent({
+          organizerEmail: session.user.email || "",
+          title,
+          description,
+          start: scheduledStart,
+          end: scheduledEnd,
+          attendees: meetingAttendees,
+        });
+
+        if (calendarData.meetLink) {
+          resolvedMeetLink = calendarData.meetLink;
+          resolvedMeetSource = "google_workspace";
+        }
+      } catch (error) {
+        if (!manualMeetLink) {
+          return json(error instanceof Error ? error.message : "Unable to create the Google Meet event.", 400);
+        }
+      }
+
+      if (!resolvedMeetLink || !isValidGoogleMeetLink(resolvedMeetLink)) {
+        return json("Unable to create a valid Google Meet link. Provide a fallback Google Meet link or complete Google Workspace organizer setup.", 400);
+      }
+
+      if (!firstResolvedMeetLink && resolvedMeetLink) {
+        firstResolvedMeetLink = resolvedMeetLink;
+      }
 
       lectureInsertRows.push(
         Prisma.sql`
@@ -730,7 +780,7 @@ export async function POST(request) {
       enrollmentRows,
       title,
       scheduledStart: firstOccurrenceStart,
-      meetLink: resolvedMeetLink,
+      meetLink: firstResolvedMeetLink || manualMeetLink,
     });
 
     await createAuditLog({

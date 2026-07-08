@@ -26,6 +26,7 @@ export default function LectureScheduleForm({ options, onSuccess }) {
   const [loadingOptions, setLoadingOptions] = useState(false);
   const [teachersLoading, setTeachersLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [toast, setToast] = useState("");
   const assignmentLookupRef = useRef(0);
   const [classOpen, setClassOpen] = useState(false);
   const [subjectOpen, setSubjectOpen] = useState(false);
@@ -177,6 +178,12 @@ export default function LectureScheduleForm({ options, onSuccess }) {
     setTeacherOpen(false);
   }
 
+  function showToast(message) {
+    setToast(message);
+    window.clearTimeout(window.__lectureScheduleToastTimer);
+    window.__lectureScheduleToastTimer = window.setTimeout(() => setToast(""), 2800);
+  }
+
   function toggleStudent(studentId) {
     setForm((current) => ({
       ...current,
@@ -192,29 +199,24 @@ export default function LectureScheduleForm({ options, onSuccess }) {
     const endDate = new Date(form.endDate);
 
     if (!form.courseId || !form.subjectId || !form.teacherId || !form.title) {
-      window.alert("Class, subject, teacher, and title are required.");
+      showToast("Class, subject, teacher, and title are required.");
       return;
     }
 
     const meetLink = form.googleMeetLink.trim();
 
-    if (!meetLink) {
-      window.alert("Google Meet link is required.");
-      return;
-    }
-
-    if (!meetLink.startsWith("https://meet.google.com/")) {
-      window.alert("Google Meet link must start with https://meet.google.com/.");
+    if (meetLink && !meetLink.startsWith("https://meet.google.com/")) {
+      showToast("Google Meet link must start with https://meet.google.com/.");
       return;
     }
 
     if (!form.startDate || !form.endDate || Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime()) || endDate < startDate) {
-      window.alert("Lecture end date must be on or after the start date.");
+      showToast("Lecture end date must be on or after the start date.");
       return;
     }
 
     if (!form.startTime || !form.endTime) {
-      window.alert("Lecture start and end times are required.");
+      showToast("Lecture start and end times are required.");
       return;
     }
 
@@ -234,27 +236,23 @@ export default function LectureScheduleForm({ options, onSuccess }) {
       endMinutes < 0 ||
       endMinutes > 59
     ) {
-      window.alert("Please provide valid lecture start and end times.");
-      return;
-    }
-
-    if (startHours > endHours || (startHours === endHours && startMinutes >= endMinutes)) {
-      window.alert("Lecture end time must be later than the start time.");
+      showToast("Please provide valid lecture start and end times.");
       return;
     }
 
     if (!form.days.length) {
-      window.alert("Select at least one lecture day.");
+      showToast("Select at least one lecture day.");
       return;
     }
 
     setSubmitting(true);
 
     try {
+      const payload = meetLink ? { ...form, googleMeetLink: meetLink } : { ...form };
       const response = await fetch("/api/coordinator/lecture-schedules", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...form, googleMeetLink: meetLink }),
+        body: JSON.stringify(payload),
       });
       const data = await response.json();
 
@@ -282,14 +280,20 @@ export default function LectureScheduleForm({ options, onSuccess }) {
       setTeacherNotice("");
       onSuccess?.();
     } catch (error) {
-      window.alert(error instanceof Error ? error.message : "Unable to schedule lecture.");
+      showToast(error instanceof Error ? error.message : "Unable to schedule lecture.");
     } finally {
       setSubmitting(false);
     }
   }
 
   return (
-    <form onSubmit={handleSubmit} className="grid gap-3 rounded-[2rem] border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(250,247,240,0.98)_100%)] p-5 shadow-[0_20px_70px_-36px_rgba(13,59,46,0.18)] backdrop-blur-xl lg:grid-cols-2">
+    <>
+      {toast ? (
+        <div className="fixed right-6 top-6 z-[90] rounded-2xl border border-[#2D8A6A]/20 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(250,247,240,0.98)_100%)] px-4 py-3 text-sm font-semibold text-[#063F32] shadow-[0_18px_60px_-36px_rgba(13,59,46,0.22)] backdrop-blur-xl">
+          {toast}
+        </div>
+      ) : null}
+      <form onSubmit={handleSubmit} className="grid gap-3 rounded-[2rem] border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(250,247,240,0.98)_100%)] p-5 shadow-[0_20px_70px_-36px_rgba(13,59,46,0.18)] backdrop-blur-xl lg:grid-cols-2">
       <div className="relative">
         <select
           value={form.courseId}
@@ -327,19 +331,6 @@ export default function LectureScheduleForm({ options, onSuccess }) {
       {teacherNotice ? <p className="rounded-2xl border border-[#2D8A6A]/15 bg-[#FAF7F0] px-4 py-3 text-sm text-[#245C4F]">{teacherNotice}</p> : null}
 
       <input value={form.title} onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))} placeholder="Lecture title" className="rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 text-sm text-[#063F32] outline-none focus:border-[#2D8A6A] focus:ring-4 focus:ring-[#C9A227]/20" />
-      <input
-        value={form.googleMeetLink}
-        onChange={(event) => setForm((current) => ({ ...current, googleMeetLink: event.target.value }))}
-        placeholder="Google Meet Link"
-        className="rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 text-sm text-[#063F32] outline-none lg:col-span-2 focus:border-[#2D8A6A] focus:ring-4 focus:ring-[#C9A227]/20"
-      />
-
-      <div className="rounded-2xl border border-[#2D8A6A]/15 bg-[#FAF7F0] p-4 lg:col-span-2">
-        <p className="text-sm text-[#245C4F]">
-          Lecture will be scheduled for all active students enrolled in this class. New active students added later will also be included when the lecture is created.
-        </p>
-      </div>
-
       <div className="grid gap-3 sm:grid-cols-2 lg:col-span-2">
         <div>
           <label className="block text-sm font-semibold text-[#245C4F]">Start date</label>
@@ -393,6 +384,7 @@ export default function LectureScheduleForm({ options, onSuccess }) {
       <button type="submit" disabled={submitting} className="rounded-2xl bg-[#0D5C48] px-5 py-3 text-sm font-semibold text-[#FAF7F0] transition hover:bg-[#063F32] lg:col-span-2">
         {submitting ? "Saving..." : "Schedule for all active students"}
       </button>
-    </form>
+      </form>
+    </>
   );
 }

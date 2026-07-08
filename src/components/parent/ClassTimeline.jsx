@@ -2,7 +2,7 @@
 
 import { motion } from "framer-motion";
 import { formatDateTime } from "@/lib/dateTime";
-import { getLectureDisplayStatus } from "@/lib/lectureStatus";
+import { getLectureDisplayStatus, getLecturePrimaryLink } from "@/lib/lectureStatus";
 
 const STATUS_BADGES = {
   scheduled: "bg-[#FAF7F0] text-[#245C4F] ring-1 ring-[#2D8A6A]/15",
@@ -50,6 +50,7 @@ export default function ClassTimeline({ items = [] }) {
               const statusKey = String(getLectureDisplayStatus(item) || item.status || "").toLowerCase();
               const badgeClass = STATUS_BADGES[statusKey] || "bg-[#FAF7F0] text-[#245C4F] ring-1 ring-[#2D8A6A]/15";
               const markerClass = STATUS_MARKERS[statusKey] || "bg-[#9ca3af]";
+              const primaryLink = getLecturePrimaryLink(item);
 
               return (
                 <motion.article
@@ -78,9 +79,18 @@ export default function ClassTimeline({ items = [] }) {
                     </span>
                   </div>
 
-                  {item.recording_drive_url ? (
-                    <a href={item.recording_drive_url} target="_blank" rel="noreferrer" className="mt-3 inline-flex rounded-full bg-[#FAF7F0] px-3 py-1.5 text-sm font-semibold text-[#0D5C48] transition hover:bg-[#F1EADC]">
-                      View recording
+                  {primaryLink ? (
+                    <a
+                      href={primaryLink.href}
+                      target="_blank"
+                      rel="noreferrer"
+                      className={`mt-3 inline-flex rounded-full px-3 py-1.5 text-sm font-semibold transition ${
+                        primaryLink.kind === "recording"
+                          ? "bg-[#FAF7F0] text-[#0D5C48] ring-1 ring-[#2D8A6A]/15 hover:bg-[#F1EADC]"
+                          : "bg-[#0D5C48] text-[#FAF7F0] hover:bg-[#0D5C48]/90"
+                      }`}
+                    >
+                      {primaryLink.label}
                     </a>
                   ) : null}
                 </motion.article>

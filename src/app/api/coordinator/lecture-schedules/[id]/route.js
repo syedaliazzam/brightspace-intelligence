@@ -5,6 +5,7 @@ import { createAuditLog } from "@/lib/auditLog";
 import {
   cancelCalendarLectureEvent,
   createCalendarLectureEvent,
+  extractMeetCodeFromLink,
   updateCalendarLectureEvent,
 } from "@/lib/googleCalendar";
 import { requireRole, roleGuardResponse } from "@/lib/roleGuard";
@@ -38,12 +39,21 @@ async function getLecture(id) {
       ls.scheduled_end,
       ls.status::text AS status,
       ls.google_calendar_event_id,
+      ls.scheduled_by::text AS coordinator_user_id,
+      cu.email AS coordinator_email,
       su.id::text AS student_user_id,
+      su.email AS student_email,
+      su.full_name AS student_name,
       pu.id::text AS parent_user_id,
-      tu.id::text AS teacher_user_id
+      pu.email AS parent_email,
+      pu.full_name AS parent_name,
+      tu.id::text AS teacher_user_id,
+      tu.email AS teacher_email,
+      tu.full_name AS teacher_name
     FROM lecture_schedules ls
     INNER JOIN student_profiles sp ON sp.id = ls.student_id
     INNER JOIN users su ON su.id = sp.user_id
+    LEFT JOIN users cu ON cu.id = ls.scheduled_by
     INNER JOIN teacher_profiles tp ON tp.id = ls.teacher_id
     INNER JOIN users tu ON tu.id = tp.user_id
     LEFT JOIN student_parents spp ON spp.student_id = sp.id AND spp.is_primary = TRUE
@@ -88,13 +98,13 @@ export async function PATCH(request, context) {
       return json("Invalid lecture schedule action.", 400);
     }
 
-    if (!isValidGoogleMeetLink(manualMeetLink)) {
-      return json("Google Meet link is required.", 400);
+    if (manualMeetLink && !isValidGoogleMeetLink(manualMeetLink)) {
+      return json("Google Meet link must start with https://meet.google.com/.", 400);
     }
 
     if (action === "cancel") {
       try {
-        await cancelCalendarLectureEvent(lecture.google_calendar_event_id);
+        await cancelCalendarLectureEvent(lecture.google_calendar_event_id, lecture.coordinator_email || session.user.email || "");
       } catch {}
 
       await prisma.$transaction(async (tx) => {
@@ -135,19 +145,39 @@ export async function PATCH(request, context) {
     if (action === "update") {
       let calendarData = {
         eventId: lecture.google_calendar_event_id || "",
-        meetLink: "",
-        meetSpaceId: "",
+        meetLink: manualMeetLink || "",
+        meetSpaceId: extractMeetCodeFromLink(manualMeetLink),
       };
+      let resolvedMeetLink = manualMeetLink || "";
+      let resolvedMeetSource = manualMeetLink ? "manual" : "google_workspace";
 
       try {
         calendarData = await updateCalendarLectureEvent(lecture.google_calendar_event_id, {
+          organizerEmail: lecture.coordinator_email || session.user.email || "",
           title: title || lecture.title,
           description: description || lecture.description,
           start: scheduledStart,
           end: scheduledEnd,
+          attendees: [
+            lecture.teacher_email ? { email: lecture.teacher_email, name: lecture.teacher_name } : null,
+            lecture.student_email ? { email: lecture.student_email, name: lecture.student_name } : null,
+            lecture.parent_email ? { email: lecture.parent_email, name: lecture.parent_name } : null,
+          ].filter(Boolean),
         });
+        if (calendarData.meetLink) {
+          resolvedMeetLink = calendarData.meetLink;
+          resolvedMeetSource = "google_workspace";
+        }
       } catch {
-        calendarData = { eventId: lecture.google_calendar_event_id || "", meetLink: "", meetSpaceId: "" };
+        calendarData = {
+          eventId: lecture.google_calendar_event_id || "",
+          meetLink: manualMeetLink || "",
+          meetSpaceId: extractMeetCodeFromLink(manualMeetLink),
+        };
+      }
+
+      if (!resolvedMeetLink || !isValidGoogleMeetLink(resolvedMeetLink)) {
+        return json("Unable to create a valid Google Meet link. Provide a fallback Google Meet link or complete Google Workspace organizer setup.", 400);
       }
 
       await prisma.$transaction(async (tx) => {
@@ -158,12 +188,9 @@ export async function PATCH(request, context) {
               scheduled_start = ${scheduledStart}::timestamp,
               scheduled_end = ${scheduledEnd}::timestamp,
               google_calendar_event_id = ${calendarData.eventId || lecture.google_calendar_event_id || null},
-              google_meet_link = COALESCE(${manualMeetLink || null}, google_meet_link),
-              meet_link_source = CASE
-                WHEN ${manualMeetLink || null} IS NOT NULL THEN 'manual'::text
-                ELSE meet_link_source
-              END,
-              google_meet_space_id = COALESCE(${calendarData.meetSpaceId || null}, google_meet_space_id),
+              google_meet_link = ${resolvedMeetLink},
+              meet_link_source = ${resolvedMeetSource},
+              google_meet_space_id = COALESCE(${calendarData.meetSpaceId || extractMeetCodeFromLink(manualMeetLink) || null}, google_meet_space_id),
               updated_at = NOW()
           WHERE id = ${id}::uuid
         `;
@@ -194,13 +221,40 @@ export async function PATCH(request, context) {
       return json("Lecture schedule updated.", 200);
     }
 
-    if (action === "reschedule" && !manualMeetLink) {
-      return json("Google Meet link is required.", 400);
+    let calendarData = {
+      eventId: lecture.google_calendar_event_id || "",
+      meetLink: manualMeetLink,
+      meetSpaceId: extractMeetCodeFromLink(manualMeetLink),
+    };
+    let resolvedMeetLink = manualMeetLink;
+    let resolvedMeetSource = manualMeetLink ? "manual" : "google_workspace";
+
+    try {
+      calendarData = await createCalendarLectureEvent({
+        organizerEmail: session.user.email || lecture.coordinator_email || "",
+        title: title || lecture.title,
+        description: description || lecture.description,
+        start: scheduledStart,
+        end: scheduledEnd,
+        attendees: [
+          lecture.teacher_email ? { email: lecture.teacher_email, name: lecture.teacher_name } : null,
+          lecture.student_email ? { email: lecture.student_email, name: lecture.student_name } : null,
+          lecture.parent_email ? { email: lecture.parent_email, name: lecture.parent_name } : null,
+        ].filter(Boolean),
+      });
+      if (calendarData.meetLink) {
+        resolvedMeetLink = calendarData.meetLink;
+        resolvedMeetSource = "google_workspace";
+      }
+    } catch (error) {
+      if (!manualMeetLink) {
+        throw error;
+      }
     }
 
-    const calendarData = { eventId: lecture.google_calendar_event_id || "", meetLink: manualMeetLink, meetSpaceId: "" };
-    const resolvedMeetLink = manualMeetLink;
-    const resolvedMeetSource = "manual";
+    if (!resolvedMeetLink || !isValidGoogleMeetLink(resolvedMeetLink)) {
+      return json("Unable to create a valid Google Meet link. Provide a fallback Google Meet link or complete Google Workspace organizer setup.", 400);
+    }
 
     const [newLecture] = await prisma.$transaction(async (tx) => {
       await tx.$executeRaw`

@@ -5,7 +5,7 @@ import FullCalendar from "@fullcalendar/react";
 import dayGridPlugin from "@fullcalendar/daygrid";
 import timeGridPlugin from "@fullcalendar/timegrid";
 import interactionPlugin from "@fullcalendar/interaction";
-import { canShowJoinMeet, getLectureDisplayStatus } from "@/lib/lectureStatus";
+import { getLectureDisplayStatus, getLectureEventDetailLink, getLecturePrimaryLink } from "@/lib/lectureStatus";
 
 const APP_TIMEZONE = "Asia/Karachi";
 
@@ -58,10 +58,6 @@ function getLectureTimeState(lecture) {
   if (now < start) return "upcoming";
   if (now >= start && now <= end) return "live";
   return "ended";
-}
-
-function canShowMeetLink(lecture) {
-  return canShowJoinMeet(lecture);
 }
 
 export default function LMSCalendar({ apiUrl, filters = {}, extraParams = {}, onDateSelect, onEventClick, title = "Lecture calendar" }) {
@@ -142,7 +138,9 @@ export default function LMSCalendar({ apiUrl, filters = {}, extraParams = {}, on
                 display_status: displayStatus,
                 status: lecture.status,
                 google_meet_link: lecture.google_meet_link,
-                can_join: canShowMeetLink(lecture),
+                recording_drive_url: lecture.recording_drive_url,
+                primary_link: getLecturePrimaryLink(lecture),
+                event_detail_link: getLectureEventDetailLink(lecture),
                 description: lecture.description,
                 rescheduled_start: lecture.rescheduled_start || lecture.rescheduledStartTime || lecture.rescheduled_scheduled_start,
                 rescheduled_end: lecture.rescheduled_end || lecture.rescheduledEndTime || lecture.rescheduled_scheduled_end,
@@ -254,9 +252,9 @@ export default function LMSCalendar({ apiUrl, filters = {}, extraParams = {}, on
               <p><strong className="text-[#063F32]">End:</strong> {formatLocalDateTime(selected.scheduled_end)}</p>
               <p><strong className="text-[#063F32]">Status:</strong> {selected.display_status || selected.status || "Not available"}</p>
               <p className="whitespace-pre-line"><strong className="text-[#063F32]">Description:</strong> {selected.description || "Not available"}</p>
-              {selected.google_meet_link && canShowMeetLink(selected) ? (
-                <a href={selected.google_meet_link} target="_blank" rel="noreferrer" className="inline-flex rounded-full bg-[linear-gradient(135deg,#0D3B2E,#0D5C48)] px-4 py-2 text-sm font-semibold text-[#FFF5D6]">
-                  Open Meet
+              {selected.event_detail_link ? (
+                <a href={selected.event_detail_link.href} target="_blank" rel="noreferrer" className={`inline-flex rounded-full px-4 py-2 text-sm font-semibold ${selected.event_detail_link.kind === "recording" ? "bg-[#FAF7F0] text-[#0D5C48] ring-1 ring-[#2D8A6A]/20" : "bg-[linear-gradient(135deg,#0D3B2E,#0D5C48)] text-[#FFF5D6]"}`}>
+                  {selected.event_detail_link.label}
                 </a>
               ) : null}
             </div>

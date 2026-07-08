@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { formatDateTimeRange } from "@/lib/dateTime";
-import { canShowJoinMeet, getLectureDisplayStatus } from "@/lib/lectureStatus";
+import { getLectureDisplayStatus, getLecturePrimaryLink } from "@/lib/lectureStatus";
 import PaginationControls from "@/components/parent/PaginationControls";
 
 export default function ParentClassesTable({ items = [] }) {
@@ -51,8 +51,7 @@ export default function ParentClassesTable({ items = [] }) {
                 <td className="px-3 py-4 text-[#245C4F]">{item.display_status || getLectureDisplayStatus(item)}</td>
                 <td className="px-3 py-4">
                   <div className="flex flex-wrap gap-2">
-                    {canShowJoinMeet(item) ? <a className="font-semibold text-[#0D5C48]" href={item.google_meet_link} target="_blank" rel="noreferrer">Meet</a> : null}
-                    {item.recording_drive_url ? <a className="font-semibold text-[#0D5C48]" href={item.recording_drive_url} target="_blank" rel="noreferrer">Recording</a> : null}
+                    {getLecturePrimaryLink(item) ? <a className="font-semibold text-[#0D5C48]" href={getLecturePrimaryLink(item).href} target="_blank" rel="noreferrer">{getLecturePrimaryLink(item).label}</a> : null}
                   </div>
                 </td>
               </tr>

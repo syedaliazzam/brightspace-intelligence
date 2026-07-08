@@ -331,7 +331,7 @@ export default function AdminHeadlinesPage() {
         </div>
 
         {editingId ? (
-          <div className="fixed inset-x-0 top-0 z-50 min-h-screen overflow-visible bg-[#063F32]/45 px-4 pb-8 pt-24 backdrop-blur-sm sm:pt-28">
+          <div className="fixed inset-0 z-50 overflow-y-auto bg-[#063F32]/45 px-4 pb-8 pt-24 backdrop-blur-sm sm:pt-28">
             <div className="mx-auto w-full max-w-3xl">
               <section className="overflow-hidden rounded-[2rem] border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(250,247,240,0.98)_100%)] shadow-[0_32px_90px_-38px_rgba(13,59,46,0.24)]">
               <div className="bg-[linear-gradient(135deg,rgba(13,59,46,0.98),rgba(13,92,72,0.94))] px-6 py-6 text-[#FAF7F0] sm:px-8">
@@ -375,7 +375,7 @@ export default function AdminHeadlinesPage() {
         ) : null}
 
         {deletingItem ? (
-          <div className="fixed inset-x-0 top-0 z-[60] min-h-screen overflow-visible bg-[#063F32]/45 px-4 pb-8 pt-20 backdrop-blur-sm sm:pt-24">
+          <div className="fixed inset-0 z-[60] overflow-y-auto bg-[#063F32]/45 px-4 pb-8 pt-20 backdrop-blur-sm sm:pt-24">
             <div className="mx-auto w-full max-w-2xl">
               <section className="overflow-hidden rounded-[2rem] border border-rose-200 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(250,247,240,0.98)_100%)] shadow-[0_32px_90px_-38px_rgba(13,59,46,0.24)]">
               <div className="bg-[linear-gradient(135deg,rgba(127,29,29,0.98),rgba(185,28,28,0.95),rgba(254,226,226,0.92))] px-6 py-6 text-white sm:px-8">

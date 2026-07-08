@@ -2,14 +2,14 @@
 
 import { AnimatePresence, motion } from "framer-motion";
 import CompletionReportForm from "@/components/teacher/CompletionReportForm";
-import { canShowJoinMeet, canShowMarkConducted, getLectureDisplayStatus } from "@/lib/lectureStatus";
+import { canShowMarkConducted, getLectureDisplayStatus, getTeacherLectureActionLink } from "@/lib/lectureStatus";
 
 export default function ClassActionModal({ lecture, open, onClose, onChanged }) {
   if (!open || !lecture?.id) {
     return null;
   }
 
-  const canJoin = canShowJoinMeet(lecture);
+  const primaryLink = getTeacherLectureActionLink(lecture);
   const displayStatus = getLectureDisplayStatus(lecture);
 
   async function readJson(response) {
@@ -28,7 +28,6 @@ export default function ClassActionModal({ lecture, open, onClose, onChanged }) 
       return;
     }
     onChanged?.();
-    onClose?.();
   }
 
   return (
@@ -44,9 +43,18 @@ export default function ClassActionModal({ lecture, open, onClose, onChanged }) 
             <button onClick={onClose} className="rounded-xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-3 py-2 text-sm font-semibold text-[#063F32]">Close</button>
           </div>
           <div className="mt-5 grid gap-5">
-            {lecture.google_meet_link && canJoin ? (
-              <a href={lecture.google_meet_link} target="_blank" rel="noreferrer" className="rounded-2xl bg-[#0D5C48] px-4 py-3 text-center text-sm font-semibold text-[#FAF7F0]">
-                Join Google Meet
+            {primaryLink ? (
+              <a
+                href={primaryLink.href}
+                target="_blank"
+                rel="noreferrer"
+                className={`rounded-2xl px-4 py-3 text-center text-sm font-semibold ${
+                  primaryLink.kind === "recording"
+                    ? "bg-[#FAF7F0] text-[#0D5C48] ring-1 ring-[#2D8A6A]/15"
+                    : "bg-[#0D5C48] text-[#FAF7F0]"
+                }`}
+              >
+                {primaryLink.label}
               </a>
             ) : (
               <span className="rounded-2xl bg-[#FAF7F0] px-4 py-3 text-center text-sm font-semibold text-[#245C4F]">{displayStatus}</span>
