@@ -43,10 +43,15 @@ function MessageBubble({ message, mode }) {
   );
 }
 
-function Modal({ title, subtitle, onClose, children, actions, showTopClose = true }) {
+function Modal({ title, subtitle, onClose, children, actions, showTopClose = true, portalTargetId }) {
+  const insidePage = Boolean(portalTargetId);
   const content = (
-    <div className="fixed inset-0 z-[9999] isolate flex items-start justify-center bg-[#063F32]/45 px-4 pt-10 pb-8">
-      <div className="relative z-[10000] w-full max-w-3xl rounded-[2rem] border border-[#2D8A6A]/15 bg-white shadow-[0_24px_80px_-36px_rgba(13,59,46,0.24)]">
+    <div
+      className={`${
+        insidePage ? "absolute inset-0 z-40 flex items-start justify-center bg-[#063F32]/35 px-4 py-6 sm:py-8" : "fixed inset-0 z-[9999] isolate flex items-start justify-center bg-[#063F32]/45 px-4 pt-10 pb-8"
+      }`}
+    >
+      <div className={`relative ${insidePage ? "z-50 max-w-3xl" : "z-[10000] max-w-3xl"} w-full rounded-[2rem] border border-[#2D8A6A]/15 bg-white shadow-[0_24px_80px_-36px_rgba(13,59,46,0.24)]`}>
         <div className="border-b border-[#F1EADC] px-6 py-4">
           <div className="flex items-start justify-between gap-4">
             <div>
@@ -67,7 +72,8 @@ function Modal({ title, subtitle, onClose, children, actions, showTopClose = tru
   );
 
   if (typeof document === "undefined") return content;
-  return createPortal(content, document.body);
+  const target = portalTargetId ? document.getElementById(portalTargetId) : null;
+  return createPortal(content, target || document.body);
 }
 
 function SelectField({ value, onChange, onFocus, onBlur, className = "", children, ...props }) {
@@ -100,7 +106,7 @@ function SelectField({ value, onChange, onFocus, onBlur, className = "", childre
   );
 }
 
-export default function NoteThreadsBoard({ mode = "viewer", lectures = [] }) {
+export default function NoteThreadsBoard({ mode = "viewer", lectures = [], portalTargetId }) {
   const canReply = mode === "teacher" || mode === "admin" || mode === "parent" || mode === "student";
   const [threads, setThreads] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -296,6 +302,7 @@ export default function NoteThreadsBoard({ mode = "viewer", lectures = [] }) {
           title="Thread"
           subtitle={`${selected.class_level || selected.course_title || "-"} · ${selected.subject_name || "-"}`}
           onClose={() => setSelected(null)}
+          portalTargetId={portalTargetId}
           actions={
             canReply && canReplyToSelected ? (
               <div className="space-y-3">
@@ -342,6 +349,7 @@ export default function NoteThreadsBoard({ mode = "viewer", lectures = [] }) {
           title="Edit note"
           subtitle={`${editingThread.class_level || editingThread.course_title || "-"} · ${editingThread.subject_name || "-"}`}
           onClose={() => { setEditingThread(null); setEditingText(""); }}
+          portalTargetId={portalTargetId}
           actions={
             <div className="flex items-center justify-end gap-3">
               <button type="button" onClick={() => { setEditingThread(null); setEditingText(""); }} className="rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 text-sm font-semibold text-[#0D5C48] hover:bg-[#F1EADC]">Cancel</button>
@@ -358,6 +366,7 @@ export default function NoteThreadsBoard({ mode = "viewer", lectures = [] }) {
           title="Delete note"
           subtitle={`${deletingThread.class_level || deletingThread.course_title || "-"} · ${deletingThread.subject_name || "-"}`}
           onClose={() => setDeletingThread(null)}
+          portalTargetId={portalTargetId}
           actions={
             <div className="flex items-center justify-end gap-3">
               <button type="button" onClick={() => setDeletingThread(null)} className="rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 text-sm font-semibold text-[#0D5C48] hover:bg-[#F1EADC]">Cancel</button>

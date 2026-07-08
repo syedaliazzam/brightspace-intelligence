@@ -35,8 +35,11 @@ export default function ParentAttendancePage() {
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(201,162,39,0.12),transparent_35%),radial-gradient(circle_at_top_right,rgba(45,138,106,0.12),transparent_32%),linear-gradient(180deg,#FAF7F0_0%,#F7F1E3_100%)]" />
       <div className="relative mx-auto max-w-7xl space-y-6 overflow-hidden rounded-[2rem] px-4 py-4 sm:px-6 lg:px-8">
       <section className="rounded-[2rem] border border-[#2D8A6A]/15 bg-[linear-gradient(135deg,rgba(13,59,46,0.98),rgba(13,92,72,0.94))] p-6 text-[#FAF7F0] shadow-[0_24px_80px_-36px_rgba(13,59,46,0.32)] sm:p-8">
-        <p className="text-[11px] font-bold uppercase tracking-[0.24em]">Parent attendance</p>
+        <p className="inline-flex rounded-full border border-[#FFF5D6]/30 bg-[#FFF5D6]/10 px-3 py-1 text-[0.65rem] font-semibold uppercase tracking-[0.24em] text-[#FFF5D6]">Parent attendance</p>
         <h1 className="mt-3 font-display text-3xl font-bold tracking-tight sm:text-4xl">Participation records</h1>
+        <p className="mt-3 max-w-3xl text-sm leading-7 text-[#F1EADC]/90 sm:text-base">
+          Review attendance trends, absences, and participation updates for the selected child.
+        </p>
       </section>
       <ChildSwitcher
         childrenList={state.children}

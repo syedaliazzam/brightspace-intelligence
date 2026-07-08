@@ -114,8 +114,8 @@ export default function TeacherAttendancePage() {
           <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(228,198,102,0.12),transparent_28%),radial-gradient(circle_at_bottom_left,rgba(101,184,145,0.14),transparent_30%)]" />
           <div className="relative max-w-6xl">
             <p className="inline-flex rounded-full border border-[#FFF5D6]/30 bg-[#FFF5D6]/10 px-3 py-1 text-[0.65rem] font-semibold uppercase tracking-[0.24em] text-[#FFF5D6]">Attendance</p>
-            <h1 className="mb-3 mt-4 text-3xl font-bold text-[#FAF7F0] sm:text-4xl lg:text-4xl font-display">Manual student attendance</h1>
-            <p className="mt-3 max-w-2xl text-sm text-[#F1EADC]">Select a class, subject, and ended lecture to mark student attendance. Teacher Meet attendance remains synced separately.</p>
+            <h1 className="mb-2 mt-4 text-3xl font-bold text-[#FAF7F0] sm:text-4xl lg:text-4xl font-display">Manual student attendance</h1>
+            <p className="mt-2 max-w-5xl text-sm leading-7 text-[#EAF6EF] sm:text-base lg:whitespace-nowrap">Select a class, subject, and ended lecture to mark student attendance. Teacher Meet attendance remains synced separately.</p>
           </div>
         </section>
 

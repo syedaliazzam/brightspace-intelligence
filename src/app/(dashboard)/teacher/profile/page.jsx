@@ -34,15 +34,18 @@ export default function TeacherProfilePage() {
           <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(228,198,102,0.12),transparent_28%),radial-gradient(circle_at_bottom_left,rgba(101,184,145,0.14),transparent_30%)]" />
           <div className="relative max-w-6xl">
             <p className="inline-flex rounded-full border border-[#FFF5D6]/30 bg-[#FFF5D6]/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.24em] text-[#FFF5D6]">Profile</p>
-            <h1 className="mb-3 mt-4 text-2xl font-bold text-[#FAF7F0] sm:text-4xl lg:text-4xl font-display">Teacher account details</h1>
+            <h1 className="mb-2 mt-4 text-2xl font-bold text-[#FAF7F0] sm:text-4xl lg:text-4xl font-display">Teacher account details</h1>
+            <p className="mt-2 max-w-5xl text-sm leading-7 text-[#EAF6EF] sm:text-base lg:whitespace-nowrap">
+              Review your profile details, contact information, and account status.
+            </p>
           </div>
         </section>
         {state.error ? <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">{state.error}</div> : null}
-        <section className="grid gap-6 rounded-[2rem] sm:grid-cols-2">
+        <section className="grid gap-6 sm:grid-cols-2">
           {visibleFields.map(([label, value]) => (
-            <div key={label} className="rounded-2xl border border-[#2D8A6A]/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(250,247,240,0.98)_100%)] p-4 shadow-[0_20px_70px_-36px_rgba(13,59,46,0.18)] backdrop-blur-xl">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]">{label}</p>
-              <p className="mt-2 font-semibold text-[#063F32]">{value}</p>
+            <div key={label} className="rounded-[1.5rem] border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(250,247,240,0.98)_100%)] p-4 px-6 shadow-[0_16px_50px_-34px_rgba(13,59,46,0.16)] backdrop-blur-xl">
+              <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#0D5C48]">{label}</p>
+              <p className="mt-2 text-sm font-semibold text-[#063F32]">{value || "Not provided"}</p>
             </div>
           ))}
         </section>

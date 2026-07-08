@@ -47,7 +47,7 @@ export default function PaymentAccessGuard({ children }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 px-4">
-      <div className="w-full max-w-lg rounded-[2rem] border border-white/70 bg-white p-6 shadow-[0_24px_80px_-36px_rgba(15,23,42,0.35)]">
+      <div className="w-full max-w-lg border border-white/70 bg-white p-6 shadow-[0_24px_80px_-36px_rgba(15,23,42,0.35)]">
         <p className="text-sm font-semibold uppercase tracking-[0.24em] text-rose-700">
           Payment Due Date Passed
         </p>
