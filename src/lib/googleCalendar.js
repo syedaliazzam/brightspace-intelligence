@@ -171,11 +171,27 @@ function buildEventPayload(payload, includeConferenceData = true) {
     throw new Error("Invalid Google Calendar date/time payload.");
   }
 
+  function toCalendarLocalDateTime(value) {
+    const date = value instanceof Date ? value : new Date(value);
+    if (Number.isNaN(date.getTime())) {
+      throw new Error("Invalid Google Calendar local date/time payload.");
+    }
+
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    const hours = String(date.getHours()).padStart(2, "0");
+    const minutes = String(date.getMinutes()).padStart(2, "0");
+    const seconds = String(date.getSeconds()).padStart(2, "0");
+
+    return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}`;
+  }
+
   const eventPayload = {
     summary: payload.title,
     description: payload.description || "",
-    start: { dateTime: start.toISOString(), timeZone: payload.timeZone || "Asia/Karachi" },
-    end: { dateTime: end.toISOString(), timeZone: payload.timeZone || "Asia/Karachi" },
+    start: { dateTime: toCalendarLocalDateTime(start), timeZone: payload.timeZone || "Asia/Karachi" },
+    end: { dateTime: toCalendarLocalDateTime(end), timeZone: payload.timeZone || "Asia/Karachi" },
     conferenceData: includeConferenceData
       ? {
           createRequest: {
