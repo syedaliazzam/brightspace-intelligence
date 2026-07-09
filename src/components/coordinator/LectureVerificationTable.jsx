@@ -1,33 +1,52 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { formatDateTime, formatDateTimeRange } from "@/lib/dateTime";
 import { getAttendanceStatus, getLectureDisplayStatus } from "@/lib/lectureStatus";
 
 export default function LectureVerificationTable({ items = [], onRefresh }) {
   const [syncNotice, setSyncNotice] = useState("");
+  const [syncingId, setSyncingId] = useState("");
   const [rejectingItem, setRejectingItem] = useState(null);
   const [rejectRemarks, setRejectRemarks] = useState("");
   const [submittingReject, setSubmittingReject] = useState(false);
 
+  useEffect(() => {
+    if (!syncNotice) return undefined;
+    const timeout = window.setTimeout(() => {
+      setSyncNotice("");
+    }, 2600);
+    return () => window.clearTimeout(timeout);
+  }, [syncNotice]);
+
   async function syncMeetAttendance(id) {
-    const response = await fetch(`/api/coordinator/lecture-schedules/${id}/meet-attendance-sync`, {
-      method: "POST",
-    });
-    const data = await response.json();
+    setSyncingId(id);
+    try {
+      const response = await fetch(`/api/coordinator/lecture-schedules/${id}/meet-attendance-sync`, {
+        method: "POST",
+      });
+      const data = await response.json();
 
-    if (!response.ok) {
-      throw new Error(data?.message || "Unable to sync Meet attendance.");
+      if (!response.ok) {
+        throw new Error(data?.message || "Unable to sync Meet attendance.");
+      }
+
+      if (data.available === false || data.partial || data.recording?.share_errors?.length) {
+        setSyncNotice(
+          data.message ||
+            (data.recording?.share_errors?.length
+              ? "Meet attendance synced, but recording sharing still needs attention."
+              : "Meet attendance may be available only after Google finishes processing the conference record.")
+        );
+      } else {
+        setSyncNotice("Meet data synced successfully.");
+      }
+
+      onRefresh?.();
+    } finally {
+      setSyncingId("");
     }
-
-    if (data.available === false) {
-      setSyncNotice(
-        data.message || "Meet attendance may be available only after Google finishes processing the conference record."
-      );
-    }
-
-    onRefresh?.();
   }
 
   async function updateVerification(id, payload) {
@@ -61,6 +80,23 @@ export default function LectureVerificationTable({ items = [], onRefresh }) {
     }
   }
 
+  function resolveMeetingPerson(person, fallbacks = {}) {
+    return {
+      name: person?.name || fallbacks.name || "",
+      email: person?.email || fallbacks.email || "",
+      joined:
+        typeof person?.joined === "boolean"
+          ? person.joined
+          : typeof fallbacks.joined === "boolean"
+            ? fallbacks.joined
+            : Boolean(person?.joined_at || fallbacks.joined_at),
+      status: person?.status || fallbacks.status || "absent",
+      joined_at: person?.joined_at || fallbacks.joined_at || null,
+      left_at: person?.left_at || fallbacks.left_at || null,
+      duration_minutes: Number(person?.duration_minutes ?? fallbacks.duration_minutes ?? 0),
+    };
+  }
+
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="relative space-y-4">
       {items.length ? (
@@ -71,8 +107,24 @@ export default function LectureVerificationTable({ items = [], onRefresh }) {
                 item.google_meet_sync_meta && typeof item.google_meet_sync_meta === "object"
                   ? item.google_meet_sync_meta
                   : {};
-              const host = meetMeta.host || null;
-              const cohost = meetMeta.cohost || null;
+              const host = resolveMeetingPerson(meetMeta.host, {
+                name: item.coordinator_name,
+                email: item.coordinator_email,
+                joined: item.coordinator_joined,
+                status: item.coordinator_attendance_status,
+                joined_at: item.coordinator_joined_at,
+                left_at: item.coordinator_left_at,
+                duration_minutes: item.coordinator_duration_minutes,
+              });
+              const cohost = resolveMeetingPerson(meetMeta.cohost, {
+                name: item.teacher_name,
+                email: item.teacher_email,
+                joined: item.teacher_joined,
+                status: item.teacher_attendance_status,
+                joined_at: item.teacher_joined_at,
+                left_at: item.teacher_left_at,
+                duration_minutes: item.teacher_duration_minutes,
+              });
               const others = Array.isArray(meetMeta.others) ? meetMeta.others : [];
               const recording = meetMeta.recording || null;
 
@@ -89,8 +141,20 @@ export default function LectureVerificationTable({ items = [], onRefresh }) {
               </div>
 
               <div className="flex flex-wrap gap-2">
-                <button type="button" onClick={() => syncMeetAttendance(item.id).catch((error) => window.alert(error.message))} className="rounded-xl border border-[#2D8A6A]/20 bg-[#EAF6EF] px-3 py-2 text-xs font-semibold text-[#0D5C48] transition hover:bg-[#DFF1E7] focus:outline-none focus:ring-4 focus:ring-[#C9A227]/20">
-                  Sync Meet Attendance
+                <button
+                  type="button"
+                  disabled={syncingId === item.id}
+                  onClick={() => syncMeetAttendance(item.id).catch((error) => window.alert(error.message))}
+                  className="inline-flex items-center gap-2 rounded-xl border border-[#2D8A6A]/20 bg-[#EAF6EF] px-3 py-2 text-xs font-semibold text-[#0D5C48] transition hover:bg-[#DFF1E7] focus:outline-none focus:ring-4 focus:ring-[#C9A227]/20 disabled:cursor-not-allowed disabled:opacity-70"
+                >
+                  {syncingId === item.id ? (
+                    <>
+                      <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-[#0D5C48]/25 border-t-[#0D5C48]" />
+                      Syncing...
+                    </>
+                  ) : (
+                    "Sync Meet Attendance"
+                  )}
                 </button>
                 {['completed_by_teacher', 'live', 'scheduled', 'upcoming'].includes(String(item.display_status || item.status || '').toLowerCase()) ? (
                   <>
@@ -132,22 +196,24 @@ export default function LectureVerificationTable({ items = [], onRefresh }) {
               </div>
               <div className="rounded-2xl bg-[#FAF7F0] p-4 text-sm text-[#245C4F]">
                 <p className="font-semibold text-[#063F32]">Host attendance</p>
-                <p className="mt-2">{host?.name || item.coordinator_name || "Coordinator"}</p>
-                <p className="mt-1 text-xs text-[#245C4F]">Joined: {host?.joined || item.coordinator_joined ? "Yes" : "No"}</p>
-                <p className="mt-1 text-xs text-[#245C4F]">Status: {host?.status || item.coordinator_attendance_status || "absent"}</p>
-                <p className="mt-1 text-xs text-[#245C4F]">Joined at: {host?.joined_at ? formatDateTime(host.joined_at) : item.coordinator_joined_at ? formatDateTime(item.coordinator_joined_at) : "-"}</p>
-                <p className="mt-1 text-xs text-[#245C4F]">Left at: {host?.left_at ? formatDateTime(host.left_at) : item.coordinator_left_at ? formatDateTime(item.coordinator_left_at) : "-"}</p>
-                <p className="mt-1 text-xs text-[#245C4F]">{host?.duration_minutes ?? item.coordinator_duration_minutes ?? 0} minutes</p>
+                <p className="mt-2">{host.name || "Coordinator"}</p>
+                <p className="mt-1 text-xs text-[#245C4F]">Email: {host.email || "-"}</p>
+                <p className="mt-1 text-xs text-[#245C4F]">Joined: {host.joined ? "Yes" : "No"}</p>
+                <p className="mt-1 text-xs text-[#245C4F]">Status: {host.status || "absent"}</p>
+                <p className="mt-1 text-xs text-[#245C4F]">Joined at: {host.joined_at ? formatDateTime(host.joined_at) : "-"}</p>
+                <p className="mt-1 text-xs text-[#245C4F]">Left at: {host.left_at ? formatDateTime(host.left_at) : "-"}</p>
+                <p className="mt-1 text-xs text-[#245C4F]">{host.duration_minutes} minutes</p>
               </div>
               <div className="rounded-2xl bg-[#FAF7F0] p-4 text-sm text-[#245C4F]">
                 <p className="font-semibold text-[#063F32]">Teacher attendance</p>
-                <p className="mt-2">{cohost?.name || item.teacher_name}</p>
+                <p className="mt-2">{cohost.name || item.teacher_name}</p>
+                <p className="mt-1 text-xs text-[#245C4F]">Email: {cohost.email || "-"}</p>
                 <p className="mt-1 text-xs text-[#245C4F]">Role: Co-host</p>
-                <p className="mt-1 text-xs text-[#245C4F]">Joined: {cohost?.joined || item.teacher_joined ? "Yes" : "No"}</p>
-                <p className="mt-1 text-xs text-[#245C4F]">Status: {cohost?.status || item.teacher_attendance_status}</p>
-                <p className="mt-1 text-xs text-[#245C4F]">Joined at: {cohost?.joined_at ? formatDateTime(cohost.joined_at) : item.teacher_joined_at ? formatDateTime(item.teacher_joined_at) : "-"}</p>
-                <p className="mt-1 text-xs text-[#245C4F]">Left at: {cohost?.left_at ? formatDateTime(cohost.left_at) : item.teacher_left_at ? formatDateTime(item.teacher_left_at) : "-"}</p>
-                <p className="mt-1 text-xs text-[#245C4F]">{cohost?.duration_minutes ?? item.teacher_duration_minutes ?? 0} minutes</p>
+                <p className="mt-1 text-xs text-[#245C4F]">Joined: {cohost.joined ? "Yes" : "No"}</p>
+                <p className="mt-1 text-xs text-[#245C4F]">Status: {cohost.status || "absent"}</p>
+                <p className="mt-1 text-xs text-[#245C4F]">Joined at: {cohost.joined_at ? formatDateTime(cohost.joined_at) : "-"}</p>
+                <p className="mt-1 text-xs text-[#245C4F]">Left at: {cohost.left_at ? formatDateTime(cohost.left_at) : "-"}</p>
+                <p className="mt-1 text-xs text-[#245C4F]">{cohost.duration_minutes} minutes</p>
               </div>
               <div className="rounded-2xl bg-[#FAF7F0] p-4 text-sm text-[#245C4F]">
                 <p className="font-semibold text-[#063F32]">Others who joined</p>
@@ -227,19 +293,19 @@ export default function LectureVerificationTable({ items = [], onRefresh }) {
       )}
 
       {syncNotice ? (
-        <div className="absolute inset-0 z-[78] rounded-[2rem] bg-[linear-gradient(180deg,rgba(13,59,46,0.14),rgba(13,59,46,0.08))] px-4 py-6 backdrop-blur-[3px] sm:px-6 lg:px-8">
-          <div className="mx-auto w-full max-w-2xl rounded-[2rem] border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(250,247,240,0.99)_100%)] p-6 shadow-[0_30px_90px_-36px_rgba(13,59,46,0.28)]">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="pointer-events-none fixed right-4 top-24 z-[92] w-full max-w-sm sm:right-6">
+          <div className="pointer-events-auto rounded-[1.5rem] border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(250,247,240,0.99)_100%)] p-4 shadow-[0_24px_70px_-30px_rgba(13,59,46,0.28)] backdrop-blur-xl">
+            <div className="flex items-start justify-between gap-3">
               <div>
-                <p className="inline-flex rounded-full border border-[#2D8A6A]/15 bg-[#EAF6EF] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.24em] text-[#0D5C48]">
-                  Meet sync notice
+                <p className="inline-flex rounded-full border border-[#2D8A6A]/15 bg-[#EAF6EF] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.22em] text-[#0D5C48]">
+                  Meet sync
                 </p>
-                <p className="mt-3 text-sm leading-7 text-[#245C4F]">{syncNotice}</p>
+                <p className="mt-2 text-sm font-medium text-[#245C4F]">{syncNotice}</p>
               </div>
               <button
                 type="button"
                 onClick={() => setSyncNotice("")}
-                className="rounded-xl border border-[#2D8A6A]/15 bg-white/80 px-3 py-2 text-xs font-semibold text-[#0D5C48] transition hover:bg-[#F1EADC]"
+                className="rounded-lg border border-[#2D8A6A]/15 bg-white/80 px-2.5 py-1.5 text-[11px] font-semibold text-[#0D5C48] transition hover:bg-[#F1EADC]"
               >
                 Close
               </button>
@@ -249,7 +315,7 @@ export default function LectureVerificationTable({ items = [], onRefresh }) {
       ) : null}
 
       {rejectingItem ? (
-        <div className="absolute inset-0 z-[80] rounded-[2rem] bg-[linear-gradient(180deg,rgba(13,59,46,0.14),rgba(13,59,46,0.08))] px-4 py-6 backdrop-blur-[3px] sm:px-6 lg:px-8">
+        <div className="absolute inset-0 z-[80] rounded-[2rem] bg-[#063F32]/45 px-4 py-10 backdrop-blur-sm sm:px-6 lg:px-8">
           <div className="mx-auto w-full max-w-2xl rounded-[2rem] border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(250,247,240,0.99)_100%)] p-6 shadow-[0_30px_90px_-36px_rgba(13,59,46,0.28)] backdrop-blur-xl">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
               <div>

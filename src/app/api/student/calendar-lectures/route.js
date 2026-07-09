@@ -121,7 +121,7 @@ export async function GET(request) {
           ls.scheduled_start::text AS scheduled_start,
           ls.scheduled_end::text AS scheduled_end,
           ls.google_meet_link,
-          ls.recording_drive_url,
+          COALESCE(ls.google_meet_sync_meta->'recording'->>'url', ls.recording_drive_url) AS recording_drive_url,
           ls.status::text AS status,
           ${LECTURE_STATUS_SQL} AS display_status,
           sub.id::text AS subject_id,

@@ -2,7 +2,7 @@
 
 import { motion } from "framer-motion";
 import { formatDateTimeRange } from "@/lib/dateTime";
-import { getLectureDisplayStatus } from "@/lib/lectureStatus";
+import { getLectureDisplayStatus, getLecturePrimaryLink } from "@/lib/lectureStatus";
 
 export default function LectureScheduleTable({ items = [], onRefresh }) {
   const finalStatuses = new Set(["cancelled", "verified_by_coordinator", "completed_by_teacher"]);
@@ -54,6 +54,7 @@ export default function LectureScheduleTable({ items = [], onRefresh }) {
           items.map((item) => {
             const statusKey = String(item.status || "").toLowerCase();
             const isFinal = finalStatuses.has(statusKey);
+            const primaryLink = getLecturePrimaryLink(item);
 
             return (
               <div key={item.id} className="grid gap-3 px-5 py-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,0.9fr)_minmax(0,0.8fr)_minmax(0,0.8fr)_minmax(0,0.8fr)_minmax(0,0.8fr)_minmax(0,0.8fr)_minmax(0,1.15fr)_minmax(0,1.35fr)_180px] lg:items-center">
@@ -73,12 +74,12 @@ export default function LectureScheduleTable({ items = [], onRefresh }) {
                 <div className="min-w-0 text-sm leading-6 text-[#245C4F] break-words">
                   <p>{item.course_title}</p>
                   {item.meet_link_source ? <p className="mt-1 text-xs text-[#245C4F]">Link source: {item.meet_link_source}</p> : null}
-                  {item.google_meet_link && !isFinal && !["ended", "completed", "verified", "missed", "cancelled", "rescheduled", "disputed"].includes(String(item.display_status || getLectureDisplayStatus(item)).toLowerCase()) ? (
-                    <a href={item.google_meet_link} target="_blank" rel="noreferrer" className="mt-1 inline-flex text-xs font-semibold text-[#0D5C48]">
-                      Open Meet link
+                  {primaryLink ? (
+                    <a href={primaryLink.href} target="_blank" rel="noreferrer" className="mt-1 inline-flex text-xs font-semibold text-[#0D5C48]">
+                      {primaryLink.label}
                     </a>
                   ) : (
-                    <p className="mt-1 text-xs text-[#245C4F]">No active Meet link</p>
+                    <p className="mt-1 text-xs text-[#245C4F]">No active Meet or recording link</p>
                   )}
                 </div>
                 <div className="flex flex-wrap gap-2 lg:justify-end">

@@ -79,20 +79,14 @@ export default function AdminAuditLogsPage() {
     action: "",
     entityType: "",
   });
-  const [state, setState] = useState(() => {
-    const cached = readCache(
-      getCacheKey({ search: "", action: "", entityType: "" })
-    );
-
-    return {
-      loading: !cached,
-      error: "",
-      available: cached?.available !== false,
-      actions: cached?.actions || [],
-      entityTypes: cached?.entityTypes || [],
-      items: cached?.items || [],
-      summary: cached?.summary || { total: 0, recent: 0 },
-    };
+  const [state, setState] = useState({
+    loading: true,
+    error: "",
+    available: true,
+    actions: [],
+    entityTypes: [],
+    items: [],
+    summary: { total: 0, recent: 0 },
   });
   const [actionOpen, setActionOpen] = useState(false);
   const [entityOpen, setEntityOpen] = useState(false);

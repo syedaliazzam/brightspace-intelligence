@@ -256,6 +256,39 @@ export async function updateCalendarLectureEvent(eventId, payload) {
   };
 }
 
+export async function getCalendarLectureEvent(eventId, organizerEmail) {
+  if (!eventId) {
+    return null;
+  }
+
+  const calendarId = encodeURIComponent(String(organizerEmail || "").trim() || getCalendarId());
+  const data = await calendarRequest(
+    `/calendars/${calendarId}/events/${encodeURIComponent(eventId)}?conferenceDataVersion=1`,
+    {
+      impersonateUserEmail: organizerEmail || undefined,
+    }
+  );
+
+  return {
+    id: data?.id || "",
+    organizer: {
+      email: String(data?.organizer?.email || "").trim().toLowerCase(),
+      displayName: String(data?.organizer?.displayName || "").trim(),
+    },
+    creator: {
+      email: String(data?.creator?.email || "").trim().toLowerCase(),
+      displayName: String(data?.creator?.displayName || "").trim(),
+    },
+    attendees: Array.isArray(data?.attendees)
+      ? data.attendees.map((item) => ({
+          email: String(item?.email || "").trim().toLowerCase(),
+          displayName: String(item?.displayName || "").trim(),
+          responseStatus: String(item?.responseStatus || "").trim(),
+        }))
+      : [],
+  };
+}
+
 export async function cancelCalendarLectureEvent(eventId, organizerEmail) {
   if (!eventId) {
     return null;

@@ -149,7 +149,7 @@ export async function GET(request) {
         ls.status::text AS status,
         ${LECTURE_STATUS_SQL} AS display_status,
         ls.google_meet_link,
-        ls.recording_drive_url,
+        COALESCE(ls.google_meet_sync_meta->'recording'->>'url', ls.recording_drive_url) AS recording_drive_url,
         sub.name AS subject_name,
         tu.full_name AS teacher_name,
         a.full_name AS student_name,

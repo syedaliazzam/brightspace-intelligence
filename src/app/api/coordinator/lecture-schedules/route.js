@@ -326,6 +326,10 @@ export async function GET(request) {
           ls.google_meet_link,
           ls.meet_link_source,
           ls.google_meet_space_id,
+          COALESCE(
+            MAX(ls.google_meet_sync_meta->'recording'->>'url'),
+            MAX(ls.recording_drive_url)
+          ) AS recording_drive_url,
           ls.teacher_id::text AS teacher_id,
           ls.subject_id::text AS subject_id,
           ls.title,

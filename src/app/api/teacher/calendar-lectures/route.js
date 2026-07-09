@@ -119,6 +119,7 @@ export async function GET(request) {
           ls.google_calendar_event_id,
           ls.google_meet_link,
           ls.meet_link_source,
+          COALESCE(ls.google_meet_sync_meta->'recording'->>'url', ls.recording_drive_url) AS recording_drive_url,
           ls.title,
           ls.description,
           ls.teacher_id::text AS teacher_id,
