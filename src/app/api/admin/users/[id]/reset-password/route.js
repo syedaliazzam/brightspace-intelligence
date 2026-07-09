@@ -102,6 +102,42 @@ async function insertAuditLog(actorUserId, targetUserId, action, description, me
   );
 }
 
+async function insertCredentialsMessage({
+  userId,
+  recipientEmail,
+  body,
+  bodyText,
+}) {
+  await prisma.$executeRaw`
+    INSERT INTO outbound_messages (
+      id,
+      message_type,
+      related_entity_type,
+      related_entity_id,
+      recipient_email,
+      subject,
+      body,
+      body_text,
+      sent_status,
+      created_at,
+      updated_at
+    )
+    VALUES (
+      ${crypto.randomUUID()}::uuid,
+      'payment_credentials',
+      'user',
+      ${userId}::uuid,
+      ${recipientEmail},
+      ${"Your LMS access credentials"},
+      ${body},
+      ${bodyText},
+      ${"sent"},
+      NOW(),
+      NOW()
+    )
+  `;
+}
+
 export async function POST(request, { params }) {
   const session = await auth();
   const role = String(session?.user?.role || "").toLowerCase();
@@ -124,6 +160,17 @@ export async function POST(request, { params }) {
     }
 
     const passwordHash = await nextPassword;
+    const [userRow] = await prisma.$queryRaw`
+      SELECT id::text AS id, email, full_name
+      FROM users
+      WHERE id = ${id}::uuid
+      LIMIT 1
+    `;
+
+    if (!userRow?.id) {
+      return json("User not found.", 404);
+    }
+
     const [updated] = await prisma.$queryRaw`
       UPDATE users
       SET password_hash = ${passwordHash}
@@ -142,6 +189,15 @@ export async function POST(request, { params }) {
       "User password reset by admin.",
       {}
     );
+
+    if (userRow.email) {
+      await insertCredentialsMessage({
+        userId: updated.id,
+        recipientEmail: userRow.email,
+        body: `Login Credentials Created\n\nStaff Login\nName: ${userRow.full_name || "Staff"}\nEmail: ${userRow.email || "-"}\nTemporary Password: ${nextPassword}\n\nLogin Page:\n${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/login`,
+        bodyText: `Login Credentials Created\n\nStaff Login\nName: ${userRow.full_name || "Staff"}\nEmail: ${userRow.email || "-"}\nTemporary Password: ${nextPassword}\n\nLogin Page:\n${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/login`,
+      });
+    }
 
     return json("Password reset.", 200, {
       temporaryPassword: nextPassword,

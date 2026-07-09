@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
+import { signOut } from "next-auth/react";
 import { ChevronDown } from "lucide-react";
 import AdminConfirmDialog from "@/components/admin/AdminConfirmDialog";
 import AdminDashboardCards from "@/components/admin/AdminDashboardCards";
@@ -93,6 +94,7 @@ function writeCache(key, payload) {
 }
 
 export default function AdminUsersPage() {
+  const router = useRouter();
   const session = useDashboardSession();
   const searchParams = useSearchParams();
   const view = String(searchParams.get("view") || "staff").toLowerCase();
@@ -126,6 +128,11 @@ export default function AdminUsersPage() {
     password: "",
     pending: false,
     error: "",
+  });
+  const [resetSuccess, setResetSuccess] = useState({
+    open: false,
+    password: "",
+    userName: "",
   });
   const [confirmState, setConfirmState] = useState({
     open: false,
@@ -192,19 +199,23 @@ export default function AdminUsersPage() {
         }
 
         const items = payloads.flatMap((payload) => payload.items || []);
+        const staffRoles = new Set(["admin", "coordinator", "teacher"]);
+        const staffOnlyItems = items.filter((item) =>
+          staffRoles.has(String(item.role || "").toLowerCase())
+        );
         const summary = {
-          total: items.length,
-          active: items.filter((item) => item.status === "active").length,
-          suspended: items.filter((item) => item.status === "suspended").length,
-          archived: items.filter((item) => item.status === "archived").length,
+          total: staffOnlyItems.length,
+          active: staffOnlyItems.filter((item) => item.status === "active").length,
+          suspended: staffOnlyItems.filter((item) => item.status === "suspended").length,
+          archived: staffOnlyItems.filter((item) => item.status === "archived").length,
         };
 
-        const payload = { items, summary };
+        const payload = { items: staffOnlyItems, summary };
         writeCache(cacheKey, payload);
         setState((current) => ({
           ...current,
           overviewLoading: false,
-          overviewItems: items,
+          overviewItems: staffOnlyItems,
           summary,
         }));
         return payload;
@@ -293,9 +304,13 @@ export default function AdminUsersPage() {
         }
 
         const tableItems = payloads.flatMap((payload) => payload.items || []);
+        const staffRoles = new Set(["admin", "coordinator", "teacher"]);
+        const staffOnlyItems = tableItems.filter((item) =>
+          staffRoles.has(String(item.role || "").toLowerCase())
+        );
         items = filters.role
-          ? tableItems.filter((item) => item.role === filters.role)
-          : tableItems;
+          ? staffOnlyItems.filter((item) => item.role === filters.role)
+          : staffOnlyItems;
         data = { items };
       } else {
         const response = await fetch(`/api/admin/users?${params.toString()}`, {
@@ -480,13 +495,17 @@ export default function AdminUsersPage() {
         throw new Error(data?.message || "Unable to reset password.");
       }
 
-      window.alert(`Password: ${data.temporaryPassword}`);
       setResetModal({
         open: false,
         record: null,
         password: "",
         pending: false,
         error: "",
+      });
+      setResetSuccess({
+        open: true,
+        password: data.temporaryPassword || "",
+        userName: resetModal.record?.name || resetModal.record?.full_name || "Selected user",
       });
     } catch (error) {
       setResetModal((current) => ({
@@ -569,6 +588,40 @@ export default function AdminUsersPage() {
     setDetailModal({ open: false, record: null });
   }
 
+  async function loginAsParent(row) {
+    const params = new URLSearchParams();
+    if (row.username) params.set("identifier", row.username);
+    else if (row.email) params.set("identifier", row.email);
+    if (row.temporary_password) params.set("password", row.temporary_password);
+
+    const loginUrl = `/login${params.toString() ? `?${params.toString()}` : ""}`;
+
+    try {
+      await signOut({ redirect: false });
+    } catch {
+      // Ignore sign-out errors and continue to the login page.
+    }
+
+    router.push(loginUrl);
+  }
+
+  async function loginAsStaff(row) {
+    const params = new URLSearchParams();
+    if (row.email) params.set("identifier", row.email);
+    else if (row.username) params.set("identifier", row.username);
+    if (row.temporary_password) params.set("password", row.temporary_password);
+
+    const loginUrl = `/login${params.toString() ? `?${params.toString()}` : ""}`;
+
+    try {
+      await signOut({ redirect: false });
+    } catch {
+      // Ignore sign-out errors and continue to the login page.
+    }
+
+    router.push(loginUrl);
+  }
+
   return (
     <div className="min-h-screen bg-[#FAF7F0] text-[#063F32]">
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(201,162,39,0.14),transparent_32%),radial-gradient(circle_at_top_right,rgba(45,138,106,0.14),transparent_28%),linear-gradient(180deg,#FAF7F0_0%,#F7F1E3_100%)]" />
@@ -613,6 +666,34 @@ export default function AdminUsersPage() {
           title="Loading user management"
           subtitle="Fetching the latest records and summary cards..."
         />
+      ) : null}
+
+      {resetSuccess.open ? (
+        <div className="fixed inset-0 z-[60] flex items-start justify-end bg-[#063F32]/35 px-4 py-4 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-[1.75rem] border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(250,247,240,0.98)_100%)] p-5 shadow-[0_24px_80px_-36px_rgba(13,59,46,0.26)]">
+            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[#0D5C48]">
+              Password reset successful
+            </p>
+            <h3 className="mt-2 text-lg font-semibold text-[#063F32]">
+              {resetSuccess.userName}
+            </h3>
+            <p className="mt-3 text-sm text-[#245C4F]">
+              Password: <span className="font-semibold text-[#063F32]">{resetSuccess.password || "-"}</span>
+            </p>
+            <div className="mt-5 flex justify-end">
+              <button
+                type="button"
+                onClick={async () => {
+                  setResetSuccess({ open: false, password: "", userName: "" });
+                  await Promise.all([loadOverview({ force: true }), loadTable({ force: true })]);
+                }}
+                className="rounded-2xl border border-[#2D8A6A]/20 bg-[#0D5C48] px-4 py-2 text-sm font-semibold text-[#FAF7F0] transition hover:bg-[#063F32]"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
       ) : null}
 
       <AdminDashboardCards items={cards} />
@@ -757,15 +838,45 @@ export default function AdminUsersPage() {
             label: "User",
             render: (row) => (
               <div>
-                <p className="font-semibold text-[#063F32]">{row.name}</p>
-                <div className="mt-1 text-xs text-[#245C4F]">
-                  <p>{row.email || "No email"}</p>
-                </div>
+                <p className="font-semibold text-[#063F32]">
+                  {view === "parents" || view === "students" || view === "staff"
+                    ? row.name || row.full_name || row.username || "-"
+                    : row.name}
+                </p>
+                {view === "admin" ? (
+                  <div className="mt-1 text-xs text-[#245C4F]">
+                    <p>{row.email || "No email"}</p>
+                  </div>
+                ) : null}
               </div>
             ),
           },
+          ...(view === "staff"
+            ? [
+                {
+                  key: "email",
+                  label: "Email",
+                  render: (row) => row.email || "-",
+                },
+                {
+                  key: "temporary_password",
+                  label: "Password",
+                  render: (row) => row.temporary_password || "-",
+                },
+              ]
+            : []),
           ...(view === "students"
             ? [
+                {
+                  key: "username",
+                  label: "Username",
+                  render: (row) => row.username || "-",
+                },
+                {
+                  key: "temporary_password",
+                  label: "Password",
+                  render: (row) => row.temporary_password || "-",
+                },
                 {
                   key: "class_level",
                   label: "Class",
@@ -795,6 +906,16 @@ export default function AdminUsersPage() {
             : []),
           ...(view === "parents"
             ? [
+                {
+                  key: "email",
+                  label: "Email",
+                  render: (row) => row.email || "-",
+                },
+                {
+                  key: "temporary_password",
+                  label: "Password",
+                  render: (row) => row.temporary_password || "-",
+                },
                 {
                   key: "relation",
                   label: "Relation",
@@ -833,12 +954,21 @@ export default function AdminUsersPage() {
           state.loading ? "Loading users..." : "No users matched the current filters."
         }
         actions={(row) => (
-          <>
+          <div className="flex min-w-max items-center gap-2 whitespace-nowrap">
+            {view === "parents" || view === "students" || view === "staff" ? (
+              <button
+                type="button"
+                onClick={() => (view === "staff" ? loginAsStaff(row) : loginAsParent(row))}
+                className="whitespace-nowrap rounded-xl border border-[#2D8A6A]/20 bg-[#EAF6EF] px-3 py-2 text-xs font-semibold text-[#0D5C48] transition hover:bg-[#DFF2E7]"
+              >
+                Login
+              </button>
+            ) : null}
             {view === "staff" && ["admin", "coordinator", "teacher"].includes(String(row.role || "").toLowerCase()) ? (
               <button
                 type="button"
                 onClick={() => setModal({ open: true, record: row })}
-                className="rounded-xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-1 py-2 text-xs font-semibold text-[#063F32] transition hover:bg-[#F1EADC]"
+                className="whitespace-nowrap rounded-xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-1 py-2 text-xs font-semibold text-[#063F32] transition hover:bg-[#F1EADC]"
               >
                 Edit
               </button>
@@ -853,9 +983,9 @@ export default function AdminUsersPage() {
                     action: row.status === "suspended" ? "activate" : "suspend",
                     status: row.status === "suspended" ? "active" : "suspended",
                     pending: false,
-                  })
+                })
                 }
-                className="rounded-xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-3 py-2 text-xs font-semibold text-[#063F32] transition hover:bg-[#F1EADC]"
+                className="whitespace-nowrap rounded-xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-3 py-2 text-xs font-semibold text-[#063F32] transition hover:bg-[#F1EADC]"
               >
                 {row.status === "suspended" ? "Activate" : "Suspend"}
               </button>
@@ -864,8 +994,8 @@ export default function AdminUsersPage() {
               <button
                 type="button"
                 onClick={() => resetPassword(row)}
-              className="rounded-xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-3 py-2 text-xs font-semibold text-[#063F32] transition hover:bg-[#F1EADC]"
-            >
+                className="whitespace-nowrap rounded-xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-3 py-2 text-xs font-semibold text-[#063F32] transition hover:bg-[#F1EADC]"
+              >
                 {resetModal.pending ? (
                   <span className="inline-flex items-center gap-2">
                     <LeafSpinnerInline />
@@ -881,14 +1011,14 @@ export default function AdminUsersPage() {
                 <button
                   type="button"
                   onClick={() => openDetails(row)}
-                  className="rounded-xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-3 py-2 text-xs font-semibold text-[#063F32] transition hover:bg-[#F1EADC]"
+                  className="whitespace-nowrap rounded-xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-3 py-2 text-xs font-semibold text-[#063F32] transition hover:bg-[#F1EADC]"
                 >
                   View
                 </button>
                 <button
                   type="button"
                   onClick={() => setModal({ open: true, record: row })}
-                  className="rounded-xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-3 py-2 text-xs font-semibold text-[#063F32] transition hover:bg-[#F1EADC]"
+                  className="whitespace-nowrap rounded-xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-3 py-2 text-xs font-semibold text-[#063F32] transition hover:bg-[#F1EADC]"
                 >
                   Edit
                 </button>
@@ -896,7 +1026,7 @@ export default function AdminUsersPage() {
                   <button
                     type="button"
                     onClick={() => activateUser(row)}
-                    className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-100"
+                    className="whitespace-nowrap rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700 transition hover:bg-emerald-100"
                   >
                     Activate
                   </button>
@@ -904,14 +1034,23 @@ export default function AdminUsersPage() {
                   <button
                     type="button"
                     onClick={() => deleteUser(row)}
-                    className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700 transition hover:bg-rose-100"
-                  >
-                    Delete
-                  </button>
+                    className="whitespace-nowrap rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700 transition hover:bg-rose-100"
+                >
+                  Delete
+                </button>
                 )}
               </>
             ) : null}
-          </>
+            {view === "parents" || view === "students" ? (
+              <button
+                type="button"
+                onClick={() => resetPassword(row)}
+                className="whitespace-nowrap rounded-xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-3 py-2 text-xs font-semibold text-[#063F32] transition hover:bg-[#F1EADC]"
+              >
+                Reset password
+              </button>
+            ) : null}
+          </div>
         )}
       />
 

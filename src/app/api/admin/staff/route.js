@@ -165,6 +165,51 @@ async function insertAuditLog(actorUserId, targetId, action, description, metada
   );
 }
 
+async function insertCredentialsMessage({
+  relatedEntityId,
+  recipientEmail,
+  subject,
+  body,
+  bodyText,
+  createdBy,
+  tx,
+}) {
+  const messageId = crypto.randomUUID();
+
+  await tx.$executeRaw`
+    INSERT INTO outbound_messages (
+      id,
+      message_type,
+      related_entity_type,
+      related_entity_id,
+      recipient_email,
+      subject,
+      body,
+      body_text,
+      sent_status,
+      created_by,
+      created_at,
+      updated_at
+    )
+    VALUES (
+      ${messageId}::uuid,
+      'payment_credentials',
+      'user',
+      ${relatedEntityId}::uuid,
+      ${recipientEmail},
+      ${subject},
+      ${body},
+      ${bodyText},
+      'sent',
+      ${createdBy}::uuid,
+      NOW(),
+      NOW()
+    )
+  `;
+
+  return messageId;
+}
+
 async function syncProfile(tableName, payload, tx) {
   const profileId = crypto.randomUUID();
 
@@ -379,6 +424,18 @@ export async function POST(request) {
         { role },
         tx
       );
+
+      if (email) {
+        await insertCredentialsMessage({
+          relatedEntityId: userId,
+          recipientEmail: email,
+          subject: "Your LMS access credentials",
+          body: `Login Credentials Created\n\nStaff Login\nName: ${fullName}\nEmail: ${email || "-"}\nPhone: ${phone || "-"}\nTemporary Password: ${password}\n\nLogin Page:\n${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/login`,
+          bodyText: `Login Credentials Created\n\nStaff Login\nName: ${fullName}\nEmail: ${email || "-"}\nPhone: ${phone || "-"}\nTemporary Password: ${password}\n\nLogin Page:\n${process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"}/login`,
+          createdBy: authState.session.user.id,
+          tx,
+        });
+      }
     });
 
     return json("Staff user created.", 201, {
@@ -390,6 +447,7 @@ export async function POST(request) {
         role,
         status: "active",
         editable: true,
+        temporary_password: password,
       },
     });
   } catch (error) {

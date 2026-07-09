@@ -106,6 +106,55 @@ function getSearchConditions(search, userColumns) {
   return [Prisma.sql`(${Prisma.join(conditions, ' OR ')})`];
 }
 
+function extractTemporaryPassword(bodyText) {
+  const text = String(bodyText || "");
+  const match = text.match(/Temporary Password:\s*(.+)/i);
+  return match?.[1]?.trim() || "";
+}
+
+function extractStudentTemporaryPassword(bodyText) {
+  const text = String(bodyText || "");
+  const studentPasswordLabelMatch = text.match(
+    /(?:Student\s+)?Password:\s*([^\n\r]+)/i
+  );
+
+  if (studentPasswordLabelMatch?.[1]) {
+    return studentPasswordLabelMatch[1].trim();
+  }
+
+  const explicitStudentPasswordMatch = text.match(
+    /Student Temporary Password:\s*([^\n\r]+)/i
+  );
+
+  if (explicitStudentPasswordMatch?.[1]) {
+    return explicitStudentPasswordMatch[1].trim();
+  }
+
+  const studentSectionMatch = text.match(
+    /Student Login[\s\S]*?Temporary Password:\s*([^\n\r]+)/i
+  );
+
+  if (studentSectionMatch?.[1]) {
+    return studentSectionMatch[1].trim();
+  }
+
+  const matches = [...text.matchAll(/Temporary Password:\s*([^\n\r]+)/gi)];
+  return matches.length > 1 ? matches[1][1].trim() : matches[0]?.[1]?.trim() || "";
+}
+
+function extractStaffTemporaryPassword(bodyText) {
+  const text = String(bodyText || "");
+  const staffSectionMatch = text.match(
+    /Staff Login[\s\S]*?Temporary Password:\s*([^\n\r]+)/i
+  );
+
+  if (staffSectionMatch?.[1]) {
+    return staffSectionMatch[1].trim();
+  }
+
+  return extractTemporaryPassword(text);
+}
+
 async function getUsers(search, role, status, classLevel = "") {
   const userColumns = await getTableColumns("users");
   const displayNameSql = getDisplayNameSql(userColumns);
@@ -137,8 +186,25 @@ async function getUsers(search, role, status, classLevel = "") {
     SELECT
       u.id::text AS id,
       ${displayNameSql} AS name,
+      u.username,
       u.email,
       u.phone,
+      (
+        SELECT COALESCE(om.body_text, om.body)
+        FROM outbound_messages om
+        WHERE LOWER(om.message_type) = 'payment_credentials'
+          AND (
+            LOWER(COALESCE(om.recipient_email, '')) = LOWER(COALESCE(u.email, ''))
+            OR (COALESCE(u.username, '') <> '' AND COALESCE(om.body_text, om.body) ILIKE '%' || u.username || '%')
+            OR (COALESCE(u.full_name, '') <> '' AND COALESCE(om.body_text, om.body) ILIKE '%' || u.full_name || '%')
+          )
+          AND (
+            COALESCE(om.body_text, om.body) ILIKE '%Student Login%'
+            OR COALESCE(om.body_text, om.body) ILIKE '%Staff Login%'
+          )
+        ORDER BY om.created_at DESC NULLS LAST
+        LIMIT 1
+      ) AS latest_credentials_body_text,
       COALESCE(sp.grade_level, '') AS class_level,
       sp.id::text AS student_profile_id,
       sp.admission_no,
@@ -203,9 +269,9 @@ async function getUsers(search, role, status, classLevel = "") {
       WHERE spp_latest.parent_id = pp.id
       ORDER BY e.updated_at DESC NULLS LAST, e.created_at DESC NULLS LAST, rl.created_at DESC NULLS LAST
       LIMIT 1
-    ) latest_registration ON TRUE
+      ) latest_registration ON TRUE
     ${whereClause}
-    GROUP BY u.id, u.full_name, u.email, u.phone, sp.id, sp.admission_no, sp.age, sp.status, sp.grade_level, c.title, rl.student_name, rl.parent_name, rl.parent_relation, rl.program_name, rl.current_school, rl.current_grade, rl.gender, rl.date_of_birth, rl.city_country, rl.nationality, rl.religion, rl.preferred_language, rl.child_profile, rl.child_strengths, rl.child_support_needs, rl.child_special_interests, rl.developmental_concern, rl.developmental_concern_details, rl.medical_conditions, rl.support_person_during_learning, rl.device_available, rl.school_expectations, pp.id, pp.relation, latest_registration.parent_relation, parent_user.full_name, u.status, r.name
+    GROUP BY u.id, u.username, u.full_name, u.email, u.phone, sp.id, sp.admission_no, sp.age, sp.status, sp.grade_level, c.title, rl.student_name, rl.parent_name, rl.parent_relation, rl.program_name, rl.current_school, rl.current_grade, rl.gender, rl.date_of_birth, rl.city_country, rl.nationality, rl.religion, rl.preferred_language, rl.child_profile, rl.child_strengths, rl.child_support_needs, rl.child_special_interests, rl.developmental_concern, rl.developmental_concern_details, rl.medical_conditions, rl.support_person_during_learning, rl.device_available, rl.school_expectations, pp.id, pp.relation, latest_registration.parent_relation, parent_user.full_name, u.status, r.name
     ${orderClause}
   `;
 }
@@ -316,15 +382,26 @@ export async function GET(request) {
 
   try {
     const users = await getUsers(search, role, status, classLevel);
+    const normalizedUsers = users.map((user) => ({
+      ...user,
+      temporary_password:
+        String(user.role || "").toLowerCase() === "student"
+          ? extractStudentTemporaryPassword(user.latest_credentials_body_text)
+          : String(user.role || "").toLowerCase() === "admin" ||
+              String(user.role || "").toLowerCase() === "coordinator" ||
+              String(user.role || "").toLowerCase() === "teacher"
+            ? extractStaffTemporaryPassword(user.latest_credentials_body_text)
+            : extractTemporaryPassword(user.latest_credentials_body_text),
+    }));
     return json("Users fetched.", 200, {
-      items: users,
+      items: normalizedUsers,
       summary: {
-        total: users.length,
-        students: users.filter((item) => item.role === "student").length,
-        parents: users.filter((item) => item.role === "parent").length,
-        active: users.filter((item) => item.status === "active").length,
-        suspended: users.filter((item) => item.status === "suspended").length,
-        archived: users.filter((item) => item.status === "archived").length,
+        total: normalizedUsers.length,
+        students: normalizedUsers.filter((item) => item.role === "student").length,
+        parents: normalizedUsers.filter((item) => item.role === "parent").length,
+        active: normalizedUsers.filter((item) => item.status === "active").length,
+        suspended: normalizedUsers.filter((item) => item.status === "suspended").length,
+        archived: normalizedUsers.filter((item) => item.status === "archived").length,
       },
     });
   } catch (error) {
