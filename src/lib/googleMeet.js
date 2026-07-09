@@ -154,11 +154,9 @@ function getParticipantEmail(participant) {
     participant?.user?.email ||
     participant?.email ||
     participant?.anonymousUser?.email ||
-    participant?.phoneUser?.phoneNumber ||
     participant?.participantKey?.userEmail ||
     participant?.participantKey?.email ||
     participant?.participantEmail ||
-    participant?.displayName ||
     "";
 
   if (String(candidate).includes("@")) {
@@ -171,7 +169,6 @@ function getParticipantEmail(participant) {
     participant?.user?.email ||
     participant?.email ||
     participant?.anonymousUser?.email ||
-    participant?.phoneUser?.phoneNumber ||
     participant?.participantKey?.userEmail ||
     participant?.participantKey?.email ||
     ""
@@ -179,15 +176,20 @@ function getParticipantEmail(participant) {
 }
 
 function getParticipantName(participant) {
-  return (
+  const candidate =
     participant?.signedinUser?.displayName ||
     participant?.signedInUser?.displayName ||
     participant?.user?.displayName ||
     participant?.displayName ||
     participant?.anonymousUser?.displayName ||
     participant?.phoneUser?.displayName ||
-    ""
-  );
+    "";
+
+  if (!candidate || isNumericLike(candidate)) {
+    return "";
+  }
+
+  return candidate;
 }
 
 function durationMinutes(start, end) {
@@ -301,6 +303,11 @@ function uniqueValues(values = []) {
   return [...new Set(values.filter(Boolean))];
 }
 
+function isNumericLike(value) {
+  const text = String(value || "").trim();
+  return /^\d+$/.test(text);
+}
+
 function getParamValue(parameter) {
   if (parameter === undefined || parameter === null) return "";
   if (typeof parameter === "string" || typeof parameter === "number" || typeof parameter === "boolean") {
@@ -361,8 +368,6 @@ function getActivityParticipant(item, event, parameters) {
     ]) ||
     actor?.email ||
     actor?.callerEmail ||
-    actor?.profileId ||
-    actor?.identifier ||
     actor?.userEmail ||
     "";
   const identifier = normalizeEmail(
@@ -380,7 +385,6 @@ function getActivityParticipant(item, event, parameters) {
       actor?.profileName ||
       actor?.displayName ||
       actor?.name ||
-      actor?.profileId ||
       event?.actor?.displayName ||
       ""
   );
@@ -424,13 +428,30 @@ function buildAuditEventSearchTokens({ item, event, parameters }) {
   );
 }
 
-function eventMatchesLecture({ item, event, parameters, lectureIdentifiers }) {
+function buildConferenceIdVariants(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return [];
+  const normalized = normalizeDisplayName(raw);
+  const suffix = raw.includes("/") ? raw.split("/").pop() || "" : raw;
+  const suffixNormalized = normalizeDisplayName(suffix);
+  return uniqueValues([normalized, suffixNormalized].filter(Boolean));
+}
+
+function eventMatchesLecture({ item, event, parameters, lectureIdentifiers, conferenceRecordStartTime, conferenceRecordEndTime }) {
   const meetingCode = normalizeMeetCode(lectureIdentifiers?.meetingCode || "");
-  const conferenceId = normalizeDisplayName(lectureIdentifiers?.conferenceId || "");
-  const conferenceRecordName = normalizeDisplayName(lectureIdentifiers?.conferenceRecordName || "");
+  const conferenceIdVariants = buildConferenceIdVariants(lectureIdentifiers?.conferenceId || "");
+  const conferenceRecordVariants = buildConferenceIdVariants(lectureIdentifiers?.conferenceRecordName || "");
   const calendarEventId = normalizeDisplayName(lectureIdentifiers?.calendarEventId || "");
   const storedMeetLink = normalizeMeetCode(lectureIdentifiers?.storedMeetLink || "");
+  const organizerEmail = normalizeEmail(lectureIdentifiers?.organizerEmail || "");
+  const eventOrganizerEmail = normalizeEmail(getParameterCandidate(parameters, ["organizer_email", "organizerEmail"]) || item?.actor?.email || "");
   const eventTokens = buildAuditEventSearchTokens({ item, event, parameters });
+  const inConferenceWindow = eventFallsWithinConferenceWindow(
+    item,
+    event,
+    conferenceRecordStartTime,
+    conferenceRecordEndTime
+  );
 
   if (meetingCode && eventTokens.some((token) => token === meetingCode || token.includes(meetingCode))) {
     return true;
@@ -440,11 +461,11 @@ function eventMatchesLecture({ item, event, parameters, lectureIdentifiers }) {
     return true;
   }
 
-  if (conferenceId && eventTokens.some((token) => token === conferenceId || token.includes(conferenceId))) {
+  if (conferenceIdVariants.some((conferenceId) => eventTokens.some((token) => token === conferenceId || token.includes(conferenceId)))) {
     return true;
   }
 
-  if (conferenceRecordName && eventTokens.some((token) => token === conferenceRecordName || token.includes(conferenceRecordName))) {
+  if (conferenceRecordVariants.some((conferenceRecordName) => eventTokens.some((token) => token === conferenceRecordName || token.includes(conferenceRecordName)))) {
     return true;
   }
 
@@ -452,7 +473,30 @@ function eventMatchesLecture({ item, event, parameters, lectureIdentifiers }) {
     return true;
   }
 
+  if (organizerEmail && eventOrganizerEmail && organizerEmail === eventOrganizerEmail && inConferenceWindow) {
+    return true;
+  }
+
   return false;
+}
+
+function eventFallsWithinConferenceWindow(item, event, conferenceRecordStartTime, conferenceRecordEndTime) {
+  const activityTime = new Date(getActivityTime(item, event));
+  const start = new Date(conferenceRecordStartTime || 0);
+  const end = new Date(conferenceRecordEndTime || 0);
+
+  if (Number.isNaN(activityTime.getTime()) || Number.isNaN(start.getTime())) {
+    return false;
+  }
+
+  const effectiveEnd = Number.isNaN(end.getTime())
+    ? new Date(start.getTime() + 4 * 60 * 60 * 1000)
+    : end;
+
+  return (
+    activityTime.getTime() >= start.getTime() - 15 * 60 * 1000 &&
+    activityTime.getTime() <= effectiveEnd.getTime() + 15 * 60 * 1000
+  );
 }
 
 function mergeAuditRecords(records) {
@@ -488,6 +532,97 @@ function mergeAuditRecords(records) {
     if (!existing.email && record.email) existing.email = record.email;
     if (!existing.displayName && record.displayName) existing.displayName = record.displayName;
     if (!existing.endpointId && record.endpointId) existing.endpointId = record.endpointId;
+  }
+
+  return [...grouped.values()];
+}
+
+function mergeMeetSessionAndAuditRecords(auditRecords = [], meetRecords = []) {
+  const grouped = new Map();
+
+  function getKey(record) {
+    return normalizeDisplayName(
+      normalizeEmail(record?.participantEmail || "") ||
+      record?.googleParticipantId ||
+      record?.endpointId ||
+      record?.participantKey ||
+      record?.participantName ||
+      record?.displayName ||
+      ""
+    );
+  }
+
+  function upsert(record, source) {
+    const key = getKey(record);
+    if (!key) return;
+
+    const existing = grouped.get(key);
+    if (!existing) {
+      grouped.set(key, {
+        ...record,
+        _source: source,
+      });
+      return;
+    }
+
+    const existingJoined = existing.joinedAt ? new Date(existing.joinedAt).getTime() : Number.POSITIVE_INFINITY;
+    const nextJoined = record.joinedAt ? new Date(record.joinedAt).getTime() : Number.POSITIVE_INFINITY;
+    const existingLeft = existing.leftAt ? new Date(existing.leftAt).getTime() : 0;
+    const nextLeft = record.leftAt ? new Date(record.leftAt).getTime() : 0;
+    const existingDuration = Number(existing.durationMinutes || 0);
+    const nextDuration = Number(record.durationMinutes || 0);
+
+    grouped.set(key, {
+      ...existing,
+      ...record,
+      participantEmail: existing.participantEmail || record.participantEmail || "",
+      participantName: existing.participantName || record.participantName || existing.displayName || record.displayName || "",
+      googleParticipantId: existing.googleParticipantId || record.googleParticipantId || "",
+      googleSessionId: existing.googleSessionId || record.googleSessionId || "",
+      joinedAt: nextJoined < existingJoined ? record.joinedAt : existing.joinedAt,
+      leftAt: nextLeft > existingLeft ? record.leftAt : existing.leftAt,
+      durationMinutes: Math.max(existingDuration, nextDuration),
+      raw: existing.raw || record.raw,
+      _source: existing._source === "audit" ? "audit" : source,
+    });
+  }
+
+  for (const record of auditRecords) {
+    upsert(record, "audit");
+  }
+
+  for (const record of meetRecords) {
+    const directEmailMatch = record?.participantEmail
+      ? auditRecords.find(
+          (auditRecord) => normalizeEmail(auditRecord?.participantEmail || "") === normalizeEmail(record.participantEmail)
+        )
+      : null;
+    const directNameMatch = !directEmailMatch && record?.participantName
+      ? auditRecords.find(
+          (auditRecord) => normalizeDisplayName(auditRecord?.participantName || "") === normalizeDisplayName(record.participantName)
+        )
+      : null;
+
+    if (directEmailMatch || directNameMatch) {
+      const matched = directEmailMatch || directNameMatch;
+      upsert(
+        {
+          ...matched,
+          participantEmail: matched.participantEmail || record.participantEmail || "",
+          participantName: matched.participantName || record.participantName || "",
+          googleParticipantId: record.googleParticipantId || matched.googleParticipantId || "",
+          googleSessionId: record.googleSessionId || matched.googleSessionId || "",
+          joinedAt: record.joinedAt || matched.joinedAt,
+          leftAt: record.leftAt || matched.leftAt,
+          durationMinutes: Math.max(Number(record.durationMinutes || 0), Number(matched.durationMinutes || 0)),
+          raw: matched.raw || record.raw,
+        },
+        "audit"
+      );
+      continue;
+    }
+
+    upsert(record, "meet");
   }
 
   return [...grouped.values()];
@@ -569,6 +704,8 @@ async function getAdminReportsMeetAttendanceRecords({
   const startTime = new Date(safeStart.getTime() - 24 * 60 * 60000).toISOString();
   const endTime = new Date(safeEnd.getTime() + 24 * 60 * 60000).toISOString();
   const matchedRecords = [];
+  const fallbackWindowRecords = [];
+  const fallbackWindowIdentities = [];
   const identities = [];
   const sampleAuditParameters = [];
   const sampleEvents = [];
@@ -599,7 +736,14 @@ async function getAdminReportsMeetAttendanceRecords({
             tokens: buildAuditEventSearchTokens({ item, event, parameters }).slice(0, 20),
           });
         }
-        const matchesLecture = eventMatchesLecture({ item, event, parameters, lectureIdentifiers });
+        const matchesLecture = eventMatchesLecture({
+          item,
+          event,
+          parameters,
+          lectureIdentifiers,
+          conferenceRecordStartTime,
+          conferenceRecordEndTime,
+        });
         if (!matchesLecture) {
           continue;
         }
@@ -644,23 +788,7 @@ async function getAdminReportsMeetAttendanceRecords({
         const identifierType = normalizeDisplayName(
           getParameterCandidate(parameters, ["identifier_type"]) || participant.identifierType || ""
         );
-        if ((identifierType === "email address" || identifierType === "email_address" || identifier.includes("@")) && identifier && participantName) {
-          identities.push({
-            email: identifier,
-            name: participantName,
-            role: "participant",
-            source: "admin_reports",
-          });
-        }
-        const durationMinutes = durationFromAudit(parameters);
-        const endTimeValue = (() => {
-          const candidate = getParamValue(parameters.get("event_end_time")) || getParamValue(parameters.get("end_time"));
-          if (candidate) return candidate;
-          if (durationMinutes && joinedAt) return new Date(new Date(joinedAt).getTime() + durationMinutes * 60000).toISOString();
-          return getActivityTime(item, event);
-        })();
-
-        matchedRecords.push({
+        const currentRecord = {
           participantKey: buildParticipantKey({
             ...participant,
             participantEmail,
@@ -671,20 +799,59 @@ async function getAdminReportsMeetAttendanceRecords({
           googleParticipantId: participant.endpointId || "",
           googleSessionId: normalizeDisplayName(getParamValue(parameters.get("identifier")) || item?.id?.uniqueQualifier || ""),
           joinedAt,
+          leftAt: null,
+          durationMinutes: 0,
+          raw: { item, event, parameters: Object.fromEntries(parameters.entries()), participant },
+        };
+        if ((identifierType === "email address" || identifierType === "email_address" || identifier.includes("@")) && identifier && participantName) {
+          const identityRecord = {
+            email: identifier,
+            name: participantName,
+            role: "participant",
+            source: "admin_reports",
+          };
+          identities.push(identityRecord);
+          if (
+            eventFallsWithinConferenceWindow(item, event, conferenceRecordStartTime, conferenceRecordEndTime) &&
+            normalizeEmail(getParameterCandidate(parameters, ["organizer_email"]) || "") === normalizeEmail(lectureIdentifiers?.organizerEmail || impersonateUserEmail || "")
+          ) {
+            fallbackWindowIdentities.push(identityRecord);
+          }
+        }
+        const durationMinutes = durationFromAudit(parameters);
+        const endTimeValue = (() => {
+          const candidate = getParamValue(parameters.get("event_end_time")) || getParamValue(parameters.get("end_time"));
+          if (candidate) return candidate;
+          if (durationMinutes && joinedAt) return new Date(new Date(joinedAt).getTime() + durationMinutes * 60000).toISOString();
+          return getActivityTime(item, event);
+        })();
+        const finalizedRecord = {
+          ...currentRecord,
           leftAt: endTimeValue,
           durationMinutes,
-          raw: { item, event, parameters: Object.fromEntries(parameters.entries()), participant },
-        });
+        };
+
+        matchedRecords.push(finalizedRecord);
+
+        if (
+          eventFallsWithinConferenceWindow(item, event, conferenceRecordStartTime, conferenceRecordEndTime) &&
+          normalizeEmail(getParameterCandidate(parameters, ["organizer_email"]) || "") === normalizeEmail(lectureIdentifiers?.organizerEmail || impersonateUserEmail || "")
+        ) {
+          fallbackWindowRecords.push(finalizedRecord);
+        }
       }
     }
 
     pageToken = String(payload?.nextPageToken || "");
   } while (pageToken);
 
+  const effectiveRecords = matchedRecords.length ? matchedRecords : fallbackWindowRecords;
+  const effectiveIdentities = identities.length ? identities : fallbackWindowIdentities;
+
   return {
-    available: matchedRecords.length > 0,
-    records: mergeAuditRecords(matchedRecords),
-    identities,
+    available: effectiveRecords.length > 0,
+    records: mergeAuditRecords(effectiveRecords),
+    identities: effectiveIdentities,
     sampleAuditParameters,
     sampleEvents,
     reports_api_called: true,
@@ -832,9 +999,10 @@ export async function getMeetAttendanceRecords({
   }
 
   const fallbackRecords = await getMeetConferenceParticipantRecords(conferenceRecord.name, impersonateUserEmail);
-  const records = fallbackRecords.length
-    ? fallbackRecords
-    : mergeAuditRecords(reportsAttendance.records || []);
+  const records = mergeMeetSessionAndAuditRecords(
+    mergeAuditRecords(reportsAttendance.records || []),
+    fallbackRecords
+  );
 
   return {
     available: true,

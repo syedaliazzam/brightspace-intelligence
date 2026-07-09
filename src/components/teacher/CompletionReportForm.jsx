@@ -7,6 +7,14 @@ export default function CompletionReportForm({ lecture, onSaved }) {
   const [form, setForm] = useState({ topicCovered: "", summary: "", homeworkGiven: "", studentPerformance: "" });
   const [pending, setPending] = useState(false);
 
+  async function readJson(response) {
+    const contentType = response.headers.get("content-type") || "";
+    if (!contentType.includes("application/json")) {
+      throw new Error(await response.text());
+    }
+    return response.json();
+  }
+
   useEffect(() => {
     let active = true;
 
@@ -51,12 +59,12 @@ export default function CompletionReportForm({ lecture, onSaved }) {
 
     setPending(true);
     try {
-      const response = await fetch(`/api/teacher/lectures/${lecture.id}/completion-report`, {
+      const response = await fetch(`/api/teacher/lectures/${lecture.id}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(form),
       });
-      const data = await response.json();
+      const data = await readJson(response);
       if (!response.ok) throw new Error(data?.message || "Unable to submit report.");
       onSaved?.();
     } catch (error) {

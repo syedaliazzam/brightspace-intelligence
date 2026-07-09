@@ -97,6 +97,34 @@ export default function LectureVerificationTable({ items = [], onRefresh }) {
     };
   }
 
+  function isOpaqueParticipantValue(value) {
+    const text = String(value || "").trim();
+    return /^\d+$/.test(text) || /^\d{15,}$/.test(text);
+  }
+
+  function renderParticipantLabel(person) {
+    const name = String(person?.name || "").trim();
+    const email = String(person?.email || "").trim();
+
+    if (name && !isOpaqueParticipantValue(name)) {
+      return name;
+    }
+
+    if (email && !isOpaqueParticipantValue(email)) {
+      return email;
+    }
+
+    return "Participant";
+  }
+
+  function renderParticipantEmail(person) {
+    const email = String(person?.email || "").trim();
+    if (email && !isOpaqueParticipantValue(email)) {
+      return email;
+    }
+    return "";
+  }
+
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="relative space-y-4">
       {items.length ? (
@@ -219,10 +247,15 @@ export default function LectureVerificationTable({ items = [], onRefresh }) {
                 <p className="font-semibold text-[#063F32]">Others who joined</p>
                 {others.length ? (
                   <div className="mt-2 space-y-2">
-                    {others.slice(0, 4).map((person, index) => (
+                    {others
+                      .filter((person) => {
+                        const label = String(person?.name || person?.email || "").trim();
+                        return label && !isOpaqueParticipantValue(label);
+                      })
+                      .map((person, index) => (
                       <div key={`${person.email || person.name || "participant"}-${index}`} className="rounded-xl border border-[#2D8A6A]/10 bg-white/70 px-3 py-2">
-                        <p className="text-xs font-semibold text-[#063F32]">{person.name || person.email || "Participant"}</p>
-                        <p className="mt-1 text-xs text-[#245C4F]">{person.email || "No email"}</p>
+                        <p className="text-xs font-semibold text-[#063F32]">{renderParticipantLabel(person)}</p>
+                        <p className="mt-1 text-xs text-[#245C4F]">{renderParticipantEmail(person) || "No email"}</p>
                         <p className="mt-1 text-xs text-[#245C4F]">{person.duration_minutes || 0} minutes</p>
                       </div>
                     ))}

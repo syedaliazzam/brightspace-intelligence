@@ -32,7 +32,7 @@ export default function ClassActionModal({ lecture, open, onClose, onChanged }) 
 
   return (
     <AnimatePresence>
-      <div className="fixed inset-x-0 top-0 z-50 flex min-h-screen items-start justify-center overflow-visible bg-[#063F32]/45 px-4 pt-12 pb-8">
+      <div className="fixed inset-0 z-50 flex min-h-screen items-start justify-center overflow-y-auto bg-[#063F32]/45 px-4 pt-12 pb-8">
         <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 12 }} className="w-full max-w-3xl overflow-hidden rounded-[2rem] border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(250,247,240,0.98)_100%)] p-6 shadow-[0_24px_80px_-36px_rgba(13,59,46,0.32)]">
           <div className="flex items-start justify-between gap-4">
             <div>

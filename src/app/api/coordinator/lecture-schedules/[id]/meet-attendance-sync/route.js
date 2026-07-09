@@ -44,6 +44,12 @@ function normalizeEmail(value) {
   return String(value || "").trim().toLowerCase();
 }
 
+function isMaskedEmail(value) {
+  const text = String(value || "").trim().toLowerCase();
+  if (!text || !text.includes("@")) return false;
+  return text.includes("*") || text.includes("…") || text.includes("...");
+}
+
 function normalizeMeetCode(value) {
   return String(value || "")
     .trim()
@@ -120,6 +126,19 @@ function addIdentityAlias(store, { email = "", name = "", role = "participant", 
   }
 }
 
+function emailLocalPart(value) {
+  const normalized = normalizeEmail(value);
+  return normalized.includes("@") ? normalized.split("@")[0] : "";
+}
+
+function maskedEmailLooksLike(masked, actual) {
+  const maskedLocal = emailLocalPart(masked);
+  const actualLocal = emailLocalPart(actual);
+  if (!maskedLocal || !actualLocal) return false;
+  if (!isMaskedEmail(masked)) return false;
+  return actualLocal.startsWith(maskedLocal) || maskedLocal.startsWith(actualLocal.slice(0, Math.max(4, Math.min(actualLocal.length, 8))));
+}
+
 function resolveParticipantIdentity(store, { name = "", email = "", endpointId = "" }) {
   const normalizedEmail = normalizeEmail(email);
   const normalizedName = normalizeName(name);
@@ -135,6 +154,12 @@ function resolveParticipantIdentity(store, { name = "", email = "", endpointId =
 
   if (normalizedEndpointId && store.byName.has(normalizedEndpointId)) {
     return store.byName.get(normalizedEndpointId);
+  }
+
+  for (const [aliasEmail, alias] of store.byEmail.entries()) {
+    if (normalizedEmail && maskedEmailLooksLike(normalizedEmail, aliasEmail)) {
+      return alias;
+    }
   }
 
   for (const [aliasName, alias] of store.byName.entries()) {
@@ -265,48 +290,148 @@ function enrichParticipants(records, identityStore) {
       email: record.participantEmail,
       endpointId: record.googleParticipantId,
     });
+    const resolvedEmail = normalizeEmail(
+      record.participantEmail && !isMaskedEmail(record.participantEmail)
+        ? record.participantEmail
+        : resolved?.email || ""
+    );
+    const resolvedName =
+      record.participantName && !/^\d+$/.test(String(record.participantName).trim())
+        ? record.participantName
+        : resolved?.name || "";
 
     return {
       ...record,
-      participantEmail: normalizeEmail(record.participantEmail || resolved?.email || ""),
-      participantName: record.participantName || resolved?.name || "",
+      participantEmail: resolvedEmail,
+      participantName: resolvedName || record.displayName || "",
       resolvedRole: resolved?.role || "",
       resolvedSource: resolved?.source || "",
     };
   });
 }
 
-function pickBestMatch(records, expectedEmails = [], expectedRole = "") {
+function pickBestMatch(records, expectedEmails = [], expectedRole = "", expectedNames = []) {
   const normalizedEmails = normalizeEmailVariants(expectedEmails);
+  const normalizedNames = normalizeNameVariants(expectedNames);
   const exactRoleMatches = records.filter((record) => record.resolvedRole === expectedRole);
   const emailMatches = records.filter((record) => normalizedEmails.includes(normalizeEmail(record.participantEmail)));
-  const ranked = [...new Set([...emailMatches, ...exactRoleMatches])].sort(
+  const nameMatches = records.filter((record) => {
+    const recordName = normalizeName(record.participantName || "");
+    if (!recordName) return false;
+    return normalizedNames.some(
+      (expectedName) =>
+        expectedName &&
+        (recordName === expectedName || recordName.includes(expectedName) || expectedName.includes(recordName))
+    );
+  });
+  const ranked = [...new Set([...emailMatches, ...exactRoleMatches, ...nameMatches])].sort(
     (left, right) => Number(right.durationMinutes || 0) - Number(left.durationMinutes || 0)
   );
   return ranked[0] || null;
 }
 
+function pickLongestRecord(records, predicate = () => true) {
+  return [...records.filter(predicate)].sort((left, right) => Number(right.durationMinutes || 0) - Number(left.durationMinutes || 0))[0] || null;
+}
+
+function dedupeParticipantRecords(records = []) {
+  const grouped = new Map();
+
+  for (const record of records) {
+    const emailKey = normalizeEmail(record?.participantEmail || "");
+    const nameKey = normalizeName(record?.participantName || "");
+    const key = emailKey || nameKey;
+    if (!key) continue;
+
+    const existing = grouped.get(key);
+    if (!existing) {
+      grouped.set(key, { ...record });
+      continue;
+    }
+
+    const existingDuration = Number(existing.durationMinutes || 0);
+    const nextDuration = Number(record.durationMinutes || 0);
+    if (nextDuration > existingDuration) {
+      grouped.set(key, {
+        ...existing,
+        ...record,
+        participantEmail: record.participantEmail || existing.participantEmail || "",
+        participantName: record.participantName || existing.participantName || "",
+      });
+      continue;
+    }
+
+    grouped.set(key, {
+      ...existing,
+      participantEmail: existing.participantEmail || record.participantEmail || "",
+      participantName: existing.participantName || record.participantName || "",
+    });
+  }
+
+  return [...grouped.values()];
+}
+
 function classifyParticipants(records, lecture, calendarEvent) {
   const expected = buildExpectedParticipants(lecture, calendarEvent);
-  const host = pickBestMatch(records, expected[0].emailVariants, "host");
-  const cohost = pickBestMatch(
-    records.filter((record) => record !== host),
-    expected[1].emailVariants,
-    "cohost"
-  );
+  const hostEmailVariants = normalizeEmailVariants(expected[0].emailVariants);
+  const cohostEmailVariants = normalizeEmailVariants(expected[1].emailVariants);
+  const hostCandidates = records.filter((record) => {
+    const recordEmail = normalizeEmail(record.participantEmail || "");
+    const recordName = normalizeName(record.participantName || "");
+    return (
+      record.resolvedRole === "host" ||
+      (recordEmail && hostEmailVariants.includes(recordEmail)) ||
+      (recordName && normalizeNameVariants(expected[0].nameVariants).some((expectedName) => recordName === expectedName || recordName.includes(expectedName) || expectedName.includes(recordName)))
+    );
+  });
+  const host = pickLongestRecord(hostCandidates) || pickBestMatch(records, expected[0].emailVariants, "host", expected[0].nameVariants);
+  const cohostCandidates = records.filter((record) => {
+    if (record === host) return false;
+    const recordEmail = normalizeEmail(record.participantEmail || "");
+    const recordName = normalizeName(record.participantName || "");
+    return (
+      record.resolvedRole === "cohost" ||
+      (recordEmail && cohostEmailVariants.includes(recordEmail)) ||
+      (recordName && normalizeNameVariants(expected[1].nameVariants).some((expectedName) => recordName === expectedName || recordName.includes(expectedName) || expectedName.includes(recordName)))
+    );
+  });
+  const cohost =
+    pickLongestRecord(cohostCandidates) ||
+    pickBestMatch(
+      records.filter((record) => record !== host),
+      expected[1].emailVariants,
+      "cohost",
+      expected[1].nameVariants
+    );
+  const fallbackCohost =
+    cohost ||
+    pickLongestRecord(
+      records.filter((record) => record !== host),
+      (record) => {
+        const name = normalizeName(record.participantName || "");
+        return Boolean(name) && !/^\d+$/.test(String(record.participantName || "").trim());
+      }
+    );
   const reservedEmails = new Set(
     normalizeEmailVariants([
       ...(expected[0]?.emailVariants || []),
       ...(expected[1]?.emailVariants || []),
       host?.participantEmail || "",
-      cohost?.participantEmail || "",
+      fallbackCohost?.participantEmail || "",
     ])
   );
   const others = records.filter((record) => {
-    if (record === host || record === cohost) return false;
+    if (record === host || record === fallbackCohost) return false;
     const recordEmail = normalizeEmail(record.participantEmail || "");
     if (recordEmail && reservedEmails.has(recordEmail)) return false;
+    if (record.resolvedRole === "host" && host) return false;
+    if (record.resolvedRole === "cohost" && fallbackCohost) return false;
     if (record.resolvedRole === "host" || record.resolvedRole === "cohost") return false;
+    return true;
+  });
+  const dedupedOthers = dedupeParticipantRecords(others).filter((record) => {
+    if (host && normalizeName(record.participantName || "") === normalizeName(host.participantName || "")) return false;
+    if (fallbackCohost && normalizeName(record.participantName || "") === normalizeName(fallbackCohost.participantName || "")) return false;
     return true;
   });
 
@@ -318,35 +443,55 @@ function classifyParticipants(records, lecture, calendarEvent) {
           userId: expected[0].userId || "",
         }
       : null,
-    cohost: cohost
+    cohost: fallbackCohost
       ? {
-          ...cohost,
+          ...fallbackCohost,
           roleType: "teacher",
           userId: expected[1].userId || "",
         }
       : null,
-    others,
+    others: dedupedOthers,
   };
 }
 
-function toLectureMetaRecord(record, roleType = "participant", fallbackEmail = "") {
+function toLectureMetaRecord(record, roleType = "participant", fallbackEmail = "", conferenceEndTime = null) {
   const joinedAt = record.joinedAt || null;
-  const durationMinutes = Number(record.durationMinutes || 0);
-  const leftAt =
-    joinedAt && durationMinutes > 0
-      ? new Date(new Date(joinedAt).getTime() + durationMinutes * 60000).toISOString()
+  const conferenceEnd = conferenceEndTime ? new Date(conferenceEndTime) : null;
+  const rawDurationMinutes = Number(record.durationMinutes || 0);
+  const joinedAtDate = joinedAt ? new Date(joinedAt) : null;
+  const conferenceEndTimeValue = conferenceEnd && !Number.isNaN(conferenceEnd.getTime()) ? conferenceEnd.getTime() : null;
+  const joinedAtTime = joinedAtDate && !Number.isNaN(joinedAtDate.getTime()) ? joinedAtDate.getTime() : null;
+  const effectiveDurationMinutes =
+    joinedAtTime && conferenceEndTimeValue
+      ? Math.max(0, Math.round((Math.min(joinedAtTime + rawDurationMinutes * 60000, conferenceEndTimeValue) - joinedAtTime) / 60000))
+      : rawDurationMinutes;
+  const durationLeftAt =
+    joinedAtTime && effectiveDurationMinutes > 0
+      ? new Date(joinedAtTime + effectiveDurationMinutes * 60000).toISOString()
       : record.leftAt || null;
+  const clampedLeftAt =
+    durationLeftAt && conferenceEnd && !Number.isNaN(conferenceEnd.getTime())
+      ? new Date(Math.min(new Date(durationLeftAt).getTime(), conferenceEnd.getTime())).toISOString()
+      : durationLeftAt;
 
   return {
     name: record.participantName || "",
     email: record.participantEmail || fallbackEmail || "",
-    joined: Boolean(durationMinutes > 0 || joinedAt),
-    status: durationStatus(durationMinutes),
+    joined: Boolean(effectiveDurationMinutes > 0 || joinedAt),
+    status: durationStatus(effectiveDurationMinutes),
     joined_at: joinedAt,
-    left_at: leftAt,
-    duration_minutes: durationMinutes,
+    left_at: clampedLeftAt,
+    duration_minutes: effectiveDurationMinutes,
     role_type: roleType,
   };
+}
+
+function isMeaningfulParticipant(record) {
+  const name = String(record?.participantName || "").trim();
+  const email = normalizeEmail(record?.participantEmail || "");
+  if (email) return true;
+  if (!name) return false;
+  return !/^\d+$/.test(name);
 }
 
 export async function POST(_request, { params }) {
@@ -498,26 +643,55 @@ export async function POST(_request, { params }) {
     const enrichedRecords = enrichParticipants(meetData.records, identityStore);
     const classification = classifyParticipants(enrichedRecords, lecture, calendarEvent);
     const hostMeta = classification.host
-      ? toLectureMetaRecord(classification.host, "coordinator", lecture.coordinator_email || "")
+      ? toLectureMetaRecord(classification.host, "coordinator", lecture.coordinator_email || "", meetData.conference_record_end_time || meetData.conferenceRecord?.endTime || null)
       : null;
     const teacherMeta = classification.cohost
-      ? toLectureMetaRecord(classification.cohost, "teacher", lecture.teacher_email || "")
+      ? toLectureMetaRecord(classification.cohost, "teacher", lecture.teacher_email || "", meetData.conference_record_end_time || meetData.conferenceRecord?.endTime || null)
       : null;
-    const othersMeta = classification.others.map((record) => toLectureMetaRecord(record, "participant"));
+    const normalizedCoordinatorEmail = normalizeEmail(lecture.coordinator_email || lecture.google_organizer_email || "");
+    const normalizedTeacherEmail = normalizeEmail(lecture.teacher_email || lecture.google_teacher_email || "");
+    const normalizedCoordinatorName = lecture.coordinator_name || "";
+    const normalizedTeacherName = lecture.teacher_name || "";
+    const othersMeta = classification.others
+      .filter(isMeaningfulParticipant)
+      .map((record) => toLectureMetaRecord(record, "participant", "", meetData.conference_record_end_time || meetData.conferenceRecord?.endTime || null))
+      .filter((item) => {
+        const itemEmail = normalizeEmail(item.email || "");
+        const itemName = normalizeName(item.name || "");
+        if (itemEmail && (itemEmail === normalizedCoordinatorEmail || itemEmail === normalizedTeacherEmail)) return false;
+        if (itemName && normalizeName(normalizedCoordinatorName) === itemName) return false;
+        if (itemName && normalizeName(normalizedTeacherName) === itemName) return false;
+        return true;
+      });
+
+    const hostRecord = hostMeta
+      ? {
+          ...hostMeta,
+          name: lecture.coordinator_name || hostMeta.name || "",
+          email: lecture.coordinator_email || lecture.google_organizer_email || hostMeta.email || "",
+        }
+      : null;
+    const teacherRecord = teacherMeta
+      ? {
+          ...teacherMeta,
+          name: lecture.teacher_name || teacherMeta.name || "",
+          email: lecture.teacher_email || lecture.google_teacher_email || teacherMeta.email || "",
+        }
+      : null;
 
     console.log("[meet-sync] classification", {
-      host: hostMeta
+      host: hostRecord
         ? {
-            email: hostMeta.email,
-            name: hostMeta.name,
-            duration_minutes: hostMeta.duration_minutes,
+            email: hostRecord.email,
+            name: hostRecord.name,
+            duration_minutes: hostRecord.duration_minutes,
           }
         : null,
-      cohost: teacherMeta
+      cohost: teacherRecord
         ? {
-            email: teacherMeta.email,
-            name: teacherMeta.name,
-            duration_minutes: teacherMeta.duration_minutes,
+            email: teacherRecord.email,
+            name: teacherRecord.name,
+            duration_minutes: teacherRecord.duration_minutes,
           }
         : null,
       others: othersMeta.map((item) => ({
@@ -527,7 +701,7 @@ export async function POST(_request, { params }) {
       })),
     });
 
-    if (!hostMeta && !teacherMeta && !othersMeta.length) {
+    if (!hostRecord && !teacherRecord && !othersMeta.length) {
       return json("No matching Google Meet audit data found yet for this lecture.", 200, {
         synced: 0,
         unmatched_participants: [],
@@ -563,8 +737,8 @@ export async function POST(_request, { params }) {
           ${classification.host.durationMinutes || 0},
           'google_meet'::attendance_source,
           ${classification.host.durationMinutes > 0 || classification.host.joinedAt ? 'present' : 'absent'}::attendance_status,
-          ${classification.host.participantEmail || null},
-          ${classification.host.participantName || null},
+          ${hostRecord?.email || classification.host.participantEmail || null},
+          ${hostRecord?.name || classification.host.participantName || null},
           ${classification.host.googleParticipantId || null},
           ${classification.host.googleSessionId || null},
           ${JSON.stringify(classification.host.raw || {})}::jsonb
@@ -613,8 +787,8 @@ export async function POST(_request, { params }) {
           ${classification.cohost.durationMinutes || 0},
           'google_meet'::attendance_source,
           ${classification.cohost.durationMinutes > 0 || classification.cohost.joinedAt ? 'present' : 'absent'}::attendance_status,
-          ${classification.cohost.participantEmail || null},
-          ${classification.cohost.participantName || null},
+          ${teacherRecord?.email || classification.cohost.participantEmail || null},
+          ${teacherRecord?.name || classification.cohost.participantName || null},
           ${classification.cohost.googleParticipantId || null},
           ${classification.cohost.googleSessionId || null},
           ${JSON.stringify(classification.cohost.raw || {})}::jsonb
@@ -679,16 +853,16 @@ export async function POST(_request, { params }) {
       synced_at: new Date().toISOString(),
       meet_space_id: meetSpaceId || "",
       conference_record_name: meetData.conferenceRecord?.name || "",
-      host: hostMeta
+      host: hostRecord
         ? {
             role: "coordinator",
-            name: hostMeta.name || lecture.coordinator_name || "",
-            email: hostMeta.email || lecture.coordinator_email || lecture.google_organizer_email || "",
-            joined: hostMeta.joined,
-            status: hostMeta.status,
-            joined_at: hostMeta.joined_at,
-            left_at: hostMeta.left_at,
-            duration_minutes: hostMeta.duration_minutes,
+            name: hostRecord.name || lecture.coordinator_name || "",
+            email: hostRecord.email || lecture.coordinator_email || lecture.google_organizer_email || "",
+            joined: hostRecord.joined,
+            status: hostRecord.status,
+            joined_at: hostRecord.joined_at,
+            left_at: hostRecord.left_at,
+            duration_minutes: hostRecord.duration_minutes,
           }
         : preservedHost
           ? preservedHost
@@ -702,16 +876,16 @@ export async function POST(_request, { params }) {
             left_at: null,
             duration_minutes: 0,
           },
-      cohost: teacherMeta
+      cohost: teacherRecord
         ? {
             role: "teacher",
-            name: teacherMeta.name || lecture.teacher_name || "",
-            email: teacherMeta.email || lecture.teacher_email || lecture.google_teacher_email || "",
-            joined: teacherMeta.joined,
-            status: teacherMeta.status,
-            joined_at: teacherMeta.joined_at,
-            left_at: teacherMeta.left_at,
-            duration_minutes: teacherMeta.duration_minutes,
+            name: teacherRecord.name || lecture.teacher_name || "",
+            email: teacherRecord.email || lecture.teacher_email || lecture.google_teacher_email || "",
+            joined: teacherRecord.joined,
+            status: teacherRecord.status,
+            joined_at: teacherRecord.joined_at,
+            left_at: teacherRecord.left_at,
+            duration_minutes: teacherRecord.duration_minutes,
           }
         : preservedCohost
           ? preservedCohost
@@ -795,8 +969,8 @@ export async function POST(_request, { params }) {
         resolved_source: record.resolvedSource || "",
       })),
       classification: {
-        host: hostMeta,
-        cohost: teacherMeta,
+        host: hostRecord,
+        cohost: teacherRecord,
         others: othersMeta,
       },
       host: syncMeta.host,
