@@ -244,27 +244,6 @@ export default function LectureVerificationTable({ items = [], onRefresh }) {
                 <p className="mt-1 text-xs text-[#245C4F]">{cohost.duration_minutes} minutes</p>
               </div>
               <div className="rounded-2xl bg-[#FAF7F0] p-4 text-sm text-[#245C4F]">
-                <p className="font-semibold text-[#063F32]">Others who joined</p>
-                {others.length ? (
-                  <div className="mt-2 space-y-2">
-                    {others
-                      .filter((person) => {
-                        const label = String(person?.name || person?.email || "").trim();
-                        return label && !isOpaqueParticipantValue(label);
-                      })
-                      .map((person, index) => (
-                      <div key={`${person.email || person.name || "participant"}-${index}`} className="rounded-xl border border-[#2D8A6A]/10 bg-white/70 px-3 py-2">
-                        <p className="text-xs font-semibold text-[#063F32]">{renderParticipantLabel(person)}</p>
-                        <p className="mt-1 text-xs text-[#245C4F]">{renderParticipantEmail(person) || "No email"}</p>
-                        <p className="mt-1 text-xs text-[#245C4F]">{person.duration_minutes || 0} minutes</p>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="mt-2">No other participants were captured in the last sync.</p>
-                )}
-              </div>
-              <div className="rounded-2xl bg-[#FAF7F0] p-4 text-sm text-[#245C4F]">
                 <p className="font-semibold text-[#063F32]">Recording</p>
                 {recording?.url || item.recording_drive_url ? (
                   <a

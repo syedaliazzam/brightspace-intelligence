@@ -457,14 +457,13 @@ function classifyParticipants(records, lecture, calendarEvent) {
 function toLectureMetaRecord(record, roleType = "participant", fallbackEmail = "", conferenceEndTime = null) {
   const joinedAt = record.joinedAt || null;
   const conferenceEnd = conferenceEndTime ? new Date(conferenceEndTime) : null;
-  const rawDurationMinutes = Number(record.durationMinutes || 0);
   const joinedAtDate = joinedAt ? new Date(joinedAt) : null;
   const conferenceEndTimeValue = conferenceEnd && !Number.isNaN(conferenceEnd.getTime()) ? conferenceEnd.getTime() : null;
   const joinedAtTime = joinedAtDate && !Number.isNaN(joinedAtDate.getTime()) ? joinedAtDate.getTime() : null;
   const effectiveDurationMinutes =
     joinedAtTime && conferenceEndTimeValue
-      ? Math.max(0, Math.round((Math.min(joinedAtTime + rawDurationMinutes * 60000, conferenceEndTimeValue) - joinedAtTime) / 60000))
-      : rawDurationMinutes;
+      ? Math.max(0, Math.round((conferenceEndTimeValue - joinedAtTime) / 60000))
+      : Number(record.durationMinutes || 0);
   const durationLeftAt =
     joinedAtTime && effectiveDurationMinutes > 0
       ? new Date(joinedAtTime + effectiveDurationMinutes * 60000).toISOString()
@@ -899,15 +898,7 @@ export async function POST(_request, { params }) {
             left_at: null,
             duration_minutes: 0,
           },
-      others: othersMeta.map((item) => ({
-        name: item.name,
-        email: item.email,
-        joined: item.joined,
-        status: item.status,
-        joined_at: item.joined_at,
-        left_at: item.left_at,
-        duration_minutes: item.duration_minutes,
-      })),
+      others: [],
       recording: latestRecording
         ? {
             status: latestRecording.state || "available",
@@ -940,7 +931,7 @@ export async function POST(_request, { params }) {
 
     return json(syncMessage, 200, {
       synced: (classification.host ? 1 : 0) + (classification.cohost ? 1 : 0),
-      unmatched_participants: othersMeta,
+      unmatched_participants: [],
       available: true,
       reports_api_called: true,
       eventsReturned: Number(meetData.eventsReturned || 0),
@@ -971,7 +962,7 @@ export async function POST(_request, { params }) {
       classification: {
         host: hostRecord,
         cohost: teacherRecord,
-        others: othersMeta,
+        others: [],
       },
       host: syncMeta.host,
       cohost: syncMeta.cohost,
