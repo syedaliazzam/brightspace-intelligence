@@ -131,7 +131,8 @@ export async function GET(request) {
           ${entityTypeSelect},
           ${entityIdSelect},
           ${createdAtSelect},
-          COALESCE(actor.full_name, actor.email, actor.phone, 'System') AS actor_name
+          COALESCE(actor.full_name, actor.email, actor.phone, 'System') AS actor_name,
+          COALESCE(actor.email, '') AS actor_email
         FROM audit_logs al
         LEFT JOIN users actor ON actor.id = al.actor_user_id
         ${whereClause}

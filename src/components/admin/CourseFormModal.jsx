@@ -36,6 +36,13 @@ export default function CourseFormModal({
     setError("");
 
     try {
+      const classMode =
+        typeof form.classMode === "string" ? form.classMode.trim() : "";
+      const description =
+        typeof form.description === "string" ? form.description.trim() : "";
+      const status =
+        typeof form.status === "string" ? form.status.trim() : "active";
+
       const endpoint = record?.id
         ? `/api/admin/courses/${record.id}`
         : "/api/admin/courses";
@@ -44,8 +51,10 @@ export default function CourseFormModal({
         method,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          ...form,
-          name: form.classMode,
+          classMode,
+          name: classMode,
+          description,
+          status,
         }),
       });
       const data = await response.json();

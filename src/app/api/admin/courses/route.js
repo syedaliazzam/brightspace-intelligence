@@ -13,6 +13,58 @@ function normalizeText(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 
+function normalizeClassInput(value) {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function normalizeTextCandidate(value) {
+  if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+    return String(value).trim();
+  }
+
+  if (!value || typeof value !== "object") {
+    return "";
+  }
+
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const text = normalizeTextCandidate(item);
+      if (text) return text;
+    }
+    return "";
+  }
+
+  const candidates = [
+    value.classMode,
+    value.class_mode,
+    value.name,
+    value.title,
+    value.label,
+    value.value,
+    value.text,
+    value.description,
+    value.status,
+  ];
+
+  for (const candidate of candidates) {
+    if (typeof candidate === "string" || typeof candidate === "number" || typeof candidate === "boolean") {
+      const text = String(candidate).trim();
+      if (text) {
+        return text;
+      }
+    }
+  }
+
+  for (const nested of Object.values(value)) {
+    const text = normalizeTextCandidate(nested);
+    if (text) {
+      return text;
+    }
+  }
+
+  return "";
+}
+
 function normalizeCourseStatus(value) {
   const status = normalizeText(value).toLowerCase();
   return ["active", "pending", "suspended", "archived"].includes(status)
@@ -307,11 +359,14 @@ export async function POST(request) {
     }
 
     const body = await request.json();
-    const classLevel =
-      normalizeClassLevel(body?.classMode || body?.name) ||
-      normalizeText(body?.classMode || body?.name);
-    const description = normalizeText(body?.description);
-    const status = normalizeCourseStatus(body?.status);
+    const rawClassValue =
+      normalizeClassInput(body?.classMode) ||
+      normalizeClassInput(body?.name) ||
+      normalizeTextCandidate(body?.classMode) ||
+      normalizeTextCandidate(body?.name);
+    const classLevel = normalizeClassLevel(rawClassValue) || rawClassValue;
+    const description = normalizeTextCandidate(body?.description);
+    const status = normalizeCourseStatus(normalizeTextCandidate(body?.status));
 
     if (!classLevel) {
       return json("Class name is required.", 400);

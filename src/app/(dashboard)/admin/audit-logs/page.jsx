@@ -326,6 +326,11 @@ export default function AdminAuditLogsPage() {
               },
               { key: "entity_type", label: "Entity" },
               { key: "actor_name", label: "Actor" },
+              {
+                key: "actor_email",
+                label: "Email",
+                render: (row) => row.actor_email || "-",
+              },
               { key: "description", label: "Description" },
               {
                 key: "created_at",

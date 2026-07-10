@@ -13,6 +13,54 @@ function normalizeText(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 
+function normalizeTextCandidate(value) {
+  if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+    return String(value).trim();
+  }
+
+  if (!value || typeof value !== "object") {
+    return "";
+  }
+
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const text = normalizeTextCandidate(item);
+      if (text) return text;
+    }
+    return "";
+  }
+
+  const candidates = [
+    value.classMode,
+    value.class_mode,
+    value.name,
+    value.title,
+    value.label,
+    value.value,
+    value.text,
+    value.description,
+    value.status,
+  ];
+
+  for (const candidate of candidates) {
+    if (typeof candidate === "string" || typeof candidate === "number" || typeof candidate === "boolean") {
+      const text = String(candidate).trim();
+      if (text) {
+        return text;
+      }
+    }
+  }
+
+  for (const nested of Object.values(value)) {
+    const text = normalizeTextCandidate(nested);
+    if (text) {
+      return text;
+    }
+  }
+
+  return "";
+}
+
 function normalizeCourseStatus(value) {
   const status = normalizeText(value).toLowerCase();
   return ["active", "pending", "suspended", "archived"].includes(status)
@@ -134,13 +182,12 @@ export async function PATCH(request, { params }) {
 
     const { id } = await params;
     const body = await request.json();
-    const classLevel =
-      normalizeClassLevel(body?.classMode || body?.name) ||
-      normalizeText(body?.classMode || body?.name);
-    const description = normalizeText(body?.description);
-    const status = normalizeCourseStatus(body?.status);
-    const updates = [];
-
+    const rawClassValue =
+      normalizeTextCandidate(body?.classMode) ||
+      normalizeTextCandidate(body?.name);
+    const classLevel = normalizeClassLevel(rawClassValue) || rawClassValue;
+    const description = normalizeTextCandidate(body?.description);
+    const status = normalizeCourseStatus(normalizeTextCandidate(body?.status));
     if (!classLevel) {
       return json("Class name is required.", 400);
     }
@@ -157,26 +204,18 @@ export async function PATCH(request, { params }) {
       return json("This class already exists.", 409);
     }
 
-    updates.push(Prisma.sql`title = ${classLevel}`);
-    updates.push(Prisma.sql`class_level = ${classLevel}`);
-
-    if (description || body?.description === "") {
-      updates.push(Prisma.sql`description = ${description || null}`);
-    }
-    if (status) {
-      updates.push(Prisma.sql`status = ${status}::user_status`);
-    }
-
     await prisma.$transaction(async (tx) => {
-      if (updates.length) {
-        await tx.$executeRaw(
-          Prisma.sql`
-            UPDATE courses
-            SET ${Prisma.join(updates, Prisma.sql`, `)}
-            WHERE id = ${id}::uuid
-          `
-        );
-      }
+      await tx.$executeRaw(
+        Prisma.sql`
+          UPDATE courses
+          SET
+            title = ${classLevel},
+            class_level = ${classLevel},
+            description = ${description || null},
+            status = ${status}::user_status
+          WHERE id = ${id}::uuid
+        `
+      );
 
       await syncCourseSubjects(tx, id, classLevel);
 
