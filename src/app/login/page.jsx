@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
 import { signIn } from "next-auth/react";
 import { Eye, EyeOff } from "lucide-react";
@@ -29,7 +28,6 @@ const item = {
 
 export default function LoginPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -37,8 +35,9 @@ export default function LoginPage() {
   const [pending, setPending] = useState(false);
 
   useEffect(() => {
-    const prefillIdentifier = searchParams?.get("identifier") || searchParams?.get("email") || "";
-    const prefillPassword = searchParams?.get("password") || "";
+    const searchParams = new URLSearchParams(window.location.search);
+    const prefillIdentifier = searchParams.get("identifier") || searchParams.get("email") || "";
+    const prefillPassword = searchParams.get("password") || "";
 
     if (prefillIdentifier) {
       setIdentifier(prefillIdentifier);
@@ -47,7 +46,7 @@ export default function LoginPage() {
     if (prefillPassword) {
       setPassword(prefillPassword);
     }
-  }, [searchParams]);
+  }, []);
 
   async function handleSubmit(event) {
     event.preventDefault();
