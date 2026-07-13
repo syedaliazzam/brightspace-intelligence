@@ -1,6 +1,8 @@
 import crypto from "crypto";
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
+import { themedEmailShell, sendEmail } from "@/lib/email";
+import { sendWhatsAppText } from "@/lib/whatsapp";
 import prisma from "@/lib/prisma";
 
 const ALLOWED_ROLES = new Set(["admin", "coordinator"]);
@@ -18,9 +20,23 @@ export async function POST(request, { params }) {
 
   try {
     const { id } = await params;
+    let paymentPayload = {};
+    try {
+      paymentPayload = await request.json();
+    } catch {
+      paymentPayload = {};
+    }
     const [row] = await prisma.$queryRaw`
       SELECT
         id::text AS id,
+        COALESCE(NULLIF(TRIM(student_name), ''), NULLIF(TRIM(child_name), '')) AS student_name,
+        COALESCE(NULLIF(TRIM(parent_name), ''), NULLIF(TRIM(parent_name), '')) AS parent_name,
+        email,
+        phone,
+        COALESCE(NULLIF(TRIM(class_level), ''), NULLIF(TRIM(class_applying_for), '')) AS class_level,
+        COALESCE(NULLIF(TRIM(child_age), ''), '') AS child_age,
+        COALESCE(NULLIF(TRIM(city_country), ''), '') AS city_country,
+        COALESCE(NULLIF(TRIM(message), ''), NULLIF(TRIM(why_interested), ''), NULLIF(TRIM(questions_comments), '')) AS message,
         registration_token,
         registration_lead_id::text AS registration_lead_id,
         LOWER(status::text) AS status
@@ -36,8 +52,18 @@ export async function POST(request, { params }) {
       process.env.NEXT_PUBLIC_APP_URL ||
       process.env.APP_URL ||
       request.nextUrl.origin;
-    const registrationLink = `${appUrl.replace(/\/+$/, "")}/admission-form?leadToken=${encodeURIComponent(token)}`;
+    const baseRegistrationLink = `${appUrl.replace(/\/+$/, "")}/admission-form?leadToken=${encodeURIComponent(token)}`;
+    const registrationUrl = new URL(baseRegistrationLink);
+    if (paymentPayload?.admissionFeeId) registrationUrl.searchParams.set("admissionFeeId", String(paymentPayload.admissionFeeId));
+    if (paymentPayload?.admissionFeeAmount) registrationUrl.searchParams.set("admissionFeeAmount", String(paymentPayload.admissionFeeAmount));
+    if (paymentPayload?.discountId) registrationUrl.searchParams.set("discountId", String(paymentPayload.discountId));
+    if (paymentPayload?.discountPercent) registrationUrl.searchParams.set("discountPercent", String(paymentPayload.discountPercent));
+    if (paymentPayload?.paymentMethodId) registrationUrl.searchParams.set("paymentMethodId", String(paymentPayload.paymentMethodId));
+    if (paymentPayload?.paymentMethodName) registrationUrl.searchParams.set("paymentMethodName", String(paymentPayload.paymentMethodName));
+    if (paymentPayload?.paymentInstructions) registrationUrl.searchParams.set("paymentInstructions", String(paymentPayload.paymentInstructions));
+    const registrationLink = registrationUrl.toString();
     const generatedAt = new Date();
+    const dueAt = new Date(generatedAt.getTime() + 5 * 24 * 60 * 60 * 1000);
     const generatedBy = session?.user?.id || null;
     const alreadyGenerated = Boolean(row.registration_token);
 
@@ -48,16 +74,98 @@ export async function POST(request, { params }) {
           registration_token = ${token},
           status = ${"link_generated"},
           registration_link_generated_at = ${generatedAt},
+          admission_form_sent_at = ${generatedAt},
+          admission_form_due_at = ${dueAt},
+          admission_form_last_reminder_at = NULL,
+          admission_form_reminder_count = 0,
+          admission_form_status = ${"sent"},
+          admission_form_submitted_at = NULL,
+          admission_form_last_channel = ${"email_whatsapp"},
+          admission_form_last_error = NULL,
           registration_link_generated_by = CAST(${generatedBy || null} AS uuid),
+          updated_at = NOW()
+        WHERE id = ${id}::uuid
+      `;
+    } else {
+      await prisma.$executeRaw`
+        UPDATE interested_students
+        SET
+          admission_form_sent_at = COALESCE(admission_form_sent_at, ${generatedAt}),
+          admission_form_due_at = COALESCE(admission_form_due_at, ${dueAt}),
+          admission_form_status = COALESCE(NULLIF(admission_form_status, ''), ${"sent"}),
+          admission_form_last_channel = COALESCE(admission_form_last_channel, ${"email_whatsapp"}),
+          admission_form_last_error = NULL,
           updated_at = NOW()
         WHERE id = ${id}::uuid
       `;
     }
 
-    return json("Registration link generated.", 200, {
+    if (row?.id && row?.email) {
+      const studentName = row.student_name || "Student";
+      const parentName = row.parent_name || "Parent";
+      const subject = `Your Ash-Shajrah admission form for ${studentName}`;
+      const previewLink = registrationLink;
+      const registrationDetails = [
+        `Student: ${studentName}`,
+        `Parent: ${parentName}`,
+        `Email: ${row.email || "-"}`,
+        `Phone: ${row.phone || "-"}`,
+        `Class: ${row.class_level || "-"}`,
+        `Child age: ${row.child_age || "-"}`,
+        `City / Country: ${row.city_country || "-"}`,
+        `Message: ${row.message || "-"}`,
+      ];
+      const html = themedEmailShell({
+        eyebrow: "Admission Form",
+        title: "Your registration form is ready",
+        intro: `Assalamualaikum ${parentName}, your prefilled admission form is ready. Please open the form link below and complete the next steps.`,
+        rows: [
+          ["Student", studentName],
+          ["Parent", parentName],
+          ["Email", row.email || "-"],
+        ["Phone", row.phone || "-"],
+        ["Class", row.class_level || "-"],
+        ["Child age", row.child_age || "-"],
+        ["City / Country", row.city_country || "-"],
+        ["Message", row.message || "-"],
+      ],
+      buttonLabel: "Open Admission Form",
+      buttonUrl: registrationLink,
+      footerNote: `If the button does not work, open this link directly: ${registrationLink}`,
+      });
+
+      await sendEmail({
+        to: row.email,
+        subject,
+        html,
+        text: `Assalamualaikum ${parentName}, your prefilled admission form is ready.\n\n${registrationDetails.join("\n")}\n\nOpen this link:\n${registrationLink}`,
+      });
+
+      if (row.phone) {
+        const whatsappResult = await sendWhatsAppText({
+          to: row.phone,
+          message: `Assalamualaikum ${parentName}, your Ash-Shajrah admission form is ready.\n\n${registrationDetails.join("\n")}\n\nOpen form: ${registrationLink}`,
+        }).catch((error) => {
+          console.error("INTERESTED_STUDENT_WHATSAPP_ERROR:", error);
+          return { success: false, error: error instanceof Error ? error.message : "WhatsApp message failed." };
+        });
+
+        if (whatsappResult?.skipped) {
+          console.error("INTERESTED_STUDENT_WHATSAPP_SKIPPED:", {
+            reason: "Missing WhatsApp config or recipient",
+            phone: row.phone,
+            hasPhoneNumberId: Boolean(process.env.WHATSAPP_PHONE_NUMBER_ID),
+            hasAccessToken: Boolean(process.env.WHATSAPP_ACCESS_TOKEN),
+          });
+        }
+      }
+    }
+
+      return json("Registration link generated.", 200, {
       success: true,
       already_generated: alreadyGenerated,
       registration_link: registrationLink,
+      admission_form_due_at: dueAt.toISOString(),
     });
   } catch (error) {
     return json(error instanceof Error ? error.message : "Unable to generate registration link.", 500);

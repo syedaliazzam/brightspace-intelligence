@@ -2,12 +2,13 @@ import crypto from "crypto";
 import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
+import { normalizeClassLevel as normalizeAcademicClassLevel } from "@/lib/academicCatalog";
 import { sendEmail } from "@/lib/email";
 import prisma from "@/lib/prisma";
 import { generateVoucherNumber } from "@/lib/voucherNumber";
 
 const ALLOWED_ROLES = new Set(["admin", "coordinator"]);
-const ELIGIBLE_LEAD_STATUSES = new Set(["new_lead", "pending_clarification"]);
+const ELIGIBLE_LEAD_STATUSES = new Set(["new_lead", "pending_clarification", "pending"]);
 const VALID_VOUCHER_STATUSES = new Set([
   "unpaid",
   "submitted",
@@ -58,7 +59,20 @@ function normalizeEnumValue(value) {
 }
 
 function normalizeClassLevel(value) {
-  return String(value || "").trim().toLowerCase();
+  const incoming = String(value || "").trim();
+  const normalized = incoming.toLowerCase().replace(/[^a-z0-9]/g, "");
+  const aliases = {
+    prenursery: "Pre-Nursery",
+    prenurserry: "Pre-Nursery",
+    prepi: "Pre-Nursery",
+    prep1: "Pre-Nursery",
+    prepnursery: "Pre-Nursery",
+    nursery: "Nursery",
+    kg1: "KG-1",
+    kg2: "KG-2",
+  };
+
+  return normalizeAcademicClassLevel(aliases[normalized] || incoming) || aliases[normalized] || incoming;
 }
 
 async function getEnumLabels(typeName, tx = prisma) {
@@ -491,7 +505,93 @@ async function getLeadById(id, tx = prisma) {
     LIMIT 1
   `;
 
-  return lead;
+  if (lead?.id) {
+    return lead;
+  }
+
+  const [linkedStudent] = await tx.$queryRaw`
+    SELECT
+      istd.id::text AS id,
+      istd.registration_lead_id::text AS registration_lead_id,
+      COALESCE(
+        NULLIF(TRIM(istd.student_name), ''),
+        NULLIF(TRIM(istd.child_name), '')
+      ) AS student_name,
+      COALESCE(
+        NULLIF(TRIM(istd.parent_name), ''),
+        NULLIF(TRIM(istd.notes), '')
+      ) AS parent_name,
+      COALESCE(
+        NULLIF(TRIM(istd.class_level), ''),
+        NULLIF(TRIM(istd.class_applying_for), '')
+      ) AS class_level,
+      COALESCE(
+        NULLIF(TRIM(istd.email), ''),
+        NULLIF(TRIM(istd.phone), '')
+      ) AS contact_value,
+      LOWER(istd.status::text) AS status
+    FROM interested_students istd
+    WHERE istd.id = ${id}::uuid
+    LIMIT 1
+  `;
+
+  const linkedLeadId = linkedStudent?.registration_lead_id || "";
+  if (linkedLeadId) {
+    const [leadByLink] = await tx.$queryRaw`
+      SELECT
+        id::text AS id,
+        student_name,
+        parent_name,
+        class_level,
+        email,
+        phone,
+        LOWER(status::text) AS status
+      FROM registration_leads
+      WHERE id = ${linkedLeadId}::uuid
+      LIMIT 1
+    `;
+
+    if (leadByLink?.id) {
+      return leadByLink;
+    }
+  }
+
+  if (!linkedStudent?.id) {
+    return null;
+  }
+
+  const [matchedLead] = await tx.$queryRaw`
+    SELECT
+      id::text AS id,
+      student_name,
+      parent_name,
+      class_level,
+      email,
+      phone,
+      LOWER(status::text) AS status
+    FROM registration_leads
+    WHERE
+      (
+        NULLIF(TRIM(student_name), '') IS NOT NULL
+        AND LOWER(TRIM(student_name)) = LOWER(${linkedStudent.student_name || ""})
+      )
+      OR (
+        NULLIF(TRIM(email), '') IS NOT NULL
+        AND LOWER(TRIM(email)) = LOWER(${linkedStudent.contact_value || ""})
+      )
+      OR (
+        NULLIF(TRIM(phone), '') IS NOT NULL
+        AND TRIM(phone) = TRIM(${linkedStudent.contact_value || ""})
+      )
+      OR (
+        NULLIF(TRIM(class_level), '') IS NOT NULL
+        AND LOWER(TRIM(class_level)) = LOWER(${linkedStudent.class_level || ""})
+      )
+    ORDER BY created_at DESC NULLS LAST, id DESC
+    LIMIT 1
+  `;
+
+  return matchedLead || null;
 }
 
 function buildPaymentSubmitUrl(voucherNo) {
@@ -817,6 +917,7 @@ export async function POST(request) {
       if (!lead?.id) {
         throw new Error("Registration lead not found.");
       }
+      const resolvedRegistrationLeadId = lead.id;
 
       if (!ELIGIBLE_LEAD_STATUSES.has(String(lead.status || "").toLowerCase())) {
         throw new Error("Fee voucher can only be created for new or clarification-pending leads.");
@@ -906,7 +1007,7 @@ export async function POST(request) {
 
       const paymentSubmitUrl = buildPaymentSubmitUrl(voucherNo);
       const payload = {
-        registrationLeadId,
+        registrationLeadId: resolvedRegistrationLeadId,
         amount: voucherAmount,
         dueDate,
         paymentMethodId: selectedPaymentMethod?.id || null,
@@ -969,15 +1070,15 @@ export async function POST(request) {
       await tx.$executeRaw`
         UPDATE registration_leads
         SET status = CAST('voucher_created' AS registration_status)
-        WHERE id = ${registrationLeadId}::uuid
+        WHERE id = ${resolvedRegistrationLeadId}::uuid
       `;
 
       await insertAuditLog(
         session.user.id,
         voucherId,
         "fee_voucher_created",
-        `Fee voucher ${voucherNo} created for registration lead ${registrationLeadId}.`,
-        { voucherId, voucherNo, registrationLeadId },
+        `Fee voucher ${voucherNo} created for registration lead ${resolvedRegistrationLeadId}.`,
+        { voucherId, voucherNo, registrationLeadId: resolvedRegistrationLeadId },
         tx
       );
 

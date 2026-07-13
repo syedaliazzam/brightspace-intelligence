@@ -1,6 +1,7 @@
 import crypto from "crypto";
 import { NextResponse } from "next/server";
 import { sendEmail, themedEmailShell } from "@/lib/email";
+import { sendWhatsAppText } from "@/lib/whatsapp";
 import prisma from "@/lib/prisma";
 import { uploadPaymentProof } from "@/lib/supabaseStorage";
 
@@ -273,6 +274,18 @@ Paid At: ${paidAt}`;
       }
     } catch (emailError) {
       console.error("PAYMENT_SUBMIT_EMAIL_ERROR:", emailError);
+    }
+
+    try {
+      const coordinatorPhone = process.env.WHATSAPP_NOTIFY_TO || "";
+      if (coordinatorPhone) {
+        await sendWhatsAppText({
+          to: coordinatorPhone,
+          message: `Payment submitted for voucher ${voucherNo}\n\nStudent: ${lead?.student_name || "-"}\nParent: ${lead?.parent_name || "-"}\nPhone: ${lead?.phone || "-"}\nAmount: ${paidAmount}\nPaid At: ${paidAt}\nTransaction ID: ${transactionId}`,
+        });
+      }
+    } catch (whatsAppError) {
+      console.error("PAYMENT_SUBMIT_WHATSAPP_ERROR:", whatsAppError);
     }
 
     return json("Payment proof submitted.", 201, { item });

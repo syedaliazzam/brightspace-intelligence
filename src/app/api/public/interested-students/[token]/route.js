@@ -12,6 +12,7 @@ export async function GET(_request, { params }) {
       SELECT
         student_name,
         parent_name,
+        class_level,
         email,
         phone,
         LOWER(status::text) AS status
@@ -29,6 +30,7 @@ export async function GET(_request, { params }) {
       item: {
         student_name: item.student_name || "",
         parent_name: item.parent_name || "",
+        class_level: item.class_level || "",
         email: item.email || "",
         phone: item.phone || "",
       },

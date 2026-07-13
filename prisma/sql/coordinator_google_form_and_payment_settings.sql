@@ -7,6 +7,18 @@ ADD COLUMN IF NOT EXISTS city TEXT;
 ALTER TABLE registration_leads
 ADD COLUMN IF NOT EXISTS preferred_schedule TEXT;
 
+ALTER TABLE registration_leads
+ADD COLUMN IF NOT EXISTS payment_method TEXT;
+
+ALTER TABLE registration_leads
+ADD COLUMN IF NOT EXISTS admission_fee_amount NUMERIC(12,2);
+
+ALTER TABLE registration_leads
+ADD COLUMN IF NOT EXISTS discount_percent NUMERIC(5,2);
+
+ALTER TABLE registration_leads
+ADD COLUMN IF NOT EXISTS payment_instructions TEXT;
+
 CREATE TABLE IF NOT EXISTS fee_settings (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name TEXT NOT NULL,

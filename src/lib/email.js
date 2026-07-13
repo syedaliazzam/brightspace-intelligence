@@ -34,8 +34,8 @@ export function themedEmailShell({ eyebrow, title, intro, rows = [], bodyBlocks 
     .map(
       ([label, value]) => `
         <tr>
-          <td style="padding:8px 0;color:#245C4F;">${escapeHtml(label)}</td>
-          <td style="padding:8px 0;text-align:right;font-weight:700;color:#063F32;">${escapeHtml(value || "-")}</td>
+          <td style="padding:8px 12px 8px 0;color:#245C4F;vertical-align:top;width:42%;word-break:break-word;">${escapeHtml(label)}</td>
+          <td style="padding:8px 0;text-align:right;font-weight:700;color:#063F32;vertical-align:top;width:58%;word-break:break-word;overflow-wrap:anywhere;">${escapeHtml(value || "-")}</td>
         </tr>
       `
     )
@@ -54,8 +54,8 @@ export function themedEmailShell({ eyebrow, title, intro, rows = [], bodyBlocks 
             <p style="margin:14px 0 0;font-size:15px;line-height:1.7;color:#EAF6EF;">${escapeHtml(intro)}</p>
           </div>
           <div style="padding:28px;background:rgba(250,247,240,.98);">
-            <div style="border:1px solid #2D8A6A;border-radius:22px;padding:18px;background:#fffaf0;">
-              <table role="presentation" cellspacing="0" cellpadding="0" style="width:100%;border-collapse:collapse;font-size:14px;">
+            <div style="border:1px solid #2D8A6A;border-radius:22px;padding:18px;background:#fffaf0;overflow:hidden;">
+              <table role="presentation" cellspacing="0" cellpadding="0" style="width:100%;border-collapse:collapse;font-size:14px;table-layout:fixed;">
                 ${renderedRows}
               </table>
             </div>

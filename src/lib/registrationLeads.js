@@ -1,12 +1,12 @@
 import { Prisma } from "@prisma/client";
 import prisma from "@/lib/prisma";
-import { normalizeClassLevel } from "@/lib/academicCatalog";
 
 export function normalizeText(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 
 export function buildRegistrationLeadPayload(input = {}) {
+  const requestedClassLevel = normalizeText(input.class_level ?? input.classLevel);
   return {
     studentName: normalizeText(input.student_name ?? input.studentName),
     parentName: normalizeText(input.parent_name ?? input.parentName),
@@ -14,7 +14,7 @@ export function buildRegistrationLeadPayload(input = {}) {
     email: normalizeText(input.email ?? input.parentEmail).toLowerCase(),
     phone: normalizeText(input.phone),
     age: Number(normalizeText(input.age ?? input.student_age ?? input.studentAge)),
-    classLevel: normalizeClassLevel(input.class_level ?? input.classLevel),
+    classLevel: requestedClassLevel,
     address: normalizeText(input.address),
     city: normalizeText(input.city),
     notes: normalizeText(input.notes),

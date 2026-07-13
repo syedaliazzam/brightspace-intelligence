@@ -3,7 +3,6 @@ import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { getAppUrl, sendEmail } from "@/lib/email";
-import { normalizeClassLevel } from "@/lib/academicCatalog";
 import prisma from "@/lib/prisma";
 
 const ALLOWED_ROLES = new Set(["admin", "coordinator"]);
@@ -15,6 +14,10 @@ function json(message, status = 200, extra = {}) {
 
 function normalizeText(value) {
   return typeof value === "string" ? value.trim() : "";
+}
+
+function normalizePhoneDigits(value) {
+  return normalizeText(value).replace(/\D/g, "");
 }
 
 async function getRoleId(roleName, tx) {
@@ -172,19 +175,26 @@ async function insertCredentialsMessage({
 }
 
 function getClassCode(classLevel) {
-  const normalized = normalizeClassLevel(classLevel);
-  const codes = {
-    "Pre-Nursery": "PN",
-    Nursery: "NUR",
-    "KG-1": "KG1",
-    "KG-2": "KG2",
-  };
+  const normalized = normalizeText(classLevel);
 
-  if (!normalized || !codes[normalized]) {
+  if (!normalized) {
     throw new Error("Invalid class level for roll number generation.");
   }
 
-  return codes[normalized];
+  const sanitized = normalized
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, " ")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((part) => part[0])
+    .join("");
+
+  if (!sanitized) {
+    throw new Error("Invalid class level for roll number generation.");
+  }
+
+  return sanitized.slice(0, 6);
 }
 
 async function generateNextRollNo(classLevel, tx) {
@@ -260,8 +270,8 @@ async function findExistingUser({ email, phone, roleName }, tx) {
 
   const normalizedRole = normalizeText(roleName).toLowerCase();
   const normalizedEmail = normalizeText(email).toLowerCase();
-
-  const [parentUser] = email && phone
+  const normalizedPhoneDigits = normalizePhoneDigits(phone);
+  const [parentUser] = email && normalizedPhoneDigits
     ? await tx.$queryRaw`
         SELECT u.id::text AS id, LOWER(r.name) AS role_name
         FROM users u
@@ -269,7 +279,7 @@ async function findExistingUser({ email, phone, roleName }, tx) {
         WHERE LOWER(r.name) = ${normalizedRole}
           AND (
             LOWER(u.email) = ${normalizedEmail}
-            OR u.phone = ${phone}
+            OR REGEXP_REPLACE(COALESCE(u.phone, ''), '\\D', '', 'g') = ${normalizedPhoneDigits}
           )
         LIMIT 1
       `
@@ -287,19 +297,19 @@ async function findExistingUser({ email, phone, roleName }, tx) {
           FROM users u
           INNER JOIN roles r ON r.id = u.role_id
           WHERE LOWER(r.name) = ${normalizedRole}
-            AND u.phone = ${phone}
+            AND REGEXP_REPLACE(COALESCE(u.phone, ''), '\\D', '', 'g') = ${normalizedPhoneDigits}
           LIMIT 1
         `;
 
   if (parentUser?.id) return parentUser;
 
-  const [anyUser] = email && phone
+  const [anyUser] = email && normalizedPhoneDigits
     ? await tx.$queryRaw`
         SELECT u.id::text AS id, LOWER(r.name) AS role_name
         FROM users u
         LEFT JOIN roles r ON r.id = u.role_id
         WHERE LOWER(u.email) = ${normalizedEmail}
-           OR u.phone = ${phone}
+           OR REGEXP_REPLACE(COALESCE(u.phone, ''), '\\D', '', 'g') = ${normalizedPhoneDigits}
         LIMIT 1
       `
     : email
@@ -314,14 +324,17 @@ async function findExistingUser({ email, phone, roleName }, tx) {
           SELECT u.id::text AS id, LOWER(r.name) AS role_name
           FROM users u
           LEFT JOIN roles r ON r.id = u.role_id
-          WHERE u.phone = ${phone}
+          WHERE REGEXP_REPLACE(COALESCE(u.phone, ''), '\\D', '', 'g') = ${normalizedPhoneDigits}
           LIMIT 1
         `;
 
   if (anyUser?.id) {
-    throw new Error(
-      `A user with this ${email ? "email" : "phone"} already exists${anyUser.role_name ? ` as ${anyUser.role_name}` : ""}.`
-    );
+    return {
+      id: anyUser.id,
+      role_name: anyUser.role_name || "",
+      conflict: true,
+      conflict_field: email ? "email" : "phone",
+    };
   }
 
   return null;
@@ -442,22 +455,19 @@ async function createStudentParentLink(studentId, parentId, tx) {
 }
 
 async function createEnrollmentForStudent(studentProfileId, registrationLeadId, classLevel, tx) {
-  const normalizedClassLevel = normalizeClassLevel(classLevel);
-
-  if (!normalizedClassLevel) {
-    throw new Error("Registration class_level is invalid. Allowed values: Pre-Nursery, Nursery, KG-1, KG-2.");
-  }
-
   const [course] = await tx.$queryRaw`
     SELECT id::text AS id
     FROM courses
-    WHERE class_level = ${normalizedClassLevel}
-      AND COALESCE(status, 'active'::user_status) = 'active'::user_status
+    WHERE (
+      LOWER(COALESCE(class_level, title, '')) = LOWER(${normalizeText(classLevel)})
+      OR LOWER(COALESCE(title, class_level, '')) = LOWER(${normalizeText(classLevel)})
+    )
+    AND COALESCE(status, 'active'::user_status) = 'active'::user_status
     LIMIT 1
   `;
 
   if (!course?.id) {
-    throw new Error(`Class not found for class_level: ${normalizedClassLevel}. Run prisma/seed-academic.sql.`);
+    throw new Error(`Class not found for class_level: ${normalizeText(classLevel)}. Check courses table values.`);
   }
 
   const enrollmentId = crypto.randomUUID();
@@ -528,6 +538,7 @@ async function getSubmissionRecord(id, tx = prisma) {
       fv."status"::text AS voucher_status,
       fv.amount AS voucher_amount,
       rl.id::text AS registration_lead_id,
+      istd.id::text AS interested_student_id,
       rl.student_name,
       rl.parent_name,
       rl.parent_relation,
@@ -535,12 +546,19 @@ async function getSubmissionRecord(id, tx = prisma) {
       rl.phone,
       rl.address,
       rl.city,
-      rl.class_level,
+      COALESCE(
+        NULLIF(TRIM(rl.class_level), ''),
+        NULLIF(TRIM(istd.class_level), ''),
+        NULLIF(TRIM(istd.class_applying_for), '')
+      ) AS class_level,
+      NULLIF(TRIM(istd.class_level), '') AS interested_class_level,
+      NULLIF(TRIM(istd.class_applying_for), '') AS interested_class_applying_for,
       rl.age AS student_age,
       CASE WHEN rl.id IS NULL THEN true ELSE false END AS is_monthly_voucher
     FROM fee_submissions fs
     INNER JOIN fee_vouchers fv ON fv.id = fs.voucher_id
     LEFT JOIN registration_leads rl ON rl.id = fv.registration_id
+    LEFT JOIN interested_students istd ON istd.registration_lead_id = rl.id
     WHERE fs.id = ${id}::uuid
     LIMIT 1;
   `;
@@ -627,9 +645,9 @@ export async function POST(request, { params }) {
     }
 
     // APPROVE FLOW
-    const parentContactEmail =
+    let parentContactEmail =
       submission.email || submission.parent_email || submission.parentEmail || "";
-    const parentContactPhone =
+    let parentContactPhone =
       submission.phone || submission.parent_phone || submission.parentPhone || "";
 
     if (submission.is_monthly_voucher) {
@@ -671,7 +689,19 @@ export async function POST(request, { params }) {
       });
     }
 
-    const studentRollNo = await generateNextRollNo(submission.class_level, prisma);
+    const resolvedClassLevel =
+      normalizeText(submission.class_level) ||
+      normalizeText(submission.interested_class_level) ||
+      normalizeText(submission.interested_class_applying_for);
+
+    if (!resolvedClassLevel) {
+      return json(
+        "Unable to determine class level for this payment submission. Please make sure the admission form stored the selected class.",
+        400
+      );
+    }
+
+    const studentRollNo = await generateNextRollNo(resolvedClassLevel, prisma);
     const parentTemporaryPassword = buildParentPassword(
       submission.parent_name || `${submission.student_name} Parent`,
       studentRollNo
@@ -727,12 +757,50 @@ export async function POST(request, { params }) {
       const parentRoleId = await getRoleId("parent", tx);
       const studentRoleId = await getRoleId("student", tx);
 
-      const existingParent = await findExistingUser({
+      const existingParentLookup = await findExistingUser({
         email: parentContactEmail,
         phone: parentContactPhone,
         roleName: "parent",
       }, tx);
 
+      const parentHasRoleConflict =
+        existingParentLookup?.conflict &&
+        existingParentLookup?.role_name &&
+        existingParentLookup.role_name !== "parent";
+
+      const existingParent = parentHasRoleConflict ? null : existingParentLookup;
+
+      const emailConflictCheck = parentHasRoleConflict && parentContactEmail
+        ? await tx.$queryRaw`
+            SELECT id::text AS id
+            FROM users
+            WHERE LOWER(email) = ${parentContactEmail.toLowerCase()}
+            LIMIT 1
+          `
+        : [null];
+
+      const phoneConflictCheck = parentHasRoleConflict && parentContactPhone
+        ? await tx.$queryRaw`
+            SELECT id::text AS id
+            FROM users
+            WHERE REGEXP_REPLACE(COALESCE(phone, ''), '\\D', '', 'g') = ${normalizePhoneDigits(parentContactPhone)}
+            LIMIT 1
+          `
+        : [null];
+
+      const safeParentEmail = emailConflictCheck?.[0]?.id
+        ? ""
+        : parentContactEmail;
+      const safeParentPhone = phoneConflictCheck?.[0]?.id
+        ? ""
+        : parentContactPhone;
+
+      if (parentHasRoleConflict && !safeParentEmail && !safeParentPhone) {
+        return json(
+          "Parent contact details already belong to another account. Please update the parent contact information before approving payment.",
+          400
+        );
+      }
 
       let parentUserId = existingParent?.id || null;
       let parentProfileId = null;
@@ -742,16 +810,16 @@ export async function POST(request, { params }) {
         parentUserId = await createUser({
           roleId: parentRoleId,
           fullName: submission.parent_name || `${submission.student_name} Parent`,
-          email: parentContactEmail,
-          phone: parentContactPhone,
+          email: safeParentEmail,
+          phone: safeParentPhone,
           passwordHash: parentPasswordHash,
         }, tx);
 
         parentProfileId = await createProfile("parent_profiles", {
           userId: parentUserId,
           fullName: submission.parent_name || `${submission.student_name} Parent`,
-          email: parentContactEmail,
-          phone: parentContactPhone,
+          email: safeParentEmail,
+          phone: safeParentPhone,
           relation: submission.parent_relation,
           registrationLeadId: submission.registration_lead_id,
         }, tx);
@@ -824,8 +892,8 @@ export async function POST(request, { params }) {
           parentProfileId = await createProfile("parent_profiles", {
             userId: parentUserId,
             fullName: submission.parent_name || `${submission.student_name} Parent`,
-            email: parentContactEmail,
-            phone: parentContactPhone,
+            email: safeParentEmail,
+            phone: safeParentPhone,
             relation: submission.parent_relation,
             registrationLeadId: submission.registration_lead_id,
           }, tx);
@@ -839,40 +907,60 @@ export async function POST(request, { params }) {
         }
       }
 
-      studentLoginUsername = await createUniqueStudentUsername({
-        studentName: submission.student_name,
-        classLevel: submission.class_level,
-        registrationNumber: studentRollNo,
-      }, tx);
+      const [existingStudentEnrollment] = await tx.$queryRaw`
+        SELECT
+          sp.id::text AS student_profile_id,
+          u.id::text AS student_user_id,
+          u.username
+        FROM enrollments e
+        INNER JOIN student_profiles sp ON sp.id = e.student_id
+        INNER JOIN users u ON u.id = sp.user_id
+        WHERE e.registration_id = ${submission.registration_lead_id}::uuid
+        LIMIT 1
+      `;
 
-      const studentUserId = await createUser({
-        roleId: studentRoleId,
-        fullName: submission.student_name,
-        username: studentLoginUsername,
-        email: null,
-        phone: null,
-        passwordHash: studentPasswordHash,
-      }, tx);
+      let studentUserId = existingStudentEnrollment?.student_user_id || null;
+      let studentProfileId = existingStudentEnrollment?.student_profile_id || null;
 
-      const studentProfileId = await createProfile("student_profiles", {
-        userId: studentUserId,
-        fullName: submission.student_name,
-        email: null,
-        phone: null,
-        admissionNo: studentRollNo,
-        classLevel: submission.class_level,
-        address: submission.address,
-        city: submission.city,
-        studentAge: submission.student_age,
-        registrationLeadId: submission.registration_lead_id,
-      }, tx);
-      await createStudentParentLink(studentProfileId, parentProfileId, tx);
-      await createEnrollmentForStudent(
-        studentProfileId,
-        submission.registration_lead_id,
-        submission.class_level,
-        tx
-      );
+      if (!studentUserId || !studentProfileId) {
+        studentLoginUsername = await createUniqueStudentUsername({
+          studentName: submission.student_name,
+          classLevel: resolvedClassLevel,
+          registrationNumber: studentRollNo,
+        }, tx);
+
+        studentUserId = await createUser({
+          roleId: studentRoleId,
+          fullName: submission.student_name,
+          username: studentLoginUsername,
+          email: null,
+          phone: null,
+          passwordHash: studentPasswordHash,
+        }, tx);
+
+        studentProfileId = await createProfile("student_profiles", {
+          userId: studentUserId,
+          fullName: submission.student_name,
+          email: null,
+          phone: null,
+          admissionNo: studentRollNo,
+          classLevel: resolvedClassLevel,
+          address: submission.address,
+          city: submission.city,
+          studentAge: submission.student_age,
+          registrationLeadId: submission.registration_lead_id,
+        }, tx);
+        await createStudentParentLink(studentProfileId, parentProfileId, tx);
+        await createEnrollmentForStudent(
+          studentProfileId,
+          submission.registration_lead_id,
+          resolvedClassLevel,
+          tx
+        );
+      } else {
+        studentLoginUsername = existingStudentEnrollment.username || "";
+      }
+
       await tx.$executeRaw`
         UPDATE fee_vouchers
         SET student_id = ${studentProfileId}::uuid

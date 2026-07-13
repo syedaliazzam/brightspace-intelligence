@@ -25,7 +25,13 @@ export async function GET() {
       recentLeads,
     ] = await Promise.all([
       prisma.$queryRaw`SELECT COUNT(*)::int AS total FROM registration_leads WHERE status = 'new_lead'`,
-      prisma.$queryRaw`SELECT COUNT(*)::int AS total FROM fee_vouchers WHERE status = 'unpaid'`,
+      prisma.$queryRaw`
+        SELECT COUNT(*)::int AS total
+        FROM interested_students
+        WHERE admission_form_sent_at IS NOT NULL
+          AND admission_form_submitted_at IS NULL
+          AND LOWER(COALESCE(admission_form_status::text, '')) IN ('sent', 'reminded', 'overdue', 'not_submitted', 'pending')
+      `,
       prisma.$queryRaw`SELECT COUNT(*)::int AS total FROM fee_submissions WHERE status = 'pending'`,
       prisma.$queryRaw`SELECT COUNT(*)::int AS total FROM student_profiles WHERE status = 'active'`,
       prisma.$queryRaw`

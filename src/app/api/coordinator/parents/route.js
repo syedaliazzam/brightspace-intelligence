@@ -61,7 +61,10 @@ export async function GET(request) {
       SELECT
         pp.id::text AS id,
         u.id::text AS user_id,
-        u.full_name,
+        COALESCE(
+          NULLIF(TRIM(u.full_name), ''),
+          NULLIF(TRIM(latest_registration.parent_name), '')
+        ) AS full_name,
         u.email,
         u.phone,
         u.status::text AS status,
@@ -115,7 +118,7 @@ export async function GET(request) {
       LEFT JOIN courses c ON c.id = e.course_id
       LEFT JOIN registration_leads rl ON rl.id = e.registration_id
       LEFT JOIN LATERAL (
-        SELECT rl.parent_relation
+        SELECT rl.parent_name, rl.parent_relation
         FROM student_parents spp_latest
         INNER JOIN enrollments e ON e.student_id = spp_latest.student_id
         INNER JOIN registration_leads rl ON rl.id = e.registration_id
@@ -124,8 +127,8 @@ export async function GET(request) {
         LIMIT 1
       ) latest_registration ON TRUE
       ${whereClause}
-      GROUP BY pp.id, u.id, u.full_name, u.email, u.phone, u.status, pp.relation, latest_registration.parent_relation
-      ORDER BY u.full_name ASC
+      GROUP BY pp.id, u.id, u.full_name, u.email, u.phone, u.status, pp.relation, latest_registration.parent_relation, latest_registration.parent_name
+      ORDER BY COALESCE(NULLIF(TRIM(u.full_name), ''), NULLIF(TRIM(latest_registration.parent_name), ''), '') ASC
       `,
       ...values
     );

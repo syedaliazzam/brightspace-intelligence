@@ -1,9 +1,12 @@
 import crypto from "crypto";
 import { NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { normalizeClassLevel } from "@/lib/academicCatalog";
 import { sendEmail } from "@/lib/email";
 import prisma from "@/lib/prisma";
+import { generateVoucherNumber } from "@/lib/voucherNumber";
 import { uploadAdmissionDocument } from "@/lib/supabaseStorage";
+import { uploadPaymentProof } from "@/lib/supabaseStorage";
 
 function json(success, message, status, extra = {}) {
   return NextResponse.json({ success, message, ...extra }, { status });
@@ -61,6 +64,332 @@ function normalizeBoolean(value) {
 function getOptionalFile(formData, key) {
   const file = formData.get(key);
   return file instanceof File && file.size > 0 ? file : null;
+}
+
+async function getTableColumns(tableName, tx = prisma) {
+  const rows = await tx.$queryRaw`
+    SELECT
+      column_name,
+      is_nullable,
+      column_default
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = ${tableName}
+  `;
+
+  return rows.reduce((accumulator, row) => {
+    accumulator[row.column_name] = {
+      nullable: row.is_nullable === "YES",
+      defaultValue: row.column_default,
+    };
+    return accumulator;
+  }, {});
+}
+
+function addColumn(columns, values, name, value) {
+  columns.push(Prisma.raw(`"${name}"`));
+  values.push(value);
+}
+
+function ensureSupportedRequiredColumns(tableName, columns, supportedColumns) {
+  const missing = Object.entries(columns)
+    .filter(
+      ([columnName, meta]) =>
+        !meta.nullable && !meta.defaultValue && !supportedColumns.has(columnName)
+    )
+    .map(([columnName]) => columnName);
+
+  if (missing.length) {
+    throw new Error(`${tableName} requires unsupported columns: ${missing.join(", ")}.`);
+  }
+}
+
+function normalizeDueDate(value) {
+  const trimmed = normalizeText(value);
+  if (!trimmed) return "";
+
+  const date = new Date(trimmed);
+  return Number.isNaN(date.getTime()) ? "" : date.toISOString();
+}
+
+function toMoney(value) {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) && numeric > 0 ? numeric : 0;
+}
+
+async function getRegularFeeAmount(classLevel, tx = prisma) {
+  const [row] = await tx.$queryRaw`
+    SELECT amount::float8 AS amount
+    FROM regular_fee
+    WHERE LOWER(class_level::text) = LOWER(${classLevel})
+      AND LOWER(status::text) = 'active'
+    ORDER BY created_at DESC NULLS LAST, id DESC
+    LIMIT 1
+  `;
+
+  return Number(row?.amount || 0);
+}
+
+async function getPaymentMethodById(paymentMethodId, tx = prisma) {
+  if (!paymentMethodId) {
+    return null;
+  }
+
+  const [row] = await tx.$queryRaw`
+    SELECT
+      id::text AS id,
+      name,
+      method_key,
+      bank_name,
+      account_title,
+      account_number,
+      iban,
+      branch_code,
+      instructions,
+      LOWER(status::text) AS status
+    FROM payment_methods
+    WHERE id = ${paymentMethodId}::uuid
+      AND LOWER(status::text) = 'active'
+    LIMIT 1
+  `;
+
+  return row || null;
+}
+
+async function insertFeeVoucherForAdmission({
+  registrationLeadId,
+  classLevel,
+  voucherNo: providedVoucherNo,
+  paymentMethodId,
+  paymentMethodName,
+  admissionFeeAmount,
+  discountPercent,
+  paymentInstructions,
+  dueDate,
+  tx,
+}) {
+  const voucherNo = providedVoucherNo || await generateVoucherNumber();
+  const columns = await getTableColumns("fee_vouchers", tx);
+  const insertColumns = [];
+  const insertValues = [];
+  const supportedColumns = new Set();
+  const voucherId = crypto.randomUUID();
+  const regularFeeAmount = await getRegularFeeAmount(classLevel, tx);
+  const discountAmount = Number(((regularFeeAmount * Number(discountPercent || 0)) / 100).toFixed(2));
+  const subtotalAmount = Number((regularFeeAmount + Number(admissionFeeAmount || 0)).toFixed(2));
+  const totalAmount = Number((subtotalAmount - discountAmount).toFixed(2));
+  const paymentMethod = paymentMethodId ? await getPaymentMethodById(paymentMethodId, tx) : null;
+
+  if (columns.id) {
+    addColumn(insertColumns, insertValues, "id", voucherId);
+    supportedColumns.add("id");
+  }
+  if (columns.registration_id) {
+    addColumn(insertColumns, insertValues, "registration_id", registrationLeadId);
+    supportedColumns.add("registration_id");
+  }
+  if (columns.voucher_no) {
+    addColumn(insertColumns, insertValues, "voucher_no", voucherNo);
+    supportedColumns.add("voucher_no");
+  }
+  if (columns.amount) {
+    addColumn(insertColumns, insertValues, "amount", totalAmount);
+    supportedColumns.add("amount");
+  }
+  if (columns.regular_fee_applied) {
+    addColumn(insertColumns, insertValues, "regular_fee_applied", regularFeeAmount > 0);
+    supportedColumns.add("regular_fee_applied");
+  }
+  if (columns.regular_fee_amount) {
+    addColumn(insertColumns, insertValues, "regular_fee_amount", regularFeeAmount);
+    supportedColumns.add("regular_fee_amount");
+  }
+  if (columns.admission_fee_amount) {
+    addColumn(insertColumns, insertValues, "admission_fee_amount", Number(admissionFeeAmount || 0));
+    supportedColumns.add("admission_fee_amount");
+  }
+  if (columns.discount_percent) {
+    addColumn(insertColumns, insertValues, "discount_percent", Number(discountPercent || 0));
+    supportedColumns.add("discount_percent");
+  }
+  if (columns.subtotal_amount) {
+    addColumn(insertColumns, insertValues, "subtotal_amount", subtotalAmount);
+    supportedColumns.add("subtotal_amount");
+  }
+  if (columns.discount_amount) {
+    addColumn(insertColumns, insertValues, "discount_amount", discountAmount);
+    supportedColumns.add("discount_amount");
+  }
+  if (columns.total_amount) {
+    addColumn(insertColumns, insertValues, "total_amount", totalAmount);
+    supportedColumns.add("total_amount");
+  }
+  if (columns.due_date && dueDate) {
+    addColumn(insertColumns, insertValues, "due_date", new Date(dueDate));
+    supportedColumns.add("due_date");
+  }
+  if (paymentMethod?.id && columns.payment_method_id) {
+    addColumn(insertColumns, insertValues, "payment_method_id", paymentMethod.id);
+    supportedColumns.add("payment_method_id");
+  } else if (columns.payment_method && (paymentMethod?.name || paymentMethodName)) {
+    addColumn(insertColumns, insertValues, "payment_method", paymentMethod?.method_key || paymentMethod?.name || paymentMethodName || "");
+    supportedColumns.add("payment_method");
+  }
+  if (columns.payment_instructions) {
+    addColumn(insertColumns, insertValues, "payment_instructions", paymentInstructions || paymentMethod?.instructions || null);
+    supportedColumns.add("payment_instructions");
+  }
+  if (columns.status) {
+    insertColumns.push(Prisma.raw(`"status"`));
+    insertValues.push({ value: "submitted", castType: "voucher_status" });
+    supportedColumns.add("status");
+  }
+  if (columns.created_at) {
+    addColumn(insertColumns, insertValues, "created_at", new Date());
+    supportedColumns.add("created_at");
+  }
+  if (columns.updated_at) {
+    addColumn(insertColumns, insertValues, "updated_at", new Date());
+    supportedColumns.add("updated_at");
+  }
+
+  ensureSupportedRequiredColumns("fee_vouchers", columns, supportedColumns);
+
+  if (!insertColumns.length) {
+    return null;
+  }
+
+  await tx.$executeRaw`
+    INSERT INTO fee_vouchers (${Prisma.join(insertColumns, ", ")})
+    VALUES (${Prisma.join(
+      insertValues.map((item) => {
+        if (item && typeof item === "object" && item.castType) {
+          if (item.castType === "uuid") return Prisma.sql`${item.value}::uuid`;
+          if (item.castType === "voucher_status") return Prisma.sql`${item.value}::voucher_status`;
+        }
+        if (typeof item === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(item)) {
+          return Prisma.sql`${item}::uuid`;
+        }
+        if (item instanceof Date) {
+          return Prisma.sql`${item}`;
+        }
+        return Prisma.sql`${item}`;
+      }),
+      ", "
+    )})
+  `;
+
+  return {
+    voucherId,
+    voucherNo,
+    regularFeeAmount,
+    discountAmount,
+    subtotalAmount,
+    totalAmount,
+    paymentMethod,
+  };
+}
+
+async function insertFeeSubmissionForAdmission({
+  voucherId,
+  payerName,
+  payerEmail = "",
+  payerPhone = "",
+  transactionId,
+  paidAmount,
+  paidAt,
+  proofFilePath,
+  remarks = "",
+  submittedBy = null,
+  tx,
+}) {
+  const columns = await getTableColumns("fee_submissions", tx);
+  const insertColumns = [];
+  const insertValues = [];
+  const supportedColumns = new Set();
+  const submissionId = crypto.randomUUID();
+
+  if (columns.id) {
+    addColumn(insertColumns, insertValues, "id", submissionId);
+    supportedColumns.add("id");
+  }
+  if (columns.voucher_id) {
+    addColumn(insertColumns, insertValues, "voucher_id", voucherId);
+    supportedColumns.add("voucher_id");
+  }
+  if (columns.submitted_by) {
+    addColumn(insertColumns, insertValues, "submitted_by", submittedBy);
+    supportedColumns.add("submitted_by");
+  }
+  if (columns.payer_name) {
+    addColumn(insertColumns, insertValues, "payer_name", payerName || null);
+    supportedColumns.add("payer_name");
+  }
+  if (columns.transaction_id) {
+    addColumn(insertColumns, insertValues, "transaction_id", transactionId || null);
+    supportedColumns.add("transaction_id");
+  }
+  if (columns.paid_amount) {
+    addColumn(insertColumns, insertValues, "paid_amount", Number(paidAmount || 0));
+    supportedColumns.add("paid_amount");
+  }
+  if (columns.paid_at) {
+    addColumn(insertColumns, insertValues, "paid_at", paidAt ? new Date(paidAt) : null);
+    supportedColumns.add("paid_at");
+  }
+  if (columns.proof_bucket) {
+    addColumn(insertColumns, insertValues, "proof_bucket", "payment_proofs");
+    supportedColumns.add("proof_bucket");
+  }
+  if (columns.proof_file_path) {
+    addColumn(insertColumns, insertValues, "proof_file_path", proofFilePath);
+    supportedColumns.add("proof_file_path");
+  }
+  if (columns.proof_file_url) {
+    addColumn(insertColumns, insertValues, "proof_file_url", null);
+    supportedColumns.add("proof_file_url");
+  }
+  if (columns.remarks) {
+    addColumn(insertColumns, insertValues, "remarks", remarks || null);
+    supportedColumns.add("remarks");
+  }
+  if (columns.status) {
+    insertColumns.push(Prisma.raw(`"status"`));
+    insertValues.push({ value: "pending", castType: "fee_submission_status" });
+    supportedColumns.add("status");
+  }
+  if (columns.created_at) {
+    addColumn(insertColumns, insertValues, "created_at", new Date());
+    supportedColumns.add("created_at");
+  }
+  if (columns.updated_at) {
+    addColumn(insertColumns, insertValues, "updated_at", new Date());
+    supportedColumns.add("updated_at");
+  }
+
+  ensureSupportedRequiredColumns("fee_submissions", columns, supportedColumns);
+
+  await tx.$executeRaw`
+    INSERT INTO fee_submissions (${Prisma.join(insertColumns, ", ")})
+    VALUES (${Prisma.join(
+      insertValues.map((item) => {
+        if (item && typeof item === "object" && item.castType) {
+          if (item.castType === "uuid") return Prisma.sql`${item.value}::uuid`;
+          if (item.castType === "fee_submission_status") return Prisma.sql`${item.value}::fee_submission_status`;
+        }
+        if (typeof item === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(item)) {
+          return Prisma.sql`${item}::uuid`;
+        }
+        if (item instanceof Date) {
+          return Prisma.sql`${item}`;
+        }
+        return Prisma.sql`${item}`;
+      }),
+      ", "
+    )})
+  `;
+
+  return submissionId;
 }
 
 function buildParentSummary({
@@ -231,6 +560,17 @@ export async function POST(request) {
     const preferredContactPerson = normalizeText(formData.get("preferred_contact_person"));
     const deviceAvailable = normalizeText(formData.get("device_available"));
     const supportPersonDuringLearning = normalizeText(formData.get("support_person_during_learning"));
+    const paymentMethod = normalizeText(formData.get("payment_method"));
+    const paymentMethodId = normalizeText(formData.get("paymentMethodId") || formData.get("payment_method_id"));
+    const admissionFeeAmount = normalizeText(formData.get("admission_fee"));
+    const discountPercent = normalizeText(formData.get("discount_percent"));
+    const paymentInstructions = normalizeText(formData.get("payment_instructions"));
+    const payerName = normalizeText(formData.get("payer_name"));
+    const payerEmail = normalizeText(formData.get("payer_email"));
+    const payerPhone = normalizeText(formData.get("payer_phone"));
+    const transactionId = normalizeText(formData.get("transaction_id"));
+    const paidAmount = normalizeText(formData.get("paid_amount"));
+    const paidAt = normalizeText(formData.get("paid_at"));
     const whyJoinSchool = normalizeText(formData.get("why_join_school"));
     const schoolExpectations = normalizeText(formData.get("school_expectations"));
     const declarationAccepted = normalizeBoolean(formData.get("declaration_accepted")) === true;
@@ -241,6 +581,7 @@ export async function POST(request) {
       childPhotographFile: getOptionalFile(formData, "child_photograph_file"),
       previousSchoolReportFile: getOptionalFile(formData, "previous_school_report_file"),
       medicalReportFile: getOptionalFile(formData, "medical_report_file"),
+      paymentProofFile: getOptionalFile(formData, "payment_proof_file"),
     };
 
     if (!programName) return json(false, "Programme is required.", 400);
@@ -287,6 +628,9 @@ export async function POST(request) {
     }
     if (!files.childPhotographFile) {
       return json(false, "Recent child photograph is required.", 400);
+    }
+    if (!files.paymentProofFile) {
+      return json(false, "Payment proof is required.", 400);
     }
 
     if (fatherEmail && !isValidEmail(fatherEmail)) {
@@ -491,11 +835,76 @@ export async function POST(request) {
       LIMIT 1
     `;
 
+    let paymentSubmissionResult = null;
+    if (files.paymentProofFile) {
+      const admissionPaymentVoucherNo = await generateVoucherNumber();
+      const paymentProofUpload = await uploadPaymentProof({
+        voucherNo: admissionPaymentVoucherNo,
+        file: files.paymentProofFile,
+      });
+      const paymentDueDate = new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString();
+
+      paymentSubmissionResult = await prisma.$transaction(async (tx) => {
+        const voucher = await insertFeeVoucherForAdmission({
+          registrationLeadId: createdLead.id,
+          classLevel,
+          voucherNo: admissionPaymentVoucherNo,
+          paymentMethodId,
+          paymentMethodName: paymentMethod || "",
+          admissionFeeAmount: toMoney(admissionFeeAmount),
+          discountPercent: Number(String(discountPercent || "0").replace("%", "")) || 0,
+          paymentInstructions,
+          dueDate: paymentDueDate,
+          tx,
+        });
+
+        const paidAmountValue = toMoney(paidAmount) || voucher.totalAmount;
+        const submissionId = await insertFeeSubmissionForAdmission({
+          voucherId: voucher.voucherId,
+          payerName: payerName || parentSummary.parentName || "",
+          payerEmail,
+          payerPhone,
+          transactionId,
+          paidAmount: paidAmountValue,
+          paidAt,
+          proofFilePath: paymentProofUpload.storedPath,
+          remarks: JSON.stringify({
+            paymentMethod: paymentMethod || paymentMethodId || "",
+            admissionFeeAmount: toMoney(admissionFeeAmount),
+            discountPercent: Number(String(discountPercent || "0").replace("%", "")) || 0,
+            paymentInstructions: paymentInstructions || "",
+            payerEmail: payerEmail || "",
+            payerPhone: payerPhone || "",
+          }),
+          submittedBy: null,
+          tx,
+        });
+
+        await tx.$executeRaw`
+          UPDATE registration_leads
+          SET status = ${"fee_submitted"}::registration_status
+          WHERE id = ${createdLead.id}::uuid
+        `;
+
+        return {
+          voucherNo: voucher.voucherNo,
+          voucherId: voucher.voucherId,
+          submissionId,
+          proofFilePath: paymentProofUpload.storedPath,
+          totalAmount: voucher.totalAmount,
+        };
+      });
+    }
+
     if (leadToken && linkedLead?.id && createdLead?.id) {
       await prisma.$executeRaw`
         UPDATE interested_students
         SET
           status = ${"registered"},
+          admission_form_status = ${"submitted"},
+          admission_form_submitted_at = NOW(),
+          admission_form_last_channel = COALESCE(admission_form_last_channel, ${"form_submit"}),
+          admission_form_last_error = NULL,
           registration_lead_id = ${createdLead.id}::uuid,
           updated_at = NOW()
         WHERE id = ${linkedLead.id}::uuid
@@ -593,7 +1002,12 @@ Interested Lead Token: ${leadToken || "N/A"}`;
     return json(
       true,
       "Admission form submitted successfully. Our admissions team will review the application and contact you with the next steps, In Sha Allah.",
-      201
+      201,
+      paymentSubmissionResult
+        ? {
+            payment_submission: paymentSubmissionResult,
+          }
+        : {}
     );
   } catch (error) {
     return json(

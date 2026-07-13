@@ -100,7 +100,7 @@ export default function Sidebar({
 
   const shell = (
     <aside
-      className={`flex h-full w-72 flex-col overflow-x-hidden border-r border-[#2D8A6A]/15 bg-[linear-gradient(180deg,#0D3B2E_0%,#063F32_100%)] shadow-[0_18px_60px_-40px_rgba(13,59,46,0.18)] backdrop-blur-xl transition-[width] duration-200 ${collapsed ? "lg:w-20" : "lg:w-72"
+      className={`flex h-full w-72 flex-col overflow-hidden border-r border-[#2D8A6A]/15 bg-[linear-gradient(180deg,#0D3B2E_0%,#063F32_100%)] shadow-[0_18px_60px_-40px_rgba(13,59,46,0.18)] backdrop-blur-xl transition-[width] duration-200 ${collapsed ? "lg:w-20" : "lg:w-72"
         }`}
     >
       <div
@@ -151,11 +151,13 @@ export default function Sidebar({
         </button>
       </div>
 
-      <nav className="scrollbar-thin scrollbar-thumb-white/20 flex-1 space-y-1 overflow-x-hidden overflow-y-auto px-3 py-4">
+      <nav
+        className="scrollbar-thin scrollbar-thumb-white/20 min-h-0 flex-1 space-y-1 overflow-x-hidden overflow-y-auto px-3 py-4 overscroll-contain"
+      >
         {items.map((item) => {
           if (item.label === "User Management" && Array.isArray(item.children)) {
             return (
-              <div key={item.label} className="space-y-2 rounded-2xl bg-white/5 p-0 overflow-x-hidden">
+              <div key={item.label} className="space-y-2 overflow-hidden rounded-2xl bg-white/5 p-0">
                 <button
                   type="button"
                   onClick={() =>
@@ -164,38 +166,36 @@ export default function Sidebar({
                       userManagement: !current.userManagement,
                     }))
                   }
-                  className={`flex w-full items-center justify-between rounded-[18px] px-3 py-3 text-sm font-medium transition ${isUserManagementActive
+                  className={`grid min-h-[52px] w-full grid-cols-[40px_minmax(0,1fr)_24px] items-center gap-3 rounded-[18px] px-3 py-1.5 text-sm font-medium transition ${isUserManagementActive
                       ? "bg-[linear-gradient(135deg,#C9A227_0%,#E4C766_100%)] text-[#063F32] shadow-[0_10px_24px_rgba(201,162,39,0.22)]"
                       : "text-[#F1EADC]/75 hover:bg-white/10 hover:text-[#FAF7F0]"
-                    } ${collapsed ? "lg:justify-center lg:px-2" : ""}`}
+                    } ${collapsed ? "lg:grid-cols-[40px_0px_0px] lg:gap-0 lg:px-2" : ""}`}
                 >
-                  <span className={`flex min-w-0 items-center gap-3 ${collapsed ? "lg:justify-center" : ""}`}>
                     <span
-                      className={`flex h-9 w-9 items-center justify-center rounded-xl transition ${isUserManagementActive
+                      className={`grid h-10 w-10 shrink-0 place-items-center rounded-2xl transition ${isUserManagementActive
                           ? "bg-[#FFF5D6] text-[#063F32]"
                           : "bg-white/10 text-[#FAF7F0]"
                         }`}
                     >
-                      <Users className="h-3.5 w-3.5" strokeWidth={2} />
+                      <Users className="h-[18px] w-[18px]" strokeWidth={2} />
                     </span>
                     <span
-                    className={`truncate transition-all duration-200 ${collapsed
-                          ? "lg:hidden lg:max-w-0 lg:overflow-hidden lg:opacity-0 lg:pointer-events-none"
+                      className={`min-w-0 truncate whitespace-nowrap leading-5 transition-opacity duration-150 ${collapsed
+                          ? "lg:pointer-events-none lg:w-0 lg:overflow-hidden lg:opacity-0"
                           : "lg:max-w-full opacity-100"
                         }`}
                     >
                       {item.label}
                     </span>
-                  </span>
                   <span
-                    className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/10 text-[#FAF7F0] transition-transform duration-200 ${openGroups.userManagement ? "rotate-180" : ""} ${collapsed ? "lg:hidden" : ""}`}
+                    className={`grid h-6 w-6 shrink-0 place-items-center rounded-xl border border-white/10 bg-white/10 text-[#FAF7F0] transition-transform duration-200 ${openGroups.userManagement ? "rotate-180" : ""} ${collapsed ? "lg:hidden" : ""}`}
                   >
                     <ChevronDown className="h-4 w-4" strokeWidth={2.25} />
                   </span>
                 </button>
 
                 {openGroups.userManagement ? (
-                  <div className={`space-y-1 overflow-x-hidden ${collapsed ? "pl-0" : "pl-0"}`}>
+                  <div className="space-y-1 overflow-hidden">
                     {item.children.map((child) => {
                       const childHref = child.href.split("?")[0];
                       const childView = new URLSearchParams(child.href.split("?")[1] || "").get("view");
@@ -209,23 +209,21 @@ export default function Sidebar({
                           key={child.href}
                           href={child.href}
                           aria-current={active ? "page" : undefined}
-                          className={`flex items-center justify-between gap-2 rounded-[18px] px-3 py-2 text-sm font-medium transition ${active
+                          className={`grid min-h-[46px] grid-cols-[40px_minmax(0,1fr)] items-center gap-3 rounded-[18px] px-3 py-1.5 text-sm font-medium transition ${active
                               ? "bg-[linear-gradient(135deg,#C9A227_0%,#E4C766_100%)] text-[#063F32] shadow-[0_10px_24px_rgba(201,162,39,0.22)]"
                               : "text-[#F1EADC]/75 hover:bg-white/10 hover:text-[#FAF7F0]"
-                            } ${collapsed ? "lg:px-2" : ""}`}
+                            } ${collapsed ? "lg:grid-cols-[40px_0px] lg:gap-0 lg:px-2" : ""}`}
                           onClick={onMobileClose}
                         >
-                          <span className={`flex min-w-0 items-center gap-2 ${collapsed ? "lg:justify-center" : ""}`}>
-                            <span
-                              className={`flex h-7 w-7 shrink-0 items-center ml-2 justify-center rounded-xl transition ${active
+                          <span
+                            className={`grid h-9 w-9 shrink-0 place-items-center rounded-xl transition ${active
                                   ? "bg-[#FFF5D6] text-[#063F32]"
                                   : "bg-white/10 text-[#FAF7F0]"
                                 }`}
-                            >
-                              <ChildIcon className="h-3.5 w-3.5" strokeWidth={2} />
-                            </span>
-                            <span className="truncate">{child.label}</span>
+                          >
+                            <ChildIcon className="h-4 w-4 shrink-0" strokeWidth={2} />
                           </span>
+                          <span className="min-w-0 truncate whitespace-nowrap leading-5">{child.label}</span>
                         </Link>
                       );
                     })}
@@ -242,20 +240,20 @@ export default function Sidebar({
               key={item.href}
               href={item.href}
               aria-current={active ? "page" : undefined}
-              className={`group gap-3 flex items-center rounded-[18px] px-3 py-3 text-sm font-medium transition ${active
+              className={`group grid min-h-[52px] grid-cols-[40px_minmax(0,1fr)] items-center gap-3 rounded-[18px] px-3 py-1.5 text-sm font-medium transition ${active
                   ? "bg-[linear-gradient(135deg,#C9A227_0%,#E4C766_100%)] text-[#063F32] shadow-[0_10px_24px_rgba(201,162,39,0.22)]"
                   : "text-[#F1EADC]/75 hover:bg-white/10 hover:text-[#FAF7F0]"
-                } ${collapsed ? "justify-center" : ""}`}
+                } ${collapsed ? "lg:grid-cols-[40px_0px] lg:gap-0 lg:px-2" : ""}`}
               onClick={onMobileClose}
             >
               <span
-                className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-[11px] font-semibold transition ${active ? "bg-[#FFF5D6] text-[#063F32]" : "bg-white/10 text-[#FAF7F0] group-hover:bg-white/15"
-                  } ${collapsed ? "mx-auto" : ""}`}
+                className={`grid h-10 w-10 shrink-0 place-items-center rounded-2xl text-[11px] font-semibold transition ${active ? "bg-[#FFF5D6] text-[#063F32]" : "bg-white/10 text-[#FAF7F0] group-hover:bg-white/15"
+                  }`}
               >
-                <Icon className="h-4 w-4" strokeWidth={2} />
+                <Icon className="h-[18px] w-[18px] shrink-0" strokeWidth={2} />
               </span>
               <span
-                className={`truncate transition-all duration-200 ${collapsed ? "lg:hidden lg:max-w-0 lg:overflow-hidden lg:opacity-0 lg:pointer-events-none" : "lg:max-w-full opacity-100"
+                className={`min-w-0 truncate whitespace-nowrap leading-5 transition-opacity duration-150 ${collapsed ? "lg:pointer-events-none lg:w-0 lg:overflow-hidden lg:opacity-0" : "opacity-100"
                   }`}
               >
                 {item.label}

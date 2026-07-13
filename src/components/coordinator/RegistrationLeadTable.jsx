@@ -71,13 +71,8 @@ function DocumentLink({ label, href }) {
   );
 }
 
-function LeadDetailsModal({ lead, onClose, onCreateVoucher, portalTargetId }) {
+function LeadDetailsModal({ lead, onClose, portalTargetId }) {
   if (!lead) return null;
-
-  const canCreateVoucher =
-    lead?.can_create_voucher === true ||
-    lead?.canCreateVoucher === true ||
-    lead?.status === "new_lead";
 
   return (
     <ClientPortal targetId={portalTargetId}>
@@ -91,18 +86,6 @@ function LeadDetailsModal({ lead, onClose, onCreateVoucher, portalTargetId }) {
             </p>
           </div>
           <div className="flex items-center gap-3">
-            {canCreateVoucher ? (
-              <button
-                type="button"
-                onClick={() => {
-                  onCreateVoucher?.(lead);
-                  onClose();
-                }}
-                className="rounded-full bg-[#0D5C48] px-4 py-2 text-sm font-semibold text-[#FAF7F0] transition hover:bg-[#063F32]"
-              >
-                Create Voucher
-              </button>
-            ) : null}
             <button
               type="button"
               onClick={onClose}
@@ -238,7 +221,6 @@ function LeadDetailsModal({ lead, onClose, onCreateVoucher, portalTargetId }) {
 
 export default function RegistrationLeadTable({
   leads,
-  onCreateVoucher,
   portalTargetId = "coordinator-page-portal-root",
 }) {
   const [selectedLead, setSelectedLead] = useState(null);
@@ -270,10 +252,6 @@ export default function RegistrationLeadTable({
             <tbody className="divide-y divide-[#F1EADC]">
               {leads.map((lead, index) => {
                 const displayStatus = getDisplayStatus(lead);
-                const canCreateVoucher =
-                  lead?.can_create_voucher === true ||
-                  lead?.canCreateVoucher === true ||
-                  lead?.status === "new_lead";
 
                 return (
                   <motion.tr
@@ -322,15 +300,6 @@ export default function RegistrationLeadTable({
                         >
                           View Details
                         </button>
-                        {canCreateVoucher ? (
-                          <button
-                            type="button"
-                            onClick={() => onCreateVoucher?.(lead)}
-                            className="rounded-full bg-[#0D5C48] px-4 py-2 text-sm font-semibold text-[#FAF7F0] transition hover:bg-[#063F32]"
-                          >
-                            Create Voucher
-                          </button>
-                        ) : null}
                       </div>
                     </td>
                   </motion.tr>
@@ -397,15 +366,6 @@ export default function RegistrationLeadTable({
                 >
                   View Details
                 </button>
-                {(lead?.can_create_voucher === true || lead?.canCreateVoucher === true || lead?.status === "new_lead") ? (
-                  <button
-                    type="button"
-                    onClick={() => onCreateVoucher?.(lead)}
-                    className="rounded-full bg-[#0D5C48] px-4 py-2 text-sm font-semibold text-[#FAF7F0] transition hover:bg-[#063F32]"
-                  >
-                    Create Voucher
-                  </button>
-                ) : null}
               </div>
             </motion.article>
           );
@@ -415,7 +375,6 @@ export default function RegistrationLeadTable({
       <LeadDetailsModal
         lead={selectedLead}
         onClose={() => setSelectedLead(null)}
-        onCreateVoucher={onCreateVoucher}
         portalTargetId={portalTargetId}
       />
     </section>

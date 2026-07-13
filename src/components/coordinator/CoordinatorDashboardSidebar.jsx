@@ -10,7 +10,6 @@ import {
   LayoutDashboard,
   Users,
   UserCog,
-  ReceiptText,
   BadgeDollarSign,
   CreditCard,
   GraduationCap,
@@ -24,8 +23,6 @@ const NAV_ITEMS = [
   { label: "Dashboard / Overview", href: "/coordinator/dashboard", icon: LayoutDashboard, tone: "bg-[#FAF7F0] text-[#245C4F]" },
   { label: "Interested Students", href: "/coordinator/interested-students", icon: Users, tone: "bg-[#EAF6EF] text-[#0D5C48]" },
   { label: "Registration Leads", href: "/coordinator/registration-leads", icon: UserCog, tone: "bg-[#FFF5D6] text-[#8A6B00]" },
-  { label: "Fee Vouchers", href: "/coordinator/fee-vouchers", icon: ReceiptText, tone: "bg-[#FFF5D6] text-[#8A6B00]" },
-  { label: "Regular Fee Vouchers", href: "/coordinator/regular-fee-vouchers", icon: BadgeDollarSign, tone: "bg-[#EAF6EF] text-[#0D5C48]" },
   { label: "Payments", href: "/coordinator/payments", icon: CreditCard, tone: "bg-[#FAF7F0] text-[#245C4F]" },
   { label: "Students", href: "/coordinator/students", icon: GraduationCap, tone: "bg-[#EAF6EF] text-[#0D5C48]" },
   { label: "Parents", href: "/coordinator/parents", icon: UserRound, tone: "bg-[#FAF7F0] text-[#245C4F]" },
@@ -49,7 +46,7 @@ function getInitials(value) {
 }
 
 function NavIcon({ Icon, active, tone }) {
-  const className = active ? "h-4 w-4 text-[#063F32]" : `h-4 w-4 ${tone?.split(" ").slice(1).join(" ") || "text-[#245C4F]"}`;
+  const className = active ? "h-[18px] w-[18px] text-[#063F32]" : `h-[18px] w-[18px] ${tone?.split(" ").slice(1).join(" ") || "text-[#245C4F]"}`;
   return <Icon className={className} strokeWidth={2} />;
 }
 
@@ -68,7 +65,7 @@ export default function CoordinatorDashboardSidebar({ profile }) {
   }, []);
 
   const shell = (
-    <aside className="flex h-full w-72 flex-col border-r border-[#2D8A6A]/12 bg-[linear-gradient(180deg,rgba(255,255,255,0.95)_0%,rgba(250,247,240,0.98)_100%)] shadow-[0_18px_60px_-40px_rgba(13,59,46,0.28)] backdrop-blur-xl">
+    <aside className="flex h-full w-72 flex-col overflow-hidden border-r border-[#2D8A6A]/12 bg-[linear-gradient(180deg,rgba(255,255,255,0.95)_0%,rgba(250,247,240,0.98)_100%)] shadow-[0_18px_60px_-40px_rgba(13,59,46,0.28)] backdrop-blur-xl">
       <div className="border-b border-[#2D8A6A]/10 px-5 py-4">
         <div className="flex items-center gap-3">
           <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-transparent">
@@ -81,7 +78,7 @@ export default function CoordinatorDashboardSidebar({ profile }) {
         </div>
       </div>
 
-      <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-4">
+      <nav className="scrollbar-thin scrollbar-thumb-white/20 min-h-0 flex-1 space-y-1 overflow-x-hidden overflow-y-auto px-3 py-4 overscroll-contain">
         {NAV_ITEMS.map((item) => {
           const active = isActive(pathname, item.href);
           return (
@@ -89,20 +86,20 @@ export default function CoordinatorDashboardSidebar({ profile }) {
               key={item.href}
               href={item.href}
               onClick={() => setMobileOpen(false)}
-              className={`flex items-center gap-3 rounded-2xl px-3 py-3 text-sm font-medium transition ${
+              className={`grid min-h-[52px] grid-cols-[40px_minmax(0,1fr)] items-center gap-3 rounded-2xl px-3 py-1.5 text-sm font-medium transition ${
                 active
                   ? "bg-[linear-gradient(135deg,#C9A227,#E4C766)] text-[#063F32] ring-1 ring-inset ring-[#E4C766]/40"
                   : "text-[#245C4F] hover:bg-[#FAF7F0] hover:text-[#063F32]"
               }`}
             >
               <span
-                className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl transition ${
+                className={`grid h-10 w-10 shrink-0 place-items-center rounded-2xl transition ${
                   active ? "bg-[#FFF5D6] text-[#063F32]" : item.tone
                 }`}
               >
                 <NavIcon Icon={item.icon} active={active} tone={item.tone} />
               </span>
-              <span className="truncate">{item.label}</span>
+              <span className="min-w-0 truncate whitespace-nowrap leading-5">{item.label}</span>
             </Link>
           );
         })}

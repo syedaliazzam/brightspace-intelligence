@@ -4,7 +4,7 @@ import { Suspense, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
 import { ChevronDown } from "lucide-react";
-import { ALLOWED_CLASS_LEVELS } from "@/lib/academicCatalog";
+import { normalizeClassLevel } from "@/lib/academicCatalog";
 
 const PROGRAM_OPTIONS = [
   "Early Childhood Education (Parent Partnership Model)",
@@ -18,7 +18,7 @@ const SUPPORT_OPTIONS = ["Mother", "Father", "Both", "Guardian"];
 const CONTACT_OPTIONS = ["Father", "Mother"];
 const DEVICE_OPTIONS = ["Laptop", "Desktop Computer", "External Monitor / Large Screen"];
 
-const STEP_TITLES = [
+const BASE_STEP_TITLES = [
   "Programme",
   "Student",
   "Profile",
@@ -52,6 +52,17 @@ const initialForm = {
   developmentalConcern: "",
   developmentalConcernDetails: "",
   medicalConditions: "",
+  paymentMethod: "",
+  admissionFee: "",
+  discountPercent: "",
+  paymentInstructions: "",
+  payerName: "",
+  payerEmail: "",
+  payerPhone: "",
+  transactionId: "",
+  paidAmount: "",
+  paidAt: "",
+  paymentProofFile: null,
   fatherNameEnglish: "",
   fatherNameUrdu: "",
   fatherCnic: "",
@@ -123,13 +134,20 @@ function calculateAgeFromDate(dateValue) {
   return age >= 0 ? age : "";
 }
 
+function normalizeLookupKey(value) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "");
+}
+
 function getPrimaryParentName(form) {
   return form.preferredContactPerson === "Mother"
     ? form.motherNameEnglish || form.fatherNameEnglish
     : form.fatherNameEnglish || form.motherNameEnglish;
 }
 
-function getStepErrors(form) {
+function getStepErrors(form, previewMode = false) {
   const errors = {};
 
   if (!form.programName) errors.programName = "Programme is required.";
@@ -148,23 +166,23 @@ function getStepErrors(form) {
   if (!form.religion.trim()) errors.religion = "Religion is required.";
   if (!form.preferredLanguage) errors.preferredLanguage = "Preferred language is required.";
 
-  if (!form.whyJoinSchool.trim()) errors.whyJoinSchool = "Please share why you wish your child to join Ash-Shajarah.";
-  if (!form.schoolExpectations.trim()) errors.schoolExpectations = "Please share your expectations from the school.";
+  if (!form.whyJoinSchool?.trim()) errors.whyJoinSchool = "Please share why you wish your child to join Ash-Shajarah.";
+  if (!form.schoolExpectations?.trim()) errors.schoolExpectations = "Please share your expectations from the school.";
   if (!form.supportPersonDuringLearning) errors.supportPersonDuringLearning = "Please select who will support the child.";
   if (!form.deviceAvailable) errors.deviceAvailable = "Device availability is required.";
   if (!form.attendedOnlineClasses) errors.attendedOnlineClasses = "Please select whether the child attended online classes.";
   if (!form.developmentalConcern) errors.developmentalConcern = "Please select whether there is any diagnosed concern.";
-  if (form.developmentalConcern === "Yes" && !form.developmentalConcernDetails.trim()) {
+  if (form.developmentalConcern === "Yes" && !String(form.developmentalConcernDetails || "").trim()) {
     errors.developmentalConcernDetails = "Please share the diagnosed concern details.";
   }
 
-  if (!form.fatherNameEnglish.trim() && !form.motherNameEnglish.trim()) {
+  if (!String(form.fatherNameEnglish || "").trim() && !String(form.motherNameEnglish || "").trim()) {
     errors.parentNames = "At least one parent name is required.";
   }
-  if (form.fatherEmail.trim() && !isValidEmail(form.fatherEmail.trim())) {
+  if (String(form.fatherEmail || "").trim() && !isValidEmail(String(form.fatherEmail || "").trim())) {
     errors.fatherEmail = "Enter a valid father email address.";
   }
-  if (form.motherEmail.trim() && !isValidEmail(form.motherEmail.trim())) {
+  if (String(form.motherEmail || "").trim() && !isValidEmail(String(form.motherEmail || "").trim())) {
     errors.motherEmail = "Enter a valid mother email address.";
   }
   if (!form.preferredContactPerson) {
@@ -176,10 +194,10 @@ function getStepErrors(form) {
   if (
     form.preferredContactPerson === "Father" &&
     !(
-      form.fatherContactWhatsapp.trim() ||
-      form.fatherEmergencyContact.trim() ||
-      form.fatherContactOffice.trim() ||
-      form.fatherContactHome.trim()
+      String(form.fatherContactWhatsapp || "").trim() ||
+      String(form.fatherEmergencyContact || "").trim() ||
+      String(form.fatherContactOffice || "").trim() ||
+      String(form.fatherContactHome || "").trim()
     )
   ) {
     errors.fatherContactWhatsapp = "Father contact number is required for the preferred contact person.";
@@ -187,10 +205,10 @@ function getStepErrors(form) {
   if (
     form.preferredContactPerson === "Mother" &&
     !(
-      form.motherContactWhatsapp.trim() ||
-      form.motherEmergencyContact.trim() ||
-      form.motherContactOffice.trim() ||
-      form.motherContactHome.trim()
+      String(form.motherContactWhatsapp || "").trim() ||
+      String(form.motherEmergencyContact || "").trim() ||
+      String(form.motherContactOffice || "").trim() ||
+      String(form.motherContactHome || "").trim()
     )
   ) {
     errors.motherContactWhatsapp = "Mother contact number is required for the preferred contact person.";
@@ -199,41 +217,27 @@ function getStepErrors(form) {
   if (!form.birthCertificateFile) errors.birthCertificateFile = "Child B-Form / Birth Certificate is required.";
   if (!form.parentCnicFile) errors.parentCnicFile = "Parent CNIC is required.";
   if (!form.childPhotographFile) errors.childPhotographFile = "Recent child photograph is required.";
+  if (previewMode) {
+    if (!form.paymentMethod) errors.paymentMethod = "Payment method is required.";
+    if (!form.admissionFee) errors.admissionFee = "Admission fee is required.";
+    if (!String(form.discountPercent || "").trim()) errors.discountPercent = "Discount is required.";
+    if (!String(form.paymentInstructions || "").trim()) errors.paymentInstructions = "Payment instructions are required.";
+  } else {
+    if (!String(form.payerName || "").trim()) errors.payerName = "Payer name is required.";
+    if (String(form.payerEmail || "").trim() && !isValidEmail(String(form.payerEmail || "").trim())) {
+      errors.payerEmail = "Enter a valid payer email address.";
+    } else if (!String(form.payerEmail || "").trim()) {
+      errors.payerEmail = "Payer email is required.";
+    }
+    if (!String(form.payerPhone || "").trim()) errors.payerPhone = "Payer phone is required.";
+    if (!String(form.transactionId || "").trim()) errors.transactionId = "Transaction ID is required.";
+    if (!String(form.paidAmount || "").trim()) errors.paidAmount = "Paid amount is required.";
+    if (!String(form.paidAt || "").trim()) errors.paidAt = "Paid at date/time is required.";
+    if (!form.paymentProofFile) errors.paymentProofFile = "Payment proof file is required.";
+  }
   if (!form.declarationAccepted) errors.declarationAccepted = "You must accept the declaration before submitting.";
 
   return errors;
-}
-
-function getErrorsForStep(form, step) {
-  const allErrors = getStepErrors(form);
-  const keysByStep = {
-    0: ["programName", "classLevel", "preferredStartingMonth", "preferredStartingMonthOther"],
-    1: ["studentName", "gender", "dateOfBirth", "country", "city", "nationality", "religion", "preferredLanguage"],
-    2: ["attendedOnlineClasses", "developmentalConcern", "developmentalConcernDetails"],
-    3: ["parentNames", "fatherEmail", "motherEmail", "preferredContactPerson", "primaryParent", "fatherContactWhatsapp", "motherContactWhatsapp"],
-    4: ["supportPersonDuringLearning", "deviceAvailable", "birthCertificateFile", "parentCnicFile", "childPhotographFile"],
-    5: ["whyJoinSchool", "schoolExpectations", "declarationAccepted"],
-  };
-
-  return (keysByStep[step] || []).reduce((accumulator, key) => {
-    if (allErrors[key]) {
-      accumulator[key] = allErrors[key];
-    }
-    return accumulator;
-  }, {});
-}
-
-function stepHasErrors(step, errors) {
-  const map = {
-    0: ["programName", "classLevel", "preferredStartingMonth", "preferredStartingMonthOther"],
-    1: ["studentName", "gender", "dateOfBirth", "country", "city", "nationality", "religion", "preferredLanguage"],
-    2: ["attendedOnlineClasses", "developmentalConcern", "developmentalConcernDetails"],
-    3: ["parentNames", "fatherEmail", "motherEmail", "preferredContactPerson", "primaryParent", "fatherContactWhatsapp", "motherContactWhatsapp"],
-    4: ["supportPersonDuringLearning", "deviceAvailable", "birthCertificateFile", "parentCnicFile", "childPhotographFile"],
-    5: ["whyJoinSchool", "schoolExpectations", "declarationAccepted"],
-  };
-
-  return (map[step] || []).some((key) => Boolean(errors[key]));
 }
 
 function FieldError({ error }) {
@@ -247,7 +251,7 @@ function SelectField({ id, value, onChange, error, className = "", children }) {
     <div className="relative w-full">
       <select
         id={id}
-        value={value}
+        value={value ?? ""}
         onMouseDown={() => setOpen((current) => !current)}
         onFocus={() => setOpen(true)}
         onBlur={() => setOpen(false)}
@@ -272,11 +276,67 @@ function AdmissionFormContent() {
   const [pending, setPending] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
   const [leadToken, setLeadToken] = useState("");
+  const [leadClassLevel, setLeadClassLevel] = useState("");
   const [tokenLoading, setTokenLoading] = useState(false);
+  const [paymentOptions, setPaymentOptions] = useState({
+    discounts: [],
+    paymentMethods: [],
+    regularFees: [],
+    admissionFees: [],
+    classLevels: [],
+    coordinatorMaxDiscountPercent: 20,
+  });
   const searchParams = useSearchParams();
+  const leadTokenParam = searchParams?.get("leadToken") || "";
+  const isPreviewMode = searchParams?.get("preview") === "1";
+  const STEP_TITLES = ["Programme", "Student", "Profile", "Parents", "Readiness", "Payment", "Declaration"];
+  const totalSteps = STEP_TITLES.length;
+
+  function getErrorsForCurrentStep(formValue, currentStep) {
+    const allErrors = getStepErrors(formValue, isPreviewMode);
+    const keysByStep = {
+      0: ["programName", "classLevel", "preferredStartingMonth", "preferredStartingMonthOther"],
+      1: ["studentName", "gender", "dateOfBirth", "country", "city", "nationality", "religion", "preferredLanguage"],
+      2: ["attendedOnlineClasses", "developmentalConcern", "developmentalConcernDetails"],
+      3: ["parentNames", "fatherEmail", "motherEmail", "preferredContactPerson", "primaryParent", "fatherContactWhatsapp", "motherContactWhatsapp"],
+      4: ["supportPersonDuringLearning", "deviceAvailable", "birthCertificateFile", "parentCnicFile", "childPhotographFile"],
+      5: isPreviewMode
+        ? ["paymentMethod", "admissionFee", "discountPercent", "paymentInstructions"]
+        : ["payerName", "payerEmail", "payerPhone", "transactionId", "paidAmount", "paidAt", "paymentProofFile"],
+      6: ["whyJoinSchool", "schoolExpectations", "declarationAccepted"],
+    };
+
+    return (keysByStep[currentStep] || []).reduce((accumulator, key) => {
+      if (allErrors[key]) {
+        accumulator[key] = allErrors[key];
+      }
+      return accumulator;
+    }, {});
+  }
+
+  function stepHasCurrentErrors(currentStep, errorsValue) {
+    const map = {
+      0: ["programName", "classLevel", "preferredStartingMonth", "preferredStartingMonthOther"],
+      1: ["studentName", "gender", "dateOfBirth", "country", "city", "nationality", "religion", "preferredLanguage"],
+      2: ["attendedOnlineClasses", "developmentalConcern", "developmentalConcernDetails"],
+      3: ["parentNames", "fatherEmail", "motherEmail", "preferredContactPerson", "primaryParent", "fatherContactWhatsapp", "motherContactWhatsapp"],
+      4: ["supportPersonDuringLearning", "deviceAvailable", "birthCertificateFile", "parentCnicFile", "childPhotographFile"],
+      5: isPreviewMode
+        ? ["paymentMethod", "admissionFee", "discountPercent", "paymentInstructions"]
+        : ["payerName", "payerEmail", "payerPhone", "transactionId", "paidAmount", "paidAt", "paymentProofFile"],
+      6: ["whyJoinSchool", "schoolExpectations", "declarationAccepted"],
+    };
+
+    return (map[currentStep] || []).some((key) => Boolean(errorsValue[key]));
+  }
+
+  function getAllCurrentErrors(formValue) {
+    const errors = getStepErrors(formValue, isPreviewMode);
+    return errors;
+  }
 
   useEffect(() => {
-    const token = searchParams?.get("leadToken") || "";
+    const token = leadTokenParam;
     if (!token) return;
 
     setLeadToken(token);
@@ -297,11 +357,13 @@ function AdmissionFormContent() {
         setForm((current) => ({
           ...current,
           studentName: data.item.student_name || current.studentName,
+          classLevel: data.item.class_level || current.classLevel,
           fatherNameEnglish: data.item.parent_name || current.fatherNameEnglish,
           fatherEmail: data.item.email || current.fatherEmail,
           fatherContactWhatsapp: data.item.phone || current.fatherContactWhatsapp,
           preferredContactPerson: current.preferredContactPerson || "Father",
         }));
+        setLeadClassLevel(String(data.item.class_level || "").trim());
       } catch {
         // Allow manual admission form submission even if prefill is unavailable.
       } finally {
@@ -314,9 +376,151 @@ function AdmissionFormContent() {
     return () => {
       active = false;
     };
-  }, [searchParams]);
+  }, [leadTokenParam]);
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadPaymentOptions() {
+      try {
+        const response = await fetch("/api/public/admission-form-options", { cache: "no-store" });
+        const data = await response.json();
+        if (!response.ok || !data || !active) return;
+
+        setPaymentOptions({
+          discounts: Array.isArray(data.discounts) ? data.discounts : [],
+          paymentMethods: Array.isArray(data.paymentMethods) ? data.paymentMethods : [],
+          regularFees: Array.isArray(data.regularFees) ? data.regularFees : [],
+          admissionFees: Array.isArray(data.admissionFees) ? data.admissionFees : [],
+          classLevels: Array.isArray(data.classLevels) ? data.classLevels : [],
+          coordinatorMaxDiscountPercent: Number(data.coordinatorMaxDiscountPercent || 20),
+        });
+      } catch {
+        // Keep the form usable even if payment options cannot be loaded.
+      }
+    }
+
+    void loadPaymentOptions();
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const previewClassLevel = useMemo(() => String(leadClassLevel || form.classLevel || "").trim(), [leadClassLevel, form.classLevel]);
+
+  const classLevelOptions = useMemo(() => {
+    const items = paymentOptions.classLevels
+      .map((item) => String(item?.class_level || item?.title || "").trim())
+      .filter(Boolean);
+
+    return items.filter((item, index) => items.findIndex((entry) => entry.toLowerCase() === item.toLowerCase()) === index);
+  }, [paymentOptions.classLevels]);
 
   const age = useMemo(() => calculateAgeFromDate(form.dateOfBirth), [form.dateOfBirth]);
+  const matchingRegularFees = useMemo(() => {
+    const normalizedPreviewClass = normalizeLookupKey(previewClassLevel);
+    return paymentOptions.regularFees.filter((item) => {
+      const classLevel = normalizeLookupKey(item?.class_level || "");
+      return !normalizedPreviewClass || classLevel === normalizedPreviewClass;
+    });
+  }, [previewClassLevel, paymentOptions.regularFees]);
+
+  useEffect(() => {
+    if (!form.admissionFee && matchingRegularFees.length === 1) {
+      setForm((current) => ({
+        ...current,
+        admissionFee: String(matchingRegularFees[0]?.amount || ""),
+      }));
+    }
+  }, [form.admissionFee, matchingRegularFees]);
+
+  const previewRegularFee = useMemo(() => {
+    return matchingRegularFees[0] || null;
+  }, [matchingRegularFees]);
+
+  const previewAdmissionFeeOptions = useMemo(() => {
+    return paymentOptions.admissionFees.filter((item) => {
+      const classLevel = normalizeLookupKey(item?.class_level || "");
+      const normalizedPreviewClass = normalizeLookupKey(previewClassLevel);
+      return !normalizedPreviewClass || !classLevel || classLevel === normalizedPreviewClass;
+    });
+  }, [previewClassLevel, paymentOptions.admissionFees]);
+
+  const previewAdmissionFee = useMemo(() => {
+    if (form.admissionFee) {
+      return previewAdmissionFeeOptions.find((item) => String(item.amount || "") === String(form.admissionFee || "")) || null;
+    }
+    return null;
+  }, [form.admissionFee, previewAdmissionFeeOptions]);
+
+  const liveSelectedAdmissionFeeId = useMemo(() => searchParams?.get("admissionFeeId") || "", [searchParams]);
+  const liveSelectedAdmissionFeeAmountParam = useMemo(() => searchParams?.get("admissionFeeAmount") || "", [searchParams]);
+  const liveSelectedDiscountId = useMemo(() => searchParams?.get("discountId") || "", [searchParams]);
+  const liveSelectedDiscountPercentParam = useMemo(() => searchParams?.get("discountPercent") || "", [searchParams]);
+  const liveSelectedPaymentMethodId = useMemo(() => searchParams?.get("paymentMethodId") || "", [searchParams]);
+  const liveSelectedPaymentMethodNameParam = useMemo(() => searchParams?.get("paymentMethodName") || "", [searchParams]);
+  const livePaymentInstructionsFromLink = useMemo(() => searchParams?.get("paymentInstructions") || "", [searchParams]);
+  const liveSelectedAdmissionFee = useMemo(
+    () =>
+      paymentOptions.admissionFees.find((item) => item.id === liveSelectedAdmissionFeeId) ||
+      paymentOptions.admissionFees.find((item) => String(item.amount || "") === String(liveSelectedAdmissionFeeAmountParam || "")) ||
+      null,
+    [liveSelectedAdmissionFeeId, liveSelectedAdmissionFeeAmountParam, paymentOptions.admissionFees]
+  );
+  const liveSelectedDiscount = useMemo(
+    () =>
+      paymentOptions.discounts.find((item) => item.id === liveSelectedDiscountId) ||
+      paymentOptions.discounts.find((item) => String(item.percent || "") === String(liveSelectedDiscountPercentParam || "")) ||
+      null,
+    [liveSelectedDiscountId, liveSelectedDiscountPercentParam, paymentOptions.discounts]
+  );
+  const liveSelectedPaymentMethod = useMemo(
+    () =>
+      paymentOptions.paymentMethods.find((item) => item.id === liveSelectedPaymentMethodId) ||
+      paymentOptions.paymentMethods.find((item) => String(item.name || "").trim().toLowerCase() === String(liveSelectedPaymentMethodNameParam || "").trim().toLowerCase()) ||
+      null,
+    [liveSelectedPaymentMethodId, liveSelectedPaymentMethodNameParam, paymentOptions.paymentMethods]
+  );
+  const liveAdmissionFeeAmount = Number(liveSelectedAdmissionFee?.amount || liveSelectedAdmissionFeeAmountParam || 0);
+  const liveDiscountPercent = Number(liveSelectedDiscount?.percent || 0);
+  const livePaymentInstructions = String(livePaymentInstructionsFromLink || liveSelectedPaymentMethod?.instructions || "").trim();
+
+  const previewDiscountPercent = useMemo(() => {
+    return Number(String(form.discountPercent || "0").replace("%", "")) || 0;
+  }, [form.discountPercent]);
+
+  const previewPaymentInstructions = useMemo(() => {
+    return String(form.paymentInstructions || "").trim();
+  }, [form.paymentInstructions]);
+
+  const isPreviewPaymentReady = useMemo(() => {
+    if (!isPreviewMode) return true;
+    return Boolean(form.admissionFee && String(form.discountPercent || "").trim() && previewPaymentInstructions);
+  }, [isPreviewMode, form.admissionFee, form.discountPercent, previewPaymentInstructions]);
+
+  useEffect(() => {
+    if (!isPreviewMode) return undefined;
+
+    const targetOrigin = window.location.origin;
+    window.parent?.postMessage(
+      {
+        type: "ADMISSION_PREVIEW_PAYMENT_READY",
+        leadToken,
+        ready: isPreviewPaymentReady,
+      },
+      targetOrigin
+    );
+
+    return undefined;
+  }, [isPreviewMode, leadToken, isPreviewPaymentReady]);
+
+  const previewRegularFeeAmount = Number(previewRegularFee?.amount || 0);
+  const previewDiscountAmount = Math.round((previewRegularFeeAmount * previewDiscountPercent) / 100);
+  const previewAdmissionFeeAmount = Number(previewAdmissionFee?.amount || 0);
+  const previewTotalAmount = Math.max(previewRegularFeeAmount - previewDiscountAmount + previewAdmissionFeeAmount, 0);
+  const liveDiscountAmount = Math.round(previewRegularFeeAmount * (liveDiscountPercent / 100));
+  const liveTotalAmount = Math.max(previewRegularFeeAmount - liveDiscountAmount + liveAdmissionFeeAmount, 0);
 
   function updateField(name, value) {
     setForm((current) => ({ ...current, [name]: value }));
@@ -324,14 +528,24 @@ function AdmissionFormContent() {
   }
 
   function goNext() {
-    const nextErrors = getErrorsForStep(form, step);
+    if (isPreviewMode && step === 5 && !isPreviewPaymentReady) {
+      setErrors((current) => ({
+        ...current,
+        admissionFee: form.admissionFee ? "" : "Admission fee is required.",
+        discountPercent: String(form.discountPercent || "").trim() ? "" : "Discount is required.",
+        paymentInstructions: previewPaymentInstructions ? "" : "Payment instructions are required.",
+      }));
+      return;
+    }
+
+    const nextErrors = getErrorsForCurrentStep(form, step);
     setErrors(nextErrors);
 
     if (Object.values(nextErrors).some(Boolean)) {
       return;
     }
 
-    setStep((current) => Math.min(current + 1, STEP_TITLES.length - 1));
+    setStep((current) => Math.min(current + 1, totalSteps - 1));
   }
 
   function goBack() {
@@ -340,12 +554,12 @@ function AdmissionFormContent() {
 
   async function handleSubmit(event) {
     event.preventDefault();
-    const nextErrors = getStepErrors(form);
+    const nextErrors = getAllCurrentErrors(form);
     setErrors(nextErrors);
 
     if (Object.values(nextErrors).some(Boolean)) {
       setSuccessMessage("");
-      const firstErrorStep = STEP_TITLES.findIndex((_, index) => stepHasErrors(index, nextErrors));
+      const firstErrorStep = STEP_TITLES.findIndex((_, index) => stepHasCurrentErrors(index, nextErrors));
       if (firstErrorStep >= 0) setStep(firstErrorStep);
       return;
     }
@@ -408,6 +622,16 @@ function AdmissionFormContent() {
         preferred_contact_person: form.preferredContactPerson,
         support_person_during_learning: form.supportPersonDuringLearning,
         device_available: form.deviceAvailable,
+        payment_method: isPreviewMode ? form.paymentMethod : (liveSelectedPaymentMethod?.name || liveSelectedPaymentMethod?.method_key || ""),
+        admission_fee: isPreviewMode ? form.admissionFee : String(liveAdmissionFeeAmount || ""),
+        discount_percent: isPreviewMode ? form.discountPercent : String(liveDiscountPercent || ""),
+        payment_instructions: isPreviewMode ? form.paymentInstructions : livePaymentInstructions,
+        payer_name: form.payerName,
+        payer_email: form.payerEmail,
+        payer_phone: form.payerPhone,
+        transaction_id: form.transactionId,
+        paid_amount: form.paidAmount,
+        paid_at: form.paidAt,
         why_join_school: form.whyJoinSchool,
         school_expectations: form.schoolExpectations,
         declaration_accepted: form.declarationAccepted ? "Yes" : "No",
@@ -420,6 +644,7 @@ function AdmissionFormContent() {
         ["child_photograph_file", form.childPhotographFile],
         ["previous_school_report_file", form.previousSchoolReportFile],
         ["medical_report_file", form.medicalReportFile],
+        ["payment_proof_file", form.paymentProofFile],
       ].forEach(([key, file]) => {
         if (file) payload.append(key, file);
       });
@@ -473,7 +698,7 @@ function AdmissionFormContent() {
           <label className="mb-2 block text-[11px] font-bold uppercase tracking-[0.18em] text-[#0D5C48]" htmlFor="classLevel">Applying for Class</label>
           <SelectField id="classLevel" value={form.classLevel} onChange={(event) => updateField("classLevel", event.target.value)} error={errors.classLevel} className={inputClass(errors.classLevel)}>
             <option value="">Select class</option>
-            {[...ALLOWED_CLASS_LEVELS].map((option) => <option key={option} value={option}>{option}</option>)}
+            {classLevelOptions.map((option) => <option key={option} value={option}>{option}</option>)}
           </SelectField>
         </div>
         <div>
@@ -755,6 +980,317 @@ function AdmissionFormContent() {
     );
   }
 
+  function renderPaymentStep() {
+    if (!isPreviewMode) {
+      return (
+        <div className="grid gap-5 rounded-[1.35rem] border border-[rgba(13,59,46,0.08)] bg-white/95 p-4 shadow-[0_12px_28px_rgba(13,59,46,0.05)] sm:p-6">
+          <div className="grid gap-4 rounded-[1.1rem] border border-[rgba(201,162,39,0.22)] bg-[#FFF5D6]/70 p-4">
+            <div className="rounded-[1rem] border border-[#2D8A6A]/10 bg-white p-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]">Payment methods</p>
+              <div className="mt-3 space-y-2">
+                {paymentOptions.paymentMethods.length ? paymentOptions.paymentMethods.map((method) => (
+                  <div key={method.id || method.name} className="rounded-xl border border-[#2D8A6A]/10 bg-[#FAF7F0] px-3 py-2 text-sm text-[#063F32]">
+                    <p className="font-semibold">{method.name || "Payment method"}</p>
+                    <div className="mt-2 grid gap-1 text-xs text-[#245C4F]">
+                      {method.bank_name ? <p><span className="font-semibold text-[#063F32]">Bank:</span> {method.bank_name}</p> : null}
+                      {method.account_title ? <p><span className="font-semibold text-[#063F32]">Account title:</span> {method.account_title}</p> : null}
+                      {method.account_number ? <p><span className="font-semibold text-[#063F32]">Account number:</span> {method.account_number}</p> : null}
+                      {method.iban ? <p><span className="font-semibold text-[#063F32]">IBAN:</span> {method.iban}</p> : null}
+                      {method.branch_code ? <p><span className="font-semibold text-[#063F32]">Branch code:</span> {method.branch_code}</p> : null}
+                      {method.instructions ? <p><span className="font-semibold text-[#063F32]">Instructions:</span> {method.instructions}</p> : null}
+                    </div>
+                  </div>
+                )) : (
+                  <p className="text-sm text-[#245C4F]">No payment methods available.</p>
+                )}
+              </div>
+            </div>
+
+            <div className="grid gap-4 rounded-[1rem] border border-[#2D8A6A]/10 bg-white p-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]">Payment details</p>
+              <p className="text-sm text-[#245C4F]">Please use the selected payment details below before uploading your payment proof.</p>
+              <div className="grid gap-3 md:grid-cols-3">
+                <div className="rounded-[1rem] border border-[#2D8A6A]/15 bg-[#FAF7F0] p-4">
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]">Admission fee</p>
+                  <p className="mt-3 text-xl font-bold text-[#063F32]">
+                    {liveSelectedAdmissionFee ? `PKR ${liveAdmissionFeeAmount.toLocaleString("en-PK")}` : "No admission fee selected"}
+                  </p>
+                  <p className="mt-2 text-sm text-[#245C4F]">
+                    {liveSelectedAdmissionFee?.title || liveSelectedAdmissionFee?.name || "Choose an admission-fee item from fee management."}
+                  </p>
+                </div>
+                <div className="rounded-[1rem] border border-[#2D8A6A]/15 bg-[#FAF7F0] p-4">
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]">Discount</p>
+                  <p className="mt-3 text-xl font-bold text-[#063F32]">
+                    {liveDiscountPercent ? `${liveDiscountPercent}%` : "No discount selected"}
+                  </p>
+                  <p className="mt-2 text-sm text-[#245C4F]">Allowed discounts are limited to coordinator-approved values up to 20%.</p>
+                </div>
+                <div className="rounded-[1rem] border border-[#2D8A6A]/15 bg-[#FAF7F0] p-4">
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]">Total amount</p>
+                  <p className="mt-3 text-xl font-bold text-[#063F32]">PKR {liveTotalAmount.toLocaleString("en-PK")}</p>
+                  <p className="mt-2 text-sm text-[#245C4F]">Regular fee minus discount plus admission fee.</p>
+                </div>
+              </div>
+              <div className="rounded-[1rem] border border-[#2D8A6A]/10 bg-[#FAF7F0] p-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]">Payment instructions</p>
+                <p className="mt-2 whitespace-pre-line text-sm text-[#245C4F]">
+                  {livePaymentInstructions || "No payment instructions added yet."}
+                </p>
+              </div>
+            </div>
+
+            <div className="rounded-[1rem] border border-[#2D8A6A]/15 bg-white p-4">
+              <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]" htmlFor="payerName">
+                Payer name
+              </label>
+              <input
+                id="payerName"
+                type="text"
+                value={form.payerName || ""}
+                onChange={(event) => updateField("payerName", event.target.value)}
+                className={inputClass(errors.payerName)}
+                placeholder="Enter payer name"
+              />
+              <FieldError error={errors.payerName} />
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="rounded-[1rem] border border-[#2D8A6A]/15 bg-white p-4">
+                <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]" htmlFor="payerEmail">
+                  Payer email
+                </label>
+                <input
+                  id="payerEmail"
+                  type="email"
+                  value={form.payerEmail || ""}
+                  onChange={(event) => updateField("payerEmail", event.target.value)}
+                  className={inputClass(errors.payerEmail)}
+                  placeholder="payer@example.com"
+                />
+                <FieldError error={errors.payerEmail} />
+              </div>
+
+              <div className="rounded-[1rem] border border-[#2D8A6A]/15 bg-white p-4">
+                <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]" htmlFor="payerPhone">
+                  Payer phone
+                </label>
+                <input
+                  id="payerPhone"
+                  type="tel"
+                  value={form.payerPhone || ""}
+                  onChange={(event) => updateField("payerPhone", event.target.value)}
+                  className={inputClass(errors.payerPhone)}
+                  placeholder="03xx-xxxxxxx"
+                />
+                <FieldError error={errors.payerPhone} />
+              </div>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="rounded-[1rem] border border-[#2D8A6A]/15 bg-white p-4">
+                <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]" htmlFor="transactionId">
+                  Transaction ID
+                </label>
+                <input
+                  id="transactionId"
+                  type="text"
+                  value={form.transactionId || ""}
+                  onChange={(event) => updateField("transactionId", event.target.value)}
+                  className={inputClass(errors.transactionId)}
+                  placeholder="Bank reference or wallet transaction ID"
+                />
+                <FieldError error={errors.transactionId} />
+              </div>
+
+              <div className="rounded-[1rem] border border-[#2D8A6A]/15 bg-white p-4">
+                <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]" htmlFor="paidAmount">
+                  Paid amount
+                </label>
+                <input
+                  id="paidAmount"
+                  type="number"
+                  min="1"
+                  step="0.01"
+                  value={form.paidAmount || ""}
+                  onChange={(event) => updateField("paidAmount", event.target.value)}
+                  className={inputClass(errors.paidAmount)}
+                  placeholder="5000"
+                />
+                <FieldError error={errors.paidAmount} />
+              </div>
+            </div>
+
+            <div className="rounded-[1rem] border border-[#2D8A6A]/15 bg-white p-4">
+              <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]" htmlFor="paidAt">
+                Paid at
+              </label>
+              <input
+                id="paidAt"
+                type="datetime-local"
+                value={form.paidAt || ""}
+                onChange={(event) => updateField("paidAt", event.target.value)}
+                className={inputClass(errors.paidAt)}
+              />
+              <FieldError error={errors.paidAt} />
+            </div>
+
+            <div className="rounded-[1rem] border border-[#2D8A6A]/10 bg-white p-4">
+              <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]" htmlFor="paymentProofFile">
+                Payment proof file
+              </label>
+              <input
+                id="paymentProofFile"
+                type="file"
+                accept="image/*,.pdf"
+                onChange={(event) => updateField("paymentProofFile", event.target.files?.[0] || null)}
+                className={inputClass(errors.paymentProofFile)}
+              />
+              <FieldError error={errors.paymentProofFile} />
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="grid gap-5 rounded-[1.35rem] border border-[rgba(13,59,46,0.08)] bg-white/95 p-4 shadow-[0_12px_28px_rgba(13,59,46,0.05)] sm:p-6">
+        <div className="grid gap-4 sm:col-span-2">
+          <div className="grid gap-4 rounded-[1.1rem] border border-[rgba(201,162,39,0.22)] bg-[#FFF5D6]/70 p-4">
+            <div className="rounded-[1rem] border border-[#2D8A6A]/10 bg-white p-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]">Payment methods</p>
+              <div className="mt-3 space-y-2">
+                {paymentOptions.paymentMethods.length ? paymentOptions.paymentMethods.map((method) => (
+                  <div key={method.id || method.name} className="rounded-xl border border-[#2D8A6A]/10 bg-[#FAF7F0] px-3 py-2 text-sm text-[#063F32]">
+                    <p className="font-semibold">{method.name || "Payment method"}</p>
+                    <div className="mt-2 grid gap-1 text-xs text-[#245C4F]">
+                      {method.bank_name ? <p><span className="font-semibold text-[#063F32]">Bank:</span> {method.bank_name}</p> : null}
+                      {method.account_title ? <p><span className="font-semibold text-[#063F32]">Account title:</span> {method.account_title}</p> : null}
+                      {method.account_number ? <p><span className="font-semibold text-[#063F32]">Account number:</span> {method.account_number}</p> : null}
+                      {method.iban ? <p><span className="font-semibold text-[#063F32]">IBAN:</span> {method.iban}</p> : null}
+                      {method.branch_code ? <p><span className="font-semibold text-[#063F32]">Branch code:</span> {method.branch_code}</p> : null}
+                      {method.instructions ? <p><span className="font-semibold text-[#063F32]">Instructions:</span> {method.instructions}</p> : null}
+                      {!method.bank_name && !method.account_title && !method.account_number && !method.iban && !method.branch_code && !method.instructions ? (
+                        <p>Available payment option</p>
+                      ) : null}
+                    </div>
+                  </div>
+                )) : (
+                  <p className="text-sm text-[#245C4F]">No payment methods available.</p>
+                )}
+              </div>
+            </div>
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="rounded-[1rem] border border-[#2D8A6A]/15 bg-white p-4">
+                <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]" htmlFor="previewAdmissionFee">
+                  Admission fee
+                </label>
+                <SelectField
+                  id="previewAdmissionFee"
+                  value={form.admissionFee || ""}
+                  onChange={(event) => updateField("admissionFee", event.target.value)}
+                  error={errors.admissionFee}
+                  className={`${inputClass(errors.admissionFee)} text-xs`}
+                >
+                  <option value="">No admission fee selected</option>
+                  {previewAdmissionFeeOptions.length ? previewAdmissionFeeOptions.map((item) => (
+                    <option key={item.id || `${item.class_level}-${item.amount}`} value={String(item.amount || "")}>
+                      {item.title || item.name || "Admission fee"} - PKR {Number(item.amount || 0).toLocaleString("en-PK")}
+                    </option>
+                  )) : null}
+                </SelectField>
+                <p className="mt-2 text-sm text-[#245C4F]">Choose an admission-fee item from fee management.</p>
+              </div>
+
+              <div className="rounded-[1rem] border border-[#2D8A6A]/15 bg-white p-4">
+                <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]" htmlFor="previewDiscountPercent">
+                  Discount
+                </label>
+                <SelectField
+                  id="previewDiscountPercent"
+                  value={form.discountPercent || ""}
+                  onChange={(event) => updateField("discountPercent", event.target.value)}
+                  error={errors.discountPercent}
+                  className={`${inputClass(errors.discountPercent)} text-xs`}
+                >
+                  <option value="">No discount selected</option>
+                  {paymentOptions.discounts
+                    .filter((option) => Number(option.percent || 0) <= Number(paymentOptions.coordinatorMaxDiscountPercent || 20))
+                    .map((option) => (
+                      <option key={option.id || option.label} value={String(option.percent || "")}>
+                        {option.label || `${Number(option.percent || 0)}%`}
+                      </option>
+                    ))}
+                </SelectField>
+                <p className="mt-2 text-sm text-[#245C4F]">Allowed discounts are limited to coordinator-approved values up to 20%.</p>
+              </div>
+            </div>
+
+            <div className="rounded-[1rem] border border-[#2D8A6A]/10 bg-white p-4">
+              <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]" htmlFor="paymentInstructions">
+                Payment instructions
+              </label>
+              <textarea
+                id="paymentInstructions"
+                rows={4}
+                value={form.paymentInstructions || ""}
+                onChange={(event) => updateField("paymentInstructions", event.target.value)}
+                className={inputClass(errors.paymentInstructions)}
+                placeholder="Add payment instructions for this admission"
+              />
+              <FieldError error={errors.paymentInstructions} />
+            </div>
+
+          </div>
+
+          <div className="grid gap-3 rounded-[1.1rem] border border-[rgba(201,162,39,0.22)] bg-[#FFF5D6]/70 p-4">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#0D5C48]">Payment summary</p>
+            <div className="grid gap-3 md:grid-cols-3">
+              <div className="rounded-[1rem] border border-[#2D8A6A]/15 bg-white p-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]">Admission fee</p>
+                <p className="mt-3 text-2xl font-bold text-[#063F32]">
+                  {previewAdmissionFee ? `PKR ${Number(previewAdmissionFee.amount || 0).toLocaleString("en-PK")}` : "No admission fee selected"}
+                </p>
+                <p className="mt-2 text-sm text-[#245C4F]">
+                  {previewAdmissionFee?.title || previewAdmissionFee?.name || "Choose an admission-fee item from fee management."}
+                </p>
+              </div>
+              <div className="rounded-[1rem] border border-[#2D8A6A]/15 bg-white p-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]">Discount</p>
+                <p className="mt-3 text-2xl font-bold text-[#063F32]">{previewDiscountPercent ? `${previewDiscountPercent}%` : "No discount selected"}</p>
+                <p className="mt-2 text-sm text-[#245C4F]">Allowed discounts are limited to coordinator-approved values up to 20%.</p>
+              </div>
+              <div className="rounded-[1rem] border border-[#2D8A6A]/15 bg-white p-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]">Regular fee</p>
+                <p className="mt-3 text-2xl font-bold text-[#063F32]">{previewRegularFee ? `PKR ${previewRegularFeeAmount.toLocaleString("en-PK")}` : "No regular fee selected"}</p>
+                <p className="mt-2 text-sm text-[#245C4F]">{previewRegularFee?.title || previewRegularFee?.name || `Based on ${previewClassLevel || "the selected class"}.`}</p>
+              </div>
+            </div>
+            <div className="grid gap-3 md:grid-cols-3">
+              <div className="rounded-[1rem] border border-[#2D8A6A]/10 bg-white p-4 text-sm text-[#245C4F]">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]">Discount amount</p>
+                <p className="mt-2 text-lg font-bold text-[#063F32]">PKR {previewDiscountAmount.toLocaleString("en-PK")}</p>
+                <p className="mt-1">Applied on the regular fee only.</p>
+              </div>
+              <div className="rounded-[1rem] border border-[#2D8A6A]/10 bg-white p-4 text-sm text-[#245C4F]">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]">Total after discount</p>
+                <p className="mt-2 text-lg font-bold text-[#063F32]">PKR {previewTotalAmount.toLocaleString("en-PK")}</p>
+                <p className="mt-1">Regular fee minus discount plus admission fee.</p>
+              </div>
+              <div className="rounded-[1rem] border border-[#2D8A6A]/10 bg-white p-4 text-sm text-[#245C4F]">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]">Payment instructions</p>
+                <p className="mt-2 whitespace-pre-line">
+                  {previewPaymentInstructions || previewAdmissionFee?.instructions || "No payment instructions added yet."}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   function renderDeclarationStep() {
     return (
       <div className="grid gap-5 rounded-[1.35rem] border border-[rgba(13,59,46,0.08)] bg-white/95 p-4 shadow-[0_12px_28px_rgba(13,59,46,0.05)] sm:p-6">
@@ -783,14 +1319,25 @@ function AdmissionFormContent() {
     );
   }
 
-  const stepContent = [
-    renderProgrammeStep(),
-    renderStudentStep(),
-    renderProfileStep(),
-    renderParentsStep(),
-    renderReadinessStep(),
-    renderDeclarationStep(),
-  ];
+  const stepContent = isPreviewMode
+    ? [
+        renderProgrammeStep(),
+        renderStudentStep(),
+        renderProfileStep(),
+        renderParentsStep(),
+        renderReadinessStep(),
+        renderPaymentStep(),
+        renderDeclarationStep(),
+      ]
+    : [
+        renderProgrammeStep(),
+        renderStudentStep(),
+        renderProfileStep(),
+        renderParentsStep(),
+        renderReadinessStep(),
+        renderPaymentStep(),
+        renderDeclarationStep(),
+      ];
 
   return (
     <main className="relative min-h-screen overflow-hidden bg-[#FAF7F0] text-[#063F32]">
@@ -798,7 +1345,7 @@ function AdmissionFormContent() {
       <div className="absolute left-[-6rem] top-24 h-56 w-56 rounded-full bg-[#2D8A6A]/10 blur-3xl" />
       <div className="absolute bottom-10 right-0 h-72 w-72 rounded-full bg-[#C9A227]/10 blur-3xl" />
 
-      <div className="relative mx-auto flex min-h-screen max-w-7xl items-center px-4 py-10 sm:px-6 lg:px-8">
+      <div className="relative mx-auto flex min-h-screen max-w-7xl items-center px-2 py-2">
         <motion.div className="grid w-full items-stretch gap-8 lg:grid-cols-[0.8fr_1.2fr]" variants={container} initial="hidden" animate="show">
           <motion.section variants={item} className="flex w-full flex-col justify-start rounded-[2.2rem] border border-[rgba(13,59,46,0.12)] bg-[linear-gradient(180deg,_rgba(252,250,245,0.98)_0%,_rgba(245,240,232,0.96)_100%)] p-6 shadow-[0_24px_60px_rgba(13,59,46,0.12)] backdrop-blur-xl sm:p-7 lg:p-8">
             <div className="rounded-[1.6rem] bg-[linear-gradient(135deg,_#063F32_0%,_#0D5C48_45%,_#236B51_100%)] p-6 text-[#FAF7F0] shadow-[0_14px_32px_rgba(6,63,50,0.2)]">
@@ -815,7 +1362,13 @@ function AdmissionFormContent() {
 
             <div className="mt-7 grid gap-3 rounded-[1.6rem] border border-[rgba(13,59,46,0.08)] bg-white/70 p-3 shadow-[0_10px_24px_rgba(13,59,46,0.04)]">
               {STEP_TITLES.map((label, index) => (
-                <div key={label} className={`flex items-center gap-3 rounded-[1.15rem] border px-3 py-3 text-sm shadow-[0_8px_20px_rgba(13,59,46,0.04)] ${index === step ? "border-[#C9A227]/30 bg-[#FFF5D6]/80 text-[#063F32]" : index < step ? "border-[#2D8A6A]/20 bg-[#F4F0E7] text-[#063F32]" : "border-[rgba(13,59,46,0.10)] bg-white/90 text-[#245C4F]"}`}>
+                <button
+                  key={label}
+                  type="button"
+                  onClick={isPreviewMode ? () => setStep(index) : undefined}
+                  disabled={!isPreviewMode}
+                  className={`flex w-full items-center gap-3 rounded-[1.15rem] border px-3 py-3 text-left text-sm shadow-[0_8px_20px_rgba(13,59,46,0.04)] transition ${isPreviewMode ? "hover:-translate-y-[1px] hover:shadow-[0_12px_28px_rgba(13,59,46,0.08)]" : "cursor-default"} ${index === step ? "cursor-default border-[#C9A227]/30 bg-[#FFF5D6]/80 text-[#063F32]" : index < step ? "border-[#2D8A6A]/20 bg-[#F4F0E7] text-[#063F32]" : "border-[rgba(13,59,46,0.10)] bg-white/90 text-[#245C4F]"}`}
+                >
                   <span className={`flex h-8 w-8 items-center justify-center rounded-full text-sm font-semibold ${index === step ? "bg-gradient-to-br from-[#C9A227] to-[#E4C766] text-[#063F32]" : index < step ? "bg-[#2D8A6A] text-[#FAF7F0]" : "bg-[#FAF7F0] text-[#245C4F]"}`}>
                     {index + 1}
                   </span>
@@ -825,7 +1378,7 @@ function AdmissionFormContent() {
                       {index === step ? "Current step" : index < step ? "Completed" : "Pending"}
                     </p>
                   </div>
-                </div>
+                </button>
               ))}
             </div>
 
@@ -862,13 +1415,20 @@ function AdmissionFormContent() {
 
                 <div className="flex flex-wrap items-center gap-3">
                   <span className="rounded-full bg-[#FAF7F0] px-3 py-2 text-sm text-[#245C4F]">
-                    {tokenLoading ? "Loading lead details..." : `Step ${step + 1} of ${STEP_TITLES.length}`}
-                  </span>
+                  {tokenLoading ? (
+                    <span className="inline-flex items-center gap-2">
+                      <span className="h-4 w-4 animate-spin rounded-full border-2 border-[#0D5C48]/20 border-t-[#0D5C48]" />
+                      Loading lead details...
+                    </span>
+                  ) : (
+                    `Step ${step + 1} of ${STEP_TITLES.length}`
+                  )}
+                </span>
                   {step < STEP_TITLES.length - 1 ? (
                     <button
                       type="button"
                       onClick={goNext}
-                      disabled={pending || tokenLoading}
+                      disabled={pending || tokenLoading || (isPreviewMode && step === 5 && !isPreviewPaymentReady)}
                       className="rounded-full bg-[#236B51] px-4 py-3 text-sm font-semibold text-[#FAF7F0] shadow-[0_12px_28px_rgba(45,138,106,0.25)] transition hover:bg-[#184A38] disabled:cursor-not-allowed disabled:opacity-70"
                     >
                       Next step
@@ -878,10 +1438,10 @@ function AdmissionFormContent() {
                       type="submit"
                       whileHover={{ y: -1 }}
                       whileTap={{ scale: 0.99 }}
-                      disabled={pending || tokenLoading}
+                      disabled={pending || tokenLoading || isPreviewMode}
                       className="rounded-full bg-[#236B51] px-5 py-3 text-sm font-semibold text-[#FAF7F0] shadow-[0_12px_28px_rgba(45,138,106,0.25)] transition hover:bg-[#184A38] disabled:cursor-not-allowed disabled:opacity-70"
                     >
-                      {pending ? "Submitting..." : tokenLoading ? "Loading prefill..." : "Submit admission form"}
+                      {isPreviewMode ? "Preview only" : pending ? "Submitting..." : tokenLoading ? "Loading prefill..." : "Submit admission form"}
                     </motion.button>
                   )}
                 </div>

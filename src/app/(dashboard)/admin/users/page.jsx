@@ -158,7 +158,7 @@ export default function AdminUsersPage() {
   }, [rolePreset, view]);
 
   const loadOverview = useCallback(async (options = {}) => {
-    const force = options.force === true;
+    const force = options.force === true || view === "parents";
     const cacheKey = getOverviewCacheKey(view);
 
     if (!force) {
@@ -250,7 +250,7 @@ export default function AdminUsersPage() {
   }, [view]);
 
   const loadTable = useCallback(async (options = {}) => {
-    const force = options.force === true;
+    const force = options.force === true || view === "parents";
     const cacheKey = getCacheKey(filters);
     setState((current) => ({ ...current, loading: true, error: "" }));
 
