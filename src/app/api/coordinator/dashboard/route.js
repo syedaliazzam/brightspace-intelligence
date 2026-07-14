@@ -24,7 +24,13 @@ export async function GET() {
       recentLectures,
       recentLeads,
     ] = await Promise.all([
-      prisma.$queryRaw`SELECT COUNT(*)::int AS total FROM registration_leads WHERE status = 'new_lead'`,
+      prisma.$queryRaw`
+        SELECT COUNT(*)::int AS total
+        FROM interested_students
+        WHERE admission_form_sent_at IS NULL
+          AND admission_form_submitted_at IS NULL
+          AND LOWER(COALESCE(status::text, '')) NOT IN ('archived')
+      `,
       prisma.$queryRaw`
         SELECT COUNT(*)::int AS total
         FROM interested_students

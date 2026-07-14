@@ -2,6 +2,9 @@
 
 import { useEffect, useMemo, useState } from "react";
 import ClientPortal from "@/components/shared/ClientPortal";
+import PaginationControls from "@/components/teacher/PaginationControls";
+
+const PAGE_SIZE = 7;
 
 function formatDate(value) {
   if (!value) return "No date";
@@ -61,6 +64,7 @@ export default function InterestedStudentsPanel({
   showDetailsButton = true,
   showActionsColumn = true,
 }) {
+  const [page, setPage] = useState(1);
   const [selectedLead, setSelectedLead] = useState(null);
   const [message, setMessage] = useState("");
   const [loadingId, setLoadingId] = useState("");
@@ -142,6 +146,12 @@ export default function InterestedStudentsPanel({
   const discountPercent = Number(discount?.percent || 0);
   const discountAmount = Math.round(regularFeeAmount * (discountPercent / 100));
   const totalAmount = Math.max(regularFeeAmount - discountAmount + admissionFeeAmount, 0);
+  const totalPages = Math.max(1, Math.ceil(items.length / PAGE_SIZE));
+  const currentPage = Math.min(Math.max(1, page), totalPages);
+  const visibleItems = useMemo(() => {
+    const startIndex = (currentPage - 1) * PAGE_SIZE;
+    return items.slice(startIndex, startIndex + PAGE_SIZE);
+  }, [currentPage, items]);
 
   useEffect(() => {
     if (!selectedLead) return;
@@ -229,7 +239,7 @@ export default function InterestedStudentsPanel({
               </tr>
             </thead>
             <tbody className="divide-y divide-[#F1EADC]">
-              {items.map((item) => (
+              {visibleItems.map((item) => (
                 <tr key={item.id} className="align-top">
                   <td className="px-5 py-5 text-[#063F32]">{textOrDash(item.parent_name)}</td>
                   <td className="px-5 py-5 text-[#245C4F]">{textOrDash(item.phone)}</td>
@@ -272,10 +282,20 @@ export default function InterestedStudentsPanel({
             </tbody>
           </table>
         </div>
+        {items.length > PAGE_SIZE ? (
+          <div className="border-t border-[#2D8A6A]/10 bg-[#FAF7F0]/50 px-4 py-4">
+            <PaginationControls
+              page={currentPage}
+              pageSize={PAGE_SIZE}
+              totalItems={items.length}
+              onPageChange={(nextPage) => setPage(Math.min(Math.max(1, nextPage), totalPages))}
+            />
+          </div>
+        ) : null}
       </section>
 
       <div className="grid gap-4 lg:hidden">
-        {items.map((item) => (
+        {visibleItems.map((item) => (
           <article
             key={item.id}
             className="rounded-[1.75rem] border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(250,247,240,0.98)_100%)] p-5 shadow-[0_18px_60px_-36px_rgba(13,59,46,0.18)] backdrop-blur-xl"
@@ -319,6 +339,16 @@ export default function InterestedStudentsPanel({
             ) : null}
           </article>
         ))}
+        {items.length > PAGE_SIZE ? (
+          <div className="rounded-[1.5rem] border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(250,247,240,0.98)_100%)] shadow-[0_18px_60px_-36px_rgba(13,59,46,0.18)] backdrop-blur-xl">
+            <PaginationControls
+              page={currentPage}
+              pageSize={PAGE_SIZE}
+              totalItems={items.length}
+              onPageChange={(nextPage) => setPage(Math.min(Math.max(1, nextPage), totalPages))}
+            />
+          </div>
+        ) : null}
       </div>
 
       {selectedLead && showDetailsButton ? (
