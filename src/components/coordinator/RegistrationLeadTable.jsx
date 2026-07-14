@@ -243,7 +243,6 @@ export default function RegistrationLeadTable({
                 <th className="px-6 py-4">Child</th>
                 <th className="px-6 py-4">Parent</th>
                 <th className="px-6 py-4">Class</th>
-                <th className="px-6 py-4">Contact</th>
                 <th className="px-6 py-4">Submitted</th>
                 <th className="px-6 py-4">Status</th>
                 <th className="px-6 py-4 text-right">Action</th>
@@ -263,23 +262,13 @@ export default function RegistrationLeadTable({
                   >
                     <td className="px-6 py-5">
                       <p className="font-semibold text-[#063F32]">{lead.student_name}</p>
-                      <p className="mt-1 text-sm text-[#245C4F]">
-                        {lead.gender || "Gender not provided"} • {formatDate(lead.date_of_birth)}
-                      </p>
-                      <p className="mt-1 text-sm text-[#245C4F]">{lead.current_school || "Current school not provided"}</p>
                     </td>
                     <td className="px-6 py-5">
                       <p className="font-medium text-[#063F32]">{lead.parent_name || "Not provided"}</p>
-                      <p className="mt-1 text-sm text-[#245C4F]">{lead.parent_relation || "Relation not set"}</p>
-                      <p className="mt-1 text-sm text-[#245C4F]">{lead.city_country || "Location not provided"}</p>
                     </td>
                     <td className="px-6 py-5">
                       <p className="font-medium text-[#063F32]">{lead.class_level || "Class not selected"}</p>
                       <p className="mt-1 text-sm text-[#245C4F]">{lead.program_name || "Programme not set"}</p>
-                    </td>
-                    <td className="px-6 py-5">
-                      <p className="text-sm text-[#063F32]">{lead.email || "No email"}</p>
-                      <p className="mt-1 text-sm text-[#245C4F]">{lead.phone || "No phone"}</p>
                     </td>
                     <td className="px-6 py-5 text-sm text-[#245C4F]">{formatDateTime(lead.submitted_at)}</td>
                     <td className="px-6 py-5">
@@ -326,9 +315,6 @@ export default function RegistrationLeadTable({
                 <div>
                   <p className="text-lg font-semibold text-[#063F32]">{lead.student_name}</p>
                   <p className="mt-1 text-sm text-[#245C4F]">{lead.class_level}</p>
-                  <p className="mt-1 text-sm text-[#245C4F]">
-                    {lead.gender || "Gender not provided"} • {formatDate(lead.date_of_birth)}
-                  </p>
                 </div>
                 <span
                   className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${
@@ -343,14 +329,6 @@ export default function RegistrationLeadTable({
                 <div>
                   <dt className="font-medium text-[#245C4F]">Parent</dt>
                   <dd className="mt-1 text-[#063F32]">{lead.parent_name || "Not provided"}</dd>
-                </div>
-                <div>
-                  <dt className="font-medium text-[#245C4F]">Contact</dt>
-                  <dd className="mt-1 text-[#063F32]">{lead.email || lead.phone || "Not provided"}</dd>
-                </div>
-                <div>
-                  <dt className="font-medium text-[#245C4F]">Location</dt>
-                  <dd className="mt-1 text-[#063F32]">{lead.city_country || "Not provided"}</dd>
                 </div>
                 <div>
                   <dt className="font-medium text-[#245C4F]">Programme</dt>

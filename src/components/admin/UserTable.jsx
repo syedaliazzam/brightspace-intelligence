@@ -3,6 +3,7 @@
 import { motion } from "framer-motion";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { usePathname } from "next/navigation";
 
 const ROLE_STYLES = {
   admin: "bg-[#FAF7F0] text-[#063F32]",
@@ -25,6 +26,8 @@ function formatLabel(value) {
 
 export default function UserTable({ users }) {
   const router = useRouter();
+  const pathname = usePathname() || "";
+  const isAdminReadonlyPortal = pathname.startsWith("/admin") && !pathname.startsWith("/superadmin");
   const [pendingId, setPendingId] = useState("");
 
   async function updateStatus(userId, status) {
@@ -85,7 +88,7 @@ export default function UserTable({ users }) {
                 <th className="px-6 py-4">User</th>
                 <th className="px-6 py-4">Role</th>
                 <th className="px-6 py-4">Status</th>
-                <th className="px-6 py-4">Actions</th>
+                {!isAdminReadonlyPortal ? <th className="px-6 py-4">Actions</th> : null}
               </tr>
             </thead>
             <tbody className="divide-y divide-[#F1EADC]">
@@ -111,38 +114,40 @@ export default function UserTable({ users }) {
                       {formatLabel(user.status)}
                     </span>
                   </td>
-                  <td className="px-6 py-5">
-                    <div className="flex flex-wrap gap-2">
-                      {user.status === "active" ? (
-                        <button
-                          type="button"
-                          disabled={pendingId === `${user.id}:suspended`}
-                          onClick={() => updateStatus(user.id, "suspended")}
-                          className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700 transition hover:bg-rose-100 disabled:opacity-60"
-                        >
-                          Suspend
-                        </button>
-                      ) : (
-                        <button
-                          type="button"
-                          disabled={pendingId === `${user.id}:active`}
-                          onClick={() => updateStatus(user.id, "active")}
-                          className="rounded-xl border border-[#2D8A6A]/20 bg-[#EAF6EF] px-3 py-2 text-xs font-semibold text-[#0D5C48] transition hover:bg-[#DFF2E7] disabled:opacity-60"
-                        >
-                          Activate
-                        </button>
-                      )}
+                  {!isAdminReadonlyPortal ? (
+                    <td className="px-6 py-5">
+                      <div className="flex flex-wrap gap-2">
+                        {user.status === "active" ? (
+                          <button
+                            type="button"
+                            disabled={pendingId === `${user.id}:suspended`}
+                            onClick={() => updateStatus(user.id, "suspended")}
+                            className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700 transition hover:bg-rose-100 disabled:opacity-60"
+                          >
+                            Suspend
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            disabled={pendingId === `${user.id}:active`}
+                            onClick={() => updateStatus(user.id, "active")}
+                            className="rounded-xl border border-[#2D8A6A]/20 bg-[#EAF6EF] px-3 py-2 text-xs font-semibold text-[#0D5C48] transition hover:bg-[#DFF2E7] disabled:opacity-60"
+                          >
+                            Activate
+                          </button>
+                        )}
 
-                      <button
-                        type="button"
-                        disabled={pendingId === `${user.id}:password`}
-                        onClick={() => resetPassword(user.id)}
-                        className="rounded-xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-3 py-2 text-xs font-semibold text-[#063F32] transition hover:bg-[#F1EADC] disabled:opacity-60"
-                      >
-                        Reset password
-                      </button>
-                    </div>
-                  </td>
+                        <button
+                          type="button"
+                          disabled={pendingId === `${user.id}:password`}
+                          onClick={() => resetPassword(user.id)}
+                          className="rounded-xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-3 py-2 text-xs font-semibold text-[#063F32] transition hover:bg-[#F1EADC] disabled:opacity-60"
+                        >
+                          Reset password
+                        </button>
+                      </div>
+                    </td>
+                  ) : null}
                 </motion.tr>
               ))}
             </tbody>
@@ -175,8 +180,9 @@ export default function UserTable({ users }) {
               </div>
             </div>
 
-            <div className="mt-4 flex flex-wrap gap-2">
-              {user.status === "active" ? (
+              {!isAdminReadonlyPortal ? (
+              <div className="mt-4 flex flex-wrap gap-2">
+                {user.status === "active" ? (
                 <button
                   type="button"
                   disabled={pendingId === `${user.id}:suspended`}
@@ -205,6 +211,7 @@ export default function UserTable({ users }) {
                 Reset password
               </button>
             </div>
+              ) : null}
           </motion.article>
         ))}
       </div>

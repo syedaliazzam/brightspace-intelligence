@@ -4,8 +4,9 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 
-const ALLOWED_CREATE_ROLES = new Set(["coordinator", "teacher"]);
+const ALLOWED_CREATE_ROLES = new Set(["admin", "coordinator", "teacher"]);
 const ALLOWED_FILTER_ROLES = new Set([
+  "superadmin",
   "admin",
   "coordinator",
   "teacher",
@@ -35,7 +36,7 @@ async function requireAdminSession() {
     return { error: json("Unauthorized.", 401) };
   }
 
-  if (role !== "admin") {
+  if (role !== "admin" && role !== "superadmin") {
     return { error: json("Forbidden.", 403) };
   }
 
@@ -189,6 +190,7 @@ async function getUsers(search, role, status, classLevel = "") {
       u.username,
       u.email,
       u.phone,
+      u.password_hash,
       (
         SELECT COALESCE(om.body_text, om.body)
         FROM outbound_messages om
@@ -387,10 +389,11 @@ export async function GET(request) {
       temporary_password:
         String(user.role || "").toLowerCase() === "student"
           ? extractStudentTemporaryPassword(user.latest_credentials_body_text)
-          : String(user.role || "").toLowerCase() === "admin" ||
+          : String(user.role || "").toLowerCase() === "superadmin" ||
+              String(user.role || "").toLowerCase() === "admin" ||
               String(user.role || "").toLowerCase() === "coordinator" ||
               String(user.role || "").toLowerCase() === "teacher"
-            ? extractStaffTemporaryPassword(user.latest_credentials_body_text)
+            ? extractStaffTemporaryPassword(user.latest_credentials_body_text) || String(user.password_hash || "")
             : extractTemporaryPassword(user.latest_credentials_body_text),
     }));
     return json("Users fetched.", 200, {
@@ -428,7 +431,7 @@ export async function POST(request) {
     const role = normalizeText(body?.role).toLowerCase();
 
     if (!ALLOWED_CREATE_ROLES.has(role)) {
-      return json("Only coordinator and teacher accounts can be created here.", 400);
+      return json("Only admin, coordinator, and teacher accounts can be created here.", 400);
     }
 
     if (!fullName) {

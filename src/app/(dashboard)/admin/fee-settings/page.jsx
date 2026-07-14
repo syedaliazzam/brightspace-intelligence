@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { usePathname } from "next/navigation";
 import { ChevronDown } from "lucide-react";
 import AdminDashboardCards from "@/components/admin/AdminDashboardCards";
 import { LeafSpinnerInline, OpenBookLoader } from "@/components/shared/AshShajrahLoaders";
@@ -83,6 +84,8 @@ const actionButtonClass =
   "rounded-xl border border-[#2D8A6A]/18 bg-[linear-gradient(180deg,rgba(255,255,255,0.94)_0%,rgba(250,247,240,0.98)_100%)] px-3 py-2 text-xs font-semibold text-[#063F32] transition hover:border-[#C9A227]/35 hover:bg-[#FFF5D6]";
 
 export default function AdminFeeSettingsPage() {
+  const pathname = usePathname() || "";
+  const isSuperAdminPortal = pathname.startsWith("/superadmin");
   const [activeTab, setActiveTab] = useState("regular");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -711,7 +714,9 @@ export default function AdminFeeSettingsPage() {
               Fee management
             </p>
             <h1 className="mb-3 mt-4 text-3xl font-bold text-white-deep sm:text-4xl lg:text-4xl font-display">
-              Admin fee management and payment setup
+              {isSuperAdminPortal
+                ? "Super Admin fee management and payment setup"
+                : "Admin fee management and payment setup"}
             </h1>
             <p className="mt-3 max-w-2xl text-sm leading-7 text-[#EAF6EF] sm:text-base">
               Manage class fees, extra charges, payment methods, and global voucher settings from one place.

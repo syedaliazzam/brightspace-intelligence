@@ -4,6 +4,7 @@ import { Prisma } from "@prisma/client";
 import prisma from "@/lib/prisma";
 
 export const roleToDashboard = {
+  superadmin: "/superadmin/dashboard",
   admin: "/admin/dashboard",
   coordinator: "/coordinator/dashboard",
   teacher: "/teacher/dashboard",

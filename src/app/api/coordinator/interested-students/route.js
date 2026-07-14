@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 
-const ALLOWED_ROLES = new Set(["admin", "coordinator"]);
+const ALLOWED_ROLES = new Set(["superadmin", "admin", "coordinator"]);
 
 function json(message, status = 200, extra = {}) {
   return NextResponse.json({ message, ...extra }, { status });

@@ -35,6 +35,7 @@ import {
   ClipboardList,
   Wallet,
   ChevronDown,
+  UserPlus,
 } from "lucide-react";
 
 function isActive(pathname, href) {
@@ -45,6 +46,7 @@ function getIconForLabel(label) {
   const key = String(label || "").toLowerCase();
   if (key.includes("dashboard")) return LayoutDashboard;
   if (key.includes("staff")) return UserCog;
+  if (key.includes("teacher create") || key.includes("create teacher")) return UserPlus;
   if (key.includes("interested students")) return Users;
   if (key.includes("admission records") || key.includes("registration")) return ClipboardList;
   if (key.includes("fee management")) return Wallet;
@@ -81,17 +83,26 @@ export default function Sidebar({
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const role = String(session?.user?.role || "student").toLowerCase();
+  const roleLabel = String(session?.user?.dbRole || session?.user?.role || "student")
+    .toLowerCase()
+    .replace(/\b\w/g, (char) => char.toUpperCase())
+    .replace(/^Superadmin$/, "Super Admin")
+    .replace(/^Admin$/, "Admin");
   const items = getNavigationForRole(role);
+  const userManagementPathPrefix = role === "superadmin" ? "/superadmin/users" : "/admin/users";
   const [openGroups, setOpenGroups] = useState({
-    userManagement: pathname.startsWith("/admin/users"),
+    userManagement: pathname.startsWith(userManagementPathPrefix),
   });
 
   const adminView = String(searchParams.get("view") || "").toLowerCase();
   const isUserManagementActive =
-    pathname.startsWith("/admin/users") || openGroups.userManagement;
+    pathname.startsWith(userManagementPathPrefix) || openGroups.userManagement;
 
   useEffect(() => {
-    if (!pathname.startsWith("/admin/users")) {
+    const currentUserManagementPathPrefix =
+      role === "superadmin" ? "/superadmin/users" : "/admin/users";
+
+    if (!pathname.startsWith(currentUserManagementPathPrefix)) {
       setOpenGroups((current) =>
         current.userManagement ? { ...current, userManagement: false } : current
       );
@@ -130,7 +141,7 @@ export default function Sidebar({
               }`}
           >
             <p className="truncate text-sm font-semibold text-[#FAF7F0]">Learning Platform</p>
-            <p className="truncate text-xs text-[#F1EADC]/60">{role}</p>
+            <p className="truncate text-xs text-[#F1EADC]/60">{roleLabel}</p>
           </div>
         </div>
 
@@ -166,27 +177,27 @@ export default function Sidebar({
                       userManagement: !current.userManagement,
                     }))
                   }
-                  className={`grid min-h-[52px] w-full grid-cols-[40px_minmax(0,1fr)_24px] items-center gap-3 rounded-[18px] px-3 py-1.5 text-sm font-medium transition ${isUserManagementActive
+                  className={`grid min-h-[52px] text-left w-full grid-cols-[40px_minmax(0,1fr)_24px] items-center gap-3 rounded-[18px] px-3 py-1.5 text-sm font-medium transition overflow-hidden ${isUserManagementActive
                       ? "bg-[linear-gradient(135deg,#C9A227_0%,#E4C766_100%)] text-[#063F32] shadow-[0_10px_24px_rgba(201,162,39,0.22)]"
                       : "text-[#F1EADC]/75 hover:bg-white/10 hover:text-[#FAF7F0]"
-                    } ${collapsed ? "lg:grid-cols-[40px_0px_0px] lg:gap-0 lg:px-2" : ""}`}
+                    } ${collapsed ? "lg:grid-cols-[40px_0px_0px] lg:gap-0 lg:px-2 lg:place-content-center" : ""}`}
                 >
-                    <span
-                      className={`grid h-10 w-10 shrink-0 place-items-center rounded-2xl transition ${isUserManagementActive
-                          ? "bg-[#FFF5D6] text-[#063F32]"
-                          : "bg-white/10 text-[#FAF7F0]"
-                        }`}
-                    >
-                      <Users className="h-[18px] w-[18px]" strokeWidth={2} />
-                    </span>
-                    <span
-                      className={`min-w-0 truncate whitespace-nowrap leading-5 transition-opacity duration-150 ${collapsed
-                          ? "lg:pointer-events-none lg:w-0 lg:overflow-hidden lg:opacity-0"
-                          : "lg:max-w-full opacity-100"
-                        }`}
-                    >
-                      {item.label}
-                    </span>
+                  <span
+                    className={`grid h-10 w-10 shrink-0 place-items-center rounded-2xl transition ${isUserManagementActive
+                        ? "bg-[#FFF5D6] text-[#063F32]"
+                        : "bg-white/10 text-[#FAF7F0]"
+                      }`}
+                  >
+                    <Users className="h-[18px] w-[18px]" strokeWidth={2} />
+                  </span>
+                  <span
+                    className={`min-w-0 truncate whitespace-nowrap leading-5 transition-opacity duration-150 ${collapsed
+                        ? "lg:pointer-events-none lg:w-0 lg:overflow-hidden lg:opacity-0"
+                        : "lg:max-w-full opacity-100"
+                      }`}
+                  >
+                    {item.label}
+                  </span>
                   <span
                     className={`grid h-6 w-6 shrink-0 place-items-center rounded-xl border border-white/10 bg-white/10 text-[#FAF7F0] transition-transform duration-200 ${openGroups.userManagement ? "rotate-180" : ""} ${collapsed ? "lg:hidden" : ""}`}
                   >
@@ -209,10 +220,10 @@ export default function Sidebar({
                           key={child.href}
                           href={child.href}
                           aria-current={active ? "page" : undefined}
-                          className={`grid min-h-[46px] grid-cols-[40px_minmax(0,1fr)] items-center gap-3 rounded-[18px] px-3 py-1.5 text-sm font-medium transition ${active
+                          className={`grid min-h-[46px] grid-cols-[40px_minmax(0,1fr)] items-center gap-3 rounded-[18px] px-3 py-1.5 text-sm font-medium transition overflow-hidden ${active
                               ? "bg-[linear-gradient(135deg,#C9A227_0%,#E4C766_100%)] text-[#063F32] shadow-[0_10px_24px_rgba(201,162,39,0.22)]"
                               : "text-[#F1EADC]/75 hover:bg-white/10 hover:text-[#FAF7F0]"
-                            } ${collapsed ? "lg:grid-cols-[40px_0px] lg:gap-0 lg:px-2" : ""}`}
+                            } ${collapsed ? "lg:grid-cols-[40px_0px] lg:gap-0 lg:px-2 lg:place-content-center" : ""}`}
                           onClick={onMobileClose}
                         >
                           <span
@@ -240,10 +251,10 @@ export default function Sidebar({
               key={item.href}
               href={item.href}
               aria-current={active ? "page" : undefined}
-              className={`group grid min-h-[52px] grid-cols-[40px_minmax(0,1fr)] items-center gap-3 rounded-[18px] px-3 py-1.5 text-sm font-medium transition ${active
+              className={`group grid min-h-[52px] border-box grid-cols-[40px_minmax(0,1fr)] items-center gap-3 rounded-[18px] px-3 py-1.5 text-sm font-medium transition overflow-hidden ${active
                   ? "bg-[linear-gradient(135deg,#C9A227_0%,#E4C766_100%)] text-[#063F32] shadow-[0_10px_24px_rgba(201,162,39,0.22)]"
                   : "text-[#F1EADC]/75 hover:bg-white/10 hover:text-[#FAF7F0]"
-                } ${collapsed ? "lg:grid-cols-[40px_0px] lg:gap-0 lg:px-2" : ""}`}
+                } ${collapsed ? "lg:grid-cols-[40px_0px] lg:gap-0 lg:px-2 lg:place-content-center" : ""}`}
               onClick={onMobileClose}
             >
               <span
@@ -315,6 +326,3 @@ export default function Sidebar({
     </>
   );
 }
-
-
-

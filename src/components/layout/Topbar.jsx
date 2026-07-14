@@ -2,6 +2,12 @@
 
 function getRoleLabel(role) {
   const value = String(role || "").toLowerCase();
+  if (value === "superadmin") return "Super Admin";
+  if (value === "admin") return "Admin";
+  if (value === "coordinator") return "Coordinator";
+  if (value === "teacher") return "Teacher";
+  if (value === "parent") return "Parent";
+  if (value === "student") return "Student";
   return value ? value[0].toUpperCase() + value.slice(1) : "User";
 }
 
@@ -21,7 +27,7 @@ export default function Topbar({ session, onMenuClick, onToggleCollapsed, collap
   session?.user?.username ||
   session?.user?.email ||
   "User";
-  const role = getRoleLabel(session?.user?.role);
+  const role = getRoleLabel(session?.user?.dbRole || session?.user?.role);
 
   return (
     <header

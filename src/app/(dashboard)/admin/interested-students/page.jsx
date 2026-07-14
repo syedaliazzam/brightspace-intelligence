@@ -1,0 +1,158 @@
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+import { OpenBookLoader } from "@/components/shared/AshShajrahLoaders";
+import InterestedStudentsPanel from "@/components/coordinator/InterestedStudentsPanel";
+
+const FILTERS = [
+  { id: "all", label: "All" },
+  { id: "pending", label: "Pending" },
+  { id: "sent", label: "Sent" },
+  { id: "reminded", label: "Reminded" },
+  { id: "overdue", label: "Overdue" },
+  { id: "not_submitted", label: "Not Submitted" },
+  { id: "submitted", label: "Submitted" },
+];
+
+export default function AdminInterestedStudentsPage() {
+  const [state, setState] = useState({ items: [], loading: true, error: "" });
+  const [activeFilter, setActiveFilter] = useState("all");
+
+  useEffect(() => {
+    let active = true;
+
+    async function load() {
+      setState((current) => ({ ...current, loading: true }));
+      const response = await fetch("/api/coordinator/interested-students", { cache: "no-store" });
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data?.message || "Unable to load interested students.");
+      }
+
+      if (active) {
+        setState({ items: data.items || [], loading: false, error: "" });
+      }
+    }
+
+    load().catch((error) => {
+      if (active) {
+        setState({ items: [], loading: false, error: error.message });
+      }
+    });
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const statusCounts = useMemo(() => {
+    const counts = {
+      all: state.items.length,
+      pending: 0,
+      sent: 0,
+      reminded: 0,
+      overdue: 0,
+      not_submitted: 0,
+      submitted: 0,
+    };
+
+    for (const item of state.items) {
+      const rawStatus = String(item.admission_form_status || item.status || "pending").toLowerCase();
+      const status = rawStatus === "registered" ? "submitted" : rawStatus;
+      if (counts[status] !== undefined) counts[status] += 1;
+      if (status === "not_submitted") counts.not_submitted += 1;
+    }
+
+    return counts;
+  }, [state.items]);
+
+  const filteredItems = useMemo(() => {
+    if (activeFilter === "all") return state.items;
+    return state.items.filter((item) => {
+      const rawStatus = String(item.admission_form_status || item.status || "pending").toLowerCase();
+      const status = rawStatus === "registered" ? "submitted" : rawStatus;
+      return status === activeFilter;
+    });
+  }, [activeFilter, state.items]);
+
+  return (
+    <div id="admin-page-portal-root" className="min-h-screen space-y-6 bg-[#FAF7F0]">
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(201,162,39,0.12),transparent_35%),radial-gradient(circle_at_top_right,rgba(45,138,106,0.12),transparent_32%),linear-gradient(180deg,#FAF7F0_0%,#F7F1E3_100%)]" />
+      <div className="relative mx-auto max-w-7xl space-y-6 px-4 py-4 sm:px-6 lg:px-8">
+        <section className="relative overflow-hidden rounded-[2rem] border border-[#2D8A6A]/15 bg-[linear-gradient(135deg,rgba(13,59,46,0.98),rgba(13,92,72,0.94))] p-6 text-[#FAF7F0] shadow-[0_24px_80px_-36px_rgba(13,59,46,0.32)] sm:p-8">
+          <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(135deg,rgba(13,59,46,0.98),rgba(13,92,72,0.94))]" />
+          <div className="relative">
+            <p className="inline-flex rounded-full border border-[#E4C766]/30 bg-[#FFF5D6]/12 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.28em] text-[#FFF5D6]">
+              Admin portal
+            </p>
+            <h1 className="mt-4 font-display text-3xl font-bold tracking-tight text-[#FAF7F0] sm:text-4xl">
+              Interested students records
+            </h1>
+            <p className="mt-3 text-sm leading-7 text-[#EAF6EF] sm:text-base">
+              Review interested student submissions and their admission-form status from the admin portal.
+            </p>
+          </div>
+        </section>
+
+        {state.error ? <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">{state.error}</div> : null}
+        {state.loading ? <OpenBookLoader title="Loading interested students" subtitle="Fetching website registration records..." /> : null}
+
+        {!state.loading ? (
+          <section className="overflow-hidden rounded-[2rem] border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(250,247,240,0.98)_100%)] shadow-[0_20px_70px_-36px_rgba(13,59,46,0.18)] backdrop-blur-xl">
+            <div className="border-b border-[#2D8A6A]/10 px-6 py-5">
+              <div className="flex flex-wrap items-end justify-between gap-4">
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#0D5C48]">Admission form status</p>
+                  <h2 className="mt-2 font-display text-2xl font-bold text-[#063F32]">5-day reminder tracking</h2>
+                  <p className="mt-2 max-w-2xl text-sm leading-7 text-[#245C4F]">
+                    Monitor pending admissions, reminders sent, overdue records, and submitted applications in one view.
+                  </p>
+                </div>
+                <div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-6">
+                  {FILTERS.slice(1).map((item) => (
+                    <div key={item.id} className="rounded-2xl border border-[#2D8A6A]/15 bg-[#FAF7F0] px-4 py-3 text-center shadow-[0_12px_30px_-24px_rgba(13,59,46,0.2)]">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#0D5C48]">{item.label}</p>
+                      <p className="mt-1 text-2xl font-bold text-[#063F32]">{statusCounts[item.id] || 0}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap gap-2 border-b border-[#2D8A6A]/10 px-6 py-4">
+              {FILTERS.map((item) => {
+                const active = activeFilter === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => setActiveFilter(item.id)}
+                    className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
+                      active
+                        ? "bg-[linear-gradient(135deg,#C9A227,#E4C766)] text-[#063F32] shadow-[0_12px_24px_-16px_rgba(201,162,39,0.55)]"
+                        : "border border-[#2D8A6A]/20 bg-[#FAF7F0] text-[#063F32] hover:bg-[#F1EADC]"
+                    }`}
+                  >
+                    {item.label}
+                    {activeFilter !== "all" && item.id !== "all" ? (
+                      <span className="ml-2 text-[11px] font-bold">{statusCounts[item.id] || 0}</span>
+                    ) : null}
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="px-6 py-5">
+              <InterestedStudentsPanel
+                items={filteredItems}
+                showDetailsButton={false}
+                showActionsColumn={false}
+              />
+            </div>
+          </section>
+        ) : null}
+      </div>
+    </div>
+  );
+}

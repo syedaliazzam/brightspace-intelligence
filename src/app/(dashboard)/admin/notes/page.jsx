@@ -1,8 +1,11 @@
 "use client";
 
+import { usePathname } from "next/navigation";
 import NoteThreadsBoard from "@/components/shared/NoteThreadsBoard";
 
 export default function AdminNotesPage() {
+  const pathname = usePathname() || "";
+  const isSuperAdminPortal = pathname.startsWith("/superadmin");
   return (
     <div className="min-h-screen bg-[#FAF7F0] text-[#063F32]">
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(201,162,39,0.14),transparent_32%),radial-gradient(circle_at_top_right,rgba(45,138,106,0.14),transparent_28%),linear-gradient(180deg,#FAF7F0_0%,#F7F1E3_100%)]" />
@@ -17,7 +20,9 @@ export default function AdminNotesPage() {
               Teacher notes across the portal
             </h1>
             <p className="mt-3 max-w-2xl text-sm leading-7 text-[#EAF6EF] sm:text-base">
-              Review threaded notes, replies, and teacher updates from a single admin workspace.
+              {isSuperAdminPortal
+                ? "Review threaded notes, replies, and teacher updates from a single super admin workspace."
+                : "Review threaded notes, replies, and teacher updates from a single admin workspace."}
             </p>
           </div>
         </section>

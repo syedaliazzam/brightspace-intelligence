@@ -22,7 +22,7 @@ async function requireAdminSession() {
   const role = String(session?.user?.role || "").toLowerCase();
 
   if (!session?.user) return { error: json("Unauthorized.", 401) };
-  if (role !== "admin") return { error: json("Forbidden.", 403) };
+  if (role !== "admin" && role !== "superadmin") return { error: json("Forbidden.", 403) };
   return { session };
 }
 

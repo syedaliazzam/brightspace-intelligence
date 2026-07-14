@@ -55,7 +55,12 @@ function InfoCell({ label, value }) {
   );
 }
 
-export default function InterestedStudentsPanel({ items = [], onRefresh }) {
+export default function InterestedStudentsPanel({
+  items = [],
+  onRefresh,
+  showDetailsButton = true,
+  showActionsColumn = true,
+}) {
   const [selectedLead, setSelectedLead] = useState(null);
   const [message, setMessage] = useState("");
   const [loadingId, setLoadingId] = useState("");
@@ -181,6 +186,9 @@ export default function InterestedStudentsPanel({ items = [], onRefresh }) {
           ? "Existing admission form link loaded and sent."
           : "Admission form link sent."
       );
+      if (data?.whatsapp_url) {
+        window.open(data.whatsapp_url, "_blank", "noopener,noreferrer");
+      }
       await onRefresh?.();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Unable to generate registration message.");
@@ -217,7 +225,7 @@ export default function InterestedStudentsPanel({ items = [], onRefresh }) {
                 <th className="px-6 py-4">Message</th>
                 <th className="px-6 py-4">Form Status</th>
                 <th className="px-6 py-4">Created At</th>
-                <th className="px-6 py-4 text-right">Action</th>
+                {showActionsColumn ? <th className="px-6 py-4 text-right">Action</th> : null}
               </tr>
             </thead>
             <tbody className="divide-y divide-[#F1EADC]">
@@ -242,19 +250,23 @@ export default function InterestedStudentsPanel({ items = [], onRefresh }) {
                     ) : null}
                   </td>
                   <td className="px-5 py-5 text-sm text-[#245C4F]">{formatDate(item.created_at)}</td>
-                  <td className="px-5 py-5 text-right">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setMessage("");
-                        setSelectedLead(item);
-                      }}
-                      className="rounded-full bg-[#0D5C48] px-4 py-2 text-sm font-semibold text-[#FAF7F0] transition hover:bg-[#063F32] disabled:cursor-not-allowed disabled:opacity-70"
-                      disabled={loadingId === item.id}
-                    >
-                      Details
-                    </button>
-                  </td>
+                  {showActionsColumn ? (
+                    <td className="px-5 py-5 text-right">
+                      {showDetailsButton ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setMessage("");
+                            setSelectedLead(item);
+                          }}
+                          className="rounded-full bg-[#0D5C48] px-4 py-2 text-sm font-semibold text-[#FAF7F0] transition hover:bg-[#063F32] disabled:cursor-not-allowed disabled:opacity-70"
+                          disabled={loadingId === item.id}
+                        >
+                          Details
+                        </button>
+                      ) : null}
+                    </td>
+                  ) : null}
                 </tr>
               ))}
             </tbody>
@@ -290,24 +302,26 @@ export default function InterestedStudentsPanel({ items = [], onRefresh }) {
               <InfoCell label="Form Status" value={admissionStatusLabel(item.admission_form_status || item.status)} />
             </dl>
 
-            <div className="mt-4 flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  setMessage("");
-                  setSelectedLead(item);
-                }}
-                className="rounded-full bg-[#0D5C48] px-4 py-2 text-sm font-semibold text-[#FAF7F0] transition hover:bg-[#063F32] disabled:cursor-not-allowed disabled:opacity-70"
-                disabled={loadingId === item.id}
-              >
-                Details
-              </button>
-            </div>
+            {showDetailsButton ? (
+              <div className="mt-4 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMessage("");
+                    setSelectedLead(item);
+                  }}
+                  className="rounded-full bg-[#0D5C48] px-4 py-2 text-sm font-semibold text-[#FAF7F0] transition hover:bg-[#063F32] disabled:cursor-not-allowed disabled:opacity-70"
+                  disabled={loadingId === item.id}
+                >
+                  Details
+                </button>
+              </div>
+            ) : null}
           </article>
         ))}
       </div>
 
-      {selectedLead ? (
+      {selectedLead && showDetailsButton ? (
         <ClientPortal targetId="coordinator-page-portal-root">
           <div className="absolute inset-x-0 top-0 z-[9999] isolate flex min-h-full items-start justify-center overflow-visible bg-[#063F32]/45 px-4 pb-10 pt-10">
             <div className="max-h-[90vh] w-full max-w-6xl overflow-y-auto rounded-[2rem] border border-[#2D8A6A]/15 bg-[#FAF7F0] p-6 shadow-[0_24px_80px_-36px_rgba(13,59,46,0.24)] sm:p-8">

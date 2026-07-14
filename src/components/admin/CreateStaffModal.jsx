@@ -5,7 +5,7 @@ import { useState } from "react";
 import { Eye, EyeOff } from "lucide-react";
 
 const INITIAL_FORM = {
-  role: "coordinator",
+  role: "admin",
   fullName: "",
   email: "",
   phone: "",
@@ -40,7 +40,7 @@ export default function CreateStaffModal() {
     setError("");
 
     try {
-      const response = await fetch("/api/admin/users", {
+      const response = await fetch("/api/admin/staff", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(form),
@@ -81,7 +81,7 @@ export default function CreateStaffModal() {
         }}
         className="inline-flex items-center justify-center rounded-2xl bg-[#0D5C48] px-4 py-3 text-sm font-semibold text-[#FAF7F0] transition hover:bg-[#063F32]"
       >
-        Create coordinator or teacher
+        Create staff
       </button>
 
       {open ? (
@@ -93,7 +93,7 @@ export default function CreateStaffModal() {
                   Staff onboarding
                 </p>
                 <h2 className="mt-2 text-2xl font-semibold tracking-tight text-[#063F32]">
-                  Create coordinator or teacher
+                  Create staff member
                 </h2>
               </div>
 
@@ -114,6 +114,7 @@ export default function CreateStaffModal() {
                   onChange={(event) => updateField("role", event.target.value)}
                   className={inputClass}
                 >
+                  <option value="admin">Admin</option>
                   <option value="coordinator">Coordinator</option>
                   <option value="teacher">Teacher</option>
                 </select>

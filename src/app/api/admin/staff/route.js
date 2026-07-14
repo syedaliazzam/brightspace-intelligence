@@ -4,7 +4,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 
-const EDITABLE_ROLES = new Set(["coordinator", "teacher"]);
+const EDITABLE_ROLES = new Set(["admin", "coordinator", "teacher"]);
 
 function json(message, status = 200, extra = {}) {
   return NextResponse.json({ message, ...extra }, { status });
@@ -22,7 +22,7 @@ async function requireAdminSession() {
     return { error: json("Unauthorized.", 401) };
   }
 
-  if (role !== "admin") {
+  if (role !== "admin" && role !== "superadmin") {
     return { error: json("Forbidden.", 403) };
   }
 
@@ -360,7 +360,7 @@ export async function POST(request) {
       typeof body?.password === "string" ? body.password.trim() : "";
 
     if (!EDITABLE_ROLES.has(role)) {
-      return json("Only coordinator and teacher can be created here.", 400);
+      return json("Only admin, coordinator, and teacher can be created here.", 400);
     }
 
     if (!fullName) {
@@ -404,17 +404,19 @@ export async function POST(request) {
         )
       `;
 
-      await syncProfile(
-        role === "coordinator" ? "coordinator_profiles" : "teacher_profiles",
-        {
-          userId,
-          fullName,
-          email,
-          phone,
-          status: "active",
-        },
-        tx
-      );
+      if (role === "coordinator" || role === "teacher") {
+        await syncProfile(
+          role === "coordinator" ? "coordinator_profiles" : "teacher_profiles",
+          {
+            userId,
+            fullName,
+            email,
+            phone,
+            status: "active",
+          },
+          tx
+        );
+      }
 
       await insertAuditLog(
         authState.session.user.id,

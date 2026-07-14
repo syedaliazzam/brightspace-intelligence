@@ -25,7 +25,7 @@ async function requireAdminSession() {
     return { error: json("Unauthorized.", 401) };
   }
 
-  if (role !== "admin") {
+  if (role !== "admin" && role !== "superadmin") {
     return { error: json("Forbidden.", 403) };
   }
 

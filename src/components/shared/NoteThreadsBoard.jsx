@@ -22,12 +22,12 @@ function MessageBubble({ message, mode }) {
   const senderRole = String(message.sender_role || "").toLowerCase();
   const mine =
     mode === "admin"
-      ? senderRole === "admin"
+      ? senderRole === "admin" || senderRole === "superadmin"
       : mode === "student"
         ? senderRole === "student"
       : mode === "parent"
           ? senderRole === "parent"
-          : ["teacher", "admin"].includes(senderRole);
+          : ["teacher", "admin", "superadmin"].includes(senderRole);
 
   return (
     <div className={`flex ${mine ? "justify-end" : "justify-start"}`}>

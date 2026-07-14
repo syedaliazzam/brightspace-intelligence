@@ -146,7 +146,7 @@ export async function POST(request, { params }) {
     return json("Unauthorized.", 401);
   }
 
-  if (role !== "admin") {
+  if (role !== "admin" && role !== "superadmin") {
     return json("Forbidden.", 403);
   }
 
@@ -186,7 +186,7 @@ export async function POST(request, { params }) {
       session.user.id,
       updated.id,
       "password_reset",
-      "User password reset by admin.",
+      `User password reset by ${role === "superadmin" ? "super admin" : "admin"}.`,
       {}
     );
 

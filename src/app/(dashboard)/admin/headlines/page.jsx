@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
 import AdminDataTable from "@/components/admin/AdminDataTable";
 import { LeafSpinnerInline } from "@/components/shared/AshShajrahLoaders";
 
@@ -94,6 +95,9 @@ function HeadlineForm({ form, onChange, onSubmit, onCancel, submitting, submitLa
 }
 
 export default function AdminHeadlinesPage() {
+  const pathname = usePathname() || "";
+  const isAdminReadonlyPortal = pathname.startsWith("/admin") && !pathname.startsWith("/superadmin");
+  const isSuperAdminPortal = pathname.startsWith("/superadmin");
   const [items, setItems] = useState([]);
   const [available, setAvailable] = useState(true);
   const [loading, setLoading] = useState(true);
@@ -240,11 +244,14 @@ export default function AdminHeadlinesPage() {
               Schedule dashboard announcements
             </h1>
             <p className="mt-3 max-w-2xl text-sm leading-7 text-[#EAF6EF] sm:text-base">
-              Create time-based headlines that appear at the top of student, teacher, and parent dashboards while their date range is active.
+              {isSuperAdminPortal
+                ? "Create time-based headlines that appear at the top of student, teacher, and parent dashboards while their date range is active."
+                : "Create time-based headlines that appear at the top of student, teacher, and parent dashboards while their date range is active."}
             </p>
           </div>
         </section>
 
+        {!isAdminReadonlyPortal ? (
         <section className="rounded-[2rem] border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(250,247,240,0.98)_100%)] p-5 shadow-[0_20px_70px_-36px_rgba(13,59,46,0.18)] backdrop-blur-xl sm:p-6">
           <div className="mb-5 flex items-center justify-between gap-3">
             <div>
@@ -261,6 +268,7 @@ export default function AdminHeadlinesPage() {
             submitLabel="Create headline"
           />
         </section>
+        ) : null}
 
         {error ? (
           <section className="rounded-[1.75rem] border border-rose-200 bg-rose-50/95 p-5 text-sm text-rose-700 shadow-[0_18px_60px_-36px_rgba(185,28,28,0.12)] backdrop-blur-xl">
@@ -302,7 +310,7 @@ export default function AdminHeadlinesPage() {
             ]}
             rows={loading ? [] : items}
             emptyMessage={loading ? "Loading headlines..." : "No headlines have been created yet."}
-            actions={(row) => (
+            actions={!isAdminReadonlyPortal ? (row) => (
               <>
                 <button
                   type="button"
@@ -326,11 +334,11 @@ export default function AdminHeadlinesPage() {
                   )}
                 </button>
               </>
-            )}
+            ) : null}
           />
         </div>
 
-        {editingId ? (
+        {!isAdminReadonlyPortal && editingId ? (
           <div className="fixed inset-0 z-50 overflow-y-auto bg-[#063F32]/45 px-4 pb-8 pt-24 backdrop-blur-sm sm:pt-28">
             <div className="mx-auto w-full max-w-3xl">
               <section className="overflow-hidden rounded-[2rem] border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(250,247,240,0.98)_100%)] shadow-[0_32px_90px_-38px_rgba(13,59,46,0.24)]">
@@ -374,7 +382,7 @@ export default function AdminHeadlinesPage() {
           </div>
         ) : null}
 
-        {deletingItem ? (
+        {!isAdminReadonlyPortal && deletingItem ? (
           <div className="fixed inset-0 z-[60] overflow-y-auto bg-[#063F32]/45 px-4 pb-8 pt-20 backdrop-blur-sm sm:pt-24">
             <div className="mx-auto w-full max-w-2xl">
               <section className="overflow-hidden rounded-[2rem] border border-rose-200 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(250,247,240,0.98)_100%)] shadow-[0_32px_90px_-38px_rgba(13,59,46,0.24)]">

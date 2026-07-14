@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
 import AdminDashboardCards from "@/components/admin/AdminDashboardCards";
 import AdminDataTable from "@/components/admin/AdminDataTable";
 import { OpenBookLoader } from "@/components/shared/AshShajrahLoaders";
@@ -60,6 +61,8 @@ function writeNamedCache(key, payload) {
 }
 
 export default function AdminDashboardPage() {
+  const pathname = usePathname();
+  const isSuperAdminPortal = pathname?.startsWith("/superadmin");
   const [state, setState] = useState({
     loading: true,
     error: "",
@@ -169,13 +172,15 @@ export default function AdminDashboardPage() {
           <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(228,198,102,0.12),transparent_28%),radial-gradient(circle_at_bottom_left,rgba(101,184,145,0.14),transparent_30%)]" />
           <div className="relative max-w-6xl">
             <p className="inline-flex rounded-full border border-[#FFF5D6]/30 bg-[#FFF5D6]/10 px-3 py-1 text-[0.65rem] font-semibold uppercase tracking-[0.24em] text-[#FFF5D6]">
-              Admin dashboard
+              {isSuperAdminPortal ? "Super Admin dashboard" : "Admin dashboard"}
             </p>
             <h1 className="mb-3 mt-4 text-3xl font-bold text-white-deep sm:text-4xl lg:text-4xl font-display">
-              Platform command center
+              {isSuperAdminPortal ? "Platform command center" : "Admin command center"}
             </h1>
             <p className="mt-3 max-w-2xl text-sm leading-7 text-[#EAF6EF] sm:text-base">
-              Review account growth, intake activity, finance progress, and operational readiness from one concise admin view.
+              {isSuperAdminPortal
+                ? "Review account growth, intake activity, finance progress, and operational readiness from one concise super admin view."
+                : "Review account growth, intake activity, finance progress, and operational readiness from one concise admin view."}
             </p>
           </div>
         </section>
@@ -193,7 +198,12 @@ export default function AdminDashboardPage() {
               : cards
           }
         />
-        {state.loading ? <OpenBookLoader title="Loading dashboard" subtitle="Preparing admin insights..." /> : null}
+        {state.loading ? (
+          <OpenBookLoader
+            title="Loading dashboard"
+            subtitle={isSuperAdminPortal ? "Preparing super admin insights..." : "Preparing admin insights..."}
+          />
+        ) : null}
 
         <section className="grid gap-6 xl:grid-cols-2">
           <div className="rounded-[2rem] border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(250,247,240,0.98)_100%)] p-5 shadow-[0_20px_70px_-36px_rgba(13,59,46,0.18)] backdrop-blur-xl">
@@ -203,7 +213,7 @@ export default function AdminDashboardPage() {
                   Overview
                 </p>
                 <h2 className="mt-2 font-body text-2xl font-semibold tracking-tight text-[#063F32]">
-                  Active role coverage
+                  {isSuperAdminPortal ? "Active super admin role coverage" : "Active admin role coverage"}
                 </h2>
               </div>
             </div>
@@ -214,7 +224,7 @@ export default function AdminDashboardPage() {
                   label: "Role",
                   render: (row) => (
                     <span className="font-semibold text-[#063F32]">
-                      {formatLabel(row.role)}
+                      {row.role === "superadmin" ? "Super Admin" : formatLabel(row.role)}
                     </span>
                   ),
                 },

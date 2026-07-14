@@ -1,4 +1,24 @@
 export const dashboardNavigation = {
+  superadmin: [
+    { label: "Dashboard", href: "/superadmin/dashboard" },
+    {
+      label: "User Management",
+      children: [
+        { label: "Staff Management", href: "/superadmin/users?view=staff" },
+        { label: "Students Management", href: "/superadmin/users?view=students" },
+        { label: "Parents Management", href: "/superadmin/users?view=parents" },
+      ],
+    },
+    { label: "Subject Catalog", href: "/superadmin/subjects" },
+    { label: "Class Management", href: "/superadmin/courses" },
+    { label: "Interested Students", href: "/superadmin/interested-students" },
+    { label: "Admission Records", href: "/superadmin/registration-leads" },
+    { label: "Fee Management", href: "/superadmin/fee-settings" },
+    { label: "Payments", href: "/superadmin/payments" },
+    { label: "Notes", href: "/superadmin/notes" },
+    { label: "Headlines", href: "/superadmin/headlines" },
+    { label: "Audit History", href: "/superadmin/audit-logs" },
+  ],
   admin: [
     { label: "Dashboard", href: "/admin/dashboard" },
     {
@@ -11,8 +31,8 @@ export const dashboardNavigation = {
     },
     { label: "Subject Catalog", href: "/admin/subjects" },
     { label: "Class Management", href: "/admin/courses" },
+    { label: "Interested Students", href: "/admin/interested-students" },
     { label: "Admission Records", href: "/admin/registration-leads" },
-    { label: "Fee Management", href: "/admin/fee-settings" },
     { label: "Payments", href: "/admin/payments" },
     { label: "Notes", href: "/admin/notes" },
     { label: "Headlines", href: "/admin/headlines" },
@@ -26,6 +46,7 @@ export const dashboardNavigation = {
     { label: "Payments", href: "/coordinator/payments" },
     { label: "Students", href: "/coordinator/students" },
     { label: "Parents", href: "/coordinator/parents" },
+    { label: "Create teacher", href: "/coordinator/teacher-create" },
     { label: "Teacher Assignments", href: "/coordinator/teacher-assignments" },
     { label: "Lecture Schedules", href: "/coordinator/lecture-schedules" },
     { label: "Lecture Verifications", href: "/coordinator/lecture-verifications" },
@@ -63,6 +84,7 @@ export const dashboardNavigation = {
 
 export const roleMeta = {
   admin: { label: "Admin" },
+  superadmin: { label: "Super Admin" },
   coordinator: { label: "Coordinator" },
   teacher: { label: "Teacher" },
   parent: { label: "Parent" },

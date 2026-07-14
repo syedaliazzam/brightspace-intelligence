@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
 import { ChevronDown } from "lucide-react";
 import AdminDashboardCards from "@/components/admin/AdminDashboardCards";
 import AdminDataTable from "@/components/admin/AdminDataTable";
@@ -59,6 +60,8 @@ function writeCache(key, payload) {
 }
 
 export default function AdminSubjectsPage() {
+  const pathname = usePathname() || "";
+  const isAdminReadonlyPortal = pathname.startsWith("/admin") && !pathname.startsWith("/superadmin");
   const [filters, setFilters] = useState({ search: "", status: "", courseId: "" });
   const [state, setState] = useState(() => {
     const cached = readCache(getCacheKey({ search: "", status: "", courseId: "" }));
@@ -164,13 +167,15 @@ export default function AdminSubjectsPage() {
               </p>
             </div>
 
-            <button
-              type="button"
-              onClick={() => setModal({ open: true, record: null })}
-              className="inline-flex items-center justify-center rounded-2xl bg-[#FAF7F0] px-5 py-3 text-sm font-semibold text-[#0D5C48] transition hover:bg-[#DBD8D5]"
-            >
-              Create subject
-            </button>
+            {!isAdminReadonlyPortal ? (
+              <button
+                type="button"
+                onClick={() => setModal({ open: true, record: null })}
+                className="inline-flex items-center justify-center rounded-2xl bg-[#FAF7F0] px-5 py-3 text-sm font-semibold text-[#0D5C48] transition hover:bg-[#DBD8D5]"
+              >
+                Create subject
+              </button>
+            ) : null}
           </div>
         </section>
 
@@ -332,7 +337,7 @@ export default function AdminSubjectsPage() {
             ? "Loading subjects..."
             : "No subjects matched the current view."
         }
-        actions={(row) => (
+        actions={!isAdminReadonlyPortal ? (row) => (
           <button
             type="button"
             onClick={() => setModal({ open: true, record: row })}
@@ -340,11 +345,11 @@ export default function AdminSubjectsPage() {
           >
             Edit
           </button>
-        )}
+        ) : null}
       />
 
-        {modal.open ? (
-        <SubjectFormModal
+        {!isAdminReadonlyPortal && modal.open ? (
+          <SubjectFormModal
           key={modal.record?.id || "create-subject"}
           open={modal.open}
           record={modal.record}

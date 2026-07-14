@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { requireRole, roleGuardResponse } from "@/lib/roleGuard";
 import prisma from "@/lib/prisma";
 
-const ALLOWED_ROLES = ["teacher", "admin", "student", "parent"];
+const ALLOWED_ROLES = ["teacher", "admin", "superadmin", "student", "parent"];
 
 function json(message, status = 200, extra = {}) {
   return NextResponse.json({ message, ...extra }, { status });
@@ -15,7 +15,7 @@ function clean(value) {
 async function canAccessThread(session, threadId) {
   const role = String(session.user.role || "").toLowerCase();
 
-  if (role === "admin") {
+  if (role === "admin" || role === "superadmin") {
     return prisma.$queryRaw`
       SELECT nt.id::text AS id
       FROM note_threads nt

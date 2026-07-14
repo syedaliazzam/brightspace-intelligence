@@ -2,13 +2,21 @@ import crypto from "crypto";
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { themedEmailShell, sendEmail } from "@/lib/email";
-import { sendWhatsAppText } from "@/lib/whatsapp";
 import prisma from "@/lib/prisma";
 
 const ALLOWED_ROLES = new Set(["admin", "coordinator"]);
 
 function json(message, status = 200, extra = {}) {
   return NextResponse.json({ message, ...extra }, { status });
+}
+
+function normalizePhoneNumber(value) {
+  const digits = String(value || "").replace(/[^\d]/g, "");
+  if (!digits) return "";
+  if (digits.startsWith("92")) return digits;
+  if (digits.startsWith("0092")) return digits.slice(2);
+  if (digits.startsWith("0")) return `92${digits.slice(1)}`;
+  return digits;
 }
 
 export async function POST(request, { params }) {
@@ -103,7 +111,7 @@ export async function POST(request, { params }) {
     if (row?.id && row?.email) {
       const studentName = row.student_name || "Student";
       const parentName = row.parent_name || "Parent";
-      const subject = `Your Ash-Shajrah admission form for ${studentName}`;
+      const subject = `Your Ash-Shajrah Learning Hub (ALH) admission form for ${studentName}`;
       const previewLink = registrationLink;
       const registrationDetails = [
         `Student: ${studentName}`,
@@ -141,24 +149,6 @@ export async function POST(request, { params }) {
         text: `Assalamualaikum ${parentName}, your prefilled admission form is ready.\n\n${registrationDetails.join("\n")}\n\nOpen this link:\n${registrationLink}`,
       });
 
-      if (row.phone) {
-        const whatsappResult = await sendWhatsAppText({
-          to: row.phone,
-          message: `Assalamualaikum ${parentName}, your Ash-Shajrah admission form is ready.\n\n${registrationDetails.join("\n")}\n\nOpen form: ${registrationLink}`,
-        }).catch((error) => {
-          console.error("INTERESTED_STUDENT_WHATSAPP_ERROR:", error);
-          return { success: false, error: error instanceof Error ? error.message : "WhatsApp message failed." };
-        });
-
-        if (whatsappResult?.skipped) {
-          console.error("INTERESTED_STUDENT_WHATSAPP_SKIPPED:", {
-            reason: "Missing WhatsApp config or recipient",
-            phone: row.phone,
-            hasPhoneNumberId: Boolean(process.env.WHATSAPP_PHONE_NUMBER_ID),
-            hasAccessToken: Boolean(process.env.WHATSAPP_ACCESS_TOKEN),
-          });
-        }
-      }
     }
 
       return json("Registration link generated.", 200, {
@@ -166,6 +156,11 @@ export async function POST(request, { params }) {
       already_generated: alreadyGenerated,
       registration_link: registrationLink,
       admission_form_due_at: dueAt.toISOString(),
+      whatsapp_url: row.phone
+        ? `https://wa.me/${normalizePhoneNumber(row.phone)}?text=${encodeURIComponent(
+            `Assalamualaikum ${row.parent_name || "Parent"}, your Ash-Shajrah Learning Hub (ALH) admission form is ready.\n\nStudent: ${row.student_name || "Student"}\nParent: ${row.parent_name || "Parent"}\nEmail: ${row.email || "-"}\nPhone: ${row.phone || "-"}\nClass: ${row.class_level || "-"}\nChild age: ${row.child_age || "-"}\nCity / Country: ${row.city_country || "-"}\nMessage: ${row.message || "-"}\n\nOpen form: ${registrationLink}`
+          )}`
+        : "",
     });
   } catch (error) {
     return json(error instanceof Error ? error.message : "Unable to generate registration link.", 500);

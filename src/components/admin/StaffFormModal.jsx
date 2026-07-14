@@ -1,15 +1,17 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { ChevronDown, Eye, EyeOff } from "lucide-react";
 
 const ROLE_OPTIONS = [
+  { label: "Admin", value: "admin" },
   { label: "Coordinator", value: "coordinator" },
   { label: "Teacher", value: "teacher" },
 ];
 
 const ALL_ROLE_OPTIONS = [
+  { label: "Super Admin", value: "superadmin" },
   { label: "Admin", value: "admin" },
   { label: "Coordinator", value: "coordinator" },
   { label: "Teacher", value: "teacher" },
@@ -30,7 +32,7 @@ const PARENT_RELATION_OPTIONS = [
 
 function getInitialState(record) {
   return {
-    fullName: record?.name || "",
+    fullName: record?.name || record?.full_name || "",
     email: record?.email || "",
     phone: record?.phone || "",
     relation: record?.relation || "",
@@ -51,6 +53,9 @@ export default function StaffFormModal({
   onClose,
   onSuccess,
   roleOptions = ROLE_OPTIONS,
+  createEndpoint = "/api/admin/staff",
+  updateEndpoint,
+  badgeLabel = "Super Admin staff",
 }) {
   const [form, setForm] = useState(getInitialState(record));
   const [pending, setPending] = useState(false);
@@ -61,6 +66,20 @@ export default function StaffFormModal({
   const [statusOpen, setStatusOpen] = useState(false);
   const isParentEdit = mode === "edit" && form.role === "parent";
   const isStudentEdit = mode === "edit" && form.role === "student";
+
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+
+    setForm(getInitialState(record));
+    setPending(false);
+    setError("");
+    setShowPassword(false);
+    setRelationOpen(false);
+    setRoleOpen(false);
+    setStatusOpen(false);
+  }, [open, record, mode]);
 
   function updateField(name, value) {
     setForm((current) => ({ ...current, [name]: value }));
@@ -84,14 +103,17 @@ export default function StaffFormModal({
     try {
       const endpoint =
         mode === "edit" && record?.id
-          ? form.role === "coordinator" || form.role === "teacher"
-            ? `/api/admin/staff/${record.id}`
-            : `/api/admin/users/${record.id}`
-          : "/api/admin/staff";
+          ? updateEndpoint || (
+              form.role === "coordinator" || form.role === "teacher"
+                ? `/api/admin/staff/${record.id}`
+                : `/api/admin/users/${record.id}`
+            )
+          : createEndpoint;
       const method = mode === "edit" ? "PATCH" : "POST";
       const payload =
         mode === "edit"
           ? {
+              id: record?.id,
               fullName: form.fullName,
               email: form.email,
               phone: form.phone,
@@ -157,7 +179,7 @@ export default function StaffFormModal({
             <div className="flex items-start justify-between gap-4">
               <div>
                 <p className="text-sm font-semibold uppercase tracking-[0.24em] text-[#0D5C48]">
-                  Admin staff
+                  {badgeLabel}
                 </p>
                 <h2 className="mt-3 text-2xl font-semibold tracking-tight text-[#063F32]">
                   {mode === "edit" ? "Edit staff member" : "Create staff member"}

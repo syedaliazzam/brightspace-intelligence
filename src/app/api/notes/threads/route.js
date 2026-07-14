@@ -3,7 +3,7 @@ import { Prisma } from "@prisma/client";
 import { requireRole, roleGuardResponse } from "@/lib/roleGuard";
 import prisma from "@/lib/prisma";
 
-const ALLOWED_ROLES = ["teacher", "admin", "student", "parent"];
+const ALLOWED_ROLES = ["teacher", "admin", "superadmin", "student", "parent"];
 
 function json(message, status = 200, extra = {}) {
   return NextResponse.json({ message, ...extra }, { status });
@@ -135,7 +135,7 @@ export async function GET(request) {
 
     let items = [];
 
-    if (ctx.role === "admin") {
+    if (ctx.role === "admin" || ctx.role === "superadmin") {
       items = await prisma.$queryRaw`
         SELECT
           nt.id::text AS id,
@@ -332,9 +332,10 @@ export async function POST(request) {
 
     if (!bodyText) return json("Message is required.", 400);
 
-    if (ctx.role === "teacher" || ctx.role === "admin") {
-      const lecture = ctx.role === "teacher" ? await resolveTeacherLecture(session, body) : null;
-      const teacherId = ctx.role === "teacher" ? lecture?.teacher_id : clean(body?.teacherId || body?.teacher_id);
+    if (ctx.role === "teacher" || ctx.role === "admin" || ctx.role === "superadmin") {
+      const isTeacherRole = ctx.role === "teacher";
+      const lecture = isTeacherRole ? await resolveTeacherLecture(session, body) : null;
+      const teacherId = isTeacherRole ? lecture?.teacher_id : clean(body?.teacherId || body?.teacher_id);
       if (!teacherId) return json("Teacher profile not found.", 404);
       let courseId = clean(body?.courseId || body?.course_id) || lecture?.course_id || "";
       if (!courseId && classLevel) {

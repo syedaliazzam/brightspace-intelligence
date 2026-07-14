@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
 import { ChevronDown } from "lucide-react";
 import AdminDashboardCards from "@/components/admin/AdminDashboardCards";
 import AdminDataTable from "@/components/admin/AdminDataTable";
@@ -74,6 +75,8 @@ function writeCache(key, payload) {
 }
 
 export default function AdminAuditLogsPage() {
+  const pathname = usePathname() || "";
+  const isSuperAdminPortal = pathname.startsWith("/superadmin");
   const [filters, setFilters] = useState({
     search: "",
     action: "",
@@ -174,7 +177,9 @@ export default function AdminAuditLogsPage() {
               Audit history
             </p>
             <h1 className="mb-3 mt-4 text-3xl font-bold text-white-deep sm:text-4xl lg:text-4xl font-display">
-              Review admin actions and change history
+              {isSuperAdminPortal
+                ? "Review super admin actions and change history"
+                : "Review admin actions and change history"}
             </h1>
             <p className="mt-3 max-w-2xl text-sm leading-7 text-[#EAF6EF] sm:text-base">
               Track administrative activity across users, subjects, courses, finance settings, and system operations.

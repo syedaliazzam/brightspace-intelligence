@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { signOut } from "next-auth/react";
 import { ChevronDown } from "lucide-react";
 import AdminConfirmDialog from "@/components/admin/AdminConfirmDialog";
@@ -11,8 +11,8 @@ import StaffFormModal from "@/components/admin/StaffFormModal";
 import { LeafSpinnerInline, OpenBookLoader } from "@/components/shared/AshShajrahLoaders";
 import { useDashboardSession } from "@/components/layout/DashboardSessionContext";
 
-const ROLE_OPTIONS = ["", "admin", "coordinator", "teacher", "parent", "student"];
-const STAFF_ROLE_OPTIONS = ["", "admin", "coordinator", "teacher"];
+const ROLE_OPTIONS = ["", "superadmin", "admin", "coordinator", "teacher", "parent", "student"];
+const STAFF_ROLE_OPTIONS = ["", "superadmin", "admin", "coordinator", "teacher"];
 const CACHE_TTL = 60 * 1000;
 const DEFAULT_FILTERS = {
   search: "",
@@ -93,8 +93,23 @@ function writeCache(key, payload) {
   );
 }
 
+function dedupeUsersById(items = []) {
+  const seen = new Map();
+
+  for (const item of items) {
+    const key = String(item?.id || "");
+    if (!key) continue;
+    if (!seen.has(key)) {
+      seen.set(key, item);
+    }
+  }
+
+  return Array.from(seen.values());
+}
+
 export default function AdminUsersPage() {
   const router = useRouter();
+  const pathname = usePathname() || "";
   const session = useDashboardSession();
   const searchParams = useSearchParams();
   const view = String(searchParams.get("view") || "staff").toLowerCase();
@@ -105,6 +120,8 @@ export default function AdminUsersPage() {
         ? "parent"
         : "";
   const isStaffView = view === "staff";
+  const isAdminReadonlyPortal = pathname.startsWith("/admin") && !pathname.startsWith("/superadmin");
+  const isSuperAdminPortal = pathname.startsWith("/superadmin");
   const currentUserId = String(session?.user?.id || "");
   const [filters, setFilters] = useState({
     search: "",
@@ -186,7 +203,7 @@ export default function AdminUsersPage() {
       }
 
       if (view === "staff") {
-        const rolesToLoad = ["admin", "coordinator", "teacher"];
+        const rolesToLoad = ["superadmin", "admin", "coordinator", "teacher"];
         const responses = await Promise.all(
           rolesToLoad.map((roleValue) => fetch(`/api/admin/users?role=${roleValue}`, { cache: "no-store" }))
         );
@@ -198,8 +215,8 @@ export default function AdminUsersPage() {
           throw new Error(failPayload?.message || "Unable to load users.");
         }
 
-        const items = payloads.flatMap((payload) => payload.items || []);
-        const staffRoles = new Set(["admin", "coordinator", "teacher"]);
+        const items = dedupeUsersById(payloads.flatMap((payload) => payload.items || []));
+        const staffRoles = new Set(["superadmin", "admin", "coordinator", "teacher"]);
         const staffOnlyItems = items.filter((item) =>
           staffRoles.has(String(item.role || "").toLowerCase())
         );
@@ -279,11 +296,13 @@ export default function AdminUsersPage() {
 
       if (isStaffView) {
         const rolesToLoad =
-          filters.role === "admin"
-            ? ["admin"]
+          filters.role === "superadmin"
+            ? ["superadmin"]
+            : filters.role === "admin"
+              ? ["admin"]
             : filters.role === "coordinator" || filters.role === "teacher"
               ? [filters.role]
-              : ["admin", "coordinator", "teacher"];
+              : ["superadmin", "admin", "coordinator", "teacher"];
 
         const responses = await Promise.all(
           rolesToLoad.map((roleValue) => {
@@ -303,8 +322,8 @@ export default function AdminUsersPage() {
           throw new Error(failPayload?.message || "Unable to load users.");
         }
 
-        const tableItems = payloads.flatMap((payload) => payload.items || []);
-        const staffRoles = new Set(["admin", "coordinator", "teacher"]);
+        const tableItems = dedupeUsersById(payloads.flatMap((payload) => payload.items || []));
+        const staffRoles = new Set(["superadmin", "admin", "coordinator", "teacher"]);
         const staffOnlyItems = tableItems.filter((item) =>
           staffRoles.has(String(item.role || "").toLowerCase())
         );
@@ -354,13 +373,19 @@ export default function AdminUsersPage() {
   const cards = useMemo(() => {
     if (isStaffView) {
       const items = state.overviewItems || [];
-      const staffItems = items.filter((item) => ["admin", "coordinator", "teacher"].includes(String(item.role || "").toLowerCase()));
+      const staffItems = items.filter((item) => ["superadmin", "admin", "coordinator", "teacher"].includes(String(item.role || "").toLowerCase()));
       return [
+        {
+          key: "superadmins",
+          label: "Super admins",
+          value: staffItems.filter((item) => item.role === "superadmin").length,
+          tone: "bg-[#0D5C48] text-[#FAF7F0]",
+        },
         {
           key: "admins",
           label: "Admins",
           value: staffItems.filter((item) => item.role === "admin").length,
-          tone: "bg-[#0D5C48] text-[#FAF7F0]",
+          tone: "bg-[#FAF7F0] text-[#063F32]",
         },
         {
           key: "coordinators",
@@ -375,15 +400,15 @@ export default function AdminUsersPage() {
           tone: "bg-[#FFF5D6] text-[#8A6B00]",
         },
         {
-          key: "suspendedAdmins",
-          label: "Suspended admins",
-          value: staffItems.filter((item) => item.role === "admin" && item.status === "suspended").length,
+          key: "suspendedSuperadmins",
+          label: "Suspended super admins",
+          value: staffItems.filter((item) => item.role === "superadmin" && item.status === "suspended").length,
           tone: "bg-rose-50 text-rose-800",
         },
         {
-          key: "suspendedCoordinators",
-          label: "Suspended coordinators",
-          value: staffItems.filter((item) => item.role === "coordinator" && item.status === "suspended").length,
+          key: "suspendedAdmins",
+          label: "Suspended admins",
+          value: staffItems.filter((item) => item.role === "admin" && item.status === "suspended").length,
           tone: "bg-rose-50 text-rose-800",
         },
         {
@@ -631,7 +656,7 @@ export default function AdminUsersPage() {
           <div className="relative flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
             <div className="max-w-6xl">
               <p className="inline-flex rounded-full border border-[#FFF5D6]/30 bg-[#FFF5D6]/10 px-3 py-1 text-[0.65rem] font-semibold uppercase tracking-[0.24em] text-[#FFF5D6]">
-                User management
+                {isSuperAdminPortal ? "Super Admin management" : "Admin management"}
               </p>
               <h1 className="mb-3 mt-4 text-3xl font-bold text-white-deep sm:text-4xl lg:text-4xl font-display">
               {view === "students"
@@ -645,11 +670,13 @@ export default function AdminUsersPage() {
                   ? "Manage student accounts and keep their profiles organized."
                   : view === "parents"
                     ? "Manage parent accounts and keep their profiles organized."
-                    : "Create, update, suspend, and reset staff accounts while keeping the directory visible to admin."}
+                    : isSuperAdminPortal
+                      ? "Create, update, suspend, and reset staff accounts while keeping the directory visible to super admin."
+                      : "Create, update, suspend, and reset staff accounts while keeping the directory visible to admin."}
               </p>
             </div>
 
-            {view === "staff" ? (
+            {view === "staff" && !isAdminReadonlyPortal ? (
               <button
                 type="button"
                 onClick={() => setModal({ open: true, record: null })}
@@ -964,7 +991,7 @@ export default function AdminUsersPage() {
                 Login
               </button>
             ) : null}
-            {view === "staff" && ["admin", "coordinator", "teacher"].includes(String(row.role || "").toLowerCase()) ? (
+            {!isAdminReadonlyPortal && view === "staff" && ["admin", "coordinator", "teacher"].includes(String(row.role || "").toLowerCase()) ? (
               <button
                 type="button"
                 onClick={() => setModal({ open: true, record: row })}
@@ -973,7 +1000,7 @@ export default function AdminUsersPage() {
                 Edit
               </button>
             ) : null}
-            {view === "staff" && ["admin", "coordinator", "teacher"].includes(String(row.role || "").toLowerCase()) && String(row.id || "") !== currentUserId ? (
+            {!isAdminReadonlyPortal && view === "staff" && ["admin", "coordinator", "teacher"].includes(String(row.role || "").toLowerCase()) && String(row.id || "") !== currentUserId ? (
               <button
                 type="button"
                 onClick={() =>
@@ -990,7 +1017,7 @@ export default function AdminUsersPage() {
                 {row.status === "suspended" ? "Activate" : "Suspend"}
               </button>
             ) : null}
-            {view === "staff" && ["admin", "coordinator", "teacher"].includes(String(row.role || "").toLowerCase()) ? (
+            {!isAdminReadonlyPortal && view === "staff" && ["admin", "coordinator", "teacher"].includes(String(row.role || "").toLowerCase()) ? (
               <button
                 type="button"
                 onClick={() => resetPassword(row)}
@@ -1006,7 +1033,7 @@ export default function AdminUsersPage() {
                 )}
               </button>
             ) : null}
-            {view !== "staff" ? (
+            {!isAdminReadonlyPortal && view !== "staff" ? (
               <>
                 <button
                   type="button"
@@ -1054,7 +1081,7 @@ export default function AdminUsersPage() {
         )}
       />
 
-      {modal.open ? (
+      {!isAdminReadonlyPortal && modal.open ? (
         <StaffFormModal
           key={modal.record?.id || "create-staff"}
           open={modal.open}
@@ -1063,10 +1090,11 @@ export default function AdminUsersPage() {
           roleOptions={
             view === "staff"
               ? [
+                  { label: "Admin", value: "admin" },
                   { label: "Coordinator", value: "coordinator" },
-                  { label: "Teacher", value: "teacher" },
                 ]
               : [
+                  { label: "Super Admin", value: "superadmin" },
                   { label: "Admin", value: "admin" },
                   { label: "Coordinator", value: "coordinator" },
                   { label: "Teacher", value: "teacher" },

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 
 const roleToDashboard = {
+  superadmin: "/superadmin/dashboard",
   admin: "/admin/dashboard",
   coordinator: "/coordinator/dashboard",
   teacher: "/teacher/dashboard",
@@ -10,11 +11,20 @@ const roleToDashboard = {
 };
 
 const protectedPrefixes = ["/admin", "/coordinator", "/teacher", "/parent", "/student"];
+const superadminPrefixes = ["/superadmin"];
 const sharedProtectedPaths = [
   "/coordinator/registration-leads",
   "/coordinator/fee-vouchers",
   "/coordinator/payments",
 ];
+
+function matchesProtectedRole(protectedRole, sessionRole) {
+  if (protectedRole === "admin") {
+    return sessionRole === "admin";
+  }
+
+  return protectedRole === sessionRole;
+}
 
 function getDashboardPath(role) {
   return roleToDashboard[String(role || "").toLowerCase()] || "/login";
@@ -24,6 +34,10 @@ function getProtectedRole(pathname) {
   return protectedPrefixes.find(
     (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`)
   )?.slice(1);
+}
+
+function getSuperadminProtected(pathname) {
+  return superadminPrefixes.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
 }
 
 export default auth((req) => {
@@ -40,7 +54,7 @@ export default auth((req) => {
       return pathname === "/login" ? NextResponse.next() : NextResponse.redirect(new URL("/login", req.url));
     }
 
-    if (protectedRole) {
+    if (protectedRole || getSuperadminProtected(pathname)) {
       return NextResponse.redirect(new URL("/login", req.url));
     }
 
@@ -51,11 +65,15 @@ export default auth((req) => {
     return NextResponse.redirect(new URL(dashboard, req.url));
   }
 
-  if (isSharedProtectedPath && (sessionRole === "admin" || sessionRole === "coordinator")) {
+  if (isSharedProtectedPath && (sessionRole === "superadmin" || sessionRole === "admin" || sessionRole === "coordinator")) {
     return NextResponse.next();
   }
 
-  if (protectedRole && protectedRole !== sessionRole) {
+  if (protectedRole && !matchesProtectedRole(protectedRole, sessionRole)) {
+    return NextResponse.redirect(new URL(dashboard, req.url));
+  }
+
+  if (getSuperadminProtected(pathname) && sessionRole !== "superadmin" && sessionRole !== "admin") {
     return NextResponse.redirect(new URL(dashboard, req.url));
   }
 
@@ -63,5 +81,5 @@ export default auth((req) => {
 });
 
 export const config = {
-  matcher: ["/", "/login", "/admin/:path*", "/coordinator/:path*", "/teacher/:path*", "/parent/:path*", "/student/:path*"],
+  matcher: ["/", "/login", "/superadmin/:path*", "/admin/:path*", "/coordinator/:path*", "/teacher/:path*", "/parent/:path*", "/student/:path*"],
 };

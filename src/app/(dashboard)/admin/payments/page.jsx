@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
 import { ChevronDown } from "lucide-react";
 import AdminDashboardCards from "@/components/admin/AdminDashboardCards";
 import AdminDataTable from "@/components/admin/AdminDataTable";
@@ -67,6 +68,9 @@ function writeCache(key, payload) {
 }
 
 export default function AdminPaymentsPage() {
+  const pathname = usePathname() || "";
+  const isAdminReadonlyPortal = pathname.startsWith("/admin") && !pathname.startsWith("/superadmin");
+  const isSuperAdminPortal = pathname.startsWith("/superadmin");
   const [filters, setFilters] = useState({ search: "", status: "" });
   const [state, setState] = useState(() => {
     const cached = readCache(getCacheKey({ search: "", status: "" }));
@@ -159,7 +163,9 @@ export default function AdminPaymentsPage() {
               Review payment records
             </h1>
             <p className="mt-3 max-w-2xl text-sm leading-7 text-[#EAF6EF] sm:text-base">
-              View submitted payment proofs and track pending, verified, and rejected payment records from one admin workspace.
+              {isSuperAdminPortal
+                ? "View submitted payment proofs and track pending, verified, and rejected payment records from one super admin workspace."
+                : "View submitted payment proofs and track pending, verified, and rejected payment records from one admin workspace."}
             </p>
           </div>
         </section>
@@ -193,6 +199,7 @@ export default function AdminPaymentsPage() {
           ]}
         />
 
+        {!isAdminReadonlyPortal ? (
         <section className="rounded-[2rem] border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(250,247,240,0.98)_100%)] p-4 shadow-[0_20px_70px_-36px_rgba(13,59,46,0.18)] backdrop-blur-xl sm:p-5">
           <form
             className="grid gap-3 lg:grid-cols-[minmax(0,1.2fr)_220px_auto]"
@@ -252,6 +259,7 @@ export default function AdminPaymentsPage() {
             </button>
           </form>
         </section>
+        ) : null}
 
         {state.error ? (
           <section className="rounded-[1.75rem] border border-rose-200 bg-rose-50/95 p-5 text-sm text-rose-700 shadow-[0_18px_60px_-36px_rgba(185,28,28,0.12)] backdrop-blur-xl">

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
 import { ChevronDown } from "lucide-react";
 import AdminDashboardCards from "@/components/admin/AdminDashboardCards";
 import AdminDataTable from "@/components/admin/AdminDataTable";
@@ -70,6 +71,8 @@ function writeCache(key, payload) {
 }
 
 export default function AdminCoursesPage() {
+  const pathname = usePathname() || "";
+  const isAdminReadonlyPortal = pathname.startsWith("/admin") && !pathname.startsWith("/superadmin");
   const [filters, setFilters] = useState({
     search: "",
     status: "",
@@ -179,13 +182,15 @@ export default function AdminCoursesPage() {
               </p>
             </div>
 
-            <button
-              type="button"
-              onClick={() => setModal({ open: true, record: null })}
-              className="inline-flex items-center justify-center rounded-2xl bg-[#FAF7F0] px-5 py-3 text-sm font-semibold text-[#245C4F] transition hover:bg-[#DBD8D5]"
-            >
-              Create Class
-            </button>
+            {!isAdminReadonlyPortal ? (
+              <button
+                type="button"
+                onClick={() => setModal({ open: true, record: null })}
+                className="inline-flex items-center justify-center rounded-2xl bg-[#FAF7F0] px-5 py-3 text-sm font-semibold text-[#245C4F] transition hover:bg-[#DBD8D5]"
+              >
+                Create Class
+              </button>
+            ) : null}
           </div>
         </section>
 
@@ -357,7 +362,7 @@ export default function AdminCoursesPage() {
             ? "Loading classes..."
             : "No classes matched the current filters."
         }
-        actions={(row) => (
+        actions={!isAdminReadonlyPortal ? (row) => (
           <button
             type="button"
             onClick={() => setModal({ open: true, record: row })}
@@ -365,11 +370,11 @@ export default function AdminCoursesPage() {
           >
             Edit
           </button>
-        )}
+        ) : null}
       />
 
-        {modal.open ? (
-        <CourseFormModal
+        {!isAdminReadonlyPortal && modal.open ? (
+          <CourseFormModal
           key={modal.record?.id || "create-course"}
           open={modal.open}
           record={modal.record}

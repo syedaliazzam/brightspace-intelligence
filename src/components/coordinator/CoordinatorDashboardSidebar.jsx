@@ -17,6 +17,7 @@ import {
   CalendarDays,
   ClipboardCheck,
   FileText,
+  UserPlus,
 } from "lucide-react";
 
 const NAV_ITEMS = [
@@ -26,6 +27,7 @@ const NAV_ITEMS = [
   { label: "Payments", href: "/coordinator/payments", icon: CreditCard, tone: "bg-[#FAF7F0] text-[#245C4F]" },
   { label: "Students", href: "/coordinator/students", icon: GraduationCap, tone: "bg-[#EAF6EF] text-[#0D5C48]" },
   { label: "Parents", href: "/coordinator/parents", icon: UserRound, tone: "bg-[#FAF7F0] text-[#245C4F]" },
+  { label: "Create teacher", href: "/coordinator/teacher-create", icon: UserPlus, tone: "bg-[#EAF6EF] text-[#0D5C48]" },
   { label: "Teacher Assignments", href: "/coordinator/teacher-assignments", icon: UserCog, tone: "bg-[#FFF5D6] text-[#8A6B00]" },
   { label: "Lecture Scheduler", href: "/coordinator/lecture-schedules", icon: CalendarDays, tone: "bg-[#FAF7F0] text-[#245C4F]" },
   { label: "Lecture Verification", href: "/coordinator/lecture-verifications", icon: ClipboardCheck, tone: "bg-[#EAF6EF] text-[#0D5C48]" },

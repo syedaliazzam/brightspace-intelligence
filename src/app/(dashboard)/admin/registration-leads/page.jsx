@@ -6,7 +6,7 @@ import { auth, roleToDashboard } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 import { createSignedAdmissionDocumentUrl } from "@/lib/supabaseStorage";
 
-const ALLOWED_ROLES = new Set(["admin"]);
+const ALLOWED_ROLES = new Set(["superadmin", "admin"]);
 const VALID_STATUSES = new Set([
   "new_lead",
   "voucher_created",
@@ -148,6 +148,7 @@ export const dynamic = "force-dynamic";
 export default async function AdminRegistrationLeadsPage({ searchParams }) {
   const session = await auth();
   const role = String(session?.user?.role || "").toLowerCase();
+  const isSuperAdmin = role === "superadmin";
 
   if (!session?.user || !ALLOWED_ROLES.has(role)) {
     redirect(session?.user ? roleToDashboard[role] || "/login" : "/login");
@@ -158,6 +159,7 @@ export default async function AdminRegistrationLeadsPage({ searchParams }) {
   const statusParam = normalizeSearch(resolvedParams?.status).toLowerCase();
   const status = statusParam === "all" ? "" : statusParam || "new_lead";
   const page = Number(resolvedParams?.page || 1) || 1;
+  const hrefBase = isSuperAdmin ? "/superadmin/registration-leads" : "/admin/registration-leads";
   const leads = await getLeads(status, search);
   const leadsWithDocuments = await Promise.all(
     leads.map(async (lead) => ({
@@ -188,13 +190,15 @@ export default async function AdminRegistrationLeadsPage({ searchParams }) {
           <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(228,198,102,0.12),transparent_28%),radial-gradient(circle_at_bottom_left,rgba(101,184,145,0.14),transparent_30%)]" />
           <div className="relative max-w-6xl">
             <p className="inline-flex rounded-full border border-[#FFF5D6]/30 bg-[#FFF5D6]/10 px-3 py-1 text-[0.65rem] font-semibold uppercase tracking-[0.24em] text-[#FFF5D6]">
-              Admission records
+              {isSuperAdmin ? "Admission records" : "Interested students"}
             </p>
             <h1 className="mb-3 mt-4 text-3xl font-bold text-white-deep sm:text-4xl lg:text-4xl font-display">
-              Admission records of new students
+              {isSuperAdmin ? "Admission records" : "Interested students records"}
             </h1>
             <p className="mt-3 max-w-2xl text-sm leading-7 text-[#EAF6EF] sm:text-base">
-              Review submitted registration leads and track admission progress from the admin portal.
+              {isSuperAdmin
+                ? "Review submitted admission records and track admission progress from the super admin portal."
+                : "Review submitted registration leads and track admission progress from the admin portal."}
             </p>
           </div>
         </section>
@@ -211,7 +215,7 @@ export default async function AdminRegistrationLeadsPage({ searchParams }) {
               />
             )}
             emptyMessage="No admission records match the current filters."
-            hrefBase="/admin/registration-leads"
+            hrefBase={hrefBase}
           />
       </div>
     </div>

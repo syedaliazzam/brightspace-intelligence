@@ -82,8 +82,10 @@ export default function LoginPage() {
       const session = await sessionResponse.json();
       const role = String(session?.user?.role || "").toLowerCase();
       const target =
-        role === "admin"
-          ? "/admin/dashboard"
+        role === "superadmin"
+          ? "/superadmin/dashboard"
+          : role === "admin"
+            ? "/admin/dashboard"
           : role === "coordinator"
             ? "/coordinator/dashboard"
             : role === "teacher"

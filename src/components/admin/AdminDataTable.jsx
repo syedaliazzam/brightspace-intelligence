@@ -25,6 +25,7 @@ export default function AdminDataTable({
   loadingTitle = "Loading data",
   loadingSubtitle = "Preparing the table...",
 }) {
+  const effectiveActions = actions;
   const [page, setPage] = useState(1);
 
   const totalPages = Math.max(1, Math.ceil(rows.length / pageSize));
@@ -61,7 +62,7 @@ export default function AdminDataTable({
                     {column.label}
                   </th>
                 ))}
-                {actions ? <th className="px-6 py-4">Actions</th> : null}
+                {effectiveActions ? <th className="px-6 py-4">Actions</th> : null}
               </tr>
             </thead>
             <tbody className="divide-y divide-[#F1EADC]">
@@ -80,9 +81,9 @@ export default function AdminDataTable({
                       {renderValue(column, row)}
                     </td>
                   ))}
-                  {actions ? (
+                  {effectiveActions ? (
                     <td className="px-6 py-5 align-top">
-                      <div className="flex flex-wrap gap-2">{actions(row)}</div>
+                      <div className="flex flex-wrap gap-2">{effectiveActions(row)}</div>
                     </td>
                   ) : null}
                 </motion.tr>

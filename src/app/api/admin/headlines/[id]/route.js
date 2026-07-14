@@ -21,7 +21,7 @@ async function requireAdminSession() {
     return { error: json("Unauthorized.", 401) };
   }
 
-  if (role !== "admin") {
+  if (role !== "admin" && role !== "superadmin") {
     return { error: json("Forbidden.", 403) };
   }
 
@@ -123,13 +123,13 @@ function validateHeadline({ headline, startDate, endDate }) {
 }
 
 export async function PATCH(request, { params }) {
-  const authState = await requireAdminSession();
-
-  if (authState.error) {
-    return authState.error;
-  }
-
   try {
+    const authState = await requireAdminSession();
+
+    if (authState.error) {
+      return authState.error;
+    }
+
     if (!(await headlinesTableExists())) {
       return json("Headlines table is not available yet.", 400);
     }
@@ -187,13 +187,13 @@ export async function PATCH(request, { params }) {
 }
 
 export async function DELETE(_request, { params }) {
-  const authState = await requireAdminSession();
-
-  if (authState.error) {
-    return authState.error;
-  }
-
   try {
+    const authState = await requireAdminSession();
+
+    if (authState.error) {
+      return authState.error;
+    }
+
     if (!(await headlinesTableExists())) {
       return json("Headlines table is not available yet.", 400);
     }

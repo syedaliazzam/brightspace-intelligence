@@ -59,7 +59,7 @@ export async function GET() {
     return json("Unauthorized.", 401);
   }
 
-  if (role !== "admin") {
+  if (role !== "admin" && role !== "superadmin") {
     return json("Forbidden.", 403);
   }
 
