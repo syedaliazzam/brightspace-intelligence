@@ -127,7 +127,7 @@ export default function LoginPage() {
 
               <div className="relative">
                 <div className="inline-flex items-center rounded-full border border-white/20 bg-white/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.25em] text-[#F7EFCF]">
-                  Ash-Shajrah Learning Hub
+                  Ash-Shajrah Learning Hub (ALH)
                 </div>
                 <h1 className="mt-6 max-w-lg font-display text-4xl font-semibold leading-tight sm:text-5xl">
                   Welcome back to your academic portal

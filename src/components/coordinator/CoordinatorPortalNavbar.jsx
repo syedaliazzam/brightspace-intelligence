@@ -81,7 +81,7 @@ export default function CoordinatorPortalNavbar({ profile = {} }) {
         <div className="flex items-center justify-between gap-3">
           <button type="button" onClick={() => scrollToSection("dashboard")} className="flex min-w-0 items-center gap-3 text-left">
             <div className="flex h-11 w-11 items-center justify-center overflow-hidden rounded-2xl bg-transparent">
-              <img src="/ash-shajrah-logo.webp" alt="Ash-Shajrah Learning Hub" className="h-full w-full object-contain" />
+              <img src="/ash-shajrah-logo.webp" alt="Ash-Shajrah Learning Hub (ALH)" className="h-full w-full object-contain" />
             </div>
             <div className="min-w-0">
               <p className="text-sm font-semibold text-[#063F32]">Coordinator Portal</p>

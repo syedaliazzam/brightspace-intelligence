@@ -14,7 +14,7 @@ const outfit = Outfit({
 });
 
 export const metadata = {
-  title: "Ash-Shajrah Learning Hub | Online Learning for Values, Creativity & Confidence",
+  title: "Ash-Shajrah Learning Hub (ALH) | Online Learning for Values, Creativity & Confidence",
   description:
     "A fully online learning hub for children, parents, and educators â€” focused on early years learning, Montessori-inspired guidance, character, creativity, confidence, and leadership.",
   icons: {

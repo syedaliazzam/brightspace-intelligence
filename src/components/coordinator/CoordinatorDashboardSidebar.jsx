@@ -71,7 +71,7 @@ export default function CoordinatorDashboardSidebar({ profile }) {
       <div className="border-b border-[#2D8A6A]/10 px-5 py-4">
         <div className="flex items-center gap-3">
           <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-transparent">
-            <Image src="/ash-shajrah-logo.webp" alt="Ash-Shajrah Learning Hub" width={44} height={44} className="h-full w-full object-contain" priority />
+            <Image src="/ash-shajrah-logo.webp" alt="Ash-Shajrah Learning Hub (ALH)" width={44} height={44} className="h-full w-full object-contain" priority />
           </div>
           <div className="min-w-0">
             <p className="truncate text-sm font-semibold text-[#063F32]">Coordinator Portal</p>
@@ -131,7 +131,7 @@ export default function CoordinatorDashboardSidebar({ profile }) {
             className="flex items-center gap-3 text-left"
           >
             <div className="flex h-11 w-11 items-center justify-center overflow-hidden rounded-2xl bg-transparent">
-              <Image src="/ash-shajrah-logo.webp" alt="Ash-Shajrah Learning Hub" width={44} height={44} className="h-full w-full object-contain" priority />
+              <Image src="/ash-shajrah-logo.webp" alt="Ash-Shajrah Learning Hub (ALH)" width={44} height={44} className="h-full w-full object-contain" priority />
             </div>
             <div>
               <p className="text-sm font-semibold text-[#063F32]">Coordinator Portal</p>

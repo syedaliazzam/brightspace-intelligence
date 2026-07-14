@@ -82,7 +82,7 @@ export default function StudentPortalNavbar({ profile = {} }) {
           <div className="flex items-center justify-between gap-3">
             <button type="button" onClick={scrollToTop} className="flex min-w-0 items-center gap-3 text-left">
               <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-2xl bg-transparent transition-all duration-200 ease-in-out hover:scale-110">
-                <Image src="/ash-shajrah-logo.webp" alt="Ash-Shajrah Learning Hub" width={48} height={48} className="h-full w-full object-contain" priority />
+                <Image src="/ash-shajrah-logo.webp" alt="Ash-Shajrah Learning Hub (ALH)" width={48} height={48} className="h-full w-full object-contain" priority />
               </div>
               <div className="min-w-0">
                 <p className="text-sm font-semibold text-[#063F32]">Learning Portal</p>

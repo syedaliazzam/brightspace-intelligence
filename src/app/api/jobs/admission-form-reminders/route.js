@@ -77,7 +77,7 @@ export async function GET(request) {
         : `${process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL || ""}/admission-form`;
 
       const subject = `Admission form reminder for ${studentName}`;
-      const text = `Assalamualaikum ${parentName},\n\nThis is a reminder to complete the Ash-Shajrah admission form for ${studentName}.\n\nClass: ${row.class_level || "-"}\nMessage: ${row.message || "-"}\n\nOpen the form:\n${formLink}`;
+      const text = `Assalamualaikum ${parentName},\n\nThis is a reminder to complete the Ash-Shajrah Learning Hub (ALH) admission form for ${studentName}.\n\nClass: ${row.class_level || "-"}\nMessage: ${row.message || "-"}\n\nOpen the form:\n${formLink}`;
 
       try {
         if (isValidEmail(row.email)) {
@@ -92,7 +92,7 @@ export async function GET(request) {
         if (row.phone) {
           await sendWhatsAppText({
             to: row.phone,
-            message: `Assalamualaikum ${parentName}, please complete the Ash-Shajrah admission form for ${studentName}.\n\nOpen form: ${formLink}`,
+            message: `Assalamualaikum ${parentName}, please complete the Ash-Shajrah Learning Hub (ALH) admission form for ${studentName}.\n\nOpen form: ${formLink}`,
           });
         }
 

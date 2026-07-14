@@ -198,7 +198,7 @@ function buildVoucherPrintHtml(voucher) {
       <body>
         <div class="card">
           <div class="header">
-            <div style="font-size:12px;letter-spacing:.18em;text-transform:uppercase;opacity:.85;color:#FFF5D6;">Ash-Shajrah Learning Hub Fee Voucher</div>
+            <div style="font-size:12px;letter-spacing:.18em;text-transform:uppercase;opacity:.85;color:#FFF5D6;">Ash-Shajrah Learning Hub (ALH) Fee Voucher</div>
             <h1 style="margin:8px 0 0;font-size:28px;line-height:1.2;">${safe(voucher.voucher_no || "Voucher")}</h1>
           </div>
           <div class="body">
@@ -277,7 +277,7 @@ async function downloadVoucherPdf(voucher) {
 
   doc.setFont("helvetica", "bold");
   doc.setFontSize(18);
-  doc.text("Ash-Shajrah Learning Hub Fee Voucher", margin, y);
+  doc.text("Ash-Shajrah Learning Hub (ALH) Fee Voucher", margin, y);
   y += 28;
 
   doc.setFont("helvetica", "normal");

@@ -127,7 +127,7 @@ export default function Sidebar({
           >
             <Image
               src="/ash-shajrah-logo.webp"
-              alt="Ash-Shajrah Learning Hub"
+              alt="Ash-Shajrah Learning Hub (ALH)"
               width={44}
               height={44}
               className={`h-full w-full object-contain ${collapsed?  "hidden":"flex"}`}
