@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { HelpCircle } from "lucide-react";
 import { OpenBookLoader } from "@/components/shared/AshShajrahLoaders";
 import InterestedStudentsPanel from "@/components/coordinator/InterestedStudentsPanel";
 
@@ -13,6 +14,51 @@ const FILTERS = [
   { id: "not_submitted", label: "Not Submitted" },
   { id: "submitted", label: "Submitted" },
 ];
+
+const STATUS_HELP = {
+  pending: {
+    title: "Pending status",
+    lines: [
+      "The admission form has not been sent yet. This is the first stage for a new interested student.",
+      "Once the form is sent, the status moves to Sent. If the due date passes without submission, it can become Overdue or Not Submitted.",
+    ],
+  },
+  sent: {
+    title: "Sent status",
+    lines: [
+      "The admission form link has been sent to the parent or guardian.",
+      "This means the application is in progress and waiting for form completion.",
+    ],
+  },
+  reminded: {
+    title: "Reminded status",
+    lines: [
+      "A reminder message was sent after the original form link.",
+      "Use this when the admission form needs a follow-up before the due date.",
+    ],
+  },
+  overdue: {
+    title: "Overdue status",
+    lines: [
+      "The admission form due date has passed and the form has still not been submitted.",
+      "This usually means another follow-up is needed.",
+    ],
+  },
+  not_submitted: {
+    title: "Not Submitted status",
+    lines: [
+      "The admission form was sent, but the applicant has not submitted it yet.",
+      "This status is used when the reminder period has ended without a completed form.",
+    ],
+  },
+  submitted: {
+    title: "Submitted status",
+    lines: [
+      "The admission form has been completed and sent back by the parent or guardian.",
+      "This is the final stage before the admissions team reviews the submission.",
+    ],
+  },
+};
 
 export default function SuperAdminInterestedStudentsPage() {
   const [state, setState] = useState({ items: [], loading: true, error: "" });
@@ -109,13 +155,45 @@ export default function SuperAdminInterestedStudentsPage() {
                     Monitor pending admissions, reminders sent, overdue records, and submitted applications in one view.
                   </p>
                 </div>
-                <div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-6">
-                  {FILTERS.slice(1).map((item) => (
-                    <div key={item.id} className="rounded-2xl border border-[#2D8A6A]/15 bg-[#FAF7F0] px-4 py-3 text-center shadow-[0_12px_30px_-24px_rgba(13,59,46,0.2)]">
-                      <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#0D5C48]">{item.label}</p>
-                      <p className="mt-1 text-2xl font-bold text-[#063F32]">{statusCounts[item.id] || 0}</p>
-                    </div>
-                  ))}
+                <div className="grid grid-cols-2 gap-3 [@media(min-width:500px)]:grid-cols-3 [@media(min-width:668px)]:grid-cols-4 [@media(min-width:992px)]:grid-cols-6">
+                {FILTERS.slice(1).map((item) => {
+                    const help = STATUS_HELP[item.id];
+                    const tooltipPlacement =
+                      item.id === "pending"
+                        ? "left-2 -translate-x-0"
+                        : item.id === "submitted"
+                          ? "right-2 translate-x-0"
+                          : "left-1/2 -translate-x-1/2";
+                    return (
+                      <div key={item.id} className="rounded-2xl border border-[#2D8A6A]/15 bg-[#FAF7F0] px-4 py-3 text-center shadow-[0_12px_30px_-24px_rgba(13,59,46,0.2)]">
+                        <div className="flex items-start justify-center gap-2">
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#0D5C48]">{item.label}</p>
+                          {help ? (
+                            <div className="relative -mt-0.5">
+                              <button
+                                type="button"
+                                aria-label={`${item.label} status help`}
+                                className="peer inline-flex h-5 w-5 items-center justify-center rounded-full text-[#0D5C48] transition hover:bg-[#FFF5D6] hover:text-[#063F32]"
+                              >
+                                <HelpCircle className="h-4 w-4" strokeWidth={2} />
+                              </button>
+                              <div className={`pointer-events-none absolute top-full z-20 mt-2 w-72 rounded-2xl border border-[#2D8A6A]/15 bg-[#FAF7F0] p-4 text-left text-xs leading-6 text-[#245C4F] opacity-0 shadow-[0_18px_60px_-36px_rgba(13,59,46,0.22)] transition peer-hover:opacity-100 peer-focus-visible:opacity-100 ${tooltipPlacement}`}>
+                                <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#0D5C48]">
+                                  {help.title}
+                                </p>
+                                {help.lines.map((line) => (
+                                  <p key={line} className="mt-2">
+                                    {line}
+                                  </p>
+                                ))}
+                              </div>
+                            </div>
+                          ) : null}
+                        </div>
+                        <p className="mt-1 text-2xl font-bold text-[#063F32]">{statusCounts[item.id] || 0}</p>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             </div>

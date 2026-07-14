@@ -218,7 +218,7 @@ export default function InterestedStudentsPanel({
 
   return (
     <>
-      <section className="overflow-hidden rounded-[2rem] border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(250,247,240,0.98)_100%)] shadow-[0_20px_70px_-36px_rgba(13,59,46,0.18)] backdrop-blur-xl">
+      <section className="hidden overflow-hidden rounded-[2rem] border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(250,247,240,0.98)_100%)] shadow-[0_20px_70px_-36px_rgba(13,59,46,0.18)] backdrop-blur-xl min-[992px]:block">
         {message ? (
           <div className="border-b border-[#2D8A6A]/10 px-6 py-4 text-sm font-medium text-[#0D5C48]">{message}</div>
         ) : null}
@@ -335,7 +335,7 @@ export default function InterestedStudentsPanel({
         ) : null}
       </section>
 
-      <div className="grid gap-4 lg:hidden">
+      <div className="grid gap-4 min-[992px]:hidden">
         {visibleItems.map((item) => (
           <article
             key={item.id}
