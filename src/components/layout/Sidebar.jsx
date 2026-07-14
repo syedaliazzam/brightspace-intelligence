@@ -68,6 +68,7 @@ function getIconForLabel(label) {
   if (key.includes("subject")) return BookText;
   if (key.includes("headline")) return PanelTop;
   if (key.includes("audit")) return ShieldCheck;
+  if (key.includes("career")) return FileText;
   if (key.includes("timeline")) return Layers3;
   if (key.includes("overview")) return PanelTop;
   return Home;

@@ -1,6 +1,11 @@
 export const dashboardNavigation = {
   superadmin: [
     { label: "Dashboard", href: "/superadmin/dashboard" },
+    { label: "Careers Applications", href: "/superadmin/careers-applications" },
+    { label: "Interested Students", href: "/superadmin/interested-students" },
+    { label: "Admission Records", href: "/superadmin/registration-leads" },
+    { label: "Fee Management", href: "/superadmin/fee-settings" },
+    { label: "Payments", href: "/superadmin/payments" },
     {
       label: "User Management",
       children: [
@@ -11,16 +16,16 @@ export const dashboardNavigation = {
     },
     { label: "Subject Catalog", href: "/superadmin/subjects" },
     { label: "Class Management", href: "/superadmin/courses" },
-    { label: "Interested Students", href: "/superadmin/interested-students" },
-    { label: "Admission Records", href: "/superadmin/registration-leads" },
-    { label: "Fee Management", href: "/superadmin/fee-settings" },
-    { label: "Payments", href: "/superadmin/payments" },
     { label: "Notes", href: "/superadmin/notes" },
     { label: "Headlines", href: "/superadmin/headlines" },
     { label: "Audit History", href: "/superadmin/audit-logs" },
   ],
   admin: [
     { label: "Dashboard", href: "/admin/dashboard" },
+    { label: "Careers Applications", href: "/admin/careers-applications" },
+    { label: "Interested Students", href: "/admin/interested-students" },
+    { label: "Admission Records", href: "/admin/registration-leads" },
+    { label: "Payments", href: "/admin/payments" },
     {
       label: "User Management",
       children: [
@@ -31,9 +36,6 @@ export const dashboardNavigation = {
     },
     { label: "Subject Catalog", href: "/admin/subjects" },
     { label: "Class Management", href: "/admin/courses" },
-    { label: "Interested Students", href: "/admin/interested-students" },
-    { label: "Admission Records", href: "/admin/registration-leads" },
-    { label: "Payments", href: "/admin/payments" },
     { label: "Notes", href: "/admin/notes" },
     { label: "Headlines", href: "/admin/headlines" },
     { label: "Audit History", href: "/admin/audit-logs" },
