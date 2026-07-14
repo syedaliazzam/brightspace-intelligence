@@ -21,6 +21,21 @@ async function requireAdminSession() {
   return { session };
 }
 
+async function getRoleId(roleName) {
+  const [row] = await prisma.$queryRaw`
+    SELECT id::text AS id
+    FROM roles
+    WHERE LOWER(name) = ${roleName}
+    LIMIT 1
+  `;
+
+  if (!row?.id) {
+    throw new Error(`Role not found: ${roleName}`);
+  }
+
+  return row.id;
+}
+
 async function getUserById(id) {
   const [row] = await prisma.$queryRaw`
     SELECT
@@ -136,6 +151,7 @@ export async function PATCH(request, { params }) {
     const fullName = String(body?.fullName || "").trim();
     const email = String(body?.email || "").trim().toLowerCase();
     const phone = String(body?.phone || "").trim();
+    const nextRole = String(body?.role || existing.role || "").trim().toLowerCase();
     const relation = String(body?.relation || "").trim().toLowerCase();
     const nextStatus = String(body?.status || existing.status || "active").toLowerCase();
     const admissionNo = String(body?.admissionNo || "").trim();
@@ -154,20 +170,36 @@ export async function PATCH(request, { params }) {
       fullName ||
       email ||
       phone ||
+      nextRole ||
       relation ||
       (existing.status && nextStatus !== existing.status)
     ) {
       await prisma.$transaction(async (tx) => {
-        await tx.$executeRaw`
-          UPDATE users
-          SET
-            full_name = ${fullName || existing.full_name || existing.name},
-            email = ${email || existing.email || null},
-            phone = ${phone || existing.phone || null},
-            status = ${nextStatus}::user_status,
-            updated_at = NOW()
-          WHERE id = ${id}::uuid
-        `;
+        const roleId = nextRole ? await getRoleId(nextRole) : null;
+        if (roleId) {
+          await tx.$executeRaw`
+            UPDATE users
+            SET
+              full_name = ${fullName || existing.full_name || existing.name},
+              email = ${email || existing.email || null},
+              phone = ${phone || existing.phone || null},
+              role_id = ${roleId}::uuid,
+              status = ${nextStatus}::user_status,
+              updated_at = NOW()
+            WHERE id = ${id}::uuid
+          `;
+        } else {
+          await tx.$executeRaw`
+            UPDATE users
+            SET
+              full_name = ${fullName || existing.full_name || existing.name},
+              email = ${email || existing.email || null},
+              phone = ${phone || existing.phone || null},
+              status = ${nextStatus}::user_status,
+              updated_at = NOW()
+            WHERE id = ${id}::uuid
+          `;
+        }
 
         if (existing.role === "parent") {
           await tx.$executeRaw`
