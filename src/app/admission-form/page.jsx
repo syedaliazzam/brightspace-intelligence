@@ -269,6 +269,30 @@ function SelectField({ id, value, onChange, error, className = "", children }) {
   );
 }
 
+async function uploadAdmissionFormFile({ documentType, file, applicationId, voucherNo = "" }) {
+  if (!(file instanceof File) || file.size <= 0) {
+    return "";
+  }
+
+  const payload = new FormData();
+  payload.append("documentType", documentType);
+  payload.append("applicationId", applicationId);
+  if (voucherNo) payload.append("voucherNo", voucherNo);
+  payload.append("file", file);
+
+  const response = await fetch("/api/public/admission-file-upload", {
+    method: "POST",
+    body: payload,
+  });
+
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok || !data?.storedPath) {
+    throw new Error(data?.message || `Unable to upload ${documentType.replace(/_/g, " ")}.`);
+  }
+
+  return data.storedPath;
+}
+
 function AdmissionFormContent() {
   const [form, setForm] = useState(initialForm);
   const [errors, setErrors] = useState({});
@@ -568,6 +592,39 @@ function AdmissionFormContent() {
     setSuccessMessage("");
 
     try {
+      const applicationId = leadToken || crypto.randomUUID();
+      const birthCertificatePath = await uploadAdmissionFormFile({
+        documentType: "birth_certificate",
+        file: form.birthCertificateFile,
+        applicationId,
+      });
+      const parentCnicPath = await uploadAdmissionFormFile({
+        documentType: "parent_cnic",
+        file: form.parentCnicFile,
+        applicationId,
+      });
+      const childPhotographPath = await uploadAdmissionFormFile({
+        documentType: "child_photograph",
+        file: form.childPhotographFile,
+        applicationId,
+      });
+      const previousSchoolReportPath = await uploadAdmissionFormFile({
+        documentType: "previous_school_report",
+        file: form.previousSchoolReportFile,
+        applicationId,
+      });
+      const medicalReportPath = await uploadAdmissionFormFile({
+        documentType: "medical_report",
+        file: form.medicalReportFile,
+        applicationId,
+      });
+      const paymentProofPath = await uploadAdmissionFormFile({
+        documentType: "payment_proof",
+        file: form.paymentProofFile,
+        applicationId,
+        voucherNo: leadToken || applicationId,
+      });
+
       const payload = new FormData();
       Object.entries({
         program_name: form.programName,
@@ -636,18 +693,13 @@ function AdmissionFormContent() {
         school_expectations: form.schoolExpectations,
         declaration_accepted: form.declarationAccepted ? "Yes" : "No",
         leadToken,
+        birth_certificate_file_path: birthCertificatePath,
+        parent_cnic_file_path: parentCnicPath,
+        child_photograph_file_path: childPhotographPath,
+        previous_school_report_file_path: previousSchoolReportPath,
+        medical_report_file_path: medicalReportPath,
+        payment_proof_file_path: paymentProofPath,
       }).forEach(([key, value]) => payload.append(key, value || ""));
-
-      [
-        ["birth_certificate_file", form.birthCertificateFile],
-        ["parent_cnic_file", form.parentCnicFile],
-        ["child_photograph_file", form.childPhotographFile],
-        ["previous_school_report_file", form.previousSchoolReportFile],
-        ["medical_report_file", form.medicalReportFile],
-        ["payment_proof_file", form.paymentProofFile],
-      ].forEach(([key, file]) => {
-        if (file) payload.append(key, file);
-      });
 
       const response = await fetch("/api/public/registration-leads", {
         method: "POST",

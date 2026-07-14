@@ -574,6 +574,12 @@ export async function POST(request) {
     const whyJoinSchool = normalizeText(formData.get("why_join_school"));
     const schoolExpectations = normalizeText(formData.get("school_expectations"));
     const declarationAccepted = normalizeBoolean(formData.get("declaration_accepted")) === true;
+    const birthCertificateFilePath = normalizeText(formData.get("birth_certificate_file_path"));
+    const parentCnicFilePath = normalizeText(formData.get("parent_cnic_file_path"));
+    const childPhotographFilePath = normalizeText(formData.get("child_photograph_file_path"));
+    const previousSchoolReportFilePath = normalizeText(formData.get("previous_school_report_file_path"));
+    const medicalReportFilePath = normalizeText(formData.get("medical_report_file_path"));
+    const paymentProofFilePath = normalizeText(formData.get("payment_proof_file_path"));
 
     const files = {
       birthCertificateFile: getOptionalFile(formData, "birth_certificate_file"),
@@ -620,16 +626,16 @@ export async function POST(request) {
     if (!declarationAccepted) {
       return json(false, "You must accept the declaration before submitting the admission form.", 400);
     }
-    if (!files.birthCertificateFile) {
+    if (!files.birthCertificateFile && !birthCertificateFilePath) {
       return json(false, "Child B-Form / Birth Certificate is required.", 400);
     }
-    if (!files.parentCnicFile) {
+    if (!files.parentCnicFile && !parentCnicFilePath) {
       return json(false, "Parent CNIC document is required.", 400);
     }
-    if (!files.childPhotographFile) {
+    if (!files.childPhotographFile && !childPhotographFilePath) {
       return json(false, "Recent child photograph is required.", 400);
     }
-    if (!files.paymentProofFile) {
+    if (!files.paymentProofFile && !paymentProofFilePath) {
       return json(false, "Payment proof is required.", 400);
     }
 
@@ -669,7 +675,25 @@ export async function POST(request) {
       return json(true, "Admission form already completed.", 200);
     }
 
-    const uploads = await uploadAdmissionFiles(applicationId, files);
+    const uploads = {
+      birthCertificatePath: birthCertificateFilePath || null,
+      parentCnicPath: parentCnicFilePath || null,
+      childPhotographPath: childPhotographFilePath || null,
+      previousSchoolReportPath: previousSchoolReportFilePath || null,
+      medicalReportPath: medicalReportFilePath || null,
+    };
+
+    const needsAdmissionUpload =
+      files.birthCertificateFile ||
+      files.parentCnicFile ||
+      files.childPhotographFile ||
+      files.previousSchoolReportFile ||
+      files.medicalReportFile;
+
+    if (needsAdmissionUpload) {
+      const uploadedFiles = await uploadAdmissionFiles(applicationId, files);
+      Object.assign(uploads, uploadedFiles);
+    }
     const cityCountry = [city, country].filter(Boolean).join(", ");
 
     const [createdLead] = await prisma.$queryRaw`
@@ -836,12 +860,13 @@ export async function POST(request) {
     `;
 
     let paymentSubmissionResult = null;
-    if (files.paymentProofFile) {
+    if (files.paymentProofFile || paymentProofFilePath) {
       const admissionPaymentVoucherNo = await generateVoucherNumber();
-      const paymentProofUpload = await uploadPaymentProof({
-        voucherNo: admissionPaymentVoucherNo,
-        file: files.paymentProofFile,
-      });
+      const paymentProofStoredPath = paymentProofFilePath
+        || (await uploadPaymentProof({
+          voucherNo: admissionPaymentVoucherNo,
+          file: files.paymentProofFile,
+        })).storedPath;
       const paymentDueDate = new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString();
 
       paymentSubmissionResult = await prisma.$transaction(async (tx) => {
@@ -867,7 +892,7 @@ export async function POST(request) {
           transactionId,
           paidAmount: paidAmountValue,
           paidAt,
-          proofFilePath: paymentProofUpload.storedPath,
+          proofFilePath: paymentProofStoredPath,
           remarks: JSON.stringify({
             paymentMethod: paymentMethod || paymentMethodId || "",
             admissionFeeAmount: toMoney(admissionFeeAmount),
@@ -890,7 +915,7 @@ export async function POST(request) {
           voucherNo: voucher.voucherNo,
           voucherId: voucher.voucherId,
           submissionId,
-          proofFilePath: paymentProofUpload.storedPath,
+          proofFilePath: paymentProofStoredPath,
           totalAmount: voucher.totalAmount,
         };
       });
