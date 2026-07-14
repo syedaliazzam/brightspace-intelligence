@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
 import { ChevronDown } from "lucide-react";
@@ -364,6 +364,7 @@ function AdmissionFormContent() {
     coordinatorMaxDiscountPercent: 20,
   });
   const searchParams = useSearchParams();
+  const readinessErrorRef = useRef(null);
   const leadTokenParam = searchParams?.get("leadToken") || "";
   const isPreviewMode = searchParams?.get("preview") === "1";
   const STEP_TITLES = ["Programme", "Student", "Profile", "Parents", "Readiness", "Payment", "Declaration"];
@@ -604,6 +605,78 @@ function AdmissionFormContent() {
     setErrors((current) => ({ ...current, [name]: "" }));
   }
 
+  async function handleFileSelection(name, file) {
+    if (!file) {
+      updateField(name, null);
+      return;
+    }
+
+    const isImage = file.type.startsWith("image/");
+    const maxDirectUploadSize = 2 * 1024 * 1024;
+
+    if (!isImage && file.size > maxDirectUploadSize) {
+      setErrors((current) => ({
+        ...current,
+        [name]: "This file is too large. Please upload a smaller image or PDF.",
+      }));
+      updateField(name, null);
+      return;
+    }
+
+    if (!isImage) {
+      updateField(name, file);
+      return;
+    }
+
+    updateField(name, file);
+
+    const compressedFile = await (async () => {
+      const objectUrl = URL.createObjectURL(file);
+      try {
+        const bitmap = await new Promise((resolve, reject) => {
+          const image = new Image();
+          image.onload = () => resolve(image);
+          image.onerror = reject;
+          image.src = objectUrl;
+        });
+
+        const maxSize = 1200;
+        const scale = Math.min(1, maxSize / Math.max(bitmap.width || 1, bitmap.height || 1));
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.max(1, Math.round((bitmap.width || 1) * scale));
+        canvas.height = Math.max(1, Math.round((bitmap.height || 1) * scale));
+
+        const context = canvas.getContext("2d");
+        if (!context) {
+          return file;
+        }
+
+        context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+
+        const compressedBlob = await new Promise((resolve) =>
+          canvas.toBlob((blob) => resolve(blob), "image/jpeg", 0.72)
+        );
+
+        if (!compressedBlob || compressedBlob.size >= file.size) {
+          return file;
+        }
+
+        return new File([compressedBlob], file.name.replace(/\.[^.]+$/, ".jpg"), {
+          type: "image/jpeg",
+          lastModified: Date.now(),
+        });
+      } catch {
+        return file;
+      } finally {
+        URL.revokeObjectURL(objectUrl);
+      }
+    })();
+
+    if (compressedFile && compressedFile.size > 0 && compressedFile.size < file.size) {
+      updateField(name, compressedFile);
+    }
+  }
+
   function goNext() {
     if (isPreviewMode && step === 5 && !isPreviewPaymentReady) {
       setErrors((current) => ({
@@ -619,6 +692,11 @@ function AdmissionFormContent() {
     setErrors(nextErrors);
 
     if (Object.values(nextErrors).some(Boolean)) {
+      if (step === 4) {
+        window.requestAnimationFrame(() => {
+          readinessErrorRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+        });
+      }
       return;
     }
 
@@ -1046,8 +1124,22 @@ function AdmissionFormContent() {
   }
 
   function renderReadinessStep() {
+    const readinessErrors = ["supportPersonDuringLearning", "deviceAvailable", "birthCertificateFile", "parentCnicFile", "childPhotographFile"]
+      .filter((key) => errors[key])
+      .map((key) => errors[key]);
+
     return (
       <div className="grid gap-5 rounded-[1.35rem] border border-[rgba(13,59,46,0.08)] bg-white/95 p-4 shadow-[0_12px_28px_rgba(13,59,46,0.05)] sm:grid-cols-2 sm:p-6">
+        {readinessErrors.length ? (
+          <div ref={readinessErrorRef} className="sm:col-span-2 rounded-[1.1rem] border border-rose-200 bg-rose-50 px-4 py-4 text-sm text-rose-700">
+            <p className="font-semibold">Readiness step still needs a few required fields.</p>
+            <ul className="mt-2 list-disc space-y-1 pl-5">
+              {readinessErrors.map((error, index) => (
+                <li key={`${error}-${index}`}>{error}</li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
         <div className="sm:col-span-2 rounded-[1.1rem] border border-[rgba(201,162,39,0.26)] bg-[#FFF5D6]/80 px-4 py-4 text-sm leading-6 text-[#063F32]">
           Regular class attendance through smartphones or tablets is not permitted. Please arrange a laptop, desktop computer, or an adequately sized screen for the child.
         </div>
@@ -1060,26 +1152,26 @@ function AdmissionFormContent() {
         </div>
         <div>
           <label className="mb-2 block text-[11px] font-bold uppercase tracking-[0.18em] text-[#0D5C48]" htmlFor="birthCertificateFile">Child B-Form / Birth Certificate</label>
-          <input id="birthCertificateFile" type="file" accept="image/*,.pdf" onChange={(event) => updateField("birthCertificateFile", event.target.files?.[0] || null)} className={inputClass(errors.birthCertificateFile)} />
+          <input id="birthCertificateFile" type="file" accept="image/*,.pdf" onChange={(event) => void handleFileSelection("birthCertificateFile", event.target.files?.[0] || null)} className={inputClass(errors.birthCertificateFile)} />
           <FieldError error={errors.birthCertificateFile} />
         </div>
         <div>
           <label className="mb-2 block text-[11px] font-bold uppercase tracking-[0.18em] text-[#0D5C48]" htmlFor="parentCnicFile">Parent CNIC</label>
-          <input id="parentCnicFile" type="file" accept="image/*,.pdf" onChange={(event) => updateField("parentCnicFile", event.target.files?.[0] || null)} className={inputClass(errors.parentCnicFile)} />
+          <input id="parentCnicFile" type="file" accept="image/*,.pdf" onChange={(event) => void handleFileSelection("parentCnicFile", event.target.files?.[0] || null)} className={inputClass(errors.parentCnicFile)} />
           <FieldError error={errors.parentCnicFile} />
         </div>
         <div>
           <label className="mb-2 block text-[11px] font-bold uppercase tracking-[0.18em] text-[#0D5C48]" htmlFor="childPhotographFile">Recent Child Photograph</label>
-          <input id="childPhotographFile" type="file" accept="image/*,.pdf" onChange={(event) => updateField("childPhotographFile", event.target.files?.[0] || null)} className={inputClass(errors.childPhotographFile)} />
+          <input id="childPhotographFile" type="file" accept="image/*,.pdf" onChange={(event) => void handleFileSelection("childPhotographFile", event.target.files?.[0] || null)} className={inputClass(errors.childPhotographFile)} />
           <FieldError error={errors.childPhotographFile} />
         </div>
         <div>
           <label className="mb-2 block text-[11px] font-bold uppercase tracking-[0.18em] text-[#0D5C48]" htmlFor="previousSchoolReportFile">Previous School Report (if applicable)</label>
-          <input id="previousSchoolReportFile" type="file" accept="image/*,.pdf" onChange={(event) => updateField("previousSchoolReportFile", event.target.files?.[0] || null)} className={inputClass(false)} />
+          <input id="previousSchoolReportFile" type="file" accept="image/*,.pdf" onChange={(event) => void handleFileSelection("previousSchoolReportFile", event.target.files?.[0] || null)} className={inputClass(false)} />
         </div>
         <div className="sm:col-span-2">
           <label className="mb-2 block text-[11px] font-bold uppercase tracking-[0.18em] text-[#0D5C48]" htmlFor="medicalReportFile">Medical Report (if applicable)</label>
-          <input id="medicalReportFile" type="file" accept="image/*,.pdf" onChange={(event) => updateField("medicalReportFile", event.target.files?.[0] || null)} className={inputClass(false)} />
+          <input id="medicalReportFile" type="file" accept="image/*,.pdf" onChange={(event) => void handleFileSelection("medicalReportFile", event.target.files?.[0] || null)} className={inputClass(false)} />
         </div>
       </div>
     );
@@ -1248,7 +1340,7 @@ function AdmissionFormContent() {
                 id="paymentProofFile"
                 type="file"
                 accept="image/*,.pdf"
-                onChange={(event) => updateField("paymentProofFile", event.target.files?.[0] || null)}
+                onChange={(event) => void handleFileSelection("paymentProofFile", event.target.files?.[0] || null)}
                 className={inputClass(errors.paymentProofFile)}
               />
               <FieldError error={errors.paymentProofFile} />
