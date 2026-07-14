@@ -2,7 +2,6 @@
 
 import { ChevronDown } from "lucide-react";
 import { useState } from "react";
-import { ALLOWED_CLASS_LEVELS } from "@/lib/academicCatalog";
 import ClientPortal from "@/components/shared/ClientPortal";
 
 const EMPTY_FORM = {
@@ -32,7 +31,7 @@ function DetailRow({ label, value }) {
   );
 }
 
-export default function StudentTable({ items = [], onRefresh }) {
+export default function StudentTable({ items = [], onRefresh, classOptions = [] }) {
   const [editingItem, setEditingItem] = useState(null);
   const [detailItem, setDetailItem] = useState(null);
   const [deleteItem, setDeleteItem] = useState(null);
@@ -40,9 +39,12 @@ export default function StudentTable({ items = [], onRefresh }) {
   const [saving, setSaving] = useState(false);
   const [classOpen, setClassOpen] = useState(false);
   const [statusOpen, setStatusOpen] = useState(false);
-  const [classOptions] = useState(
-    Array.from(ALLOWED_CLASS_LEVELS).map((level) => ({ value: level, label: level }))
-  );
+  const liveClassOptions = Array.isArray(classOptions)
+    ? classOptions
+        .map((level) => String(level || "").trim())
+        .filter(Boolean)
+        .filter((level, index, array) => array.findIndex((item) => item.toLowerCase() === level.toLowerCase()) === index)
+    : [];
 
   function buildFormState(item) {
     const email =
@@ -315,9 +317,9 @@ export default function StudentTable({ items = [], onRefresh }) {
                       <option value="" disabled>
                         Select class
                       </option>
-                      {classOptions.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
+                      {liveClassOptions.map((option) => (
+                        <option key={option} value={option}>
+                          {option}
                         </option>
                       ))}
                     </select>

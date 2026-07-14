@@ -468,19 +468,21 @@ function toLectureMetaRecord(record, roleType = "participant", fallbackEmail = "
     joinedAtTime && effectiveDurationMinutes > 0
       ? new Date(joinedAtTime + effectiveDurationMinutes * 60000).toISOString()
       : record.leftAt || null;
-  const clampedLeftAt =
-    durationLeftAt && conferenceEnd && !Number.isNaN(conferenceEnd.getTime())
-      ? new Date(Math.min(new Date(durationLeftAt).getTime(), conferenceEnd.getTime())).toISOString()
-      : durationLeftAt;
+  const roleKey = String(roleType || "").toLowerCase();
+  const isStaffRole = roleKey === "coordinator" || roleKey === "teacher";
+  const joined = Boolean(effectiveDurationMinutes > 0 || joinedAt);
+  const status = isStaffRole ? (joined ? "present" : "absent") : durationStatus(effectiveDurationMinutes);
+  const leftAtValue = durationLeftAt;
+  const durationValue = effectiveDurationMinutes;
 
   return {
     name: record.participantName || "",
     email: record.participantEmail || fallbackEmail || "",
-    joined: Boolean(effectiveDurationMinutes > 0 || joinedAt),
-    status: durationStatus(effectiveDurationMinutes),
+    joined,
+    status,
     joined_at: joinedAt,
-    left_at: clampedLeftAt,
-    duration_minutes: effectiveDurationMinutes,
+    left_at: leftAtValue,
+    duration_minutes: durationValue,
     role_type: roleType,
   };
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import ClientPortal from "@/components/shared/ClientPortal";
 import PaginationControls from "@/components/teacher/PaginationControls";
 
@@ -53,7 +53,7 @@ function InfoCell({ label, value }) {
   return (
     <div>
       <dt className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#0D5C48]">{label}</dt>
-      <dd className="mt-1 text-sm leading-6 text-[#063F32]">{textOrDash(value)}</dd>
+      <dd className="mt-1 text-sm leading-6 text-[#063F32]">{value || "-"}</dd>
     </div>
   );
 }
@@ -66,6 +66,7 @@ export default function InterestedStudentsPanel({
 }) {
   const [page, setPage] = useState(1);
   const [selectedLead, setSelectedLead] = useState(null);
+  const [selectedMessage, setSelectedMessage] = useState(null);
   const [message, setMessage] = useState("");
   const [loadingId, setLoadingId] = useState("");
   const [previewAdmissionFeeId, setPreviewAdmissionFeeId] = useState("");
@@ -225,6 +226,7 @@ export default function InterestedStudentsPanel({
           <table className="min-w-full divide-y divide-[#F1EADC]">
             <thead className="bg-[linear-gradient(180deg,#FAF7F0_0%,#F1EADC_100%)]">
               <tr className="text-left text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]">
+                <th className="px-6 py-4">#</th>
                 <th className="px-6 py-4">Parent / Guardian</th>
                 <th className="px-6 py-4">WhatsApp Number</th>
                 <th className="px-6 py-4">Email Address</th>
@@ -239,45 +241,84 @@ export default function InterestedStudentsPanel({
               </tr>
             </thead>
             <tbody className="divide-y divide-[#F1EADC]">
-              {visibleItems.map((item) => (
-                <tr key={item.id} className="align-top">
-                  <td className="px-5 py-5 text-[#063F32]">{textOrDash(item.parent_name)}</td>
-                  <td className="px-5 py-5 text-[#245C4F]">{textOrDash(item.phone)}</td>
-                  <td className="px-5 py-5 text-[#245C4F]">{textOrDash(item.email)}</td>
-                  <td className="px-5 py-5 font-semibold text-[#063F32]">{textOrDash(item.student_name)}</td>
-                  <td className="px-5 py-5 text-[#245C4F]">{textOrDash(item.student_age)}</td>
-                  <td className="px-5 py-5 text-[#245C4F]">{textOrDash(item.class_level)}</td>
-                  <td className="px-5 py-5 text-[#245C4F]">{textOrDash(item.city_country)}</td>
-                  <td className="px-5 py-5 text-[#245C4F]">{truncate(item.message || item.notes, 64)}</td>
-                  <td className="px-5 py-5">
-                    <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${admissionStatusTone(item.admission_form_status)}`}>
-                      {admissionStatusLabel(item.admission_form_status || item.status)}
-                    </span>
-                    {item.admission_form_due_at && String(item.admission_form_status || item.status || "").toLowerCase() !== "submitted" ? (
-                      <p className="mt-2 text-[11px] font-medium text-[#245C4F]">
-                        Due: {formatDate(item.admission_form_due_at)}
-                      </p>
-                    ) : null}
-                  </td>
-                  <td className="px-5 py-5 text-sm text-[#245C4F]">{formatDate(item.created_at)}</td>
-                  {showActionsColumn ? (
-                    <td className="px-5 py-5 text-right">
-                      {showDetailsButton ? (
+              {visibleItems.map((item, index) => (
+                <Fragment key={item.id}>
+                  <tr key={item.id} className="align-top">
+                    <td className="px-5 py-5 text-sm font-semibold text-[#0D5C48]">
+                      {String((currentPage - 1) * PAGE_SIZE + index + 1).padStart(2, "0")}
+                    </td>
+                    <td className="px-5 py-5 text-[#063F32]">{textOrDash(item.parent_name)}</td>
+                    <td className="px-5 py-5 text-[#245C4F]">{textOrDash(item.phone)}</td>
+                    <td className="px-5 py-5 text-[#245C4F]">{textOrDash(item.email)}</td>
+                    <td className="px-5 py-5 font-semibold text-[#063F32]">{textOrDash(item.student_name)}</td>
+                    <td className="px-5 py-5 text-[#245C4F]">{textOrDash(item.student_age)}</td>
+                    <td className="px-5 py-5 text-[#245C4F]">{textOrDash(item.class_level)}</td>
+                    <td className="px-5 py-5 text-[#245C4F]">{textOrDash(item.city_country)}</td>
+                    <td className="px-5 py-5 text-[#245C4F]">
+                      <div className="relative inline-block">
                         <button
                           type="button"
-                          onClick={() => {
-                            setMessage("");
-                            setSelectedLead(item);
-                          }}
-                          className="rounded-full bg-[#0D5C48] px-4 py-2 text-sm font-semibold text-[#FAF7F0] transition hover:bg-[#063F32] disabled:cursor-not-allowed disabled:opacity-70"
-                          disabled={loadingId === item.id}
+                          onClick={() => setSelectedMessage((current) => (current?.id === item.id ? null : item))}
+                          className="max-w-[18rem] text-left font-medium text-[#0D5C48] underline decoration-dotted underline-offset-4 transition hover:text-[#063F32]"
                         >
-                          Details
+                          {truncate(item.message || item.notes, 64)}
                         </button>
+                        {selectedMessage?.id === item.id ? (
+                          <div className="absolute left-1/2 bottom-full z-[10000] mb-3 w-[min(32rem,calc(100vw-3rem))] -translate-x-1/2 rounded-[1.5rem] border border-[#2D8A6A]/15 bg-[#FAF7F0] p-4 shadow-[0_16px_50px_-36px_rgba(13,59,46,0.18)]">
+                            <div className="flex items-start justify-between gap-3">
+                              <div>
+                                <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#C9A227]">
+                                  Full message
+                                </p>
+                                <p className="mt-2 text-sm font-semibold text-[#063F32]">
+                                  {textOrDash(item.student_name)}
+                                </p>
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => setSelectedMessage(null)}
+                                className="rounded-xl border border-[#2D8A6A]/20 bg-white px-3 py-2 text-xs font-semibold text-[#063F32] transition hover:bg-[#F1EADC]"
+                              >
+                                Close
+                              </button>
+                            </div>
+                            <p className="mt-4 whitespace-pre-wrap break-words text-sm leading-7 text-[#245C4F]">
+                              {textOrDash(item.message || item.notes)}
+                            </p>
+                          </div>
+                        ) : null}
+                      </div>
+                    </td>
+                    <td className="px-5 py-5">
+                      <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${admissionStatusTone(item.admission_form_status)}`}>
+                        {admissionStatusLabel(item.admission_form_status || item.status)}
+                      </span>
+                      {item.admission_form_due_at && String(item.admission_form_status || item.status || "").toLowerCase() !== "submitted" ? (
+                        <p className="mt-2 text-[11px] font-medium text-[#245C4F]">
+                          Due: {formatDate(item.admission_form_due_at)}
+                        </p>
                       ) : null}
                     </td>
-                  ) : null}
-                </tr>
+                    <td className="px-5 py-5 text-sm text-[#245C4F]">{formatDate(item.created_at)}</td>
+                    {showActionsColumn ? (
+                      <td className="px-5 py-5 text-right">
+                        {showDetailsButton ? (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setMessage("");
+                              setSelectedLead(item);
+                            }}
+                            className="rounded-full bg-[#0D5C48] px-4 py-2 text-sm font-semibold text-[#FAF7F0] transition hover:bg-[#063F32] disabled:cursor-not-allowed disabled:opacity-70"
+                            disabled={loadingId === item.id}
+                          >
+                            Details
+                          </button>
+                        ) : null}
+                      </td>
+                    ) : null}
+                  </tr>
+                </Fragment>
               ))}
             </tbody>
           </table>
@@ -318,7 +359,18 @@ export default function InterestedStudentsPanel({
               <InfoCell label="Child Age" value={item.student_age} />
               <InfoCell label="Interested Level" value={item.class_level} />
               <InfoCell label="City / Country" value={item.city_country} />
-              <InfoCell label="Message" value={truncate(item.message || item.notes, 80)} />
+              <InfoCell
+                label="Message"
+                value={
+                  <button
+                    type="button"
+                    onClick={() => setSelectedMessage(item)}
+                    className="text-left font-medium text-[#0D5C48] underline decoration-dotted underline-offset-4 transition hover:text-[#063F32]"
+                  >
+                    {truncate(item.message || item.notes, 80)}
+                  </button>
+                }
+              />
               <InfoCell label="Form Status" value={admissionStatusLabel(item.admission_form_status || item.status)} />
             </dl>
 
@@ -554,6 +606,7 @@ export default function InterestedStudentsPanel({
           </div>
         </ClientPortal>
       ) : null}
+
     </>
   );
 }

@@ -31,6 +31,7 @@ async function getRoleId(roleName) {
 
 async function ensureUniqueUser(email, phone, excludeId = "") {
   let row;
+  const excludeClause = excludeId ? Prisma.sql`AND id <> ${excludeId}::uuid` : Prisma.empty;
 
   if (email && phone) {
     [row] = await prisma.$queryRaw`
@@ -40,7 +41,7 @@ async function ensureUniqueUser(email, phone, excludeId = "") {
         LOWER(email) = ${email.toLowerCase()}
         OR phone = ${phone}
       )
-      AND (${excludeId}::uuid IS NULL OR id <> ${excludeId}::uuid)
+      ${excludeClause}
       LIMIT 1
     `;
   } else if (email) {
@@ -48,7 +49,7 @@ async function ensureUniqueUser(email, phone, excludeId = "") {
       SELECT id::text AS id
       FROM users
       WHERE LOWER(email) = ${email.toLowerCase()}
-        AND (${excludeId}::uuid IS NULL OR id <> ${excludeId}::uuid)
+        ${excludeClause}
       LIMIT 1
     `;
   } else if (phone) {
@@ -56,7 +57,7 @@ async function ensureUniqueUser(email, phone, excludeId = "") {
       SELECT id::text AS id
       FROM users
       WHERE phone = ${phone}
-        AND (${excludeId}::uuid IS NULL OR id <> ${excludeId}::uuid)
+        ${excludeClause}
       LIMIT 1
     `;
   } else {

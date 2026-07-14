@@ -4,10 +4,8 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { createAuditLog } from "@/lib/auditLog";
 import { requireRole, roleGuardResponse } from "@/lib/roleGuard";
-import { ALLOWED_CLASS_LEVELS } from "@/lib/academicCatalog";
 
 const ALLOWED_ROLES = ["admin", "coordinator"];
-const CLASS_LEVELS = [...ALLOWED_CLASS_LEVELS];
 
 function json(message, status = 200, extra = {}) {
   return NextResponse.json({ message, ...extra }, { status });
@@ -37,7 +35,6 @@ async function getOptions() {
       SELECT id::text AS id, COALESCE(NULLIF(class_level, ''), title) AS title
       FROM courses
       WHERE status = 'active'
-        AND COALESCE(NULLIF(class_level, ''), title) IN (${Prisma.join(CLASS_LEVELS)})
       ORDER BY title ASC
     `,
     prisma.$queryRaw`
@@ -56,7 +53,6 @@ async function getOptions() {
       INNER JOIN courses c ON c.id = cs.course_id
       WHERE COALESCE(s.status, 'active'::user_status) = 'active'::user_status
         AND COALESCE(c.status, 'active'::user_status) = 'active'::user_status
-        AND COALESCE(NULLIF(c.class_level, ''), c.title) IN (${Prisma.join(CLASS_LEVELS)})
       ORDER BY s.name ASC
     `,
   ]);

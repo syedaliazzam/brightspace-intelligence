@@ -4,11 +4,11 @@ import { ChevronDown } from "lucide-react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import StudentTable from "@/components/coordinator/StudentTable";
 import ShowMoreSection from "@/components/coordinator/ShowMoreSection";
-import { ALLOWED_CLASS_LEVELS } from "@/lib/academicCatalog";
 import { OpenBookLoader } from "@/components/shared/AshShajrahLoaders";
 
 export default function CoordinatorStudentsPage() {
   const [state, setState] = useState({ items: [], loading: true, error: "" });
+  const [classOptions, setClassOptions] = useState([]);
   const [search, setSearch] = useState("");
   const [classLevel, setClassLevel] = useState("");
   const [classOpen, setClassOpen] = useState(false);
@@ -19,14 +19,38 @@ export default function CoordinatorStudentsPage() {
 
   const load = useCallback(async () => {
     setState((current) => ({ ...current, loading: true }));
-    const response = await fetch("/api/coordinator/students", { cache: "no-store" });
-    const data = await response.json();
+    const [studentsResponse, classesResponse] = await Promise.all([
+      fetch("/api/coordinator/students", { cache: "no-store" }),
+      fetch("/api/coordinator/classes", { cache: "no-store" }),
+    ]);
 
-    if (!response.ok) {
-      throw new Error(data?.message || "Unable to load students.");
+    const studentsData = await studentsResponse.json();
+    const classesData = await classesResponse.json().catch(() => ({}));
+
+    if (!studentsResponse.ok) {
+      throw new Error(studentsData?.message || "Unable to load students.");
     }
 
-    setState({ items: data.items || [], loading: false, error: "" });
+    if (classesResponse.ok) {
+      const items = Array.isArray(classesData?.items) ? classesData.items : [];
+      const liveClassOptions = items
+        .map((item) => String(item?.title || item?.class_level || "").trim())
+        .filter(Boolean);
+      setClassOptions(liveClassOptions);
+    }
+
+    const studentClassOptions = Array.isArray(studentsData.items)
+      ? studentsData.items
+          .map((item) => String(item?.class_level || item?.grade_level || item?.course_title || "").trim())
+          .filter(Boolean)
+      : [];
+
+    setClassOptions((current) => {
+      const combined = [...current, ...studentClassOptions];
+      return combined.filter((level, index) => combined.findIndex((item) => item.toLowerCase() === level.toLowerCase()) === index);
+    });
+
+    setState({ items: studentsData.items || [], loading: false, error: "" });
   }, []);
 
   useEffect(() => {
@@ -86,7 +110,7 @@ export default function CoordinatorStudentsPage() {
               className="w-full appearance-none rounded-2xl border border-[#2D8A6A]/25 bg-[#FAF7F0] px-4 py-3 pr-11 text-sm text-[#063F32] outline-none transition focus:border-[#2D8A6A] focus:ring-4 focus:ring-[#C9A227]/20"
             >
               <option value="">All classes</option>
-              {Array.from(ALLOWED_CLASS_LEVELS).map((level) => (
+              {classOptions.map((level) => (
                 <option key={level} value={level}>
                   {level}
                 </option>
@@ -106,7 +130,7 @@ export default function CoordinatorStudentsPage() {
         items={filteredItems}
         initialCount={7}
         step={7}
-        renderItems={(visibleItems) => <StudentTable items={visibleItems} onRefresh={load} />}
+        renderItems={(visibleItems) => <StudentTable items={visibleItems} onRefresh={load} classOptions={classOptions} />}
         emptyMessage="No student records available."
       />
       </div>
