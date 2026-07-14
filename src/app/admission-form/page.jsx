@@ -274,11 +274,64 @@ async function uploadAdmissionFormFile({ documentType, file, applicationId, vouc
     return "";
   }
 
+  const shouldCompressImage =
+    typeof window !== "undefined" &&
+    file.type.startsWith("image/") &&
+    file.size > 1024 * 1024;
+
+  async function compressImageFile(inputFile) {
+    const objectUrl = URL.createObjectURL(inputFile);
+    try {
+      const bitmap = await new Promise((resolve, reject) => {
+        const image = new Image();
+        image.onload = () => resolve(image);
+        image.onerror = reject;
+        image.src = objectUrl;
+      });
+
+      const maxSize = 1600;
+      const scale = Math.min(1, maxSize / Math.max(bitmap.width || 1, bitmap.height || 1));
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.max(1, Math.round((bitmap.width || 1) * scale));
+      canvas.height = Math.max(1, Math.round((bitmap.height || 1) * scale));
+
+      const context = canvas.getContext("2d");
+      if (!context) {
+        return inputFile;
+      }
+
+      context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+
+      const compressedBlob = await new Promise((resolve) =>
+        canvas.toBlob(
+          (blob) => resolve(blob),
+          "image/jpeg",
+          0.82
+        )
+      );
+
+      if (!compressedBlob || compressedBlob.size >= inputFile.size) {
+        return inputFile;
+      }
+
+      return new File([compressedBlob], inputFile.name.replace(/\.[^.]+$/, ".jpg"), {
+        type: "image/jpeg",
+        lastModified: Date.now(),
+      });
+    } catch {
+      return inputFile;
+    } finally {
+      URL.revokeObjectURL(objectUrl);
+    }
+  }
+
+  const uploadFile = shouldCompressImage ? await compressImageFile(file) : file;
+
   const payload = new FormData();
   payload.append("documentType", documentType);
   payload.append("applicationId", applicationId);
   if (voucherNo) payload.append("voucherNo", voucherNo);
-  payload.append("file", file);
+  payload.append("file", uploadFile);
 
   const response = await fetch("/api/public/admission-file-upload", {
     method: "POST",
