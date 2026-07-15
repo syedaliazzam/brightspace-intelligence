@@ -2,6 +2,7 @@ export const dashboardNavigation = {
   superadmin: [
     { label: "Dashboard", href: "/superadmin/dashboard" },
     { label: "Interested Students", href: "/superadmin/interested-students" },
+    { label: "Parent Interview Forms", href: "/superadmin/parent-interview-forms" },
     { label: "Admission Records", href: "/superadmin/registration-leads" },
     { label: "Fee Management", href: "/superadmin/fee-settings" },
     { label: "Payments", href: "/superadmin/payments" },
@@ -23,6 +24,7 @@ export const dashboardNavigation = {
   admin: [
     { label: "Dashboard", href: "/admin/dashboard" },
     { label: "Interested Students", href: "/admin/interested-students" },
+    { label: "Parent Interview Forms", href: "/admin/parent-interview-forms" },
     { label: "Admission Records", href: "/admin/registration-leads" },
     { label: "Payments", href: "/admin/payments" },
     { label: "Careers Applications", href: "/admin/careers-applications" },

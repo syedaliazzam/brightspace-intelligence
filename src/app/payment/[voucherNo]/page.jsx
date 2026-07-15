@@ -20,6 +20,7 @@ async function getVoucher(voucherNo) {
         fv.payment_method_id::text AS payment_method_id,
         fv.payment_method,
         fv.payment_instructions,
+        fv.payment_method_options,
         COALESCE(su.full_name, rl.student_name, item.student_name, '') AS student_name,
         COALESCE(rl.parent_name, item.parent_name, '') AS parent_name,
         COALESCE(rl.class_level, c.class_level, c.title, '') AS class_level,
@@ -39,6 +40,23 @@ async function getVoucher(voucherNo) {
   if (!item?.id) {
     return item;
   }
+
+  const availablePaymentMethods = await prisma.$queryRaw`
+    SELECT
+      pm.id::text AS id,
+      pm.name,
+      pm.method_key,
+      pm.account_title,
+      pm.account_number,
+      pm.iban,
+      pm.bank_name,
+      pm.branch_code,
+      pm.instructions,
+      LOWER(pm.status::text) AS status
+    FROM payment_methods pm
+    WHERE LOWER(pm.status::text) = 'active'
+    ORDER BY pm.name ASC
+  `;
 
   const [paymentMethod] = item.payment_method_id
     ? await prisma.$queryRaw`
@@ -63,6 +81,7 @@ async function getVoucher(voucherNo) {
   return {
     ...item,
     payment_method_details: paymentMethod || null,
+    available_payment_methods: availablePaymentMethods || [],
   };
 }
 
@@ -88,6 +107,9 @@ export default async function PaymentVoucherPage({ params }) {
     payment_method: voucher.payment_method || "",
     payment_instructions: voucher.payment_instructions || "",
     payment_method_details: voucher.payment_method_details || null,
+    available_payment_methods: Array.isArray(voucher.payment_method_options)
+      ? voucher.payment_method_options
+      : [],
     student_name: voucher.student_name || "",
     parent_name: voucher.parent_name || "",
     class_level: voucher.class_level || "",

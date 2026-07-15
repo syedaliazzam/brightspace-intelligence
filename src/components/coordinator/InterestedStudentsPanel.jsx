@@ -264,7 +264,11 @@ export default function InterestedStudentsPanel({
                           {truncate(item.message || item.notes, 64)}
                         </button>
                         {selectedMessage?.id === item.id ? (
-                          <div className="absolute left-1/2 bottom-full z-[10000] mb-3 w-[min(32rem,calc(100vw-3rem))] -translate-x-1/2 rounded-[1.5rem] border border-[#2D8A6A]/15 bg-[#FAF7F0] p-4 shadow-[0_16px_50px_-36px_rgba(13,59,46,0.18)]">
+                          <div
+                            className={`absolute left-1/2 z-[10000] w-[min(32rem,calc(100vw-3rem))] -translate-x-1/2 rounded-[1.5rem] border border-[#2D8A6A]/15 bg-[#FAF7F0] p-4 shadow-[0_16px_50px_-36px_rgba(13,59,46,0.18)] ${
+                              index === 0 ? "top-full mt-3" : "bottom-full mb-3"
+                            }`}
+                          >
                             <div className="flex items-start justify-between gap-3">
                               <div>
                                 <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#C9A227]">

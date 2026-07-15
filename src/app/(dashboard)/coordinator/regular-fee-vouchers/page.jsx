@@ -32,13 +32,12 @@ export default function RegularFeeVouchersPage() {
   const [classes, setClasses] = useState([]);
   const [history, setHistory] = useState([]);
   const [paymentMethods, setPaymentMethods] = useState([]);
-  const [form, setForm] = useState({ classId: "", dueDate: "", monthLabel: "", baseAmount: "", lateFeeAmount: "", paymentMethodId: "" });
+  const [form, setForm] = useState({ classId: "", dueDate: "", monthLabel: "", baseAmount: "", paymentMethodId: "" });
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [detailItem, setDetailItem] = useState(null);
   const [classOpen, setClassOpen] = useState(false);
-  const [paymentOpen, setPaymentOpen] = useState(false);
 
   async function load() {
     setLoading(true);
@@ -63,11 +62,19 @@ export default function RegularFeeVouchersPage() {
     return () => window.clearTimeout(timer);
   }, []);
 
-  const selectedClass = useMemo(() => classes.find((item) => item.id === form.classId), [classes, form.classId]);
+  useEffect(() => {
+    if (!paymentMethods.length) return;
+    if (form.paymentMethodId) return;
+    const firstMethod = paymentMethods[0];
+    if (!firstMethod?.id) return;
+    setForm((current) => (current.paymentMethodId ? current : { ...current, paymentMethodId: firstMethod.id }));
+  }, [paymentMethods, form.paymentMethodId]);
 
   function closeSelectState(setter) {
     window.setTimeout(() => setter(false), 0);
   }
+
+  const selectedClass = useMemo(() => classes.find((item) => item.id === form.classId), [classes, form.classId]);
 
   function handleClassChange(value) {
     const nextClass = classes.find((item) => item.id === value) || null;
@@ -90,7 +97,7 @@ export default function RegularFeeVouchersPage() {
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data?.message || "Unable to create vouchers.");
-      setForm({ classId: "", dueDate: "", monthLabel: "", baseAmount: "", lateFeeAmount: "", paymentMethodId: "" });
+      setForm({ classId: "", dueDate: "", monthLabel: "", baseAmount: "", paymentMethodId: "" });
       await load();
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : "Unable to create vouchers.");
@@ -121,7 +128,15 @@ export default function RegularFeeVouchersPage() {
             <label className="block">
               <span className="mb-2 block text-sm font-medium text-[#245C4F]">Class</span>
               <div className="relative">
-                <select value={form.classId} onMouseDown={() => setClassOpen((current) => !current)} onFocus={() => setClassOpen(true)} onBlur={() => closeSelectState(setClassOpen)} onChange={(e) => handleClassChange(e.target.value)} className="w-full appearance-none rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 pr-11 text-sm text-[#063F32] outline-none transition focus:border-[#2D8A6A] focus:bg-white focus:ring-4 focus:ring-[#FFF5D6]" required>
+                <select
+                  value={form.classId}
+                  onMouseDown={() => setClassOpen((current) => !current)}
+                  onFocus={() => setClassOpen(true)}
+                  onBlur={() => closeSelectState(setClassOpen)}
+                  onChange={(e) => handleClassChange(e.target.value)}
+                  className="w-full appearance-none rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 pr-11 text-sm text-[#063F32] outline-none transition focus:border-[#2D8A6A] focus:bg-white focus:ring-4 focus:ring-[#FFF5D6]"
+                  required
+                >
                   <option value="">Select class</option>
                   {classes.map((item) => (
                     <option key={item.id} value={item.id}>
@@ -130,7 +145,11 @@ export default function RegularFeeVouchersPage() {
                     </option>
                   ))}
                 </select>
-                <ChevronDown className={`pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#0D5C48] transition-transform duration-200 ${classOpen ? "rotate-180" : "rotate-0"}`} />
+                <ChevronDown
+                  className={`pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#0D5C48] transition-transform duration-200 ${
+                    classOpen ? "rotate-180" : "rotate-0"
+                  }`}
+                />
               </div>
             </label>
             <label className="block">
@@ -145,33 +164,36 @@ export default function RegularFeeVouchersPage() {
               <span className="mb-2 block text-sm font-medium text-[#245C4F]">Monthly fee</span>
               <input type="number" min="1" value={form.baseAmount} readOnly className="w-full rounded-2xl border border-[#2D8A6A]/20 bg-[#F1EADC] px-4 py-3 text-sm text-[#063F32]" required />
             </label>
-            <label className="block">
-              <span className="mb-2 block text-sm font-medium text-[#245C4F]">Late fee</span>
-              <input type="number" min="0" value={form.lateFeeAmount} onChange={(e) => setForm((c) => ({ ...c, lateFeeAmount: e.target.value }))} className="w-full rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 text-sm text-[#063F32] outline-none transition focus:border-[#2D8A6A] focus:bg-white focus:ring-4 focus:ring-[#FFF5D6]" />
-            </label>
-            <label className="block">
-              <span className="mb-2 block text-sm font-medium text-[#245C4F]">Bank / Payment Method</span>
-              <div className="relative">
-                <select
-                  value={form.paymentMethodId}
-                  onMouseDown={() => setPaymentOpen((current) => !current)}
-                  onFocus={() => setPaymentOpen(true)}
-                  onBlur={() => closeSelectState(setPaymentOpen)}
-                  onChange={(e) => setForm((c) => ({ ...c, paymentMethodId: e.target.value }))}
-                  className="w-full appearance-none rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 pr-11 text-sm text-[#063F32] outline-none transition focus:border-[#2D8A6A] focus:bg-white focus:ring-4 focus:ring-[#FFF5D6]"
-                  required
-                >
-                  <option value="">Select bank</option>
-                  {paymentMethods.map((method) => (
-                    <option key={method.id} value={method.id}>
-                      {method.name}
-                      {method.bank_name ? ` - ${method.bank_name}` : ""}
-                    </option>
-                  ))}
-                </select>
-                <ChevronDown className={`pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#0D5C48] transition-transform duration-200 ${paymentOpen ? "rotate-180" : "rotate-0"}`} />
+            <div className="md:col-span-2">
+              <p className="mb-3 block text-sm font-medium text-[#245C4F]">Bank / Payment Method</p>
+                <div className="grid gap-3 [@media(min-width:600px)]:grid-cols-2">
+                {paymentMethods.map((method) => {
+                  return (
+                      <button
+                        key={method.id}
+                        type="button"
+                        onClick={() => setForm((current) => ({ ...current, paymentMethodId: method.id }))}
+                        className="rounded-2xl border border-[#0D5C48] bg-[#EAF6EF] px-4 py-4 text-left shadow-[0_12px_32px_-22px_rgba(13,92,72,0.35)] transition hover:bg-[#EFF9F1]"
+                      >
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-semibold text-[#063F32]">{method.name}</p>
+                          {method.bank_name ? <p className="mt-1 text-xs text-[#245C4F]">Bank: {method.bank_name}</p> : null}
+                        </div>
+                      </div>
+                      <div className="mt-3 space-y-1 text-xs text-[#245C4F]">
+                        {method.account_title ? <p><span className="font-medium text-[#063F32]">Account title:</span> {method.account_title}</p> : null}
+                        {method.account_number ? <p><span className="font-medium text-[#063F32]">Account number:</span> {method.account_number}</p> : null}
+                        {method.iban ? <p><span className="font-medium text-[#063F32]">IBAN:</span> {method.iban}</p> : null}
+                        {method.branch_code ? <p><span className="font-medium text-[#063F32]">Branch code:</span> {method.branch_code}</p> : null}
+                        {method.instructions ? <p><span className="font-medium text-[#063F32]">Instructions:</span> {method.instructions}</p> : null}
+                      </div>
+                    </button>
+                  );
+                })}
               </div>
-            </label>
+              {!paymentMethods.length ? <p className="mt-2 text-sm text-[#245C4F]">No payment methods available.</p> : null}
+            </div>
             <div className="flex items-end justify-start">
               <button type="submit" disabled={submitting || !selectedClass} className="rounded-2xl bg-[#0D5C48] px-5 py-3 text-sm font-semibold text-[#FAF7F0] transition hover:bg-[#063F32] disabled:opacity-60">{submitting ? "Generating..." : "Generate vouchers"}</button>
             </div>

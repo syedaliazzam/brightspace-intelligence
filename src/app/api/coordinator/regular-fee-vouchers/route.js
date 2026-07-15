@@ -147,6 +147,17 @@ async function getPaymentMethods() {
   `;
 }
 
+async function getTableColumns(tableName) {
+  const rows = await prisma.$queryRaw`
+    SELECT column_name
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = ${tableName}
+  `;
+
+  return new Set(rows.map((row) => String(row.column_name || "").toLowerCase()));
+}
+
 export async function GET() {
   try {
     await requireRole(ALLOWED_ROLES);
@@ -171,11 +182,10 @@ export async function POST(request) {
     const dueDate = normalizeText(body?.dueDate);
     const monthLabel = normalizeText(body?.monthLabel);
     const baseAmount = Number(body?.baseAmount || 0);
-    const lateFeeAmount = Number(body?.lateFeeAmount || 0);
+    const lateFeeAmount = 0;
     const paymentMethodId = normalizeText(body?.paymentMethodId);
 
     if (!classId) return json("Class is required.", 400);
-    if (!dueDate) return json("Due date is required.", 400);
     if (!Number.isFinite(baseAmount) || baseAmount <= 0) return json("Base monthly fee is required.", 400);
 
     const [classRow] = await prisma.$queryRaw`
@@ -214,6 +224,17 @@ export async function POST(request) {
     const batchNo = `RFB-${new Date().getFullYear()}${String(new Date().getMonth() + 1).padStart(2, "0")}-${String(Date.now()).slice(-6)}`;
     const createdRows = [];
     const emailJobs = [];
+    const voucherColumns = await getTableColumns("fee_vouchers");
+    const paymentMethodSnapshot = paymentMethods.map((method) => ({
+      id: String(method.id || ""),
+      name: String(method.name || ""),
+      bank_name: method.bank_name || null,
+      account_title: method.account_title || null,
+      account_number: method.account_number || null,
+      iban: method.iban || null,
+      branch_code: method.branch_code || null,
+      instructions: method.instructions || null,
+    }));
 
     await prisma.$transaction(async (tx) => {
       let voucherSequence = await getNextVoucherSequence(tx, new Date());
@@ -229,15 +250,33 @@ export async function POST(request) {
       for (const student of students) {
         const voucherNo = `${getVoucherPrefix(new Date())}-${padSequence(voucherSequence)}`;
         voucherSequence += 1;
-        const [voucher] = await tx.$queryRaw(Prisma.sql`
+        const paymentMethodColumnFragment = voucherColumns.has("payment_method_id")
+          ? Prisma.sql`, "payment_method_id"`
+          : Prisma.empty;
+        const paymentMethodValueFragment = voucherColumns.has("payment_method_id")
+          ? Prisma.sql`, ${paymentMethodId || null}::uuid`
+          : Prisma.empty;
+        const paymentMethodOptionsColumnFragment = voucherColumns.has("payment_method_options")
+          ? Prisma.sql`, "payment_method_options"`
+          : Prisma.empty;
+        const paymentMethodOptionsValueFragment = voucherColumns.has("payment_method_options")
+          ? Prisma.sql`, ${JSON.stringify(paymentMethodSnapshot)}::jsonb`
+          : Prisma.empty;
+
+        const [voucher] = await tx.$queryRaw`
           INSERT INTO fee_vouchers (
-            id, voucher_no, registration_id, amount, due_date, status, payment_method_id, payment_instructions, created_at, updated_at
-          )
-          VALUES (
-            gen_random_uuid(), ${voucherNo}, NULL, ${baseAmount}, ${dueDate}::date, 'unpaid'::voucher_status, ${paymentMethodId || null}::uuid, NULL, NOW(), NOW()
+            "id", "voucher_no", "registration_id", "amount", "due_date", "status"
+            ${paymentMethodColumnFragment}
+            ${paymentMethodOptionsColumnFragment},
+            "payment_instructions", "created_at", "updated_at"
+          ) VALUES (
+            gen_random_uuid(), ${voucherNo}, NULL, ${baseAmount}, ${dueDate}::date, 'unpaid'::voucher_status
+            ${paymentMethodValueFragment}
+            ${paymentMethodOptionsValueFragment},
+            NULL, NOW(), NOW()
           )
           RETURNING id::text AS id
-        `);
+        `;
 
         await tx.$executeRaw`
           INSERT INTO regular_monthly_fee_voucher_items (

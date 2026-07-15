@@ -35,6 +35,7 @@ export default function StudentTable({ items = [], onRefresh, classOptions = [] 
   const [editingItem, setEditingItem] = useState(null);
   const [detailItem, setDetailItem] = useState(null);
   const [deleteItem, setDeleteItem] = useState(null);
+  const [formError, setFormError] = useState("");
   const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
   const [classOpen, setClassOpen] = useState(false);
@@ -77,12 +78,14 @@ export default function StudentTable({ items = [], onRefresh, classOptions = [] 
   function openEdit(item) {
     setEditingItem(item);
     setForm(buildFormState(item));
+    setFormError("");
   }
 
   function closeEdit() {
     if (saving) return;
     setEditingItem(null);
     setForm(EMPTY_FORM);
+    setFormError("");
   }
 
   function closeSelectState() {
@@ -103,9 +106,10 @@ export default function StudentTable({ items = [], onRefresh, classOptions = [] 
       if (!response.ok) throw new Error(data?.message || "Unable to update student.");
       setEditingItem(null);
       setForm(EMPTY_FORM);
+      setFormError("");
       onRefresh?.();
     } catch (error) {
-      window.alert(error.message || "Unable to update student.");
+      setFormError(error instanceof Error ? error.message : "Unable to update student.");
     } finally {
       setSaving(false);
     }
@@ -261,6 +265,24 @@ export default function StudentTable({ items = [], onRefresh, classOptions = [] 
               </button>
             </div>
 
+            {formError ? (
+              <div className="mx-6 mt-5 rounded-[1.5rem] border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 shadow-[0_14px_30px_-24px_rgba(225,29,72,0.25)]">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-rose-600">Update blocked</p>
+                    <p className="mt-1 font-medium">{formError}</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setFormError("")}
+                    className="rounded-xl border border-rose-200 bg-white px-3 py-2 text-xs font-semibold text-rose-700 transition hover:bg-rose-100"
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+            ) : null}
+
             <form onSubmit={submitEdit} className="px-6 py-6">
               <div className="grid gap-4 md:grid-cols-2">
                 <label className="space-y-2">
@@ -395,7 +417,7 @@ export default function StudentTable({ items = [], onRefresh, classOptions = [] 
               </button>
               <button
                 type="button"
-                onClick={() => confirmArchive().catch((error) => window.alert(error.message))}
+                onClick={() => confirmArchive().catch((error) => setFormError(error instanceof Error ? error.message : "Unable to archive student."))}
                 className="rounded-2xl bg-rose-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-rose-700"
               >
                 Delete
