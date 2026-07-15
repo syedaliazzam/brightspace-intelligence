@@ -189,3 +189,30 @@ export async function PATCH(request) {
     return json(error instanceof Error ? error.message : "Unable to update payment method.", 500);
   }
 }
+
+export async function DELETE(request) {
+  const authState = await requireAdminSession();
+  if (authState.error) return authState.error;
+
+  try {
+    if (!(await tableExists("payment_methods"))) {
+      return json("Payment method table is not available yet.", 400);
+    }
+
+    const { searchParams } = new URL(request.url);
+    const id = normalizeText(searchParams.get("id"));
+
+    if (!id) {
+      return json("Payment method id is required.", 400);
+    }
+
+    await prisma.$executeRaw`
+      DELETE FROM payment_methods
+      WHERE id = ${id}::uuid
+    `;
+
+    return json("Payment method deleted.");
+  } catch (error) {
+    return json(error instanceof Error ? error.message : "Unable to delete payment method.", 500);
+  }
+}

@@ -99,10 +99,18 @@ export default function AdminFeeSettingsPage() {
   const [regularFees, setRegularFees] = useState([]);
   const [otherFees, setOtherFees] = useState([]);
   const [paymentMethods, setPaymentMethods] = useState([]);
+  const [discounts, setDiscounts] = useState([]);
+  const [coordinatorMaxDiscountPercent, setCoordinatorMaxDiscountPercent] = useState(20);
   const [classLevels, setClassLevels] = useState([]);
   const [settings, setSettings] = useState([]);
   const [drafts, setDrafts] = useState({});
   const [forms, setForms] = useState(EMPTY_FORM);
+  const [otherDiscountId, setOtherDiscountId] = useState("");
+  const [otherBaseAmount, setOtherBaseAmount] = useState("");
+  const [deletingOtherFeeId, setDeletingOtherFeeId] = useState("");
+  const [deleteOtherFeeTarget, setDeleteOtherFeeTarget] = useState(null);
+  const [deletingPaymentMethodId, setDeletingPaymentMethodId] = useState("");
+  const [deletePaymentMethodTarget, setDeletePaymentMethodTarget] = useState(null);
   const [editing, setEditing] = useState({
     regular: "",
     other: "",
@@ -112,6 +120,7 @@ export default function AdminFeeSettingsPage() {
   const [regularClassOpen, setRegularClassOpen] = useState(false);
   const [regularStatusOpen, setRegularStatusOpen] = useState(false);
   const [otherStatusOpen, setOtherStatusOpen] = useState(false);
+  const [otherDiscountOpen, setOtherDiscountOpen] = useState(false);
   const [paymentStatusOpen, setPaymentStatusOpen] = useState(false);
 
   function closeSelectState(setter) {
@@ -142,25 +151,36 @@ export default function AdminFeeSettingsPage() {
     [finance, loading]
   );
 
+  const selectedOtherDiscount = useMemo(
+    () => discounts.find((item) => item.id === otherDiscountId) || null,
+    [discounts, otherDiscountId]
+  );
+  const otherDiscountPercent = Number(selectedOtherDiscount?.percent || 0);
+  const otherAmountBase = Number(otherBaseAmount || forms.other.amount || 0);
+  const otherDiscountAmount = otherAmountBase * (otherDiscountPercent / 100);
+  const otherFinalAmount = Math.max(otherAmountBase - otherDiscountAmount, 0);
+
   async function loadAll() {
     setLoading(true);
     setError("");
 
     try {
-      const [feeSettingsRes, regularRes, otherRes, paymentRes, classLevelsRes] = await Promise.all([
+      const [feeSettingsRes, regularRes, otherRes, paymentRes, classLevelsRes, publicOptionsRes] = await Promise.all([
         fetch("/api/admin/fee-settings", { cache: "no-store" }),
         fetch("/api/admin/regular-fees", { cache: "no-store" }),
         fetch("/api/admin/other-fees", { cache: "no-store" }),
         fetch("/api/admin/payment-methods", { cache: "no-store" }),
         fetch("/api/admin/class-levels", { cache: "no-store" }),
+        fetch("/api/public/admission-form-options", { cache: "no-store" }),
       ]);
 
-      const [feeSettingsData, regularData, otherData, paymentData, classLevelsData] = await Promise.all([
+      const [feeSettingsData, regularData, otherData, paymentData, classLevelsData, publicOptionsData] = await Promise.all([
         feeSettingsRes.json(),
         regularRes.json(),
         otherRes.json(),
         paymentRes.json(),
         classLevelsRes.json(),
+        publicOptionsRes.json(),
       ]);
 
       if (!feeSettingsRes.ok) throw new Error(feeSettingsData?.message || "Unable to load fee settings.");
@@ -199,6 +219,8 @@ export default function AdminFeeSettingsPage() {
       setRegularFees(regularData.items || []);
       setOtherFees(otherData.items || []);
       setPaymentMethods(paymentData.items || []);
+      setDiscounts(Array.isArray(publicOptionsData?.discounts) ? publicOptionsData.discounts : []);
+      setCoordinatorMaxDiscountPercent(Number(publicOptionsData?.coordinatorMaxDiscountPercent || 20));
       setClassLevels((classLevelsData.items || []).filter((item) => item.class_level));
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : "Unable to load fee management data.");
@@ -250,6 +272,8 @@ export default function AdminFeeSettingsPage() {
           status: item.status || "active",
         },
       }));
+      setOtherDiscountId("");
+      setOtherBaseAmount(String(item.amount ?? ""));
     }
 
     if (section === "payment") {
@@ -284,7 +308,14 @@ export default function AdminFeeSettingsPage() {
         payment: "/api/admin/payment-methods",
       };
       const isEditing = Boolean(editing[section]);
-      const payload = forms[section];
+      const payload = { ...forms[section] };
+
+      if (section === "other") {
+        delete payload.discount_id;
+        delete payload.discount_percent;
+        delete payload.discount_amount;
+        delete payload.net_amount;
+      }
 
       const response = await fetch(endpointMap[section], {
         method: isEditing ? "PATCH" : "POST",
@@ -298,12 +329,70 @@ export default function AdminFeeSettingsPage() {
       if (!response.ok) throw new Error(data?.message || "Unable to save record.");
 
       setForms((current) => ({ ...current, [section]: EMPTY_FORM[section] }));
+      if (section === "other") {
+        setOtherDiscountId("");
+        setOtherBaseAmount("");
+      }
       setEditing((current) => ({ ...current, [section]: "" }));
       await loadAll();
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : "Unable to save record.");
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function deleteOtherFee(id) {
+    if (!id) return;
+    setDeleteOtherFeeTarget(otherFees.find((item) => item.id === id) || { id });
+  }
+
+  async function confirmDeleteOtherFee() {
+    const id = deleteOtherFeeTarget?.id;
+    if (!id) return;
+
+    setDeleteOtherFeeTarget(null);
+    setDeletingOtherFeeId(id);
+    setError("");
+
+    try {
+      const response = await fetch(`/api/admin/other-fees?id=${encodeURIComponent(id)}`, {
+        method: "DELETE",
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data?.message || "Unable to delete other fee.");
+      await loadAll();
+    } catch (deleteError) {
+      setError(deleteError instanceof Error ? deleteError.message : "Unable to delete other fee.");
+    } finally {
+      setDeletingOtherFeeId("");
+    }
+  }
+
+  async function deletePaymentMethod(id) {
+    if (!id) return;
+    setDeletePaymentMethodTarget(paymentMethods.find((item) => item.id === id) || { id });
+  }
+
+  async function confirmDeletePaymentMethod() {
+    const id = deletePaymentMethodTarget?.id;
+    if (!id) return;
+
+    setDeletePaymentMethodTarget(null);
+    setDeletingPaymentMethodId(id);
+    setError("");
+
+    try {
+      const response = await fetch(`/api/admin/payment-methods?id=${encodeURIComponent(id)}`, {
+        method: "DELETE",
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data?.message || "Unable to delete payment method.");
+      await loadAll();
+    } catch (deleteError) {
+      setError(deleteError instanceof Error ? deleteError.message : "Unable to delete payment method.");
+    } finally {
+      setDeletingPaymentMethodId("");
     }
   }
 
@@ -409,8 +498,10 @@ export default function AdminFeeSettingsPage() {
               <tr className="text-left text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]">
                 <th className="px-6 py-4">Class</th>
                 <th className="px-6 py-4">Name</th>
-                <th className="px-6 py-4">Amount</th>
-                <th className="px-6 py-4">Status</th>
+	                <th className="px-6 py-4">Amount</th>
+	                <th className="px-6 py-4">Discount</th>
+	                <th className="px-6 py-4">Final</th>
+	                <th className="px-6 py-4">Status</th>
                 <th className="px-6 py-4">Actions</th>
               </tr>
             </thead>
@@ -419,8 +510,16 @@ export default function AdminFeeSettingsPage() {
                 <tr key={rowKey(item, index)} className={tableRowClass}>
                   <td className="px-4 py-3 text-sm">{item.class_level || "—"}</td>
                   <td className="px-4 py-3 text-sm">{item.name || item.title || "—"}</td>
-                  <td className="px-4 py-3 text-sm">PKR {money(item.amount)}</td>
-                  <td className="px-4 py-3 text-sm">{item.status || "active"}</td>
+	                  <td className="px-4 py-3 text-sm">PKR {money(item.amount)}</td>
+	                  <td className="px-4 py-3 text-sm">{item.discount_percent ? `${Number(item.discount_percent)}%` : "—"}</td>
+	                  <td className="px-4 py-3 text-sm">
+	                    PKR {money(
+	                      typeof item.net_amount !== "undefined" && item.net_amount !== null
+	                        ? item.net_amount
+	                        : Number(item.amount || 0) - Number(item.discount_amount || 0)
+	                    )}
+	                  </td>
+	                  <td className="px-4 py-3 text-sm">{item.status || "active"}</td>
                   <td className="px-6 py-5 align-top text-sm text-[#245C4F]">
                     <button type="button" className={actionButtonClass} onClick={() => startEdit("regular", item)}>Edit</button>
                   </td>
@@ -454,7 +553,46 @@ export default function AdminFeeSettingsPage() {
             <input className={fieldClass} placeholder="Fee title" value={forms.other.name} onChange={(event) => updateForm("other", "name", event.target.value)} />
             <input className={fieldClass} placeholder="Fee type" value={forms.other.fee_type} onChange={(event) => updateForm("other", "fee_type", event.target.value)} />
             <input className={fieldClass} placeholder="Class level (optional)" value={forms.other.class_level} onChange={(event) => updateForm("other", "class_level", event.target.value)} />
-            <input type="number" min="0" step="0.01" className={fieldClass} placeholder="Amount" value={forms.other.amount} onChange={(event) => updateForm("other", "amount", event.target.value)} />
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              className={fieldClass}
+              placeholder="Amount"
+              value={forms.other.amount}
+              onChange={(event) => {
+                const nextAmount = event.target.value;
+                setOtherBaseAmount(nextAmount);
+                updateForm("other", "amount", nextAmount);
+              }}
+            />
+            <div className="relative md:col-span-2">
+              <select
+                className={selectClass}
+                value={otherDiscountId}
+                onMouseDown={() => setOtherDiscountOpen((current) => !current)}
+                onFocus={() => setOtherDiscountOpen(true)}
+                onBlur={() => closeSelectState(setOtherDiscountOpen)}
+                onChange={(event) => {
+                  const selectedDiscount = discounts.find((item) => item.id === event.target.value);
+                  setOtherDiscountId(event.target.value);
+                  const baseAmount = Number(otherBaseAmount || forms.other.amount || 0);
+                  const percent = Number(selectedDiscount?.percent || 0);
+                  const nextAmount = Math.max(baseAmount - baseAmount * (percent / 100), 0);
+                  updateForm("other", "amount", nextAmount ? nextAmount.toFixed(2) : "0.00");
+                }}
+              >
+                <option value="">No discount selected</option>
+                {discounts
+                  .filter((discount) => Number(discount.percent || 0) <= coordinatorMaxDiscountPercent)
+                  .map((discount) => (
+                    <option key={discount.id} value={discount.id}>
+                      {discount.label}
+                    </option>
+                  ))}
+              </select>
+              <ChevronDown className={`pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#0D5C48] transition-transform duration-200 ${otherDiscountOpen ? "rotate-180" : "rotate-0"}`} />
+            </div>
             <textarea rows={3} className={`${fieldClass} md:col-span-4`} placeholder="Description" value={forms.other.description} onChange={(event) => updateForm("other", "description", event.target.value)} />
             <div className="relative md:col-span-1">
               <select className={selectClass} value={forms.other.status} onMouseDown={() => setOtherStatusOpen((current) => !current)} onFocus={() => setOtherStatusOpen(true)} onBlur={() => closeSelectState(setOtherStatusOpen)} onChange={(event) => updateForm("other", "status", event.target.value)}>
@@ -475,10 +613,27 @@ export default function AdminFeeSettingsPage() {
                 )}
               </button>
               {editing.other ? (
-                <button type="button" className="rounded-2xl border border-[#2D8A6A]/18 bg-[linear-gradient(180deg,rgba(255,255,255,0.94)_0%,rgba(250,247,240,0.98)_100%)] px-4 py-3 text-sm font-semibold text-[#063F32] transition hover:border-[#C9A227]/35 hover:bg-[#FFF5D6]" onClick={() => { setEditing((current) => ({ ...current, other: "" })); setForms((current) => ({ ...current, other: EMPTY_FORM.other })); }}>
+                <button type="button" className="rounded-2xl border border-[#2D8A6A]/18 bg-[linear-gradient(180deg,rgba(255,255,255,0.94)_0%,rgba(250,247,240,0.98)_100%)] px-4 py-3 text-sm font-semibold text-[#063F32] transition hover:border-[#C9A227]/35 hover:bg-[#FFF5D6]" onClick={() => { setEditing((current) => ({ ...current, other: "" })); setForms((current) => ({ ...current, other: EMPTY_FORM.other })); setOtherDiscountId(""); setOtherBaseAmount(""); }}>
                   Cancel
                 </button>
               ) : null}
+            </div>
+            <div className="grid gap-3 rounded-[1.5rem] border border-[#2D8A6A]/12 bg-white/70 p-4 md:col-span-4 md:grid-cols-3">
+              <div className="rounded-2xl bg-[#EAF6EF] p-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]">Discount</p>
+                <p className="mt-2 text-2xl font-bold text-[#063F32]">{otherDiscountPercent ? `${otherDiscountPercent}%` : "No discount selected"}</p>
+                <p className="mt-1 text-sm text-[#245C4F]">Allowed discounts are limited to coordinator-approved values up to {coordinatorMaxDiscountPercent}%.</p>
+              </div>
+              <div className="rounded-2xl bg-[#FFF5D6] p-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8A6B00]">Discount amount</p>
+                <p className="mt-2 text-2xl font-bold text-[#8A6B00]">PKR {money(otherDiscountAmount)}</p>
+                <p className="mt-1 text-sm text-[#6B5500]">Applied on the base other fee amount.</p>
+              </div>
+              <div className="rounded-2xl bg-[#F1EADC] p-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#245C4F]">Final amount</p>
+                <p className="mt-2 text-2xl font-bold text-[#063F32]">PKR {money(otherFinalAmount)}</p>
+                <p className="mt-1 text-sm text-[#245C4F]">Base amount minus discount.</p>
+              </div>
             </div>
           </form>
         </div>
@@ -505,7 +660,17 @@ export default function AdminFeeSettingsPage() {
                   <td className="px-4 py-3 text-sm">PKR {money(item.amount)}</td>
                   <td className="px-4 py-3 text-sm">{item.status || "active"}</td>
                   <td className="px-6 py-5 align-top text-sm text-[#245C4F]">
-                    <button type="button" className={actionButtonClass} onClick={() => startEdit("other", item)}>Edit</button>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button type="button" className={actionButtonClass} onClick={() => startEdit("other", item)}>Edit</button>
+                      <button
+                        type="button"
+                        className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700 transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60"
+                        onClick={() => deleteOtherFee(item.id)}
+                        disabled={deletingOtherFeeId === item.id}
+                      >
+                        {deletingOtherFeeId === item.id ? "Deleting..." : "Delete"}
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -589,7 +754,17 @@ export default function AdminFeeSettingsPage() {
                   <td className="px-4 py-3 text-sm">{item.account_number || item.account_title || "—"}</td>
                   <td className="px-4 py-3 text-sm">{item.status || "active"}</td>
                   <td className="px-6 py-5 align-top text-sm text-[#245C4F]">
-                    <button type="button" className={actionButtonClass} onClick={() => startEdit("payment", item)}>Edit</button>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button type="button" className={actionButtonClass} onClick={() => startEdit("payment", item)}>Edit</button>
+                      <button
+                        type="button"
+                        className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700 transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60"
+                        onClick={() => deletePaymentMethod(item.id)}
+                        disabled={deletingPaymentMethodId === item.id}
+                      >
+                        {deletingPaymentMethodId === item.id ? "Deleting..." : "Delete"}
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -752,6 +927,99 @@ export default function AdminFeeSettingsPage() {
             )}
           </div>
         </section>
+
+        {deleteOtherFeeTarget ? (
+          <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-[#063F32]/45 px-4">
+            <div className="w-full max-w-lg rounded-[2rem] border border-[#2D8A6A]/15 bg-[#FAF7F0] p-6 shadow-[0_24px_80px_-36px_rgba(13,59,46,0.24)]">
+              <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-[#C9A227]">Delete other fee</p>
+              <h2 className="mt-3 text-2xl font-bold tracking-tight text-[#063F32]">Remove this fee row?</h2>
+              <p className="mt-3 text-sm leading-7 text-[#245C4F]">
+                This action will permanently delete{" "}
+                <span className="font-semibold text-[#063F32]">
+                  {deleteOtherFeeTarget.name || deleteOtherFeeTarget.title || "this other fee"}
+                </span>
+                . You can not undo this after deletion.
+              </p>
+
+              <div className="mt-6 rounded-[1.5rem] border border-[#2D8A6A]/15 bg-white p-4 text-sm text-[#245C4F]">
+                <p>
+                  <span className="font-semibold text-[#063F32]">Type:</span> {deleteOtherFeeTarget.fee_type || "—"}
+                </p>
+                <p className="mt-1">
+                  <span className="font-semibold text-[#063F32]">Class:</span> {deleteOtherFeeTarget.class_level || "—"}
+                </p>
+                <p className="mt-1">
+                  <span className="font-semibold text-[#063F32]">Amount:</span> PKR {money(deleteOtherFeeTarget.amount)}
+                </p>
+              </div>
+
+              <div className="mt-6 flex flex-wrap justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setDeleteOtherFeeTarget(null)}
+                  className="rounded-full border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-2 text-sm font-semibold text-[#063F32] transition hover:bg-[#F1EADC]"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void confirmDeleteOtherFee()}
+                  disabled={deletingOtherFeeId === deleteOtherFeeTarget.id}
+                  className="rounded-full bg-rose-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-70"
+                >
+                  {deletingOtherFeeId === deleteOtherFeeTarget.id ? "Deleting..." : "Delete fee"}
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+        {deletePaymentMethodTarget ? (
+          <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-[#063F32]/45 px-4">
+            <div className="w-full max-w-lg rounded-[2rem] border border-[#2D8A6A]/15 bg-[#FAF7F0] p-6 shadow-[0_24px_80px_-36px_rgba(13,59,46,0.24)]">
+              <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-[#C9A227]">Delete payment method</p>
+              <h2 className="mt-3 text-2xl font-bold tracking-tight text-[#063F32]">Remove this payment method?</h2>
+              <p className="mt-3 text-sm leading-7 text-[#245C4F]">
+                This action will permanently delete{" "}
+                <span className="font-semibold text-[#063F32]">
+                  {deletePaymentMethodTarget.name || "this payment method"}
+                </span>
+                . You can not undo this after deletion.
+              </p>
+
+              <div className="mt-6 rounded-[1.5rem] border border-[#2D8A6A]/15 bg-white p-4 text-sm text-[#245C4F]">
+                <p>
+                  <span className="font-semibold text-[#063F32]">Method key:</span> {deletePaymentMethodTarget.method_key || "—"}
+                </p>
+                <p className="mt-1">
+                  <span className="font-semibold text-[#063F32]">Account:</span>{" "}
+                  {deletePaymentMethodTarget.account_number || deletePaymentMethodTarget.account_title || "—"}
+                </p>
+                <p className="mt-1">
+                  <span className="font-semibold text-[#063F32]">Status:</span> {deletePaymentMethodTarget.status || "active"}
+                </p>
+              </div>
+
+              <div className="mt-6 flex flex-wrap justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setDeletePaymentMethodTarget(null)}
+                  className="rounded-full border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-2 text-sm font-semibold text-[#063F32] transition hover:bg-[#F1EADC]"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void confirmDeletePaymentMethod()}
+                  disabled={deletingPaymentMethodId === deletePaymentMethodTarget.id}
+                  className="rounded-full bg-rose-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-70"
+                >
+                  {deletingPaymentMethodId === deletePaymentMethodTarget.id ? "Deleting..." : "Delete method"}
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null}
       </div>
     </div>
   );

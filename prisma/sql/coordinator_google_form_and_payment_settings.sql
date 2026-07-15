@@ -80,6 +80,10 @@ CREATE TABLE IF NOT EXISTS other_fee (
   fee_type TEXT NOT NULL,
   class_level TEXT,
   amount NUMERIC(12,2) NOT NULL DEFAULT 0,
+  discount_id UUID,
+  discount_percent NUMERIC(5,2),
+  discount_amount NUMERIC(12,2),
+  net_amount NUMERIC(12,2),
   status TEXT NOT NULL DEFAULT 'active',
   created_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
