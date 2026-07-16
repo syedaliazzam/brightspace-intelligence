@@ -3,6 +3,7 @@
 import { Fragment, useEffect, useMemo, useState } from "react";
 import ClientPortal from "@/components/shared/ClientPortal";
 import PaginationControls from "@/components/teacher/PaginationControls";
+import { CheckCircle2, CircleDashed, Send, FileCheck2, ClipboardList } from "lucide-react";
 
 const PAGE_SIZE = 7;
 
@@ -23,15 +24,19 @@ function statusLabel(value) {
 
 function admissionStatusLabel(value) {
   const normalized = String(value || "").toLowerCase();
-  if (!normalized) return "Pending";
-  if (normalized === "registered") return "Submitted";
+  if (!normalized || normalized === "pending") return "New Registrations";
+  if (normalized === "sent") return "Admission Form Sent";
+  if (normalized === "reminded") return "Reminder Sent";
+  if (normalized === "overdue") return "Overdue";
+  if (normalized === "not_submitted") return "Form Not Submitted";
+  if (normalized === "submitted" || normalized === "registered") return "Form Submitted";
   if (normalized === "not_submitted") return "Not Submitted";
   return statusLabel(normalized);
 }
 
 function admissionStatusTone(value) {
   const normalized = String(value || "").toLowerCase();
-  if (["submitted", "sent", "registered"].includes(normalized)) return "bg-[#EAF6EF] text-[#0D5C48]";
+  if (["submitted", "sent", "registered", "pending"].includes(normalized)) return "bg-[#EAF6EF] text-[#0D5C48]";
   if (["reminded"].includes(normalized)) return "bg-[#FFF5D6] text-[#8A6A00]";
   if (["overdue", "not_submitted", "failed"].includes(normalized)) return "bg-rose-50 text-rose-700";
   return "bg-[#EAF6EF] text-[#0D5C48]";
@@ -63,6 +68,7 @@ export default function InterestedStudentsPanel({
   onRefresh,
   showDetailsButton = true,
   showActionsColumn = true,
+  showFlowColumn = false,
 }) {
   const [page, setPage] = useState(1);
   const [selectedLead, setSelectedLead] = useState(null);
@@ -162,6 +168,34 @@ export default function InterestedStudentsPanel({
     setPreviewPaymentInstructions("");
   }, [selectedLead]);
 
+  function getLeadStage(item) {
+    const status = String(item.admission_form_status || item.status || "pending").toLowerCase();
+    return {
+      status,
+      sent: Boolean(item.admission_form_sent_at) || ["sent", "reminded", "submitted", "overdue", "not_submitted"].includes(status),
+      submitted: Boolean(item.admission_form_submitted_at) || status === "submitted" || status === "registered",
+      reminded: Boolean(item.admission_form_last_reminder_at) || status === "reminded",
+      overdue: status === "overdue",
+    };
+  }
+
+  function FlowStep({ active, done, icon: Icon, label }) {
+    return (
+      <div
+        className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[11px] font-semibold ${
+          done
+            ? "border-[#2D8A6A]/20 bg-[#EAF6EF] text-[#0D5C48]"
+            : active
+              ? "border-[#E4C766]/50 bg-[#FFF5D6] text-[#8A6B00]"
+              : "border-[#2D8A6A]/10 bg-white text-[#245C4F]"
+        }`}
+      >
+        <Icon className="h-3.5 w-3.5" strokeWidth={2.2} />
+        <span>{label}</span>
+      </div>
+    );
+  }
+
   async function sendAdmissionForm(item) {
     if (!item?.id) return;
 
@@ -228,6 +262,7 @@ export default function InterestedStudentsPanel({
               <tr className="text-left text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]">
                 <th className="px-6 py-4">#</th>
                 <th className="px-6 py-4">Parent / Guardian</th>
+                <th className="px-6 py-4">Form Status</th>
                 <th className="px-6 py-4">WhatsApp Number</th>
                 <th className="px-6 py-4">Email Address</th>
                 <th className="px-6 py-4">Child Name</th>
@@ -235,7 +270,7 @@ export default function InterestedStudentsPanel({
                 <th className="px-6 py-4">Interested Level</th>
                 <th className="px-6 py-4">City / Country</th>
                 <th className="px-6 py-4">Message</th>
-                <th className="px-6 py-4">Form Status</th>
+                {showFlowColumn ? <th className="px-6 py-4">Flow</th> : null}
                 <th className="px-6 py-4">Created At</th>
                 {showActionsColumn ? <th className="px-6 py-4 text-right">Action</th> : null}
               </tr>
@@ -248,6 +283,16 @@ export default function InterestedStudentsPanel({
                       {String((currentPage - 1) * PAGE_SIZE + index + 1).padStart(2, "0")}
                     </td>
                     <td className="px-5 py-5 text-[#063F32]">{textOrDash(item.parent_name)}</td>
+                    <td className="px-5 py-5">
+                      <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${admissionStatusTone(item.admission_form_status)}`}>
+                        {admissionStatusLabel(item.admission_form_status || item.status)}
+                      </span>
+                      {item.admission_form_due_at && String(item.admission_form_status || item.status || "").toLowerCase() !== "submitted" ? (
+                        <p className="mt-2 text-[11px] font-medium text-[#245C4F]">
+                          Due: {formatDate(item.admission_form_due_at)}
+                        </p>
+                      ) : null}
+                    </td>
                     <td className="px-5 py-5 text-[#245C4F]">{textOrDash(item.phone)}</td>
                     <td className="px-5 py-5 text-[#245C4F]">{textOrDash(item.email)}</td>
                     <td className="px-5 py-5 font-semibold text-[#063F32]">{textOrDash(item.student_name)}</td>
@@ -293,16 +338,21 @@ export default function InterestedStudentsPanel({
                         ) : null}
                       </div>
                     </td>
-                    <td className="px-5 py-5">
-                      <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${admissionStatusTone(item.admission_form_status)}`}>
-                        {admissionStatusLabel(item.admission_form_status || item.status)}
-                      </span>
-                      {item.admission_form_due_at && String(item.admission_form_status || item.status || "").toLowerCase() !== "submitted" ? (
-                        <p className="mt-2 text-[11px] font-medium text-[#245C4F]">
-                          Due: {formatDate(item.admission_form_due_at)}
-                        </p>
-                      ) : null}
-                    </td>
+                    {showFlowColumn ? (
+                      <td className="px-5 py-5">
+                        {(() => {
+                          const stage = getLeadStage(item);
+                          return (
+                            <div className="flex flex-wrap gap-2">
+                              <FlowStep active={!stage.sent} done={stage.sent} icon={stage.sent ? CheckCircle2 : CircleDashed} label="Registration" />
+                              <FlowStep active={stage.sent && !stage.submitted} done={stage.submitted} icon={Send} label="Interview / Form Sent" />
+                              <FlowStep active={stage.submitted && !stage.overdue} done={stage.submitted} icon={FileCheck2} label="Form Submitted" />
+                              <FlowStep active={stage.overdue} done={!stage.overdue && stage.status === "sent"} icon={ClipboardList} label="Next Admission Step" />
+                            </div>
+                          );
+                        })()}
+                      </td>
+                    ) : null}
                     <td className="px-5 py-5 text-sm text-[#245C4F]">{formatDate(item.created_at)}</td>
                     {showActionsColumn ? (
                       <td className="px-5 py-5 text-right">
