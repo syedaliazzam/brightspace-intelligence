@@ -19,6 +19,10 @@ export async function GET(request) {
       ? childId ? "WHERE sp.id = $1::uuid" : ""
       : childId ? "WHERE pp.user_id = $1::uuid AND sp.id = $2::uuid" : "WHERE pp.user_id = $1::uuid";
     const values = isAdmin ? childId ? [childId] : [] : childId ? [session.user.id, childId] : [session.user.id];
+    const visibilityFilter = "COALESCE(ls.status::text, '') = 'verified_by_coordinator'";
+    const whereClause = where
+      ? `${where} AND ${visibilityFilter}`
+      : `WHERE ${visibilityFilter}`;
 
     const rows = await prisma.$queryRawUnsafe(
       `
@@ -40,7 +44,7 @@ export async function GET(request) {
       LEFT JOIN lecture_schedules ls ON ls.id = la.lecture_id
       LEFT JOIN subjects sub ON sub.id = ls.subject_id
       ${joins}
-      ${where}
+      ${whereClause}
       ORDER BY COALESCE(ls.scheduled_start, la.created_at) DESC
       `,
       ...values

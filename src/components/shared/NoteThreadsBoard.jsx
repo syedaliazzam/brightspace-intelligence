@@ -106,8 +106,8 @@ function SelectField({ value, onChange, onFocus, onBlur, className = "", childre
   );
 }
 
-export default function NoteThreadsBoard({ mode = "viewer", lectures = [], portalTargetId }) {
-  const canReply = mode === "teacher" || mode === "admin" || mode === "parent" || mode === "student";
+export default function NoteThreadsBoard({ mode = "viewer", lectures = [], portalTargetId, allowReply = true }) {
+  const canReply = allowReply && (mode === "teacher" || mode === "admin" || mode === "parent" || mode === "student");
   const [threads, setThreads] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");

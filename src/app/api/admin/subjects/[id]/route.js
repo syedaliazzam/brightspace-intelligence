@@ -207,3 +207,67 @@ export async function PATCH(request, { params }) {
     );
   }
 }
+
+export async function DELETE(_request, { params }) {
+  const authState = await requireAdminSession();
+
+  if (authState.error) {
+    return authState.error;
+  }
+
+  try {
+    if (!(await tableExists("subjects"))) {
+      return json("Subjects table is not available yet.", 400);
+    }
+
+    const { id } = await params;
+    const subjectId = String(id || "").trim();
+
+    if (!subjectId) {
+      return json("Subject id is required.", 400);
+    }
+
+    const [existing] = await prisma.$queryRaw`
+      SELECT
+        s.id::text AS id,
+        COALESCE(s.name, 'Subject') AS name
+      FROM subjects s
+      WHERE s.id = ${subjectId}::uuid
+      LIMIT 1
+    `;
+
+    if (!existing?.id) {
+      return json("Subject not found.", 404);
+    }
+
+    await prisma.$transaction(async (tx) => {
+      if (await tableExists("course_subjects")) {
+        await tx.$executeRaw`
+          DELETE FROM course_subjects
+          WHERE subject_id = ${subjectId}::uuid
+        `;
+      }
+
+      await tx.$executeRaw`
+        DELETE FROM subjects
+        WHERE id = ${subjectId}::uuid
+      `;
+
+      await insertAuditLog(
+        authState.session.user.id,
+        subjectId,
+        "subject_deleted",
+        `Subject ${existing.name} deleted by admin.`,
+        {},
+        tx
+      );
+    });
+
+    return json("Subject deleted.", 200, { id: subjectId });
+  } catch (error) {
+    return json(
+      error instanceof Error ? error.message : "Unable to delete subject.",
+      500
+    );
+  }
+}

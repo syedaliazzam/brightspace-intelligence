@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import PaginationControls from "@/components/teacher/PaginationControls";
 import { OpenBookLoader } from "@/components/shared/AshShajrahLoaders";
@@ -24,9 +24,18 @@ export default function AdminDataTable({
   loading = false,
   loadingTitle = "Loading data",
   loadingSubtitle = "Preparing the table...",
+  resetKey = "",
 }) {
   const effectiveActions = actions;
   const [page, setPage] = useState(1);
+
+  useEffect(() => {
+    setPage(1);
+  }, [rows]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [resetKey]);
 
   const totalPages = Math.max(1, Math.ceil(rows.length / pageSize));
   const currentPage = Math.min(Math.max(1, page), totalPages);

@@ -27,6 +27,13 @@ async function ensureLeaveEnumValue() {
   `;
 }
 
+async function ensurePendingAttendanceColumn() {
+  await prisma.$executeRaw`
+    ALTER TABLE lecture_schedules
+    ADD COLUMN IF NOT EXISTS pending_student_attendance JSONB
+  `;
+}
+
 function baseLectureConditions(teacherId, classLevel, subjectId) {
   const conditions = ["ls.status::text = 'completed_by_teacher'"];
   const values = [];
@@ -53,6 +60,7 @@ export async function GET(request) {
   try {
     const session = await requireRole(ALLOWED_ROLES);
     const teacherId = await getTeacherId(session);
+    await ensurePendingAttendanceColumn();
     const { searchParams } = new URL(request.url);
     const classLevel = String(searchParams.get("classLevel") || "").trim();
     const subjectId = String(searchParams.get("subjectId") || "").trim();
@@ -94,6 +102,7 @@ export async function GET(request) {
           ls.scheduled_start::text AS scheduled_start,
           ls.scheduled_end::text AS scheduled_end,
           ls.status::text AS status,
+          ls.pending_student_attendance,
           sub.name AS subject_name,
           c.class_level
         FROM lecture_schedules ls
@@ -130,6 +139,7 @@ export async function GET(request) {
           ls.scheduled_end::text AS scheduled_end,
           ls.status::text AS status,
           ls.enrollment_id::text AS enrollment_id,
+          ls.pending_student_attendance,
           e.course_id::text AS course_id,
           c.class_level,
           sub.id::text AS subject_id,
@@ -148,6 +158,14 @@ export async function GET(request) {
       selectedLecture = lecture || null;
 
       if (selectedLecture?.course_id) {
+        const pendingRows = Array.isArray(selectedLecture.pending_student_attendance)
+          ? selectedLecture.pending_student_attendance
+          : [];
+        const pendingMap = new Map(
+          pendingRows
+            .map((row) => [String(row?.studentUserId || row?.student_user_id || "").trim(), row])
+            .filter(([key]) => key)
+        );
         students = await prisma.$queryRaw`
           SELECT DISTINCT
             sp.id::text AS student_id,
@@ -169,6 +187,16 @@ export async function GET(request) {
             AND LOWER(e2.status) = 'active'
           ORDER BY sort_key ASC, su.full_name ASC
         `;
+
+        students = students.map((row) => {
+          const pending = pendingMap.get(String(row.user_id || "").trim());
+          if (!pending) return row;
+          return {
+            ...row,
+            status: String(pending.status || row.status || "absent").toLowerCase(),
+            source: "manual",
+          };
+        });
       }
     }
 
@@ -189,6 +217,7 @@ export async function POST(request) {
   try {
     const session = await requireRole(ALLOWED_ROLES);
     await ensureLeaveEnumValue();
+    await ensurePendingAttendanceColumn();
     const body = await request.json();
     const lectureId = String(body?.lectureId || "").trim();
     const records = Array.isArray(body?.students) ? body.students : [];
@@ -217,46 +246,34 @@ export async function POST(request) {
 
     if (!lecture?.id) return json("Lecture not found.", 404);
 
-    await prisma.$transaction(async (tx) => {
-      for (const row of records) {
+    const pendingAttendance = records
+      .map((row) => {
         const studentUserId = String(row?.studentUserId || "").trim();
         const status = String(row?.status || "").trim().toLowerCase();
-        if (!studentUserId || !VALID_STATUS.has(status)) continue;
-        await tx.$executeRaw`
-          INSERT INTO lecture_attendance (
-            id,
-            lecture_id,
-            user_id,
-            role_type,
-            source,
-            status,
-            created_at,
-            updated_at
-          )
-          VALUES (
-            gen_random_uuid(),
-            ${lectureId}::uuid,
-            ${studentUserId}::uuid,
-            'student',
-            'manual'::attendance_source,
-            ${status}::attendance_status,
-            NOW(),
-            NOW()
-          )
-          ON CONFLICT (lecture_id, user_id)
-          DO UPDATE SET
-            status = EXCLUDED.status,
-            source = 'manual'::attendance_source,
+        if (!studentUserId || !VALID_STATUS.has(status)) return null;
+        return {
+          studentUserId,
+          status,
+          roleType: "student",
+          source: "manual",
+        };
+      })
+      .filter(Boolean);
+
+    await prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`
+        UPDATE lecture_schedules
+        SET pending_student_attendance = ${JSON.stringify(pendingAttendance)}::jsonb,
             updated_at = NOW()
-        `;
-      }
+        WHERE id = ${lectureId}::uuid
+      `;
       await tx.$executeRaw`
         INSERT INTO audit_logs (id, actor_user_id, action, entity_type, entity_id, created_at)
         VALUES (gen_random_uuid(), ${session.user.id}::uuid, 'manual_attendance_saved', 'lecture_schedules', ${lectureId}::uuid, NOW())
       `;
     });
 
-    return json("Attendance saved.", 200);
+    return json("Attendance saved for coordinator approval.", 200, { pending_count: pendingAttendance.length });
   } catch (error) {
     const guard = roleGuardResponse(error);
     return guard || json(error instanceof Error ? error.message : "Unable to save attendance.", 500);

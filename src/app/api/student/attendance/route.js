@@ -38,7 +38,7 @@ export async function GET() {
         )
         LEFT JOIN lecture_attendance la ON la.lecture_id = ls.id AND la.user_id = sp.user_id
         WHERE sp.user_id = ${session.user.id}::uuid
-          AND ls.status::text IN ('completed_by_teacher', 'verified_by_coordinator')
+          AND ls.status::text = 'verified_by_coordinator'
       `,
       prisma.$queryRaw`
         SELECT
@@ -70,7 +70,7 @@ export async function GET() {
         INNER JOIN users tu ON tu.id = tp.user_id
         LEFT JOIN lecture_attendance la ON la.lecture_id = ls.id AND la.user_id = sp.user_id
         WHERE sp.user_id = ${session.user.id}::uuid
-          AND ls.status::text IN ('completed_by_teacher', 'verified_by_coordinator')
+          AND ls.status::text = 'verified_by_coordinator'
         ORDER BY ls.scheduled_start DESC
       `
     ]);

@@ -235,7 +235,7 @@ async function getUsers(search, role, status, classLevel = "") {
       rl.device_available,
       rl.school_expectations,
       pp.id::text AS parent_profile_id,
-      COALESCE(rl.parent_name, parent_user.full_name, '') AS parent_name,
+      COALESCE(primary_parent_user.full_name, rl.parent_name, '') AS parent_name,
       CASE
         WHEN LOWER(COALESCE(pp.relation, '')) IN ('', 'parent')
           THEN COALESCE(NULLIF(latest_registration.parent_relation, ''), COALESCE(pp.relation, ''))
@@ -254,15 +254,13 @@ async function getUsers(search, role, status, classLevel = "") {
     LEFT JOIN student_parents spp ON spp.parent_id = pp.id
     LEFT JOIN student_profiles linked_sp ON linked_sp.id = spp.student_id
     LEFT JOIN users su ON su.id = linked_sp.user_id
-    LEFT JOIN LATERAL (
-      SELECT u_parent.full_name
-      FROM student_parents spp_parent
-      INNER JOIN parent_profiles pp_parent ON pp_parent.id = spp_parent.parent_id
-      INNER JOIN users u_parent ON u_parent.id = pp_parent.user_id
-      WHERE spp_parent.student_id = sp.id
-      ORDER BY spp_parent.is_primary DESC, u_parent.full_name ASC
-      LIMIT 1
-    ) parent_user ON TRUE
+    LEFT JOIN student_parents spp_primary
+      ON spp_primary.student_id = sp.id
+     AND spp_primary.is_primary = TRUE
+    LEFT JOIN parent_profiles pp_primary
+      ON pp_primary.id = spp_primary.parent_id
+    LEFT JOIN users primary_parent_user
+      ON primary_parent_user.id = pp_primary.user_id
     LEFT JOIN LATERAL (
       SELECT rl.parent_relation
       FROM student_parents spp_latest
@@ -273,7 +271,7 @@ async function getUsers(search, role, status, classLevel = "") {
       LIMIT 1
       ) latest_registration ON TRUE
     ${whereClause}
-    GROUP BY u.id, u.username, u.full_name, u.email, u.phone, sp.id, sp.admission_no, sp.age, sp.status, sp.grade_level, c.title, rl.student_name, rl.parent_name, rl.parent_relation, rl.program_name, rl.current_school, rl.current_grade, rl.gender, rl.date_of_birth, rl.city_country, rl.nationality, rl.religion, rl.preferred_language, rl.child_profile, rl.child_strengths, rl.child_support_needs, rl.child_special_interests, rl.developmental_concern, rl.developmental_concern_details, rl.medical_conditions, rl.support_person_during_learning, rl.device_available, rl.school_expectations, pp.id, pp.relation, latest_registration.parent_relation, parent_user.full_name, u.status, r.name
+    GROUP BY u.id, u.username, u.full_name, u.email, u.phone, sp.id, sp.admission_no, sp.age, sp.status, sp.grade_level, c.title, rl.student_name, rl.parent_name, rl.parent_relation, rl.program_name, rl.current_school, rl.current_grade, rl.gender, rl.date_of_birth, rl.city_country, rl.nationality, rl.religion, rl.preferred_language, rl.child_profile, rl.child_strengths, rl.child_support_needs, rl.child_special_interests, rl.developmental_concern, rl.developmental_concern_details, rl.medical_conditions, rl.support_person_during_learning, rl.device_available, rl.school_expectations, pp.id, pp.relation, latest_registration.parent_relation, primary_parent_user.full_name, u.status, r.name
     ${orderClause}
   `;
 }

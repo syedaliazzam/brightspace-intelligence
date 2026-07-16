@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { sendEmail } from "@/lib/email";
+import { sendEmail, themedEmailShell } from "@/lib/email";
 import { sendWhatsAppText } from "@/lib/whatsapp";
 
 function json(message, status = 200, extra = {}) {
@@ -78,6 +78,22 @@ export async function GET(request) {
 
       const subject = `Admission form reminder for ${studentName}`;
       const text = `Assalamualaikum ${parentName},\n\nThis is a reminder to complete the Ash-Shajrah Learning Hub (ALH) admission form for ${studentName}.\n\nClass: ${row.class_level || "-"}\nMessage: ${row.message || "-"}\n\nOpen the form:\n${formLink}`;
+      const html = themedEmailShell({
+        eyebrow: "Admission Form Reminder",
+        title: "Please complete the admission form",
+        intro: `Assalamualaikum ${parentName}. This is a reminder to complete the Ash-Shajrah Learning Hub (ALH) admission form for ${studentName}.`,
+        rows: [
+          ["Student", studentName],
+          ["Class", row.class_level || "-"],
+          ["Message", row.message || "-"],
+        ],
+        bodyBlocks: [
+          `<div style="padding:16px;border:1px solid #2D8A6A;border-radius:18px;background:#fffaf0;"><p style="margin:0;line-height:1.8;color:#245C4F;font-size:15px;">Please complete the admission form as soon as possible to avoid delays in processing.</p></div>`,
+        ],
+        buttonLabel: "Open Admission Form",
+        buttonUrl: formLink,
+        footerNote: `If the button does not work, open this link in your browser: ${formLink}`,
+      });
 
       try {
         if (isValidEmail(row.email)) {
@@ -85,7 +101,7 @@ export async function GET(request) {
             to: row.email,
             subject,
             text,
-            html: `<div style="font-family:Arial,sans-serif;background:#f8fafc;padding:24px;color:#0f172a;"><div style="max-width:640px;margin:0 auto;background:#fff;border:1px solid #e2e8f0;border-radius:20px;padding:24px;"><p style="margin:0 0 12px;font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:#0D5C48;font-weight:700;">Admission form reminder</p><p style="margin:0 0 16px;">Assalamualaikum ${parentName}, please complete the admission form for <strong>${studentName}</strong>.</p><p style="margin:0;"><a href="${formLink}" style="display:inline-block;background:#0D5C48;color:#fff;text-decoration:none;padding:12px 18px;border-radius:12px;font-weight:700;">Open Admission Form</a></p></div></div>`,
+            html,
           });
         }
 

@@ -27,7 +27,7 @@ export default function AdminNotesPage() {
           </div>
         </section>
 
-        <NoteThreadsBoard mode="admin" portalTargetId="admin-page-portal-root" />
+        <NoteThreadsBoard mode="admin" allowReply={!isSuperAdminPortal} portalTargetId="admin-page-portal-root" />
       </div>
     </div>
   );

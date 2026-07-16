@@ -20,6 +20,10 @@ async function ensureLectureVerificationColumns() {
     ALTER TABLE lecture_schedules
     ADD COLUMN IF NOT EXISTS google_meet_sync_meta JSONB
   `;
+  await prisma.$executeRaw`
+    ALTER TABLE lecture_schedules
+    ADD COLUMN IF NOT EXISTS pending_student_attendance JSONB
+  `;
 }
 
 async function getLectureDetails(id) {
@@ -40,6 +44,7 @@ async function getLectureDetails(id) {
       ls.google_meet_link,
       ls.recording_drive_url,
       ls.google_meet_sync_meta,
+      ls.pending_student_attendance,
       COALESCE(NULLIF(c.class_level, ''), NULLIF(c.title, ''), 'Class') AS course_title,
       sub.name AS subject_name,
       cu.id::text AS coordinator_user_id,
@@ -122,6 +127,21 @@ async function getLectureDetails(id) {
       AND LOWER(e2.status::text) = 'active'
     ORDER BY COALESCE(NULLIF(LOWER(TRIM(su.username)), ''), LOWER(TRIM(su.full_name))), su.full_name ASC
   `;
+  const pendingRows = Array.isArray(lecture.pending_student_attendance) ? lecture.pending_student_attendance : [];
+  const pendingMap = new Map(
+    pendingRows
+      .map((row) => [String(row?.studentUserId || row?.student_user_id || "").trim(), row])
+      .filter(([key]) => key)
+  );
+  const mergedRoster = roster.map((row) => {
+    const pending = pendingMap.get(String(row.user_id || "").trim());
+    if (!pending) return row;
+    return {
+      ...row,
+      status: String(pending.status || row.status || "absent").toLowerCase(),
+      source: "manual",
+    };
+  });
 
   const [teacherRows] = await Promise.all([
     prisma.$queryRaw`
@@ -159,11 +179,11 @@ async function getLectureDetails(id) {
       duration_minutes: lecture.coordinator_duration_minutes,
       status: lecture.coordinator_attendance_status,
     },
-    student_attendance_rows: roster || [],
-    total_students_count: roster.length || 0,
-    joined_students_count: roster.filter((row) => ["present", "partial"].includes(String(row.status || "").toLowerCase())).length,
-    absent_students_count: roster.filter((row) => String(row.status || "").toLowerCase() === "absent").length,
-    attendance_rows: roster || [],
+    student_attendance_rows: mergedRoster || [],
+    total_students_count: mergedRoster.length || 0,
+    joined_students_count: mergedRoster.filter((row) => ["present", "partial"].includes(String(row.status || "").toLowerCase())).length,
+    absent_students_count: mergedRoster.filter((row) => String(row.status || "").toLowerCase() === "absent").length,
+    attendance_rows: mergedRoster || [],
     unmatched_participants: [],
   };
 }
@@ -265,9 +285,44 @@ export async function PATCH(request, context) {
           studentDurationMinutes: Number(lecture.student_duration_minutes || 0),
         });
 
+        const pendingAttendance = Array.isArray(lecture.pending_student_attendance) ? lecture.pending_student_attendance : [];
+        for (const row of pendingAttendance) {
+          const studentUserId = String(row?.studentUserId || row?.student_user_id || "").trim();
+          const status = String(row?.status || "").trim().toLowerCase();
+          if (!studentUserId || !["present", "absent", "leave"].includes(status)) continue;
+          await tx.$executeRaw`
+            INSERT INTO lecture_attendance (
+              id,
+              lecture_id,
+              user_id,
+              role_type,
+              source,
+              status,
+              created_at,
+              updated_at
+            )
+            VALUES (
+              gen_random_uuid(),
+              ${id}::uuid,
+              ${studentUserId}::uuid,
+              'student',
+              'manual'::attendance_source,
+              ${status}::attendance_status,
+              NOW(),
+              NOW()
+            )
+            ON CONFLICT (lecture_id, user_id)
+            DO UPDATE SET
+              status = EXCLUDED.status,
+              source = 'manual'::attendance_source,
+              updated_at = NOW()
+          `;
+        }
+
         await tx.$executeRaw`
           UPDATE lecture_schedules
           SET status = 'verified_by_coordinator'::lecture_status,
+              pending_student_attendance = NULL,
               updated_at = NOW()
           WHERE id = ${id}::uuid
         `;

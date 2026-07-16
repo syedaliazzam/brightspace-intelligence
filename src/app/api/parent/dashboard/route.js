@@ -95,14 +95,14 @@ export async function GET(request) {
                AND LOWER(status) = 'active'
            )
          )
-         WHERE ls.status::text IN ('completed_by_teacher','verified_by_coordinator')) AS attended_lectures,
+         WHERE ls.status::text = 'verified_by_coordinator') AS attended_lectures,
         (SELECT COUNT(*)::int
          FROM lecture_attendance la
          INNER JOIN student_profiles sp ON sp.user_id = la.user_id
          INNER JOIN allowed_students a ON a.id = sp.id
          WHERE LOWER(la.status::text) = 'present') AS present_lectures,
         (SELECT COUNT(*)::int FROM homework h INNER JOIN allowed_students a ON a.id = h.student_id WHERE COALESCE(h.status::text, 'pending') = 'pending') AS pending_homework,
-        COALESCE((SELECT ROUND(100.0 * COUNT(*) FILTER (WHERE la.status::text = 'present') / NULLIF(COUNT(*), 0))::int FROM lecture_attendance la INNER JOIN student_profiles sp ON sp.user_id = la.user_id INNER JOIN allowed_students a ON a.id = sp.id), 0) AS attendance_percentage,
+        COALESCE((SELECT ROUND(100.0 * COUNT(*) FILTER (WHERE la.status::text = 'present') / NULLIF(COUNT(*), 0))::int FROM lecture_attendance la INNER JOIN student_profiles sp ON sp.user_id = la.user_id INNER JOIN allowed_students a ON a.id = sp.id INNER JOIN lecture_schedules ls ON ls.id = la.lecture_id AND ls.status::text = 'verified_by_coordinator'), 0) AS attendance_percentage,
         COALESCE((
           SELECT COALESCE(fs.status::text, fv.status::text, 'not_available')
           FROM allowed_students a

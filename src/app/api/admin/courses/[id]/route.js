@@ -249,3 +249,65 @@ export async function PATCH(request, { params }) {
     );
   }
 }
+
+export async function DELETE(_request, { params }) {
+  const authState = await requireAdminSession();
+
+  if (authState.error) {
+    return authState.error;
+  }
+
+  try {
+    if (!(await tableExists("courses"))) {
+      return json("Courses table is not available yet.", 400);
+    }
+
+    const { id } = await params;
+    const courseId = String(id || "").trim();
+
+    if (!courseId) {
+      return json("Class id is required.", 400);
+    }
+
+    const [existing] = await prisma.$queryRaw`
+      SELECT
+        c.id::text AS id,
+        COALESCE(c.title, c.class_level, 'Class') AS name
+      FROM courses c
+      WHERE c.id = ${courseId}::uuid
+      LIMIT 1
+    `;
+
+    if (!existing?.id) {
+      return json("Class not found.", 404);
+    }
+
+    await prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`
+        DELETE FROM course_subjects
+        WHERE course_id = ${courseId}::uuid
+      `;
+
+      await tx.$executeRaw`
+        DELETE FROM courses
+        WHERE id = ${courseId}::uuid
+      `;
+
+      await insertAuditLog(
+        authState.session.user.id,
+        courseId,
+        "course_deleted",
+        `Class ${existing.name} deleted by admin.`,
+        {},
+        tx
+      );
+    });
+
+    return json("Class deleted.", 200, { id: courseId });
+  } catch (error) {
+    return json(
+      error instanceof Error ? error.message : "Unable to delete class.",
+      500
+    );
+  }
+}

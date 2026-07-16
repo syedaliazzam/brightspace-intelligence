@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
-import { sendEmail } from "@/lib/email";
+import { sendEmail, themedEmailShell } from "@/lib/email";
 
 function json(message, status = 200, extra = {}) {
   return NextResponse.json({ message, ...extra }, { status });
@@ -59,23 +59,32 @@ export async function GET(request) {
 
       if (!to) continue;
 
+      const voucherUrl = `${portalBase}/payment/${encodeURIComponent(item.voucher_no)}`;
+      const reminderHtml = themedEmailShell({
+        eyebrow: "Monthly Fee Reminder",
+        title: "Your monthly fee is due soon",
+        intro: `Assalamualaikum ${item.parent_name || item.student_name || "Parent"}, your monthly fee voucher will be due on ${formatDate(item.due_date)}.`,
+        rows: [
+          ["Voucher No", item.voucher_no],
+          ["Class", item.class_title || "-"],
+          ["Amount", `PKR ${Number(item.base_amount || 0).toLocaleString("en-PK")}`],
+          ...(Number(item.late_fee_amount || 0) > 0
+            ? [["Late Fee", `PKR ${Number(item.late_fee_amount || 0).toLocaleString("en-PK")}`]]
+            : []),
+        ],
+        bodyBlocks: [
+          `<div style="padding:16px;border:1px solid #2D8A6A;border-radius:18px;background:#fffaf0;"><p style="margin:0;line-height:1.8;color:#245C4F;font-size:15px;">Please submit payment to continue LMS access.</p></div>`,
+        ],
+        buttonLabel: "Open Voucher",
+        buttonUrl: voucherUrl,
+        footerNote: `If the button does not work, open this link in your browser: ${voucherUrl}`,
+      });
+
       await sendEmail({
         to,
         subject: `Monthly fee reminder for ${item.class_title || "your class"}`,
-        html: `
-          <div style="font-family:Arial,sans-serif;background:#f8fafc;padding:24px;color:#0f172a;">
-            <div style="max-width:720px;margin:0 auto;background:#fff;border:1px solid #e2e8f0;border-radius:20px;padding:24px;">
-              <p style="margin:0 0 12px;font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:#0284c7;font-weight:700;">Monthly fee reminder</p>
-              <h2 style="margin:0 0 16px;">Your monthly fee is due soon</h2>
-              <p style="margin:0 0 16px;">Assalamualaikum ${item.parent_name || item.student_name || "Parent"}, your monthly fee voucher will be due on <strong>${formatDate(item.due_date)}</strong>.</p>
-              <p style="margin:0 0 16px;">Voucher No: <strong>${item.voucher_no}</strong></p>
-              <p style="margin:0 0 16px;">Amount: <strong>PKR ${Number(item.base_amount || 0).toLocaleString("en-PK")}</strong>${Number(item.late_fee_amount || 0) > 0 ? ` + late fee PKR ${Number(item.late_fee_amount || 0).toLocaleString("en-PK")}` : ""}</p>
-              <p style="margin:0 0 16px;">Please submit payment to continue LMS access.</p>
-              <p style="margin:0;"><a href="${portalBase}/payment/${encodeURIComponent(item.voucher_no)}" style="display:inline-block;background:#0f172a;color:#fff;text-decoration:none;padding:12px 18px;border-radius:12px;font-weight:700;">Open Voucher</a></p>
-            </div>
-          </div>
-        `,
-        text: `Monthly fee reminder\n\nVoucher No: ${item.voucher_no}\nDue Date: ${formatDate(item.due_date)}\nPlease submit payment to continue LMS access.\n\nOpen Voucher: ${portalBase}/payment/${encodeURIComponent(item.voucher_no)}`,
+        html: reminderHtml,
+        text: `Monthly fee reminder\n\nVoucher No: ${item.voucher_no}\nDue Date: ${formatDate(item.due_date)}\nAmount: PKR ${Number(item.base_amount || 0).toLocaleString("en-PK")}\n${Number(item.late_fee_amount || 0) > 0 ? `Late Fee: PKR ${Number(item.late_fee_amount || 0).toLocaleString("en-PK")}\n` : ""}Please submit payment to continue LMS access.\n\nOpen Voucher: ${voucherUrl}`,
       });
       sent += 1;
     }

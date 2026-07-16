@@ -17,7 +17,7 @@ function isValidPhone(value) {
 async function getLatestMonthlyVoucherBlockForStudent(studentId) {
   const [row] = await prisma.$queryRaw`
     SELECT
-      item.voucher_no,
+      fv.voucher_no,
       item.due_date,
       COALESCE(fs.status::text, fv.status::text, 'unpaid') AS status
     FROM regular_monthly_fee_voucher_items item
@@ -36,7 +36,7 @@ async function getLatestMonthlyVoucherBlockForStudent(studentId) {
 async function getLatestMonthlyVoucherBlockForParent(userId) {
   const [row] = await prisma.$queryRaw`
     SELECT
-      item.voucher_no,
+      fv.voucher_no,
       item.due_date,
       COALESCE(fs.status::text, fv.status::text, 'unpaid') AS status
     FROM regular_monthly_fee_voucher_items item

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { ChevronDown } from "lucide-react";
 
@@ -27,6 +27,7 @@ export default function RegistrationLeadFilters({
   const [search, setSearch] = useState(initialSearch);
   const [status, setStatus] = useState(initialStatus);
   const [statusOpen, setStatusOpen] = useState(false);
+  const searchTimerRef = useRef(null);
   const [syncState, setSyncState] = useState({
     pending: false,
     message: "",
@@ -37,6 +38,14 @@ export default function RegistrationLeadFilters({
     setSearch(initialSearch);
     setStatus(initialStatus);
   }, [initialSearch, initialStatus]);
+
+  useEffect(() => {
+    return () => {
+      if (searchTimerRef.current) {
+        window.clearTimeout(searchTimerRef.current);
+      }
+    };
+  }, []);
 
   function replaceWithHash(nextParams) {
     const hash = typeof window !== "undefined" ? window.location.hash : "";
@@ -49,6 +58,7 @@ export default function RegistrationLeadFilters({
   function applyFilters(nextSearch, nextStatus) {
     const params = new URLSearchParams(searchParams.toString());
     const normalizedStatus = String(nextStatus || "").trim();
+    const hasPage = params.has("page");
 
     if (nextSearch) {
       params.set("search", nextSearch);
@@ -61,6 +71,11 @@ export default function RegistrationLeadFilters({
     } else {
       params.set("status", "all");
     }
+
+    if (hasPage) {
+      params.delete("page");
+    }
+
     startTransition(() => {
       replaceWithHash(params);
       onFilterChange?.({ search: nextSearch, status: normalizedStatus || "all" });
@@ -120,9 +135,23 @@ export default function RegistrationLeadFilters({
             <input
               type="text"
               value={search}
-              onChange={(event) => setSearch(event.target.value)}
+              onChange={(event) => {
+                const nextSearch = event.target.value;
+                setSearch(nextSearch);
+
+                if (searchTimerRef.current) {
+                  window.clearTimeout(searchTimerRef.current);
+                }
+
+                searchTimerRef.current = window.setTimeout(() => {
+                  applyFilters(nextSearch.trim(), status);
+                }, 220);
+              }}
               onKeyDown={(event) => {
                 if (event.key === "Enter") {
+                  if (searchTimerRef.current) {
+                    window.clearTimeout(searchTimerRef.current);
+                  }
                   applyFilters(search.trim(), status);
                 }
               }}
@@ -141,11 +170,14 @@ export default function RegistrationLeadFilters({
                 onMouseDown={() => setStatusOpen((current) => !current)}
                 onFocus={() => setStatusOpen(true)}
                 onBlur={() => closeSelectState(setStatusOpen)}
-                onChange={(event) => {
-                  const nextStatus = event.target.value;
-                  setStatus(nextStatus);
-                  applyFilters(search.trim(), nextStatus);
-                }}
+              onChange={(event) => {
+                const nextStatus = event.target.value;
+                setStatus(nextStatus);
+                if (searchTimerRef.current) {
+                  window.clearTimeout(searchTimerRef.current);
+                }
+                applyFilters(search.trim(), nextStatus);
+              }}
                 className="w-full appearance-none rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 pr-11 text-sm text-[#063F32] outline-none transition focus:border-[#2D8A6A] focus:bg-white focus:ring-4 focus:ring-[#FFF5D6]"
               >
                 {STATUS_OPTIONS.map((option) => (

@@ -2,7 +2,7 @@ import crypto from "crypto";
 import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { getAppUrl, sendEmail } from "@/lib/email";
+import { buildCredentialsEmailHtml, buildPaymentDecisionEmailHtml, getAppUrl, sendEmail } from "@/lib/email";
 import prisma from "@/lib/prisma";
 
 const ALLOWED_ROLES = new Set(["admin", "coordinator"]);
@@ -62,64 +62,6 @@ function buildStudentUsername(studentName, classLevel, registrationNumber) {
   ].filter(Boolean);
 
   return parts.join(".");
-}
-
-function buildCredentialsEmailBodies({
-  parentName,
-  parentEmail,
-  parentPhone,
-  parentPassword,
-  studentName,
-  studentUsername,
-  studentPassword,
-  loginUrl,
-}) {
-  const html = `
-    <div style="font-family:Arial,sans-serif;background:#f8fafc;padding:24px;color:#0f172a;">
-      <div style="max-width:720px;margin:0 auto;background:#fff;border:1px solid #e2e8f0;border-radius:18px;padding:24px;">
-        <h2 style="margin:0 0 16px;">Login Credentials Created</h2>
-        <div style="display:grid;gap:16px;">
-          <div style="border:1px solid #e2e8f0;border-radius:14px;padding:16px;">
-            <h3 style="margin:0 0 10px;">Parent Login</h3>
-            <p style="margin:4px 0;"><strong>Name:</strong> ${parentName || "-"}</p>
-            <p style="margin:4px 0;"><strong>Email:</strong> ${parentEmail || "-"}</p>
-            <p style="margin:4px 0;"><strong>Phone:</strong> ${parentPhone || "-"}</p>
-            <p style="margin:4px 0;"><strong>Temporary Password:</strong> ${parentPassword || "-"}</p>
-          </div>
-          <div style="border:1px solid #e2e8f0;border-radius:14px;padding:16px;">
-            <h3 style="margin:0 0 10px;">Student Login</h3>
-            <p style="margin:4px 0;"><strong>Name:</strong> ${studentName || "-"}</p>
-            <p style="margin:4px 0;"><strong>Username:</strong> ${studentUsername || "-"}</p>
-            <p style="margin:4px 0;"><strong>Temporary Password:</strong> ${studentPassword || "-"}</p>
-          </div>
-          <div style="border:1px solid #dbeafe;background:#eff6ff;border-radius:14px;padding:16px;">
-            <p style="margin:0 0 8px;"><strong>Login Page:</strong></p>
-            <a href="${loginUrl}" style="color:#2563eb;text-decoration:none;">${loginUrl}</a>
-          </div>
-        </div>
-      </div>
-    </div>
-  `;
-
-  const text = `
-Login Credentials Created
-
-Parent Login
-Name: ${parentName || "-"}
-Email: ${parentEmail || "-"}
-Phone: ${parentPhone || "-"}
-Temporary Password: ${parentPassword || "-"}
-
-Student Login
-Name: ${studentName || "-"}
-Username: ${studentUsername || "-"}
-Temporary Password: ${studentPassword || "-"}
-
-Login Page:
-${loginUrl}
-`.trim();
-
-  return { html, text };
 }
 
 async function insertCredentialsMessage({
@@ -631,11 +573,20 @@ export async function POST(request, { params }) {
           const portalUrl = getAppUrl()
             ? `${getAppUrl().replace(/\/+$/, "")}/login`
             : "http://localhost:3000/login";
+          const html = buildPaymentDecisionEmailHtml({
+            eyebrow: "Payment Decision",
+            title: "Your payment has been rejected",
+            intro: `Hello, ${submission.student_name || submission.parent_name || "there"}. Your payment submission for voucher ${submission.voucher_no} was rejected. Please review the reason below and submit a new payment proof if needed.`,
+            voucherNo: submission.voucher_no,
+            reason: rejectionReason,
+            portalUrl,
+            ctaLabel: "Open LMS",
+          });
           await sendEmail({
             to: submission.email,
             subject: "Payment rejected",
-            text: `Your payment submission for voucher ${submission.voucher_no} was rejected.\n\nReason: ${rejectionReason}\n\nPlease contact support if you need help.\n\nLogin: ${portalUrl}`,
-            html: `<div style="font-family:Arial,sans-serif;color:#0f172a;"><h2>Payment Rejected</h2><p>Your payment submission for voucher <strong>${submission.voucher_no}</strong> was rejected.</p><p><strong>Reason:</strong> ${rejectionReason}</p><p>Please contact support if you need help.</p><p><a href="${portalUrl}">Open LMS</a></p></div>`,
+            text: `Payment rejected\n\nVoucher No: ${submission.voucher_no}\nReason: ${rejectionReason}\n\nOpen LMS: ${portalUrl}`,
+            html,
           });
         } catch (emailError) {
           console.error("Payment rejection email failed:", emailError);
@@ -1009,16 +960,16 @@ export async function POST(request, { params }) {
       );
 
       const loginUrl = `${getAppUrl().replace(/\/+$/, "")}/login`;
-      const { html: credentialsHtml, text: credentialsText } = buildCredentialsEmailBodies({
-        parentName: submission.parent_name || "Parent",
-        parentEmail: parentContactEmail,
-        parentPhone: parentContactPhone,
-        parentPassword: parentTemporaryPassword,
+      const credentialsHtml = buildCredentialsEmailHtml({
+        recipientName: submission.parent_name || "Parent",
         studentName: submission.student_name,
-        studentUsername: studentLoginUsername,
+        parentLogin: parentContactEmail || parentContactPhone || "",
+        parentPassword: parentTemporaryPassword,
+        studentLogin: studentLoginUsername,
         studentPassword: studentTemporaryPassword,
-        loginUrl,
+        portalUrl: loginUrl,
       });
+      const credentialsText = `Login Credentials Created\n\nParent Login\nName: ${submission.parent_name || "Parent"}\nEmail: ${parentContactEmail || "-"}\nPhone: ${parentContactPhone || "-"}\nTemporary Password: ${parentTemporaryPassword}\n\nStudent Login\nName: ${submission.student_name}\nUsername: ${studentLoginUsername}\nTemporary Password: ${studentTemporaryPassword}\n\nLogin Page:\n${loginUrl}`;
 
       const credentialsMessage = await insertCredentialsMessage({
         paymentId: submission.id,
@@ -1049,16 +1000,16 @@ export async function POST(request, { params }) {
         const portalUrl = getAppUrl()
           ? `${getAppUrl().replace(/\/+$/, "")}/login`
           : "http://localhost:3000/login";
-        const { html, text } = buildCredentialsEmailBodies({
-          parentName: submission.parent_name || "Parent",
-          parentEmail: parentContactEmail,
-          parentPhone: parentContactPhone,
-          parentPassword: parentTemporaryPassword,
+        const html = buildCredentialsEmailHtml({
+          recipientName: submission.parent_name || "Parent",
           studentName: submission.student_name,
-          studentUsername: studentLoginUsername,
+          parentLogin: parentContactEmail || parentContactPhone || "",
+          parentPassword: parentTemporaryPassword,
+          studentLogin: studentLoginUsername,
           studentPassword: studentTemporaryPassword,
-          loginUrl: portalUrl,
+          portalUrl,
         });
+        const text = `Login Credentials Created\n\nParent Login\nName: ${submission.parent_name || "Parent"}\nEmail: ${parentContactEmail || "-"}\nPhone: ${parentContactPhone || "-"}\nTemporary Password: ${parentTemporaryPassword}\n\nStudent Login\nName: ${submission.student_name}\nUsername: ${studentLoginUsername}\nTemporary Password: ${studentTemporaryPassword}\n\nLogin Page:\n${portalUrl}`;
 
         await sendEmail({
           to: parentContactEmail,

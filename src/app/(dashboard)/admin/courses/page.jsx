@@ -91,6 +91,8 @@ export default function AdminCoursesPage() {
     };
   });
   const [modal, setModal] = useState({ open: false, record: null });
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deleting, setDeleting] = useState(false);
   const [statusOpen, setStatusOpen] = useState(false);
   const [subjectOpen, setSubjectOpen] = useState(false);
 
@@ -154,6 +156,35 @@ export default function AdminCoursesPage() {
       });
     }
   }, [filters]);
+
+  const handleDelete = useCallback(async () => {
+    if (!deleteTarget?.id) return;
+
+    setDeleting(true);
+    try {
+      const response = await fetch(`/api/admin/courses/${encodeURIComponent(deleteTarget.id)}`, {
+        method: "DELETE",
+      });
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        throw new Error(data?.message || "Unable to delete class.");
+      }
+
+      setState((current) => ({
+        ...current,
+        items: current.items.filter((item) => item.id !== deleteTarget.id),
+        summary: {
+          total: Math.max(0, (current.summary?.total || 0) - 1),
+          active: Math.max(0, (current.summary?.active || 0) - (deleteTarget.status === "active" ? 1 : 0)),
+          draft: Math.max(0, (current.summary?.draft || 0) - (deleteTarget.status === "pending" ? 1 : 0)),
+        },
+      }));
+      setDeleteTarget(null);
+    } finally {
+      setDeleting(false);
+    }
+  }, [deleteTarget]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -363,13 +394,22 @@ export default function AdminCoursesPage() {
             : "No classes matched the current filters."
         }
         actions={!isAdminReadonlyPortal ? (row) => (
-          <button
-            type="button"
-            onClick={() => setModal({ open: true, record: row })}
-            className="rounded-xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-3 py-2 text-xs font-semibold text-[#063F32] transition hover:bg-[#F1EADC]"
-          >
-            Edit
-          </button>
+          <div className="flex flex-nowrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setModal({ open: true, record: row })}
+              className="rounded-xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-3 py-2 text-xs font-semibold text-[#063F32] transition hover:bg-[#F1EADC]"
+            >
+              Edit
+            </button>
+            <button
+              type="button"
+              onClick={() => setDeleteTarget(row)}
+              className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700 transition hover:bg-rose-100"
+            >
+              Delete
+            </button>
+          </div>
         ) : null}
       />
 
@@ -383,6 +423,41 @@ export default function AdminCoursesPage() {
           onClose={() => setModal({ open: false, record: null })}
           onSuccess={() => load({ force: true })}
         />
+        ) : null}
+
+        {deleteTarget ? (
+          <div className="fixed inset-0 z-[9999] flex items-start justify-center bg-[#063F32]/45 px-4 pt-10 pb-8">
+            <div className="w-full max-w-lg rounded-[2rem] border border-[#2D8A6A]/15 bg-white shadow-[0_24px_80px_-36px_rgba(13,59,46,0.24)]">
+              <div className="border-b border-[#F1EADC] px-6 py-5">
+                <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-[#C9A227]">Delete class</p>
+                <h3 className="mt-2 text-2xl font-semibold tracking-tight text-[#063F32]">Remove this class record?</h3>
+              </div>
+              <div className="space-y-4 px-6 py-5">
+                <p className="text-sm text-[#245C4F]">
+                  This will permanently delete{" "}
+                  <span className="font-semibold text-[#063F32]">{deleteTarget.name || deleteTarget.class_mode || "this class"}</span>{" "}
+                  and detach its subject links.
+                </p>
+                <div className="flex items-center justify-end gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setDeleteTarget(null)}
+                    className="rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 text-sm font-semibold text-[#063F32] transition hover:bg-[#F1EADC]"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void handleDelete()}
+                    disabled={deleting}
+                    className="rounded-2xl bg-rose-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-rose-700 disabled:opacity-60"
+                  >
+                    {deleting ? "Deleting..." : "Delete now"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
         ) : null}
       </div>
     </div>

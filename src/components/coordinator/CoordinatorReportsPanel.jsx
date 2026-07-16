@@ -143,7 +143,7 @@ export default function CoordinatorReportsPanel({ data }) {
       <div className="grid gap-6">
         <section className="rounded-[2rem] border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(250,247,240,0.98)_100%)] p-5 shadow-[0_20px_70px_-36px_rgba(13,59,46,0.18)] backdrop-blur-xl">
           <p className="text-sm font-bold uppercase tracking-[0.22em] text-[#0D5C48]">Recent Lectures</p>
-          <p className="mt-2 text-sm leading-6 text-[#245C4F]">Latest scheduled lectures shown in a compact portal table.</p>
+          <p className="mt-2 text-sm leading-6 text-[#245C4F]">Latest completed lectures shown in a compact portal table.</p>
           <div className="mt-5 overflow-x-auto rounded-[1.5rem] border border-[#2D8A6A]/15">
             <div className="min-w-[860px]">
             <div className="grid grid-cols-[1fr_1fr_1fr_1fr_120px_110px] bg-[linear-gradient(180deg,#FAF7F0_0%,#F1EADC_100%)] px-6 py-3 text-xs font-semibold uppercase tracking-[0.16em] text-[#0D5C48]">

@@ -2,7 +2,7 @@ import crypto from "crypto";
 import { NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 import { normalizeClassLevel } from "@/lib/academicCatalog";
-import { sendEmail } from "@/lib/email";
+import { sendEmail, themedEmailShell } from "@/lib/email";
 import prisma from "@/lib/prisma";
 import { generateVoucherNumber } from "@/lib/voucherNumber";
 import { uploadAdmissionDocument } from "@/lib/supabaseStorage";
@@ -951,24 +951,20 @@ Primary Contact: ${parentSummary.parentName}
 Phone: ${parentSummary.parentPhone}
 
 Our admissions team will review the application and contact you with the next steps, In Sha Allah.`;
-      const parentHtml = `
-        <div style="font-family:Arial,sans-serif;background:#f8fafc;padding:24px;color:#0f172a;">
-          <div style="max-width:640px;margin:0 auto;background:#fff;border:1px solid #e2e8f0;border-radius:20px;padding:24px;">
-            <p style="margin:0 0 12px;font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:#0284c7;font-weight:700;">Admission form submitted</p>
-            <p style="margin:0 0 16px;font-size:15px;line-height:1.7;">Assalamualaikum <strong>${parentSummary.parentName}</strong>,</p>
-            <p style="margin:0 0 16px;font-size:15px;line-height:1.7;">Your child's admission form has been submitted successfully.</p>
-            <div style="border:1px solid #e2e8f0;border-radius:16px;padding:16px;background:#f8fafc;font-size:14px;line-height:1.8;">
-              <div><strong>Student:</strong> ${studentName}</div>
-              <div><strong>Programme:</strong> ${programName}</div>
-              <div><strong>Class:</strong> ${classLevel}</div>
-              <div><strong>Preferred Starting Month:</strong> ${preferredStartingMonth}${preferredStartingMonthOther ? ` (${preferredStartingMonthOther})` : ""}</div>
-              <div><strong>Primary Contact:</strong> ${parentSummary.parentName}</div>
-              <div><strong>Phone:</strong> ${parentSummary.parentPhone}</div>
-            </div>
-            <p style="margin:20px 0 0;font-size:13px;line-height:1.7;color:#64748b;">Our admissions team will review the application and contact you with the next steps, In Sha Allah.</p>
-          </div>
-        </div>
-      `;
+      const parentHtml = themedEmailShell({
+        eyebrow: "Admission Form Submitted",
+        title: "Your child's admission form was received",
+        intro: `Assalamualaikum ${parentSummary.parentName}. Your child's admission form has been submitted successfully.`,
+        rows: [
+          ["Student", studentName],
+          ["Programme", programName],
+          ["Class", classLevel],
+          ["Preferred Starting Month", `${preferredStartingMonth}${preferredStartingMonthOther ? ` (${preferredStartingMonthOther})` : ""}`],
+          ["Primary Contact", parentSummary.parentName],
+          ["Phone", parentSummary.parentPhone],
+        ],
+        footerNote: "Our admissions team will review the application and contact you with the next steps, In Sha Allah.",
+      });
 
       await sendEmail({
         to: parentEmail,
@@ -994,27 +990,23 @@ Phone: ${parentSummary.parentPhone}
 City & Country: ${cityCountry}
 Preferred Language: ${preferredLanguage}
 Interested Lead Token: ${leadToken || "N/A"}`;
-      const coordinatorHtml = `
-        <div style="font-family:Arial,sans-serif;background:#f8fafc;padding:24px;color:#0f172a;">
-          <div style="max-width:640px;margin:0 auto;background:#fff;border:1px solid #e2e8f0;border-radius:20px;padding:24px;">
-            <p style="margin:0 0 12px;font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:#0284c7;font-weight:700;">New admission form submitted</p>
-            <p style="margin:0 0 16px;font-size:15px;line-height:1.7;">Assalamualaikum <strong>${coordinator.full_name || "Coordinator"}</strong>,</p>
-            <p style="margin:0 0 16px;font-size:15px;line-height:1.7;">A new admission form has been submitted.</p>
-            <div style="border:1px solid #e2e8f0;border-radius:16px;padding:16px;background:#f8fafc;font-size:14px;line-height:1.8;">
-              <div><strong>Student:</strong> ${studentName}</div>
-              <div><strong>Programme:</strong> ${programName}</div>
-              <div><strong>Class:</strong> ${classLevel}</div>
-              <div><strong>Preferred Starting Month:</strong> ${preferredStartingMonth}${preferredStartingMonthOther ? ` (${preferredStartingMonthOther})` : ""}</div>
-              <div><strong>Primary Parent:</strong> ${parentSummary.parentName}</div>
-              <div><strong>Email:</strong> ${parentSummary.parentEmail || linkedLead?.email || "Not provided"}</div>
-              <div><strong>Phone:</strong> ${parentSummary.parentPhone}</div>
-              <div><strong>City & Country:</strong> ${cityCountry}</div>
-              <div><strong>Preferred Language:</strong> ${preferredLanguage}</div>
-            </div>
-            <p style="margin:20px 0 0;font-size:13px;line-height:1.7;color:#64748b;">Interested lead token: ${leadToken || "N/A"}</p>
-          </div>
-        </div>
-      `;
+      const coordinatorHtml = themedEmailShell({
+        eyebrow: "New Admission Submitted",
+        title: "A new admission form has been submitted",
+        intro: `Assalamualaikum ${coordinator.full_name || "Coordinator"}. A new admission form has been submitted and is ready for review.`,
+        rows: [
+          ["Student", studentName],
+          ["Programme", programName],
+          ["Class", classLevel],
+          ["Preferred Starting Month", `${preferredStartingMonth}${preferredStartingMonthOther ? ` (${preferredStartingMonthOther})` : ""}`],
+          ["Primary Parent", parentSummary.parentName],
+          ["Email", parentSummary.parentEmail || linkedLead?.email || "Not provided"],
+          ["Phone", parentSummary.parentPhone],
+          ["City & Country", cityCountry],
+          ["Preferred Language", preferredLanguage],
+        ],
+        footerNote: `Interested lead token: ${leadToken || "N/A"}`,
+      });
 
       await sendEmail({
         to: coordinator.email,

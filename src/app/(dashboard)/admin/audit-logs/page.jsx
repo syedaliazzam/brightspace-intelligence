@@ -320,6 +320,8 @@ export default function AdminAuditLogsPage() {
         ) : null}
 
          <AdminDataTable
+            key={`${filters.search}|${filters.action}|${filters.entityType}`}
+            resetKey={`${filters.search}|${filters.action}|${filters.entityType}`}
             loading={state.loading}
             loadingTitle="Loading audit logs"
             loadingSubtitle="Preparing the audit history table..."

@@ -40,6 +40,8 @@ async function getLeads(status, search) {
         OR rl.phone ILIKE $${values.length}
         OR COALESCE(rl.city_country, '') ILIKE $${values.length}
         OR COALESCE(rl.current_school, '') ILIKE $${values.length}
+        OR COALESCE(rl.class_level, '') ILIKE $${values.length}
+        OR COALESCE(rl.program_name, '') ILIKE $${values.length}
       )`);
   }
 

@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Search } from "lucide-react";
 import StaffFormModal from "@/components/admin/StaffFormModal";
 import AdminDataTable from "@/components/admin/AdminDataTable";
 
@@ -10,42 +11,42 @@ export default function CoordinatorTeacherCreatePage() {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [search, setSearch] = useState("");
+
+  const loadTeachers = useCallback(async () => {
+    setLoading(true);
+    setError("");
+
+    try {
+      const response = await fetch("/api/coordinator/teachers", { cache: "no-store" });
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data?.message || "Unable to load teachers.");
+      }
+
+      setItems(Array.isArray(data.items) ? data.items : []);
+    } catch (loadError) {
+      setError(loadError instanceof Error ? loadError.message : "Unable to load teachers.");
+      setItems([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    let active = true;
+    void loadTeachers();
+  }, [loadTeachers]);
 
-    async function load() {
-      setLoading(true);
-      setError("");
-
-      try {
-        const response = await fetch("/api/coordinator/teachers", { cache: "no-store" });
-        const data = await response.json();
-
-        if (!response.ok) {
-          throw new Error(data?.message || "Unable to load teachers.");
-        }
-
-        if (active) {
-          setItems(data.items || []);
-        }
-      } catch (loadError) {
-        if (active) {
-          setError(loadError instanceof Error ? loadError.message : "Unable to load teachers.");
-          setItems([]);
-        }
-      } finally {
-        if (active) {
-          setLoading(false);
-        }
-      }
-    }
-
-    void load();
-    return () => {
-      active = false;
-    };
-  }, []);
+  const filteredItems = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    if (!query) return items;
+    return items.filter((item) =>
+      [item.full_name, item.email, item.phone, item.status]
+        .filter(Boolean)
+        .some((value) => String(value).toLowerCase().includes(query))
+    );
+  }, [items, search]);
 
   return (
     <div className="min-h-screen bg-[#FAF7F0] text-[#063F32]">
@@ -94,6 +95,17 @@ export default function CoordinatorTeacherCreatePage() {
             <h2 className="mt-2 text-2xl font-semibold tracking-tight text-[#063F32]">Created teachers</h2>
           </div>
 
+          <label className="mb-4 flex items-center gap-3 rounded-2xl border border-[#2D8A6A]/15 bg-white px-4 py-3 shadow-sm">
+            <Search className="h-4 w-4 text-[#0D5C48]" />
+            <input
+              type="search"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Search by name, email, phone, or status"
+              className="w-full bg-transparent text-sm text-[#063F32] outline-none placeholder:text-[#7A938B]"
+            />
+          </label>
+
           <AdminDataTable
             loading={loading}
             loadingTitle="Loading teachers"
@@ -104,7 +116,7 @@ export default function CoordinatorTeacherCreatePage() {
               { key: "phone", label: "Phone" },
               { key: "status", label: "Status" },
             ]}
-            rows={items}
+            rows={filteredItems}
             emptyMessage="No teachers created yet."
             actions={(row) => (
               <button
@@ -122,7 +134,7 @@ export default function CoordinatorTeacherCreatePage() {
         </section>
       </div>
 
-      <StaffFormModal
+        <StaffFormModal
         open={open}
         mode={editingTeacher ? "edit" : "create"}
         record={editingTeacher}
@@ -133,6 +145,7 @@ export default function CoordinatorTeacherCreatePage() {
         onSuccess={() => {
           setOpen(false);
           setEditingTeacher(null);
+          void loadTeachers();
         }}
         roleOptions={[{ label: "Teacher", value: "teacher" }]}
         createEndpoint="/api/coordinator/teachers"

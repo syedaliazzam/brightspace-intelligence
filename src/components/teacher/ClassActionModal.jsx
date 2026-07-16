@@ -1,10 +1,26 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import CompletionReportForm from "@/components/teacher/CompletionReportForm";
 import { canShowMarkConducted, getLectureDisplayStatus, getTeacherLectureActionLink } from "@/lib/lectureStatus";
 
 export default function ClassActionModal({ lecture, open, onClose, onChanged }) {
+  const [markingConducted, setMarkingConducted] = useState(false);
+  const [conductedLectureId, setConductedLectureId] = useState("");
+
+  useEffect(() => {
+    if (!open) {
+      setMarkingConducted(false);
+      setConductedLectureId("");
+      return;
+    }
+    if (lecture?.id) {
+      setMarkingConducted(false);
+      setConductedLectureId("");
+    }
+  }, [lecture?.id, open]);
+
   if (!open || !lecture?.id) {
     return null;
   }
@@ -21,13 +37,20 @@ export default function ClassActionModal({ lecture, open, onClose, onChanged }) 
   }
 
   async function markConducted() {
-    const response = await fetch(`/api/teacher/lectures/${lecture.id}`, { method: "PATCH" });
-    const data = await readJson(response);
-    if (!response.ok) {
-      window.alert(data?.message || "Unable to mark conducted.");
-      return;
+    if (markingConducted) return;
+    setMarkingConducted(true);
+    try {
+      const response = await fetch(`/api/teacher/lectures/${lecture.id}`, { method: "PATCH" });
+      const data = await readJson(response);
+      if (!response.ok) {
+        window.alert(data?.message || "Unable to mark conducted.");
+        return;
+      }
+      setConductedLectureId(lecture.id);
+      await onChanged?.();
+    } finally {
+      setMarkingConducted(false);
     }
-    onChanged?.();
   }
 
   return (
@@ -60,7 +83,22 @@ export default function ClassActionModal({ lecture, open, onClose, onChanged }) 
               <span className="rounded-2xl bg-[#FAF7F0] px-4 py-3 text-center text-sm font-semibold text-[#245C4F]">{displayStatus}</span>
             )}
             {canShowMarkConducted(lecture) ? (
-              <button onClick={markConducted} className="rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 text-sm font-semibold text-[#063F32]">Mark conducted</button>
+              <button
+                onClick={markConducted}
+                disabled={markingConducted || conductedLectureId === lecture.id}
+                className="rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 text-sm font-semibold text-[#063F32] transition disabled:cursor-not-allowed disabled:opacity-70"
+              >
+                {markingConducted ? (
+                  <span className="inline-flex items-center gap-2">
+                    <span className="h-4 w-4 animate-spin rounded-full border-2 border-[#063F32]/20 border-t-[#063F32]" />
+                    Marking...
+                  </span>
+                ) : conductedLectureId === lecture.id ? (
+                  "Conducted"
+                ) : (
+                  "Mark conducted"
+                )}
+              </button>
             ) : null}
             <CompletionReportForm
               lecture={lecture}

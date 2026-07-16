@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { signOut } from "next-auth/react";
 import { ChevronDown } from "lucide-react";
@@ -134,6 +134,7 @@ export default function AdminUsersPage() {
     overviewLoading: true,
     error: "",
     items: [],
+    allStaffItems: [],
     overviewItems: [],
     summary: null,
   });
@@ -161,6 +162,8 @@ export default function AdminUsersPage() {
   const [roleOpen, setRoleOpen] = useState(false);
   const [statusOpen, setStatusOpen] = useState(false);
   const [classOpen, setClassOpen] = useState(false);
+  const loadTableRequestRef = useRef(0);
+  const loadOverviewRequestRef = useRef(0);
 
   function closeSelectState(setter) {
     window.setTimeout(() => setter(false), 0);
@@ -175,6 +178,7 @@ export default function AdminUsersPage() {
   }, [rolePreset, view]);
 
   const loadOverview = useCallback(async (options = {}) => {
+    const requestId = ++loadOverviewRequestRef.current;
     const force = options.force === true || view === "parents";
     const cacheKey = getOverviewCacheKey(view);
 
@@ -185,6 +189,7 @@ export default function AdminUsersPage() {
           ...current,
           overviewLoading: false,
           overviewItems: cached.items || [],
+          allStaffItems: view === "staff" ? cached.items || [] : current.allStaffItems,
           summary: cached.summary || null,
         }));
         return cached;
@@ -229,10 +234,14 @@ export default function AdminUsersPage() {
 
         const payload = { items: staffOnlyItems, summary };
         writeCache(cacheKey, payload);
+        if (requestId !== loadOverviewRequestRef.current) {
+          return payload;
+        }
         setState((current) => ({
           ...current,
           overviewLoading: false,
           overviewItems: staffOnlyItems,
+          allStaffItems: staffOnlyItems,
           summary,
         }));
         return payload;
@@ -249,14 +258,21 @@ export default function AdminUsersPage() {
       }
 
       writeCache(cacheKey, data);
+      if (requestId !== loadOverviewRequestRef.current) {
+        return data;
+      }
       setState((current) => ({
         ...current,
         overviewLoading: false,
         overviewItems: data.items || [],
+        allStaffItems: view === "staff" ? data.items || [] : current.allStaffItems,
         summary: data.summary || null,
       }));
       return data;
     } catch (error) {
+      if (requestId !== loadOverviewRequestRef.current) {
+        return null;
+      }
       setState((current) => ({
         ...current,
         overviewLoading: false,
@@ -267,9 +283,49 @@ export default function AdminUsersPage() {
   }, [view]);
 
   const loadTable = useCallback(async (options = {}) => {
+    const requestId = ++loadTableRequestRef.current;
     const force = options.force === true || view === "parents";
     const cacheKey = getCacheKey(filters);
     setState((current) => ({ ...current, loading: true, error: "" }));
+
+    if (isStaffView && !force && Array.isArray(state.allStaffItems) && state.allStaffItems.length) {
+      const searchTerm = String(filters.search || "").trim().toLowerCase();
+      const selectedRole = String(filters.role || "").toLowerCase();
+      const selectedStatus = String(filters.status || "").toLowerCase();
+
+      let items = state.allStaffItems;
+
+      if (selectedRole) {
+        items = items.filter((item) => String(item.role || "").toLowerCase() === selectedRole);
+      }
+
+      if (selectedStatus) {
+        items = items.filter((item) => String(item.status || "").toLowerCase() === selectedStatus);
+      }
+
+      if (searchTerm) {
+        items = items.filter((item) => {
+          const haystack = [
+            item.name,
+            item.full_name,
+            item.username,
+            item.email,
+            item.phone,
+          ]
+            .map((value) => String(value || "").toLowerCase())
+            .join(" ");
+          return haystack.includes(searchTerm);
+        });
+      }
+
+      setState((current) => ({
+        ...current,
+        loading: false,
+        error: "",
+        items,
+      }));
+      return;
+    }
 
     if (!force) {
       const cached = readCache(cacheKey);
@@ -279,6 +335,7 @@ export default function AdminUsersPage() {
           loading: false,
           error: "",
           items: cached.items || [],
+          allStaffItems: isStaffView ? cached.items || [] : current.allStaffItems,
         }));
         return;
       }
@@ -308,7 +365,6 @@ export default function AdminUsersPage() {
           rolesToLoad.map((roleValue) => {
             const roleParams = new URLSearchParams();
             roleParams.set("role", roleValue);
-            if (filters.search) roleParams.set("search", filters.search);
             if (filters.status) roleParams.set("status", filters.status);
             if (filters.classLevel) roleParams.set("class_level", filters.classLevel);
             return fetch(`/api/admin/users?${roleParams.toString()}`, { cache: "no-store" });
@@ -327,9 +383,7 @@ export default function AdminUsersPage() {
         const staffOnlyItems = tableItems.filter((item) =>
           staffRoles.has(String(item.role || "").toLowerCase())
         );
-        items = filters.role
-          ? staffOnlyItems.filter((item) => item.role === filters.role)
-          : staffOnlyItems;
+        items = staffOnlyItems;
         data = { items };
       } else {
         const response = await fetch(`/api/admin/users?${params.toString()}`, {
@@ -345,18 +399,26 @@ export default function AdminUsersPage() {
       }
 
       writeCache(cacheKey, { items });
+      if (requestId !== loadTableRequestRef.current) {
+        return;
+      }
       setState((current) => ({
         ...current,
         loading: false,
         error: "",
         items,
+        allStaffItems: isStaffView ? items : current.allStaffItems,
       }));
     } catch (error) {
+      if (requestId !== loadTableRequestRef.current) {
+        return;
+      }
       setState((current) => ({
         ...current,
         loading: false,
         error: error instanceof Error ? error.message : "Unable to load users.",
         items: [],
+        allStaffItems: [],
       }));
     }
   }, [filters, isStaffView]);
@@ -457,6 +519,43 @@ export default function AdminUsersPage() {
       },
     ];
   }, [state.overviewItems, state.summary, isStaffView, state.items.length, view]);
+
+  const displayedItems = useMemo(() => {
+    if (!isStaffView) {
+      return state.items;
+    }
+
+    const searchTerm = String(filters.search || "").trim().toLowerCase();
+    const selectedRole = String(filters.role || "").toLowerCase();
+    const selectedStatus = String(filters.status || "").toLowerCase();
+
+    let items = Array.isArray(state.allStaffItems) ? state.allStaffItems : [];
+
+    if (selectedRole) {
+      items = items.filter((item) => String(item.role || "").toLowerCase() === selectedRole);
+    }
+
+    if (selectedStatus) {
+      items = items.filter((item) => String(item.status || "").toLowerCase() === selectedStatus);
+    }
+
+    if (searchTerm) {
+      items = items.filter((item) => {
+        const haystack = [
+          item.name,
+          item.full_name,
+          item.username,
+          item.email,
+          item.phone,
+        ]
+          .map((value) => String(value || "").toLowerCase())
+          .join(" ");
+        return haystack.includes(searchTerm);
+      });
+    }
+
+    return items;
+  }, [filters.role, filters.search, filters.status, isStaffView, state.allStaffItems, state.items]);
 
   const classOptions = useMemo(() => {
     if (view !== "students") {
@@ -687,13 +786,6 @@ export default function AdminUsersPage() {
             ) : null}
           </div>
         </section>
-
-      {state.loading || state.overviewLoading ? (
-        <OpenBookLoader
-          title="Loading user management"
-          subtitle="Fetching the latest records and summary cards..."
-        />
-      ) : null}
 
       {resetSuccess.open ? (
         <div className="fixed inset-0 z-[60] flex items-start justify-end bg-[#063F32]/35 px-4 py-4 backdrop-blur-sm">
@@ -976,7 +1068,7 @@ export default function AdminUsersPage() {
             render: (row) => formatLabel(row.status),
           },
         ]}
-        rows={state.loading ? [] : state.items}
+        rows={state.loading ? [] : displayedItems}
         emptyMessage={
           state.loading ? "Loading users..." : "No users matched the current filters."
         }

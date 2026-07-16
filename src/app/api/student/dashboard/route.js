@@ -71,7 +71,7 @@ export async function GET() {
                   AND LOWER(status) = 'active'
               )
             )
-              AND ls.status::text IN ('completed_by_teacher','verified_by_coordinator')
+              AND ls.status::text = 'verified_by_coordinator'
           ) AS conducted_lectures,
           (
             SELECT COUNT(DISTINCT ls.id)::int
@@ -87,7 +87,7 @@ export async function GET() {
                   AND LOWER(status) = 'active'
               )
             )
-              AND ls.status::text IN ('completed_by_teacher','verified_by_coordinator')
+              AND ls.status::text = 'verified_by_coordinator'
               AND COALESCE(la.status::text, 'absent') IN ('present','partial')
           ) AS lectures_present,
           (
@@ -111,7 +111,7 @@ export async function GET() {
                   AND LOWER(status) = 'active'
               )
             )
-              AND ls.status::text IN ('completed_by_teacher','verified_by_coordinator')
+              AND ls.status::text = 'verified_by_coordinator'
           ) AS attendance_percentage,
           COALESCE(
             (

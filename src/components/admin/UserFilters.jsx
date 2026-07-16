@@ -34,7 +34,6 @@ export default function UserFilters({
   const [status, setStatus] = useState(initialStatus);
   const [roleOpen, setRoleOpen] = useState(false);
   const [statusOpen, setStatusOpen] = useState(false);
-
   useEffect(() => {
     setSearch(initialSearch);
     setRole(initialRole);
@@ -67,7 +66,9 @@ export default function UserFilters({
     }
 
     startTransition(() => {
-      router.replace(params.toString() ? `${pathname}?${params}` : pathname);
+      router.replace(params.toString() ? `${pathname}?${params}` : pathname, {
+        scroll: false,
+      });
     });
   }
 

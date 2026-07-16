@@ -314,16 +314,44 @@ export function buildCredentialsEmailHtml({
   return themedEmailShell({
     eyebrow: "LMS Access Granted",
     title: "Your LMS accounts are ready",
-    intro: `Hello, ${recipientName}. Payment has been verified for ${studentName}. Please use the credentials below to sign in.`,
+    intro: `Hello, ${recipientName}. Payment has been verified for ${studentName}. Your login credentials are ready below.`,
     rows: [
       ["Parent Login", safeParentLogin],
       ["Parent Temporary Password", safeParentPassword],
       ["Student Login", safeStudentLogin],
       ["Student Temporary Password", safeStudentPassword],
     ],
+    bodyBlocks: [
+      `<div style="padding:16px;border:1px solid #2D8A6A;border-radius:18px;background:#fffaf0;"><p style="margin:0 0 6px;font-size:12px;letter-spacing:.16em;text-transform:uppercase;color:#0D5C48;font-weight:700;">Important</p><p style="margin:0;line-height:1.8;color:#245C4F;font-size:15px;">You will be asked to change the temporary password after sign in.</p></div>`,
+    ],
     buttonLabel: "Open LMS",
     buttonUrl: safePortalUrl,
-    footerNote: "You will be asked to change the temporary password after sign in.",
+    footerNote: "If the button does not work, open this link in your browser: " + safePortalUrl,
+  });
+}
+
+export function buildPaymentDecisionEmailHtml({
+  title,
+  eyebrow,
+  intro,
+  voucherNo,
+  reason,
+  portalUrl,
+  ctaLabel = "Open LMS",
+}) {
+  return themedEmailShell({
+    eyebrow,
+    title,
+    intro,
+    rows: voucherNo ? [["Voucher No", voucherNo]] : [],
+    bodyBlocks: reason
+      ? [
+          `<div style="padding:16px;border:1px solid #2D8A6A;border-radius:18px;background:#fffaf0;"><p style="margin:0 0 6px;font-size:12px;letter-spacing:.16em;text-transform:uppercase;color:#0D5C48;font-weight:700;">Message</p><p style="margin:0;line-height:1.8;color:#245C4F;font-size:15px;">${escapeHtml(reason)}</p></div>`,
+        ]
+      : [],
+    buttonLabel: ctaLabel,
+    buttonUrl: portalUrl,
+    footerNote: `If the button does not work, open this link in your browser: ${portalUrl}`,
   });
 }
 

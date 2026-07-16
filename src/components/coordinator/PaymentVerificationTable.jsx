@@ -5,6 +5,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import PaymentProofPreview from "@/components/coordinator/PaymentProofPreview";
 import ClientPortal from "@/components/shared/ClientPortal";
+import { LeafSpinnerInline } from "@/components/shared/AshShajrahLoaders";
 
 const STATUS_STYLES = {
   submitted: "bg-amber-50 text-amber-700",
@@ -304,7 +305,12 @@ export default function PaymentVerificationTable({ items, onRefresh }) {
                       onClick={() => verifyPayment(item.id, "approve")}
                       className="rounded-xl border border-[#2D8A6A]/20 bg-[#EAF6EF] px-3 py-2 text-xs font-semibold text-[#0D5C48] transition hover:bg-[#DFF1E7] disabled:opacity-60"
                     >
-                      Approve payment
+                      <span className="inline-flex items-center gap-2">
+                        {pendingId === `${item.id}:approve` ? (
+                          <LeafSpinnerInline className="h-3.5 w-3.5 border-[#0D5C48]/30 border-t-[#0D5C48]" />
+                        ) : null}
+                        <span>{pendingId === `${item.id}:approve` ? "Approving..." : "Approve payment"}</span>
+                      </span>
                     </button>
                     <button
                       type="button"
@@ -312,7 +318,12 @@ export default function PaymentVerificationTable({ items, onRefresh }) {
                       onClick={() => verifyPayment(item.id, "reject")}
                       className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700 transition hover:bg-rose-100 disabled:opacity-60"
                     >
-                      Reject payment
+                      <span className="inline-flex items-center gap-2">
+                        {pendingId === `${item.id}:reject` ? (
+                          <LeafSpinnerInline className="h-3.5 w-3.5 border-rose-300 border-t-rose-700" />
+                        ) : null}
+                        <span>{pendingId === `${item.id}:reject` ? "Rejecting..." : "Reject payment"}</span>
+                      </span>
                     </button>
                   </>
                 ) : null}
@@ -428,7 +439,12 @@ export default function PaymentVerificationTable({ items, onRefresh }) {
                   disabled={rejecting || !rejectionReason.trim()}
                   className="rounded-2xl bg-rose-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  {rejecting ? "Rejecting..." : "Reject payment"}
+                  <span className="inline-flex items-center gap-2">
+                    {rejecting ? (
+                      <LeafSpinnerInline className="h-4 w-4 border-white/35 border-t-white" />
+                    ) : null}
+                    <span>{rejecting ? "Rejecting..." : "Reject payment"}</span>
+                  </span>
                 </button>
               </div>
             </form>

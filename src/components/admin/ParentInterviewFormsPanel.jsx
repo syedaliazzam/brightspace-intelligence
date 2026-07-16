@@ -76,7 +76,7 @@ function formatFlatObject(value) {
     .join(" | ");
 }
 
-export default function ParentInterviewFormsPanel() {
+export default function ParentInterviewFormsPanel({ apiUrl = "/api/admin/parent-interview-forms" }) {
   const [state, setState] = useState({ loading: true, error: "", items: [] });
   const [search, setSearch] = useState("");
   const [selectedResponse, setSelectedResponse] = useState(null);
@@ -135,7 +135,7 @@ export default function ParentInterviewFormsPanel() {
     async function load() {
       setState((current) => ({ ...current, loading: true, error: "" }));
       try {
-        const response = await fetch("/api/admin/parent-interview-forms", { cache: "no-store" });
+        const response = await fetch(apiUrl, { cache: "no-store" });
         const data = await response.json();
         if (!response.ok) {
           throw new Error(data?.message || "Unable to load parent interview forms.");
