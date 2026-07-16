@@ -160,6 +160,9 @@ export default function InterestedStudentsPanel({
     return items.slice(startIndex, startIndex + PAGE_SIZE);
   }, [currentPage, items]);
 
+  const selectedLeadStage = selectedLead ? getLeadStage(selectedLead) : null;
+  const selectedLeadCanSend = selectedLeadStage ? !selectedLeadStage.sent && !selectedLeadStage.submitted : false;
+
   useEffect(() => {
     if (!selectedLead) return;
     setPreviewAdmissionFeeId("");
@@ -276,8 +279,11 @@ export default function InterestedStudentsPanel({
               </tr>
             </thead>
             <tbody className="divide-y divide-[#F1EADC]">
-              {visibleItems.map((item, index) => (
-                <Fragment key={item.id}>
+              {visibleItems.map((item, index) => {
+                const stage = getLeadStage(item);
+                const canSendForm = !stage.sent && !stage.submitted;
+
+                return (
                   <tr key={item.id} className="align-top">
                     <td className="px-5 py-5 text-sm font-semibold text-[#0D5C48]">
                       {String((currentPage - 1) * PAGE_SIZE + index + 1).padStart(2, "0")}
@@ -366,14 +372,14 @@ export default function InterestedStudentsPanel({
                             className="rounded-full bg-[#0D5C48] px-4 py-2 text-sm font-semibold text-[#FAF7F0] transition hover:bg-[#063F32] disabled:cursor-not-allowed disabled:opacity-70"
                             disabled={loadingId === item.id}
                           >
-                            Details
+                            {canSendForm ? "Details" : "View"}
                           </button>
                         ) : null}
                       </td>
                     ) : null}
                   </tr>
-                </Fragment>
-              ))}
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -390,7 +396,11 @@ export default function InterestedStudentsPanel({
       </section>
 
       <div className="grid gap-4 min-[992px]:hidden">
-        {visibleItems.map((item) => (
+        {visibleItems.map((item) => {
+          const stage = getLeadStage(item);
+          const canSendForm = !stage.sent && !stage.submitted;
+
+          return (
           <article
             key={item.id}
             className="rounded-[1.75rem] border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(250,247,240,0.98)_100%)] p-5 shadow-[0_18px_60px_-36px_rgba(13,59,46,0.18)] backdrop-blur-xl"
@@ -439,12 +449,13 @@ export default function InterestedStudentsPanel({
                   className="rounded-full bg-[#0D5C48] px-4 py-2 text-sm font-semibold text-[#FAF7F0] transition hover:bg-[#063F32] disabled:cursor-not-allowed disabled:opacity-70"
                   disabled={loadingId === item.id}
                 >
-                  Details
+                  {canSendForm ? "Details" : "View"}
                 </button>
               </div>
             ) : null}
           </article>
-        ))}
+        );
+        })}
         {items.length > PAGE_SIZE ? (
           <div className="rounded-[1.5rem] border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(250,247,240,0.98)_100%)] shadow-[0_18px_60px_-36px_rgba(13,59,46,0.18)] backdrop-blur-xl">
             <PaginationControls
@@ -647,10 +658,14 @@ export default function InterestedStudentsPanel({
                           await sendAdmissionForm(selectedLead);
                           setSelectedLead(null);
                         }}
-                        disabled={loadingId === selectedLead.id}
+                        disabled={loadingId === selectedLead.id || !selectedLeadCanSend}
                         className="rounded-full bg-[#0D5C48] px-4 py-2 text-sm font-semibold text-[#FAF7F0] transition hover:bg-[#063F32] disabled:cursor-not-allowed disabled:opacity-70"
                       >
-                        {loadingId === selectedLead.id ? "Sending..." : "Send Form"}
+                        {loadingId === selectedLead.id
+                          ? "Sending..."
+                          : selectedLeadCanSend
+                            ? "Send Form"
+                            : "Already Sent"}
                       </button>
                     </div>
                   </div>
