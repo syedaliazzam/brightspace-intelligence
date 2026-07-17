@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getToken } from "next-auth/jwt";
+import { auth } from "@/lib/auth";
 
 const roleToDashboard = {
   superadmin: "/superadmin/dashboard",
@@ -40,27 +40,17 @@ function getSuperadminProtected(pathname) {
   return superadminPrefixes.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`));
 }
 
-export default async function middleware(req) {
+export default auth((req) => {
   const { pathname } = req.nextUrl;
-  let token = null;
-
-  try {
-    token = await getToken({
-      req,
-      secret: process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET,
-    });
-  } catch {
-    token = null;
-  }
-
-  const sessionRole = String(token?.role || "").toLowerCase();
+  const sessionRole = String(req.auth?.user?.role || "").toLowerCase();
+  const hasSession = Boolean(req.auth?.user);
   const dashboard = getDashboardPath(sessionRole);
   const protectedRole = getProtectedRole(pathname);
   const isSharedProtectedPath = sharedProtectedPaths.some(
     (path) => pathname === path || pathname.startsWith(`${path}/`)
   );
 
-  if (!token) {
+  if (!hasSession) {
     if (pathname === "/login" || pathname === "/") {
       return pathname === "/login" ? NextResponse.next() : NextResponse.redirect(new URL("/login", req.url));
     }
@@ -89,7 +79,7 @@ export default async function middleware(req) {
   }
 
   return NextResponse.next();
-}
+});
 
 export const config = {
   matcher: ["/", "/login", "/superadmin/:path*", "/admin/:path*", "/coordinator/:path*", "/teacher/:path*", "/parent/:path*", "/student/:path*"],
