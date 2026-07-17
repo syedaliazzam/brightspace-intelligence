@@ -56,29 +56,31 @@ export async function GET() {
         istd.registration_link_generated_at,
         istd.registration_link_generated_by::text AS registration_link_generated_by,
         istd.registration_lead_id::text AS registration_lead_id,
-        pif.id::text AS parent_interview_form_id,
-        pif.status::text AS parent_interview_status,
-        pif.created_at AS parent_interview_created_at,
-        pif.submitted_at AS parent_interview_submitted_at,
-        pif.reviewed_at AS parent_interview_reviewed_at,
+        pif.parent_interview_form_id,
+        pif.parent_interview_status,
+        pif.parent_interview_created_at,
+        pif.parent_interview_submitted_at,
+        pif.parent_interview_reviewed_at,
         NULLIF(TRIM(istd.notes), '') AS notes,
         istd.created_at,
         istd.updated_at
       FROM interested_students istd
       LEFT JOIN LATERAL (
         SELECT
-          pif_inner.id,
-          pif_inner.status,
-          pif_inner.created_at,
-          pif_inner.submitted_at,
-          pif_inner.reviewed_at
+          STRING_AGG(pif_inner.id::text, ',' ORDER BY pif_inner.created_at DESC) AS parent_interview_form_id,
+          CASE
+            WHEN BOOL_OR(LOWER(COALESCE(pif_inner.status::text, '')) IN ('submitted', 'reviewed') OR pif_inner.submitted_at IS NOT NULL) THEN 'submitted'
+            WHEN BOOL_OR(LOWER(COALESCE(pif_inner.status::text, '')) = 'sent') THEN 'sent'
+            ELSE LOWER(COALESCE(MAX(pif_inner.status::text), 'pending'))
+          END AS parent_interview_status,
+          MAX(pif_inner.created_at) AS parent_interview_created_at,
+          MAX(pif_inner.submitted_at) AS parent_interview_submitted_at,
+          MAX(pif_inner.reviewed_at) AS parent_interview_reviewed_at
         FROM parent_interview_forms pif_inner
         WHERE (
           NULLIF(TRIM(pif_inner.registration_id), '') = istd.registration_lead_id::text
           OR LOWER(NULLIF(TRIM(pif_inner.parent_email), '')) = LOWER(NULLIF(TRIM(istd.email), ''))
         )
-        ORDER BY pif_inner.created_at DESC
-        LIMIT 1
       ) pif ON TRUE
       ORDER BY istd.created_at DESC NULLS LAST, istd.id DESC
     `;
