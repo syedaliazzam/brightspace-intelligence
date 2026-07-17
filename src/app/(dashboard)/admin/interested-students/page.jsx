@@ -92,7 +92,12 @@ export default function AdminInterestedStudentsPage() {
 
   const statusCounts = useMemo(() => {
     const counts = { all: normalizedItems.length, pending: 0, parent_interview_sent: 0, parent_interview_submitted: 0, sent: 0, submitted: 0, not_submitted: 0, follow_up: 0 };
-    for (const item of normalizedItems) counts[item.__currentStage] += 1;
+    for (const item of normalizedItems) {
+      counts[item.__currentStage] += 1;
+      if (item.__currentStage === "parent_interview_sent") {
+        counts.pending += 1;
+      }
+    }
     return counts;
   }, [normalizedItems]);
 
@@ -115,7 +120,7 @@ export default function AdminInterestedStudentsPage() {
         if (followUpBucket === "30+") return days >= 30;
         return true;
       }
-      return item.__currentStage === activeFilter;
+      return item.__currentStage === activeFilter || (activeFilter === "pending" && item.__currentStage === "parent_interview_sent");
     });
   }, [activeFilter, followUpBucket, normalizedItems, search]);
 
@@ -158,7 +163,7 @@ export default function AdminInterestedStudentsPage() {
             <div className="border-b border-[#2D8A6A]/10 px-6 py-5">
               <div className="flex flex-wrap items-end justify-between gap-4">
                 <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#0D5C48]">Admission form status</p>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#0D5C48]">Admission Process</p>
                 </div>
                 <div className="grid grid-cols-2 gap-3 [@media(min-width:500px)]:grid-cols-3 [@media(min-width:668px)]:grid-cols-4 [@media(min-width:992px)]:grid-cols-7">
                   {FILTERS.filter((item) => item.id !== "all").map((item, index) => {

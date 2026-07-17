@@ -12,6 +12,12 @@ function normalizeText(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 
+function extractText(value) {
+  if (typeof value === "string") return value.trim();
+  if (typeof value === "number" || typeof value === "boolean") return String(value).trim();
+  return "";
+}
+
 function normalizeMoney(value) {
   const amount = Number(value);
   return Number.isFinite(amount) && amount >= 0 ? amount : null;
@@ -36,46 +42,6 @@ async function tableExists(tableName) {
     ) AS exists
   `;
   return Boolean(row?.exists);
-}
-
-async function getColumns(tableName) {
-  const rows = await prisma.$queryRaw`
-    SELECT column_name, data_type, udt_name
-    FROM information_schema.columns
-    WHERE table_schema = 'public'
-      AND table_name = ${tableName}
-  `;
-
-  return rows.reduce((accumulator, row) => {
-    accumulator[row.column_name] = {
-      dataType: row.data_type,
-      udtName: row.udt_name,
-    };
-    return accumulator;
-  }, {});
-}
-
-function valueSql(columnMeta, value) {
-  if (!columnMeta || value === null || typeof value === "undefined") {
-    return Prisma.sql`${value ?? null}`;
-  }
-  if (columnMeta.udtName === "uuid") return Prisma.sql`${value}::uuid`;
-  if (columnMeta.dataType === "USER-DEFINED" && columnMeta.udtName) {
-    return Prisma.sql`${value}::${Prisma.raw(columnMeta.udtName)}`;
-  }
-  return Prisma.sql`${value}`;
-}
-
-function getLabelSql(columns) {
-  if (columns.name) return Prisma.sql`COALESCE(NULLIF(rf.name, ''), rf.class_level, 'Regular Fee')`;
-  if (columns.title) return Prisma.sql`COALESCE(NULLIF(rf.title, ''), rf.class_level, 'Regular Fee')`;
-  return Prisma.sql`COALESCE(rf.class_level, 'Regular Fee')`;
-}
-
-function statusSql(columns) {
-  return columns.status
-    ? Prisma.sql`LOWER(rf.status::text) AS status`
-    : Prisma.sql`'active' AS status`;
 }
 
 export async function GET() {
@@ -128,25 +94,26 @@ export async function POST(request) {
     if (!name) return json("Name is required.", 400);
     if (amount === null) return json("Amount must be zero or greater.", 400);
 
-    const columns = await getColumns("regular_fee");
     const insertColumns = [];
     const insertValues = [];
-
-    const push = (columnName, value) => {
-      if (columns[columnName]) {
-        insertColumns.push(Prisma.raw(`"${columnName}"`));
-        insertValues.push(valueSql(columns[columnName], value));
-      }
-    };
-
-    push("id", crypto.randomUUID());
-    push("class_level", classLevel);
-    push("name", name);
-    push("title", name);
-    push("amount", amount);
-    push("status", status);
-    push("created_at", new Date());
-    push("updated_at", new Date());
+    insertColumns.push(
+      Prisma.raw(`"id"`),
+      Prisma.raw(`"class_level"`),
+      Prisma.raw(`"name"`),
+      Prisma.raw(`"amount"`),
+      Prisma.raw(`"status"`),
+      Prisma.raw(`"created_at"`),
+      Prisma.raw(`"updated_at"`)
+    );
+    insertValues.push(
+      Prisma.sql`${crypto.randomUUID()}::uuid`,
+      Prisma.sql`${classLevel}`,
+      Prisma.sql`${name}`,
+      Prisma.sql`${amount}`,
+      Prisma.sql`${status}`,
+      Prisma.sql`${new Date()}`,
+      Prisma.sql`${new Date()}`
+    );
 
     await prisma.$executeRaw(
       Prisma.sql`INSERT INTO regular_fee (${Prisma.join(insertColumns, ", ")}) VALUES (${Prisma.join(insertValues, ", ")})`
@@ -169,32 +136,48 @@ export async function PATCH(request) {
 
     const body = await request.json();
     const id = normalizeText(body?.id);
-    const classLevel = normalizeText(body?.class_level || body?.classLevel);
-    const name = normalizeText(body?.name || body?.title);
+    const classLevel = extractText(body?.class_level ?? body?.classLevel);
+    const name = extractText(body?.name ?? body?.title);
     const amount = normalizeMoney(body?.amount);
-    const status = normalizeText(body?.status).toLowerCase();
+    const status = extractText(body?.status).toLowerCase();
+    const hasObjectInput =
+      (body?.class_level && typeof body.class_level === "object") ||
+      (body?.classLevel && typeof body.classLevel === "object") ||
+      (body?.name && typeof body.name === "object") ||
+      (body?.title && typeof body.title === "object") ||
+      (body?.amount && typeof body.amount === "object") ||
+      (body?.status && typeof body.status === "object");
 
     if (!id) return json("Regular fee id is required.", 400);
-
-    const columns = await getColumns("regular_fee");
-    const sets = [];
-    if (classLevel && columns.class_level) sets.push(Prisma.sql`class_level = ${classLevel}`);
-    if (name) {
-      if (columns.name) sets.push(Prisma.sql`name = ${name}`);
-      if (columns.title) sets.push(Prisma.sql`title = ${name}`);
+    if (hasObjectInput) {
+      return json("Regular fee fields must be plain text or numbers, not nested objects.", 400);
     }
-    if (amount !== null && columns.amount) sets.push(Prisma.sql`amount = ${amount}`);
-    if (status && columns.status) sets.push(Prisma.sql`status = ${status}`);
-    if (columns.updated_at) sets.push(Prisma.sql`updated_at = NOW()`);
+    if (!classLevel) return json("Class level is required.", 400);
+    if (!name) return json("Name is required.", 400);
+    if (amount === null) return json("Amount must be zero or greater.", 400);
+    if (status && !["active", "inactive"].includes(status)) {
+      return json("Status must be active or inactive.", 400);
+    }
 
-    if (!sets.length) return json("No supported fields were provided.", 400);
-
-    await prisma.$executeRaw(
-      Prisma.sql`UPDATE regular_fee SET ${Prisma.join(sets, Prisma.sql`, `)} WHERE id = ${id}::uuid`
-    );
+    await prisma.$executeRaw`
+      UPDATE regular_fee
+      SET
+        class_level = ${classLevel},
+        name = ${name},
+        amount = ${amount},
+        status = ${status},
+        updated_at = NOW()
+      WHERE id = ${id}::uuid
+    `;
 
     return json("Regular fee updated.");
   } catch (error) {
-    return json(error instanceof Error ? error.message : "Unable to update regular fee.", 500);
+    const message = error instanceof Error ? error.message : "Unable to update regular fee.";
+    return json(
+      message.includes('syntax error at or near "Object"')
+        ? "Regular fee update failed. Please review the selected class, name, amount, and status."
+        : message,
+      500
+    );
   }
 }

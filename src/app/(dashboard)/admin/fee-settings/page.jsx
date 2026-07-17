@@ -317,6 +317,34 @@ export default function AdminFeeSettingsPage() {
         delete payload.net_amount;
       }
 
+      if (section === "regular") {
+        payload.class_level = String(payload.class_level || "").trim();
+        payload.name = String(payload.name || payload.title || "").trim();
+        payload.amount = Number(payload.amount || 0);
+        payload.status = String(payload.status || "active").trim().toLowerCase() || "active";
+      }
+
+      if (section === "other") {
+        payload.name = String(payload.name || payload.title || "").trim();
+        payload.fee_type = String(payload.fee_type || payload.feeType || "admission_fee").trim();
+        payload.class_level = String(payload.class_level || payload.classLevel || "").trim();
+        payload.amount = Number(payload.amount || 0);
+        payload.description = String(payload.description || "").trim();
+        payload.status = String(payload.status || "active").trim().toLowerCase() || "active";
+      }
+
+      if (section === "payment") {
+        payload.name = String(payload.name || "").trim();
+        payload.method_key = String(payload.method_key || "").trim();
+        payload.account_title = String(payload.account_title || "").trim();
+        payload.account_number = String(payload.account_number || "").trim();
+        payload.iban = String(payload.iban || "").trim();
+        payload.bank_name = String(payload.bank_name || "").trim();
+        payload.branch_code = String(payload.branch_code || "").trim();
+        payload.instructions = String(payload.instructions || "").trim();
+        payload.status = String(payload.status || "active").trim().toLowerCase() || "active";
+      }
+
       const response = await fetch(endpointMap[section], {
         method: isEditing ? "PATCH" : "POST",
         headers: { "Content-Type": "application/json" },

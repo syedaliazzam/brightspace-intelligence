@@ -75,8 +75,10 @@ export default function InterestedStudentsPanel({
   const [page, setPage] = useState(1);
   const [selectedLead, setSelectedLead] = useState(null);
   const [selectedMessage, setSelectedMessage] = useState(null);
+  const [deleteTarget, setDeleteTarget] = useState(null);
   const [message, setMessage] = useState("");
   const [loadingId, setLoadingId] = useState("");
+  const [deletingId, setDeletingId] = useState("");
   const [previewAdmissionFeeId, setPreviewAdmissionFeeId] = useState("");
   const [previewDiscountId, setPreviewDiscountId] = useState("");
   const [previewPaymentMethodId, setPreviewPaymentMethodId] = useState("");
@@ -306,6 +308,36 @@ export default function InterestedStudentsPanel({
     }
   }
 
+  async function deleteInterestedStudent(item) {
+    if (!item?.id) return;
+
+    setDeletingId(item.id);
+    setMessage("");
+
+    try {
+      const response = await fetch(`/api/coordinator/interested-students/${encodeURIComponent(item.id)}`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+      });
+      const data = await response.json();
+
+      if (!response.ok || !data?.success) {
+        throw new Error(data?.message || "Unable to delete interested student.");
+      }
+
+      setLocalItems((current) => current.filter((lead) => lead.id !== item.id));
+      setSelectedLead((current) => (current?.id === item.id ? null : current));
+      setSelectedMessage((current) => (current?.id === item.id ? null : current));
+      setDeleteTarget(null);
+      setMessage("Interested student deleted.");
+      await onRefresh?.();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Unable to delete interested student.");
+    } finally {
+      setDeletingId("");
+    }
+  }
+
   if (!items.length) {
     return (
       <section className="rounded-[1.75rem] border border-dashed border-[#2D8A6A]/25 bg-[#FAF7F0]/80 p-10 text-center text-sm text-[#245C4F] shadow-[0_18px_60px_-36px_rgba(13,59,46,0.18)]">
@@ -347,7 +379,10 @@ export default function InterestedStudentsPanel({
               {visibleItems.map((item, index) => {
                 const stage = getLeadStage(item);
                 const canSendForm = !stage.sent && !stage.submitted;
-                const showRowAction = showActionsColumn && !stage.sent;
+                const showRowAction =
+                  (showDetailsButton && !stage.sent) ||
+                  (showActionsColumn && !stage.interviewSubmitted && !stage.sent && !stage.submitted);
+                const canDeleteRow = !stage.interviewSubmitted && !stage.sent && !stage.submitted;
 
                 return (
                   <tr key={item.id} className="align-top">
@@ -433,19 +468,31 @@ export default function InterestedStudentsPanel({
                     <td className="px-5 py-5 text-sm text-[#245C4F]">{formatDate(item.created_at)}</td>
                     {showRowAction ? (
                       <td className="px-5 py-5 text-right">
-                        {showDetailsButton ? (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setMessage("");
-                              setSelectedLead(item);
-                            }}
-                            className="rounded-full bg-[#0D5C48] px-4 py-2 text-sm font-semibold text-[#FAF7F0] transition hover:bg-[#063F32] disabled:cursor-not-allowed disabled:opacity-70"
-                            disabled={loadingId === item.id}
-                          >
-                            {canSendForm ? "Details" : "View"}
-                          </button>
-                        ) : null}
+                        <div className="inline-flex items-center justify-end gap-2 whitespace-nowrap">
+                          {showDetailsButton && !stage.sent ? (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setMessage("");
+                                setSelectedLead(item);
+                              }}
+                              className="rounded-full bg-[#0D5C48] px-4 py-2 text-sm font-semibold text-[#FAF7F0] transition hover:bg-[#063F32] disabled:cursor-not-allowed disabled:opacity-70"
+                              disabled={loadingId === item.id}
+                              >
+                                {canSendForm ? "Details" : "View"}
+                              </button>
+                          ) : null}
+                          {canDeleteRow ? (
+                            <button
+                              type="button"
+                              onClick={() => setDeleteTarget(item)}
+                              className="rounded-full border border-rose-200 bg-rose-50 px-4 py-2 text-sm font-semibold text-rose-700 transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-70"
+                              disabled={loadingId === item.id || deletingId === item.id}
+                            >
+                              {deletingId === item.id ? "Deleting..." : "Delete"}
+                            </button>
+                          ) : null}
+                        </div>
                       </td>
                     ) : null}
                   </tr>
@@ -525,19 +572,31 @@ export default function InterestedStudentsPanel({
               />
             </dl>
 
-            {showDetailsButton && !stage.sent ? (
-              <div className="mt-4 flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setMessage("");
-                    setSelectedLead(item);
-                  }}
-                  className="rounded-full bg-[#0D5C48] px-4 py-2 text-sm font-semibold text-[#FAF7F0] transition hover:bg-[#063F32] disabled:cursor-not-allowed disabled:opacity-70"
-                  disabled={loadingId === item.id}
-                >
-                  {canSendForm ? "Details" : "View"}
-                </button>
+            {showDetailsButton && !stage.sent || (showActionsColumn && !stage.interviewSubmitted && !stage.sent && !stage.submitted) ? (
+              <div className="mt-4 inline-flex items-center gap-2 whitespace-nowrap">
+                {showDetailsButton && !stage.sent ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMessage("");
+                      setSelectedLead(item);
+                    }}
+                    className="rounded-full bg-[#0D5C48] px-4 py-2 text-sm font-semibold text-[#FAF7F0] transition hover:bg-[#063F32] disabled:cursor-not-allowed disabled:opacity-70"
+                    disabled={loadingId === item.id}
+                  >
+                    {canSendForm ? "Details" : "View"}
+                  </button>
+                ) : null}
+                {showActionsColumn && !stage.interviewSubmitted && !stage.sent && !stage.submitted ? (
+                  <button
+                    type="button"
+                    onClick={() => setDeleteTarget(item)}
+                    className="rounded-full border border-rose-200 bg-rose-50 px-4 py-2 text-sm font-semibold text-rose-700 transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-70"
+                    disabled={loadingId === item.id || deletingId === item.id}
+                  >
+                    {deletingId === item.id ? "Deleting..." : "Delete"}
+                  </button>
+                ) : null}
               </div>
             ) : null}
           </article>
@@ -757,6 +816,41 @@ export default function InterestedStudentsPanel({
                     </div>
                   </div>
                 </section>
+              </div>
+            </div>
+          </div>
+        </ClientPortal>
+      ) : null}
+
+      {deleteTarget ? (
+        <ClientPortal targetId="coordinator-page-portal-root">
+          <div className="absolute inset-x-0 top-0 z-[10000] isolate flex min-h-full items-center justify-center bg-[#063F32]/45 px-4 py-10">
+            <div className="w-full max-w-lg rounded-[2rem] border border-[#2D8A6A]/15 bg-[#FAF7F0] p-6 shadow-[0_24px_80px_-36px_rgba(13,59,46,0.24)]">
+              <p className="text-sm font-semibold uppercase tracking-[0.24em] text-[#C9A227]">Delete interested student</p>
+              <h3 className="mt-3 font-display text-2xl font-bold tracking-tight text-[#063F32]">
+                {textOrDash(deleteTarget.student_name)}
+              </h3>
+              <p className="mt-2 text-sm text-[#245C4F]">
+                This will permanently remove the registration record from the interested students list.
+              </p>
+
+              <div className="mt-6 grid gap-3 sm:grid-cols-2">
+                <button
+                  type="button"
+                  onClick={() => setDeleteTarget(null)}
+                  className="rounded-full border border-[#2D8A6A]/20 bg-white px-4 py-2.5 text-sm font-semibold text-[#063F32] transition hover:bg-[#F1EADC]"
+                  disabled={deletingId === deleteTarget.id}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => deleteInterestedStudent(deleteTarget)}
+                  className="rounded-full bg-rose-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-70"
+                  disabled={deletingId === deleteTarget.id}
+                >
+                  {deletingId === deleteTarget.id ? "Deleting..." : "Delete Row"}
+                </button>
               </div>
             </div>
           </div>

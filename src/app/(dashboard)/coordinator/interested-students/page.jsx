@@ -173,6 +173,9 @@ export default function CoordinatorInterestedStudentsPage() {
     for (const item of normalizedItems) {
       const pipelineStage = getPipelineStage(item);
       counts[pipelineStage] += 1;
+      if (pipelineStage === "parent_interview_sent") {
+        counts.pending += 1;
+      }
     }
 
     return counts;
@@ -204,7 +207,10 @@ export default function CoordinatorInterestedStudentsPage() {
       }
 
       const pipelineStage = getPipelineStage(item);
-      const matchesStatus = activeFilter === "all" || pipelineStage === activeFilter;
+      const matchesStatus =
+        activeFilter === "all" ||
+        pipelineStage === activeFilter ||
+        (activeFilter === "pending" && pipelineStage === "parent_interview_sent");
       if (!matchesStatus) return false;
       if (pipelineStage === "follow_up" && followUpBucket !== "all") {
         const daysSinceDue = item.__stage?.daysSinceDue;
@@ -251,7 +257,7 @@ export default function CoordinatorInterestedStudentsPage() {
             <div className="border-b border-[#2D8A6A]/10 px-6 py-5">
               <div className="flex flex-wrap items-end justify-between gap-4">
                 <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#0D5C48] font-bold">Admission form status</p>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#0D5C48] font-bold">Admission Process</p>
                 </div>
                 <div className="grid grid-cols-2 gap-3 [@media(min-width:500px)]:grid-cols-3 [@media(min-width:668px)]:grid-cols-4 [@media(min-width:992px)]:grid-cols-7">
                   {FILTERS.filter((item) => item.id !== "all").map((item, index) => {

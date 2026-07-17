@@ -114,6 +114,31 @@ function isValidEmail(value) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 }
 
+function isValidPersonName(value) {
+  const text = String(value || "").trim();
+  return /^[A-Za-zÀ-ÖØ-öø-ÿا-ي؀-ۿ][A-Za-zÀ-ÖØ-öø-ÿا-ي؀-ۿ\s.'-]{1,78}[A-Za-zÀ-ÖØ-öø-ÿا-ي؀-ۿ.]?$/.test(text);
+}
+
+function isValidPhoneNumber(value) {
+  const text = String(value || "").trim();
+  return /^[+()0-9\s-]{7,20}$/.test(text) && /\d{7,}/.test(text);
+}
+
+function isValidNumericValue(value) {
+  const text = String(value || "").trim();
+  return /^\d+(\.\d{1,2})?$/.test(text);
+}
+
+function isValidTextName(value) {
+  const text = String(value || "").trim();
+  return /^[A-Za-zÀ-ÖØ-öø-ÿا-ي؀-ۿ][A-Za-zÀ-ÖØ-öø-ÿا-ي؀-ۿ\s.'()&/-]{1,98}[A-Za-zÀ-ÖØ-öø-ÿا-ي؀-ۿ.)]?$/.test(text);
+}
+
+function isValidTextValue(value) {
+  const text = String(value || "").trim();
+  return text.length > 0 && !/^\d+$/.test(text);
+}
+
 function calculateAgeFromDate(dateValue) {
   if (!dateValue) return "";
 
@@ -158,13 +183,24 @@ function getStepErrors(form, previewMode = false) {
   }
 
   if (!form.studentName.trim()) errors.studentName = "Student full name is required.";
+  else if (!isValidPersonName(form.studentName)) errors.studentName = "Enter a valid student name.";
+  if (form.studentNameUrdu && !String(form.studentNameUrdu).trim()) errors.studentNameUrdu = "Enter a valid student name.";
   if (!form.gender) errors.gender = "Gender is required.";
   if (!form.dateOfBirth) errors.dateOfBirth = "Date of birth is required.";
   if (!form.country.trim()) errors.country = "Country is required.";
+  else if (!isValidTextName(form.country)) errors.country = "Enter a valid country name.";
   if (!form.city.trim()) errors.city = "City is required.";
+  else if (!isValidTextName(form.city)) errors.city = "Enter a valid city name.";
   if (!form.nationality.trim()) errors.nationality = "Nationality is required.";
+  else if (!isValidTextName(form.nationality)) errors.nationality = "Enter a valid nationality.";
   if (!form.religion.trim()) errors.religion = "Religion is required.";
+  else if (!isValidTextName(form.religion)) errors.religion = "Enter a valid religion.";
   if (!form.preferredLanguage) errors.preferredLanguage = "Preferred language is required.";
+  if (!form.currentSchool.trim()) errors.currentSchool = "Current school is required.";
+  else if (!isValidTextName(form.currentSchool)) errors.currentSchool = "Enter a valid school name.";
+  if (!form.currentGrade.trim()) errors.currentGrade = "Current grade is required.";
+  else if (!isValidTextValue(form.currentGrade)) errors.currentGrade = "Enter a valid grade.";
+  if (!form.shiftReason.trim()) errors.shiftReason = "Reason for shifting is required.";
 
   if (!form.whyJoinSchool?.trim()) errors.whyJoinSchool = "Please share why you wish your child to join Ash-Shajarah.";
   if (!form.schoolExpectations?.trim()) errors.schoolExpectations = "Please share your expectations from the school.";
@@ -172,6 +208,11 @@ function getStepErrors(form, previewMode = false) {
   if (!form.deviceAvailable) errors.deviceAvailable = "Device availability is required.";
   if (!form.attendedOnlineClasses) errors.attendedOnlineClasses = "Please select whether the child attended online classes.";
   if (!form.developmentalConcern) errors.developmentalConcern = "Please select whether there is any diagnosed concern.";
+  if (!form.childProfile.trim()) errors.childProfile = "Child profile is required.";
+  if (!form.childStrengths.trim()) errors.childStrengths = "Child strengths are required.";
+  if (!form.childSupportNeeds.trim()) errors.childSupportNeeds = "Areas needing support are required.";
+  if (!form.childSpecialInterests.trim()) errors.childSpecialInterests = "Special interests are required.";
+  if (!form.medicalConditions.trim()) errors.medicalConditions = "Medical conditions field is required.";
   if (form.developmentalConcern === "Yes" && !String(form.developmentalConcernDetails || "").trim()) {
     errors.developmentalConcernDetails = "Please share the diagnosed concern details.";
   }
@@ -179,11 +220,57 @@ function getStepErrors(form, previewMode = false) {
   if (!String(form.fatherNameEnglish || "").trim() && !String(form.motherNameEnglish || "").trim()) {
     errors.parentNames = "At least one parent name is required.";
   }
+  if (String(form.fatherNameEnglish || "").trim() && !isValidPersonName(form.fatherNameEnglish)) {
+    errors.fatherNameEnglish = "Enter a valid father name.";
+  }
+  if (String(form.motherNameEnglish || "").trim() && !isValidPersonName(form.motherNameEnglish)) {
+    errors.motherNameEnglish = "Enter a valid mother name.";
+  }
+  if (!String(form.fatherNameEnglish || "").trim()) {
+    errors.fatherNameEnglish = "Father name is required.";
+  }
+  if (!String(form.motherNameEnglish || "").trim()) {
+    errors.motherNameEnglish = "Mother name is required.";
+  }
+  if (!String(form.fatherNameUrdu || "").trim()) errors.fatherNameUrdu = "Father name in Urdu is required.";
+  if (!String(form.motherNameUrdu || "").trim()) errors.motherNameUrdu = "Mother name in Urdu is required.";
+  if (!String(form.fatherCnic || "").trim()) errors.fatherCnic = "Father CNIC is required.";
+  if (!String(form.motherCnic || "").trim()) errors.motherCnic = "Mother CNIC is required.";
+  if (!String(form.fatherQualification || "").trim()) errors.fatherQualification = "Father qualification is required.";
+  else if (!isValidTextName(form.fatherQualification)) errors.fatherQualification = "Enter a valid qualification.";
+  if (!String(form.motherQualification || "").trim()) errors.motherQualification = "Mother qualification is required.";
+  else if (!isValidTextName(form.motherQualification)) errors.motherQualification = "Enter a valid qualification.";
+  if (!String(form.fatherOccupation || "").trim()) errors.fatherOccupation = "Father occupation is required.";
+  else if (!isValidTextName(form.fatherOccupation)) errors.fatherOccupation = "Enter a valid occupation.";
+  if (!String(form.motherOccupation || "").trim()) errors.motherOccupation = "Mother occupation is required.";
+  else if (!isValidTextName(form.motherOccupation)) errors.motherOccupation = "Enter a valid occupation.";
+  if (!String(form.fatherMotherTongue || "").trim()) errors.fatherMotherTongue = "Father mother tongue is required.";
+  else if (!isValidTextName(form.fatherMotherTongue)) errors.fatherMotherTongue = "Enter a valid language.";
+  if (!String(form.motherMotherTongue || "").trim()) errors.motherMotherTongue = "Mother mother tongue is required.";
+  else if (!isValidTextName(form.motherMotherTongue)) errors.motherMotherTongue = "Enter a valid language.";
+  if (!String(form.fatherContactHome || "").trim()) errors.fatherContactHome = "Father home contact is required.";
+  else if (!isValidPhoneNumber(form.fatherContactHome)) errors.fatherContactHome = "Enter a valid home contact number.";
+  if (!String(form.fatherContactOffice || "").trim()) errors.fatherContactOffice = "Father office contact is required.";
+  else if (!isValidPhoneNumber(form.fatherContactOffice)) errors.fatherContactOffice = "Enter a valid office contact number.";
+  if (!String(form.fatherContactWhatsapp || "").trim() && !String(form.fatherEmergencyContact || "").trim()) {
+    errors.fatherContactWhatsapp = "Father WhatsApp or emergency contact is required.";
+  }
+  if (!String(form.motherContactHome || "").trim()) errors.motherContactHome = "Mother home contact is required.";
+  else if (!isValidPhoneNumber(form.motherContactHome)) errors.motherContactHome = "Enter a valid home contact number.";
+  if (!String(form.motherContactOffice || "").trim()) errors.motherContactOffice = "Mother office contact is required.";
+  else if (!isValidPhoneNumber(form.motherContactOffice)) errors.motherContactOffice = "Enter a valid office contact number.";
+  if (!String(form.motherContactWhatsapp || "").trim() && !String(form.motherEmergencyContact || "").trim()) {
+    errors.motherContactWhatsapp = "Mother WhatsApp or emergency contact is required.";
+  }
   if (String(form.fatherEmail || "").trim() && !isValidEmail(String(form.fatherEmail || "").trim())) {
     errors.fatherEmail = "Enter a valid father email address.";
+  } else if (!String(form.fatherEmail || "").trim()) {
+    errors.fatherEmail = "Father email is required.";
   }
   if (String(form.motherEmail || "").trim() && !isValidEmail(String(form.motherEmail || "").trim())) {
     errors.motherEmail = "Enter a valid mother email address.";
+  } else if (!String(form.motherEmail || "").trim()) {
+    errors.motherEmail = "Mother email is required.";
   }
   if (!form.preferredContactPerson) {
     errors.preferredContactPerson = "Preferred contact person is required.";
@@ -217,6 +304,8 @@ function getStepErrors(form, previewMode = false) {
   if (!form.birthCertificateFile) errors.birthCertificateFile = "Child B-Form / Birth Certificate is required.";
   if (!form.parentCnicFile) errors.parentCnicFile = "Parent CNIC is required.";
   if (!form.childPhotographFile) errors.childPhotographFile = "Recent child photograph is required.";
+  if (!form.previousSchoolReportFile) errors.previousSchoolReportFile = "Previous school report is required.";
+  if (!form.medicalReportFile) errors.medicalReportFile = "Medical report is required.";
   if (previewMode) {
     if (!form.paymentMethod) errors.paymentMethod = "Payment method is required.";
     if (!form.admissionFee) errors.admissionFee = "Admission fee is required.";
@@ -224,14 +313,17 @@ function getStepErrors(form, previewMode = false) {
     if (!String(form.paymentInstructions || "").trim()) errors.paymentInstructions = "Payment instructions are required.";
   } else {
     if (!String(form.payerName || "").trim()) errors.payerName = "Payer name is required.";
+    else if (!isValidPersonName(form.payerName)) errors.payerName = "Enter a valid payer name.";
     if (String(form.payerEmail || "").trim() && !isValidEmail(String(form.payerEmail || "").trim())) {
       errors.payerEmail = "Enter a valid payer email address.";
     } else if (!String(form.payerEmail || "").trim()) {
       errors.payerEmail = "Payer email is required.";
     }
     if (!String(form.payerPhone || "").trim()) errors.payerPhone = "Payer phone is required.";
+    else if (!isValidPhoneNumber(form.payerPhone)) errors.payerPhone = "Enter a valid payer phone number.";
     if (!String(form.transactionId || "").trim()) errors.transactionId = "Transaction ID is required.";
     if (!String(form.paidAmount || "").trim()) errors.paidAmount = "Paid amount is required.";
+    else if (!isValidNumericValue(form.paidAmount)) errors.paidAmount = "Enter a valid paid amount.";
     if (!String(form.paidAt || "").trim()) errors.paidAt = "Paid at date/time is required.";
     if (!form.paymentProofFile) errors.paymentProofFile = "Payment proof file is required.";
   }
@@ -374,10 +466,10 @@ function AdmissionFormContent() {
     const allErrors = getStepErrors(formValue, isPreviewMode);
     const keysByStep = {
       0: ["programName", "classLevel", "preferredStartingMonth", "preferredStartingMonthOther"],
-      1: ["studentName", "gender", "dateOfBirth", "country", "city", "nationality", "religion", "preferredLanguage"],
-      2: ["attendedOnlineClasses", "developmentalConcern", "developmentalConcernDetails"],
-      3: ["parentNames", "fatherEmail", "motherEmail", "preferredContactPerson", "primaryParent", "fatherContactWhatsapp", "motherContactWhatsapp"],
-      4: ["supportPersonDuringLearning", "deviceAvailable", "birthCertificateFile", "parentCnicFile", "childPhotographFile"],
+      1: ["studentName", "studentNameUrdu", "gender", "dateOfBirth", "country", "city", "nationality", "religion", "preferredLanguage", "currentSchool", "currentGrade"],
+      2: ["shiftReason", "attendedOnlineClasses", "developmentalConcern", "developmentalConcernDetails", "childProfile", "childStrengths", "childSupportNeeds", "childSpecialInterests", "medicalConditions"],
+      3: ["parentNames", "fatherNameEnglish", "motherNameEnglish", "fatherNameUrdu", "motherNameUrdu", "fatherEmail", "motherEmail", "preferredContactPerson", "primaryParent", "fatherContactHome", "fatherContactOffice", "fatherContactWhatsapp", "fatherEmergencyContact", "motherContactHome", "motherContactOffice", "motherContactWhatsapp", "motherEmergencyContact"],
+      4: ["supportPersonDuringLearning", "deviceAvailable", "birthCertificateFile", "parentCnicFile", "childPhotographFile", "previousSchoolReportFile", "medicalReportFile"],
       5: isPreviewMode
         ? ["paymentMethod", "admissionFee", "discountPercent", "paymentInstructions"]
         : ["payerName", "payerEmail", "payerPhone", "transactionId", "paidAmount", "paidAt", "paymentProofFile"],
@@ -395,10 +487,10 @@ function AdmissionFormContent() {
   function stepHasCurrentErrors(currentStep, errorsValue) {
     const map = {
       0: ["programName", "classLevel", "preferredStartingMonth", "preferredStartingMonthOther"],
-      1: ["studentName", "gender", "dateOfBirth", "country", "city", "nationality", "religion", "preferredLanguage"],
-      2: ["attendedOnlineClasses", "developmentalConcern", "developmentalConcernDetails"],
-      3: ["parentNames", "fatherEmail", "motherEmail", "preferredContactPerson", "primaryParent", "fatherContactWhatsapp", "motherContactWhatsapp"],
-      4: ["supportPersonDuringLearning", "deviceAvailable", "birthCertificateFile", "parentCnicFile", "childPhotographFile"],
+      1: ["studentName", "studentNameUrdu", "gender", "dateOfBirth", "country", "city", "nationality", "religion", "preferredLanguage", "currentSchool", "currentGrade"],
+      2: ["shiftReason", "attendedOnlineClasses", "developmentalConcern", "developmentalConcernDetails", "childProfile", "childStrengths", "childSupportNeeds", "childSpecialInterests", "medicalConditions"],
+      3: ["parentNames", "fatherNameEnglish", "motherNameEnglish", "fatherNameUrdu", "motherNameUrdu", "fatherEmail", "motherEmail", "preferredContactPerson", "primaryParent", "fatherContactHome", "fatherContactOffice", "fatherContactWhatsapp", "fatherEmergencyContact", "motherContactHome", "motherContactOffice", "motherContactWhatsapp", "motherEmergencyContact"],
+      4: ["supportPersonDuringLearning", "deviceAvailable", "birthCertificateFile", "parentCnicFile", "childPhotographFile", "previousSchoolReportFile", "medicalReportFile"],
       5: isPreviewMode
         ? ["paymentMethod", "admissionFee", "discountPercent", "paymentInstructions"]
         : ["payerName", "payerEmail", "payerPhone", "transactionId", "paidAmount", "paidAt", "paymentProofFile"],
@@ -684,12 +776,16 @@ function AdmissionFormContent() {
         admissionFee: form.admissionFee ? "" : "Admission fee is required.",
         discountPercent: String(form.discountPercent || "").trim() ? "" : "Discount is required.",
         paymentInstructions: previewPaymentInstructions ? "" : "Payment instructions are required.",
+        form: "Please complete the payment details before continuing.",
       }));
       return;
     }
 
     const nextErrors = getErrorsForCurrentStep(form, step);
-    setErrors(nextErrors);
+    setErrors({
+      ...nextErrors,
+      form: Object.values(nextErrors)[0] || "",
+    });
 
     if (Object.values(nextErrors).some(Boolean)) {
       if (step === 4) {
@@ -710,7 +806,10 @@ function AdmissionFormContent() {
   async function handleSubmit(event) {
     event.preventDefault();
     const nextErrors = getAllCurrentErrors(form);
-    setErrors(nextErrors);
+    setErrors({
+      ...nextErrors,
+      form: Object.values(nextErrors)[0] || "",
+    });
 
     if (Object.values(nextErrors).some(Boolean)) {
       setSuccessMessage("");
@@ -913,6 +1012,7 @@ function AdmissionFormContent() {
         <div className="sm:col-span-2">
           <label className="mb-2 block text-[11px] font-bold uppercase tracking-[0.18em] text-[#0D5C48]" htmlFor="studentNameUrdu">Student Name (Urdu)</label>
           <input id="studentNameUrdu" value={form.studentNameUrdu} onChange={(event) => updateField("studentNameUrdu", event.target.value)} className={inputClass(false)} />
+          <FieldError error={errors.studentNameUrdu} />
         </div>
         <div>
           <label className="mb-2 block text-[11px] font-bold uppercase tracking-[0.18em] text-[#0D5C48]" htmlFor="gender">Gender</label>
@@ -960,10 +1060,12 @@ function AdmissionFormContent() {
         <div>
           <label className="mb-2 block text-[11px] font-bold uppercase tracking-[0.18em] text-[#0D5C48]" htmlFor="currentSchool">Current School (if applicable)</label>
           <input id="currentSchool" value={form.currentSchool} onChange={(event) => updateField("currentSchool", event.target.value)} className={inputClass(false)} />
+          <FieldError error={errors.currentSchool} />
         </div>
         <div>
           <label className="mb-2 block text-[11px] font-bold uppercase tracking-[0.18em] text-[#0D5C48]" htmlFor="currentGrade">Current Grade</label>
           <input id="currentGrade" value={form.currentGrade} onChange={(event) => updateField("currentGrade", event.target.value)} className={inputClass(false)} />
+          <FieldError error={errors.currentGrade} />
         </div>
       </div>
     );
@@ -975,6 +1077,7 @@ function AdmissionFormContent() {
         <div className="sm:col-span-2">
           <label className="mb-2 block text-[11px] font-bold uppercase tracking-[0.18em] text-[#0D5C48]" htmlFor="shiftReason">Reason for shifting from physical to online schooling</label>
           <textarea id="shiftReason" rows={3} value={form.shiftReason} onChange={(event) => updateField("shiftReason", event.target.value)} className={inputClass(false)} />
+          <FieldError error={errors.shiftReason} />
         </div>
         <div>
           <label className="mb-2 block text-[11px] font-bold uppercase tracking-[0.18em] text-[#0D5C48]" htmlFor="attendedOnlineClasses">Has the child previously attended online classes?</label>
@@ -1000,22 +1103,27 @@ function AdmissionFormContent() {
         <div className="sm:col-span-2">
           <label className="mb-2 block text-[11px] font-bold uppercase tracking-[0.18em] text-[#0D5C48]" htmlFor="childProfile">Please describe your child briefly</label>
           <textarea id="childProfile" rows={3} value={form.childProfile} onChange={(event) => updateField("childProfile", event.target.value)} className={inputClass(false)} />
+          <FieldError error={errors.childProfile} />
         </div>
         <div>
           <label className="mb-2 block text-[11px] font-bold uppercase tracking-[0.18em] text-[#0D5C48]" htmlFor="childStrengths">Strengths</label>
           <textarea id="childStrengths" rows={3} value={form.childStrengths} onChange={(event) => updateField("childStrengths", event.target.value)} className={inputClass(false)} />
+          <FieldError error={errors.childStrengths} />
         </div>
         <div>
           <label className="mb-2 block text-[11px] font-bold uppercase tracking-[0.18em] text-[#0D5C48]" htmlFor="childSupportNeeds">Areas needing support</label>
           <textarea id="childSupportNeeds" rows={3} value={form.childSupportNeeds} onChange={(event) => updateField("childSupportNeeds", event.target.value)} className={inputClass(false)} />
+          <FieldError error={errors.childSupportNeeds} />
         </div>
         <div className="sm:col-span-2">
           <label className="mb-2 block text-[11px] font-bold uppercase tracking-[0.18em] text-[#0D5C48]" htmlFor="childSpecialInterests">Special interests</label>
           <textarea id="childSpecialInterests" rows={3} value={form.childSpecialInterests} onChange={(event) => updateField("childSpecialInterests", event.target.value)} className={inputClass(false)} />
+          <FieldError error={errors.childSpecialInterests} />
         </div>
         <div className="sm:col-span-2">
           <label className="mb-2 block text-[11px] font-bold uppercase tracking-[0.18em] text-[#0D5C48]" htmlFor="medicalConditions">Medical conditions (if any)</label>
           <textarea id="medicalConditions" rows={3} value={form.medicalConditions} onChange={(event) => updateField("medicalConditions", event.target.value)} className={inputClass(false)} />
+          <FieldError error={errors.medicalConditions} />
         </div>
       </div>
     );
@@ -1042,34 +1150,42 @@ function AdmissionFormContent() {
           <div>
             <label className="mb-2 block text-[11px] font-bold uppercase tracking-[0.18em] text-[#0D5C48]">{title} Name (Block Letters)</label>
             <input value={form[nameEnglishKey]} onChange={(event) => updateField(nameEnglishKey, event.target.value)} className={inputClass(false)} />
+            <FieldError error={errors[nameEnglishKey]} />
           </div>
           <div>
             <label className="mb-2 block text-[11px] font-bold uppercase tracking-[0.18em] text-[#0D5C48]">{title} Name (Urdu)</label>
             <input value={form[nameUrduKey]} onChange={(event) => updateField(nameUrduKey, event.target.value)} className={inputClass(false)} />
+            <FieldError error={errors[nameUrduKey]} />
           </div>
           <div>
             <label className="mb-2 block text-[11px] font-bold uppercase tracking-[0.18em] text-[#0D5C48]">CNIC Number</label>
             <input value={form[cnicKey]} onChange={(event) => updateField(cnicKey, event.target.value)} className={inputClass(false)} />
+            <FieldError error={errors[cnicKey]} />
           </div>
           <div>
             <label className="mb-2 block text-[11px] font-bold uppercase tracking-[0.18em] text-[#0D5C48]">Qualification</label>
             <input value={form[qualificationKey]} onChange={(event) => updateField(qualificationKey, event.target.value)} className={inputClass(false)} />
+            <FieldError error={errors[qualificationKey]} />
           </div>
           <div>
             <label className="mb-2 block text-[11px] font-bold uppercase tracking-[0.18em] text-[#0D5C48]">Occupation</label>
             <input value={form[occupationKey]} onChange={(event) => updateField(occupationKey, event.target.value)} className={inputClass(false)} />
+            <FieldError error={errors[occupationKey]} />
           </div>
           <div>
             <label className="mb-2 block text-[11px] font-bold uppercase tracking-[0.18em] text-[#0D5C48]">Mother Tongue</label>
             <input value={form[motherTongueKey]} onChange={(event) => updateField(motherTongueKey, event.target.value)} className={inputClass(false)} />
+            <FieldError error={errors[motherTongueKey]} />
           </div>
           <div>
             <label className="mb-2 block text-[11px] font-bold uppercase tracking-[0.18em] text-[#0D5C48]">Contact No. (Home)</label>
             <input value={form[homeKey]} onChange={(event) => updateField(homeKey, event.target.value)} className={inputClass(false)} />
+            <FieldError error={errors[homeKey]} />
           </div>
           <div>
             <label className="mb-2 block text-[11px] font-bold uppercase tracking-[0.18em] text-[#0D5C48]">Contact No. (Office)</label>
             <input value={form[officeKey]} onChange={(event) => updateField(officeKey, event.target.value)} className={inputClass(false)} />
+            <FieldError error={errors[officeKey]} />
           </div>
           <div>
             <label className="mb-2 block text-[11px] font-bold uppercase tracking-[0.18em] text-[#0D5C48]">Contact No. (WhatsApp)</label>
@@ -1079,6 +1195,7 @@ function AdmissionFormContent() {
           <div>
             <label className="mb-2 block text-[11px] font-bold uppercase tracking-[0.18em] text-[#0D5C48]">Emergency Contact No.</label>
             <input value={form[emergencyKey]} onChange={(event) => updateField(emergencyKey, event.target.value)} className={inputClass(false)} />
+            <FieldError error={errors[emergencyKey]} />
           </div>
           <div>
             <label className="mb-2 block text-[11px] font-bold uppercase tracking-[0.18em] text-[#0D5C48]">Email ID</label>
@@ -1088,6 +1205,7 @@ function AdmissionFormContent() {
           <div>
             <label className="mb-2 block text-[11px] font-bold uppercase tracking-[0.18em] text-[#0D5C48]">Residential Address</label>
             <textarea rows={3} value={form[addressKey]} onChange={(event) => updateField(addressKey, event.target.value)} className={inputClass(false)} />
+            <FieldError error={errors[addressKey]} />
           </div>
         </div>
       </div>
