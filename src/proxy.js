@@ -42,10 +42,17 @@ function getSuperadminProtected(pathname) {
 
 export default async function middleware(req) {
   const { pathname } = req.nextUrl;
-  const token = await getToken({
-    req,
-    secret: process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET,
-  });
+  let token = null;
+
+  try {
+    token = await getToken({
+      req,
+      secret: process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET,
+    });
+  } catch {
+    token = null;
+  }
+
   const sessionRole = String(token?.role || "").toLowerCase();
   const dashboard = getDashboardPath(sessionRole);
   const protectedRole = getProtectedRole(pathname);
