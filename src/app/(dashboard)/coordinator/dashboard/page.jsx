@@ -169,7 +169,6 @@ export default function CoordinatorDashboardPage() {
           items={[
             { key: "totalRegistrations", label: "Total registrations", value: state.loading ? "..." : stats.totalRegistrations || 0 },
             { key: "newLeads", label: "Parent Interview Form Not Submitted", value: state.loading ? "..." : stats.newLeads || 0 },
-            { key: "parentInterviewSent", label: "Parent Interview Form Sent", value: state.loading ? "..." : stats.parentInterviewSent || 0 },
             { key: "parentInterviewSubmitted", label: "Parent Interview Form Submitted", value: state.loading ? "..." : stats.parentInterviewSubmitted || 0 },
             { key: "pendingVouchers", label: "Pending vouchers", value: state.loading ? "..." : stats.pendingVouchers || 0 },
             { key: "pendingPaymentVerifications", label: "Pending payment verifications", value: state.loading ? "..." : stats.pendingPaymentVerifications || 0 },
