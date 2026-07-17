@@ -67,11 +67,25 @@ export async function GET() {
       FROM interested_students istd
       LEFT JOIN LATERAL (
         SELECT
-          STRING_AGG(pif_inner.id::text, ',' ORDER BY pif_inner.created_at DESC) AS parent_interview_form_id,
+          COUNT(*)::int AS parent_interview_count,
+          COUNT(*) FILTER (
+            WHERE LOWER(COALESCE(pif_inner.status::text, '')) IN ('submitted', 'reviewed')
+              OR pif_inner.submitted_at IS NOT NULL
+          )::int AS parent_interview_submitted_count,
+          COUNT(*) FILTER (
+            WHERE LOWER(COALESCE(pif_inner.status::text, '')) = 'sent'
+          )::int AS parent_interview_sent_count,
+          MAX(pif_inner.id)::text AS parent_interview_form_id,
           CASE
-            WHEN BOOL_OR(LOWER(COALESCE(pif_inner.status::text, '')) IN ('submitted', 'reviewed') OR pif_inner.submitted_at IS NOT NULL) THEN 'submitted'
-            WHEN BOOL_OR(LOWER(COALESCE(pif_inner.status::text, '')) = 'sent') THEN 'sent'
-            ELSE LOWER(COALESCE(MAX(pif_inner.status::text), 'pending'))
+            WHEN COUNT(*) FILTER (
+              WHERE LOWER(COALESCE(pif_inner.status::text, '')) IN ('submitted', 'reviewed')
+                OR pif_inner.submitted_at IS NOT NULL
+            ) > 0 THEN 'submitted'
+            WHEN COUNT(*) FILTER (
+              WHERE LOWER(COALESCE(pif_inner.status::text, '')) = 'sent'
+            ) > 0 THEN 'sent'
+            WHEN COUNT(*) > 0 THEN 'pending'
+            ELSE NULL
           END AS parent_interview_status,
           MAX(pif_inner.created_at) AS parent_interview_created_at,
           MAX(pif_inner.submitted_at) AS parent_interview_submitted_at,

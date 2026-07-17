@@ -16,6 +16,7 @@ export async function GET() {
     const todayRange = getDayRange(new Date());
 
     const [
+      totalRegistrationRows,
       parentInterviewTotalRows,
       parentInterviewSubmittedRows,
       pendingVoucherRows,
@@ -25,6 +26,10 @@ export async function GET() {
       recentLectures,
       recentLeads,
     ] = await Promise.all([
+      prisma.$queryRaw`
+        SELECT COUNT(*)::int AS total
+        FROM registration_leads
+      `,
       prisma.$queryRaw`
         SELECT COUNT(*)::int AS total
         FROM parent_interview_forms
@@ -86,6 +91,7 @@ export async function GET() {
 
     return json("Coordinator dashboard fetched.", 200, {
       stats: {
+        totalRegistrations: Number(totalRegistrationRows?.[0]?.total || 0),
         newLeads: Math.max(
           Number(parentInterviewTotalRows?.[0]?.total || 0) -
             Number(parentInterviewSubmittedRows?.[0]?.total || 0),
