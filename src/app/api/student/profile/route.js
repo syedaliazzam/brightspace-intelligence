@@ -30,7 +30,15 @@ export async function GET() {
         u.status::text AS user_status,
         sp.id::text AS student_id,
         sp.admission_no,
-        sp.age,
+        COALESCE(
+          NULLIF(TRIM(CAST(sp.age AS text)), ''),
+          NULLIF(
+            TRIM(
+              CAST(EXTRACT(YEAR FROM AGE(CURRENT_DATE, rl.date_of_birth)) AS text)
+            ),
+            ''
+          )
+        ) AS age,
         sp.grade_level,
         sp.status::text AS profile_status,
         sp.created_at,
@@ -137,7 +145,15 @@ export async function PATCH(request) {
         u.status::text AS user_status,
         sp.id::text AS student_id,
         sp.admission_no,
-        sp.age,
+        COALESCE(
+          NULLIF(TRIM(CAST(sp.age AS text)), ''),
+          NULLIF(
+            TRIM(
+              CAST(EXTRACT(YEAR FROM AGE(CURRENT_DATE, rl.date_of_birth)) AS text)
+            ),
+            ''
+          )
+        ) AS age,
         sp.grade_level,
         sp.status::text AS profile_status,
         sp.created_at,

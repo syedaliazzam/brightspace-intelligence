@@ -3,7 +3,7 @@
 import { Fragment, useEffect, useMemo, useState } from "react";
 import ClientPortal from "@/components/shared/ClientPortal";
 import PaginationControls from "@/components/teacher/PaginationControls";
-import { CheckCircle2, CircleDashed, Send, FileCheck2, ClipboardList } from "lucide-react";
+import { BadgeCheck, Circle, Send, FileCheck2, ClipboardList } from "lucide-react";
 
 const PAGE_SIZE = 7;
 
@@ -27,7 +27,7 @@ function admissionStatusLabel(value) {
   if (!normalized || normalized === "pending") return "New Registrations";
   if (normalized === "sent") return "Admission Form Sent";
   if (normalized === "reminded") return "Reminder Sent";
-  if (normalized === "overdue") return "Overdue";
+  if (normalized === "overdue") return "Needs Follow-up";
   if (normalized === "not_submitted") return "Form Not Submitted";
   if (normalized === "submitted" || normalized === "registered") return "Form Submitted";
   if (normalized === "not_submitted") return "Not Submitted";
@@ -69,7 +69,9 @@ export default function InterestedStudentsPanel({
   showDetailsButton = true,
   showActionsColumn = true,
   showFlowColumn = false,
+  showStatusColumn = true,
 }) {
+  const [localItems, setLocalItems] = useState(items);
   const [page, setPage] = useState(1);
   const [selectedLead, setSelectedLead] = useState(null);
   const [selectedMessage, setSelectedMessage] = useState(null);
@@ -87,6 +89,10 @@ export default function InterestedStudentsPanel({
     classLevels: [],
     coordinatorMaxDiscountPercent: 20,
   });
+
+  useEffect(() => {
+    setLocalItems(items);
+  }, [items]);
 
   useEffect(() => {
     let active = true;
@@ -153,12 +159,12 @@ export default function InterestedStudentsPanel({
   const discountPercent = Number(discount?.percent || 0);
   const discountAmount = Math.round(regularFeeAmount * (discountPercent / 100));
   const totalAmount = Math.max(regularFeeAmount - discountAmount + admissionFeeAmount, 0);
-  const totalPages = Math.max(1, Math.ceil(items.length / PAGE_SIZE));
+  const totalPages = Math.max(1, Math.ceil(localItems.length / PAGE_SIZE));
   const currentPage = Math.min(Math.max(1, page), totalPages);
   const visibleItems = useMemo(() => {
     const startIndex = (currentPage - 1) * PAGE_SIZE;
-    return items.slice(startIndex, startIndex + PAGE_SIZE);
-  }, [currentPage, items]);
+    return localItems.slice(startIndex, startIndex + PAGE_SIZE);
+  }, [currentPage, localItems]);
 
   const selectedLeadStage = selectedLead ? getLeadStage(selectedLead) : null;
   const selectedLeadCanSend = selectedLeadStage ? !selectedLeadStage.sent && !selectedLeadStage.submitted : false;
@@ -173,28 +179,57 @@ export default function InterestedStudentsPanel({
 
   function getLeadStage(item) {
     const status = String(item.admission_form_status || item.status || "pending").toLowerCase();
+    const interviewStatus = String(item.parent_interview_status || "").toLowerCase();
+    const registered = Boolean(item.id);
+    const sent = Boolean(item.admission_form_sent_at) || ["sent", "reminded", "submitted", "overdue", "not_submitted"].includes(status);
+    const submitted = Boolean(item.admission_form_submitted_at) || status === "submitted" || status === "registered";
+    const reminded = Boolean(item.admission_form_last_reminder_at) || Number(item.admission_form_reminder_count || 0) > 0 || status === "reminded";
+    const interviewSent = Boolean(item.parent_interview_form_id) || ["pending", "sent", "submitted", "reviewed"].includes(interviewStatus);
+    const interviewSubmitted = Boolean(item.parent_interview_submitted_at) || ["submitted", "reviewed"].includes(interviewStatus);
     return {
       status,
-      sent: Boolean(item.admission_form_sent_at) || ["sent", "reminded", "submitted", "overdue", "not_submitted"].includes(status),
-      submitted: Boolean(item.admission_form_submitted_at) || status === "submitted" || status === "registered",
-      reminded: Boolean(item.admission_form_last_reminder_at) || status === "reminded",
-      overdue: status === "overdue",
+      interviewStatus,
+      registered,
+      interviewSent,
+      interviewSubmitted,
+      sent,
+      submitted,
+      reminded,
+      overdue: status === "overdue" || (reminded && !submitted),
     };
   }
 
   function FlowStep({ active, done, icon: Icon, label }) {
     return (
       <div
-        className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[11px] font-semibold ${
+        className={`inline-flex items-center gap-2 rounded-xl px-1 py-1 text-sm font-medium ${
           done
-            ? "border-[#2D8A6A]/20 bg-[#EAF6EF] text-[#0D5C48]"
+            ? "bg-transparent text-[#0D5C48]"
             : active
-              ? "border-[#E4C766]/50 bg-[#FFF5D6] text-[#8A6B00]"
-              : "border-[#2D8A6A]/10 bg-white text-[#245C4F]"
+              ? "bg-transparent text-[#8A6B00]"
+              : "bg-transparent text-[#7A938B]"
         }`}
       >
-        <Icon className="h-3.5 w-3.5" strokeWidth={2.2} />
-        <span>{label}</span>
+        <span
+          className={`inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full ${
+            done
+              ? "bg-[#0D5C48]"
+              : active
+                ? "bg-[#C9A227]"
+                : "bg-[#D6DDD8]"
+          }`}
+        >
+          {done ? (
+            <BadgeCheck className="h-3.5 w-3.5 text-[#FAF7F0]" strokeWidth={2.3} />
+          ) : (
+            active ? (
+              <BadgeCheck className="block h-3 w-3 text-[#8A6B00]" strokeWidth={2.3} />
+            ) : (
+              <Circle className="block h-2.5 w-2.5 text-[#D6DDD8]" strokeWidth={2.5} />
+            )
+          )}
+        </span>
+        <span className="min-w-0 whitespace-nowrap leading-5">{label}</span>
       </div>
     );
   }
@@ -234,6 +269,32 @@ export default function InterestedStudentsPanel({
           ? "Existing admission form link loaded and sent."
           : "Admission form link sent."
       );
+      setLocalItems((current) =>
+        current.map((lead) =>
+          lead.id === item.id
+            ? {
+                ...lead,
+                admission_form_status: "sent",
+                admission_form_sent_at: lead.admission_form_sent_at || new Date().toISOString(),
+                admission_form_due_at: lead.admission_form_due_at || data.admission_form_due_at || null,
+                admission_form_last_channel: "email_whatsapp",
+                admission_form_last_error: null,
+              }
+            : lead
+        )
+      );
+      setSelectedLead((current) =>
+        current?.id === item.id
+          ? {
+              ...current,
+              admission_form_status: "sent",
+              admission_form_sent_at: current.admission_form_sent_at || new Date().toISOString(),
+              admission_form_due_at: current.admission_form_due_at || data.admission_form_due_at || null,
+              admission_form_last_channel: "email_whatsapp",
+              admission_form_last_error: null,
+            }
+          : current
+      );
       if (data?.whatsapp_url) {
         window.open(data.whatsapp_url, "_blank", "noopener,noreferrer");
       }
@@ -255,6 +316,10 @@ export default function InterestedStudentsPanel({
 
   return (
     <>
+      {(() => {
+        const showActionHeader = showActionsColumn && visibleItems.some((item) => !getLeadStage(item).sent);
+
+        return (
       <section className="hidden overflow-hidden rounded-[2rem] border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(250,247,240,0.98)_100%)] shadow-[0_20px_70px_-36px_rgba(13,59,46,0.18)] backdrop-blur-xl min-[992px]:block">
         {message ? (
           <div className="border-b border-[#2D8A6A]/10 px-6 py-4 text-sm font-medium text-[#0D5C48]">{message}</div>
@@ -264,8 +329,9 @@ export default function InterestedStudentsPanel({
             <thead className="bg-[linear-gradient(180deg,#FAF7F0_0%,#F1EADC_100%)]">
               <tr className="text-left text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]">
                 <th className="px-6 py-4">#</th>
+                {showFlowColumn ? <th className="px-6 py-4">Flow</th> : null}
                 <th className="px-6 py-4">Parent / Guardian</th>
-                <th className="px-6 py-4">Form Status</th>
+                {showStatusColumn ? <th className="px-6 py-4">Form Status</th> : null}
                 <th className="px-6 py-4">WhatsApp Number</th>
                 <th className="px-6 py-4">Email Address</th>
                 <th className="px-6 py-4">Child Name</th>
@@ -273,32 +339,52 @@ export default function InterestedStudentsPanel({
                 <th className="px-6 py-4">Interested Level</th>
                 <th className="px-6 py-4">City / Country</th>
                 <th className="px-6 py-4">Message</th>
-                {showFlowColumn ? <th className="px-6 py-4">Flow</th> : null}
                 <th className="px-6 py-4">Created At</th>
-                {showActionsColumn ? <th className="px-6 py-4 text-right">Action</th> : null}
+                {showActionHeader ? <th className="px-6 py-4 text-right">Action</th> : null}
               </tr>
             </thead>
             <tbody className="divide-y divide-[#F1EADC]">
               {visibleItems.map((item, index) => {
                 const stage = getLeadStage(item);
                 const canSendForm = !stage.sent && !stage.submitted;
+                const showRowAction = showActionsColumn && !stage.sent;
 
                 return (
                   <tr key={item.id} className="align-top">
                     <td className="px-5 py-5 text-sm font-semibold text-[#0D5C48]">
                       {String((currentPage - 1) * PAGE_SIZE + index + 1).padStart(2, "0")}
                     </td>
+                    {showFlowColumn ? (
+                      <td className="px-5 py-5">
+                        {(() => {
+                          const stage = getLeadStage(item);
+                          return (
+                            <div className="space-y-2 text-sm text-[#245C4F]">
+                              <FlowStep active={!stage.registered} done={stage.registered} label="New Registration" />
+                              <FlowStep active={stage.registered && !stage.interviewSent} done={stage.interviewSent} label="Parent Interview Sent" />
+                              <FlowStep active={stage.interviewSent && !stage.interviewSubmitted} done={stage.interviewSubmitted} label="Parent Interview Submitted" />
+                              <FlowStep active={stage.interviewSubmitted && !stage.sent} done={stage.sent} label="Admission Form Sent" />
+                              <FlowStep active={stage.sent && !stage.submitted && !stage.reminded} done={stage.reminded} label="Admission Form Not Submitted" />
+                              <FlowStep active={stage.sent && stage.reminded && !stage.submitted} done={stage.overdue} label="Needs Follow-up" />
+                              <FlowStep active={stage.submitted} done={stage.submitted} label="Admission Form Submitted" />
+                            </div>
+                          );
+                        })()}
+                      </td>
+                    ) : null}
                     <td className="px-5 py-5 text-[#063F32]">{textOrDash(item.parent_name)}</td>
-                    <td className="px-5 py-5">
-                      <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${admissionStatusTone(item.admission_form_status)}`}>
-                        {admissionStatusLabel(item.admission_form_status || item.status)}
-                      </span>
-                      {item.admission_form_due_at && String(item.admission_form_status || item.status || "").toLowerCase() !== "submitted" ? (
-                        <p className="mt-2 text-[11px] font-medium text-[#245C4F]">
-                          Due: {formatDate(item.admission_form_due_at)}
-                        </p>
-                      ) : null}
-                    </td>
+                    {showStatusColumn ? (
+                      <td className="px-5 py-5">
+                        <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${admissionStatusTone(item.admission_form_status)}`}>
+                          {admissionStatusLabel(item.admission_form_status || item.status)}
+                        </span>
+                        {item.admission_form_due_at && String(item.admission_form_status || item.status || "").toLowerCase() !== "submitted" ? (
+                          <p className="mt-2 text-[11px] font-medium text-[#245C4F]">
+                            Due: {formatDate(item.admission_form_due_at)}
+                          </p>
+                        ) : null}
+                      </td>
+                    ) : null}
                     <td className="px-5 py-5 text-[#245C4F]">{textOrDash(item.phone)}</td>
                     <td className="px-5 py-5 text-[#245C4F]">{textOrDash(item.email)}</td>
                     <td className="px-5 py-5 font-semibold text-[#063F32]">{textOrDash(item.student_name)}</td>
@@ -344,23 +430,8 @@ export default function InterestedStudentsPanel({
                         ) : null}
                       </div>
                     </td>
-                    {showFlowColumn ? (
-                      <td className="px-5 py-5">
-                        {(() => {
-                          const stage = getLeadStage(item);
-                          return (
-                            <div className="flex flex-wrap gap-2">
-                              <FlowStep active={!stage.sent} done={stage.sent} icon={stage.sent ? CheckCircle2 : CircleDashed} label="Registration" />
-                              <FlowStep active={stage.sent && !stage.submitted} done={stage.submitted} icon={Send} label="Interview / Form Sent" />
-                              <FlowStep active={stage.submitted && !stage.overdue} done={stage.submitted} icon={FileCheck2} label="Form Submitted" />
-                              <FlowStep active={stage.overdue} done={!stage.overdue && stage.status === "sent"} icon={ClipboardList} label="Next Admission Step" />
-                            </div>
-                          );
-                        })()}
-                      </td>
-                    ) : null}
                     <td className="px-5 py-5 text-sm text-[#245C4F]">{formatDate(item.created_at)}</td>
-                    {showActionsColumn ? (
+                    {showRowAction ? (
                       <td className="px-5 py-5 text-right">
                         {showDetailsButton ? (
                           <button
@@ -394,6 +465,8 @@ export default function InterestedStudentsPanel({
           </div>
         ) : null}
       </section>
+        );
+      })()}
 
       <div className="grid gap-4 min-[992px]:hidden">
         {visibleItems.map((item) => {
@@ -415,6 +488,21 @@ export default function InterestedStudentsPanel({
               </span>
             </div>
 
+            {showFlowColumn ? (
+              <div className="mt-4 rounded-[1.25rem] border border-[#2D8A6A]/10 bg-white p-3">
+                <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#0D5C48]">Flow</p>
+                <div className="mt-3 space-y-2 text-sm text-[#245C4F]">
+                  <FlowStep active={!stage.registered} done={stage.registered} label="New Registration" />
+                  <FlowStep active={stage.registered && !stage.interviewSent} done={stage.interviewSent} label="Parent Interview Sent" />
+                  <FlowStep active={stage.interviewSent && !stage.interviewSubmitted} done={stage.interviewSubmitted} label="Parent Interview Submitted" />
+                  <FlowStep active={stage.interviewSubmitted && !stage.sent} done={stage.sent} label="Admission Form Sent" />
+                  <FlowStep active={stage.sent && !stage.submitted && !stage.reminded} done={stage.reminded} label="Admission Form Not Submitted" />
+                  <FlowStep active={stage.sent && stage.reminded && !stage.submitted} done={stage.overdue} label="Needs Follow-up" />
+                  <FlowStep active={stage.submitted} done={stage.submitted} label="Admission Form Submitted" />
+                </div>
+              </div>
+            ) : null}
+
             <dl className="mt-4 grid gap-3 text-sm text-[#245C4F] sm:grid-cols-2">
               <InfoCell label="Parent / Guardian" value={item.parent_name} />
               <InfoCell label="WhatsApp Number" value={item.phone} />
@@ -435,10 +523,9 @@ export default function InterestedStudentsPanel({
                   </button>
                 }
               />
-              <InfoCell label="Form Status" value={admissionStatusLabel(item.admission_form_status || item.status)} />
             </dl>
 
-            {showDetailsButton ? (
+            {showDetailsButton && !stage.sent ? (
               <div className="mt-4 flex flex-wrap gap-2">
                 <button
                   type="button"

@@ -16,7 +16,8 @@ export async function GET() {
     const todayRange = getDayRange(new Date());
 
     const [
-      newLeadsRows,
+      parentInterviewTotalRows,
+      parentInterviewSubmittedRows,
       pendingVoucherRows,
       pendingPaymentRows,
       activeStudentRows,
@@ -26,10 +27,12 @@ export async function GET() {
     ] = await Promise.all([
       prisma.$queryRaw`
         SELECT COUNT(*)::int AS total
-        FROM interested_students
-        WHERE admission_form_sent_at IS NULL
-          AND admission_form_submitted_at IS NULL
-          AND LOWER(COALESCE(status::text, '')) NOT IN ('archived')
+        FROM parent_interview_forms
+      `,
+      prisma.$queryRaw`
+        SELECT COUNT(*)::int AS total
+        FROM parent_interview_forms
+        WHERE submitted_at IS NOT NULL
       `,
       prisma.$queryRaw`
         SELECT COUNT(*)::int AS total
@@ -83,7 +86,12 @@ export async function GET() {
 
     return json("Coordinator dashboard fetched.", 200, {
       stats: {
-        newLeads: Number(newLeadsRows?.[0]?.total || 0),
+        newLeads: Math.max(
+          Number(parentInterviewTotalRows?.[0]?.total || 0) -
+            Number(parentInterviewSubmittedRows?.[0]?.total || 0),
+          0
+        ),
+        parentInterviewSubmitted: Number(parentInterviewSubmittedRows?.[0]?.total || 0),
         pendingVouchers: Number(pendingVoucherRows?.[0]?.total || 0),
         pendingPaymentVerifications: Number(pendingPaymentRows?.[0]?.total || 0),
         activeStudents: Number(activeStudentRows?.[0]?.total || 0),

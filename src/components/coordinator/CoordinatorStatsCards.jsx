@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 
 export default function CoordinatorStatsCards({ items = [] }) {
   return (
-    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5 xl:grid-cols-5">
       {items.map((item, index) => (
         <motion.article
           key={item.key}

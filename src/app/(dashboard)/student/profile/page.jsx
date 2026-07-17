@@ -12,6 +12,21 @@ function DetailRow({ label, value }) {
   );
 }
 
+function formatAgeValue(age, dateOfBirth) {
+  const explicitAge = String(age || "").trim();
+  if (explicitAge) return explicitAge;
+  if (!dateOfBirth) return "";
+  const dob = new Date(dateOfBirth);
+  if (Number.isNaN(dob.getTime())) return "";
+  const now = new Date();
+  let years = now.getFullYear() - dob.getFullYear();
+  const monthDelta = now.getMonth() - dob.getMonth();
+  if (monthDelta < 0 || (monthDelta === 0 && now.getDate() < dob.getDate())) {
+    years -= 1;
+  }
+  return years > 0 ? `${years} year${years === 1 ? "" : "s"}` : "";
+}
+
 export default function StudentProfilePage() {
   const [state, setState] = useState({ profile: null, error: "", loading: true });
 
@@ -49,9 +64,8 @@ export default function StudentProfilePage() {
           <DetailRow label="Email" value={profile.email} />
           <DetailRow label="Phone" value={profile.phone} />
           <DetailRow label="Admission number" value={profile.admission_no} />
-          <DetailRow label="Age" value={profile.age ? String(profile.age) : ""} />
+          <DetailRow label="Age" value={formatAgeValue(profile.age, profile.date_of_birth)} />
           <DetailRow label="Class" value={profile.grade_level} />
-          <DetailRow label="Course" value={profile.course_title} />
           <DetailRow label="Status" value={profile.profile_status || profile.user_status} />
         </div>
       </section>

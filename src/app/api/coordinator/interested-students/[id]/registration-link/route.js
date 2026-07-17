@@ -28,6 +28,7 @@ export async function POST(request, { params }) {
 
   try {
     const { id } = await params;
+    const lookupId = String(id || "").trim();
     let paymentPayload = {};
     try {
       paymentPayload = await request.json();
@@ -49,7 +50,9 @@ export async function POST(request, { params }) {
         registration_lead_id::text AS registration_lead_id,
         LOWER(status::text) AS status
       FROM interested_students
-      WHERE id = ${id}::uuid
+      WHERE id::text = ${lookupId}
+        OR registration_lead_id::text = ${lookupId}
+        OR registration_token = ${lookupId}
       LIMIT 1
     `;
 
@@ -71,7 +74,7 @@ export async function POST(request, { params }) {
     if (paymentPayload?.paymentInstructions) registrationUrl.searchParams.set("paymentInstructions", String(paymentPayload.paymentInstructions));
     const registrationLink = registrationUrl.toString();
     const generatedAt = new Date();
-    const dueAt = new Date(generatedAt.getTime() + 5 * 24 * 60 * 60 * 1000);
+    const dueAt = new Date(generatedAt.getTime() + 10 * 24 * 60 * 60 * 1000);
     const generatedBy = session?.user?.id || null;
     const alreadyGenerated = Boolean(row.registration_token);
 
@@ -93,6 +96,8 @@ export async function POST(request, { params }) {
           registration_link_generated_by = CAST(${generatedBy || null} AS uuid),
           updated_at = NOW()
         WHERE id = ${id}::uuid
+           OR registration_lead_id::text = ${lookupId}
+           OR registration_token = ${lookupId}
       `;
     } else {
       await prisma.$executeRaw`
@@ -104,7 +109,9 @@ export async function POST(request, { params }) {
           admission_form_last_channel = COALESCE(admission_form_last_channel, ${"email_whatsapp"}),
           admission_form_last_error = NULL,
           updated_at = NOW()
-        WHERE id = ${id}::uuid
+        WHERE id::text = ${lookupId}
+           OR registration_lead_id::text = ${lookupId}
+           OR registration_token = ${lookupId}
       `;
     }
 

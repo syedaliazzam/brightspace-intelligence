@@ -145,12 +145,6 @@ export default function AdminDashboardPage() {
       tone: "bg-emerald-50 text-emerald-800",
     },
     {
-      key: "newLeads",
-      label: "New Admissions",
-      value: Number(overview.newRegistrationLeads || 0),
-      tone: "bg-[#EAF6EF] text-[#0D5C48]",
-    },
-    {
       key: "classes",
       label: "Classes",
       value: Number(state.data?.system?.courseCount || 0),
@@ -163,6 +157,7 @@ export default function AdminDashboardPage() {
       tone: "bg-[#FFF5D6] text-[#8A6B00]",
     },
   ];
+  const visibleCards = isSuperAdminPortal ? cards.filter((item) => item.key !== "newLeads") : cards;
 
   return (
     <div className="min-h-screen border-0 text-[#063F32]">
@@ -194,8 +189,8 @@ export default function AdminDashboardPage() {
         <AdminDashboardCards
           items={
             state.loading
-              ? cards.map((item) => ({ ...item, value: "..." }))
-              : cards
+              ? visibleCards.map((item) => ({ ...item, value: "..." }))
+              : visibleCards
           }
         />
         {state.loading ? (

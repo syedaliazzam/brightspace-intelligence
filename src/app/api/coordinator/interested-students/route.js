@@ -19,58 +19,30 @@ export async function GET() {
     const items = await prisma.$queryRaw`
       SELECT
         istd.id::text AS id,
-        COALESCE(
-          NULLIF(TRIM(istd.parent_name), ''),
-          NULLIF(TRIM(rl.parent_name), ''),
-          NULLIF(TRIM(rl.father_name_english), ''),
-          NULLIF(TRIM(rl.mother_name_english), '')
-        ) AS parent_name,
+        NULLIF(TRIM(istd.parent_name), '') AS parent_name,
         COALESCE(
           NULLIF(TRIM(istd.child_name), ''),
-          NULLIF(TRIM(istd.student_name), ''),
-          NULLIF(TRIM(rl.student_name), '')
+          NULLIF(TRIM(istd.student_name), '')
         ) AS child_name,
         COALESCE(
           NULLIF(TRIM(istd.student_name), ''),
-          NULLIF(TRIM(istd.child_name), ''),
-          NULLIF(TRIM(rl.student_name), '')
+          NULLIF(TRIM(istd.child_name), '')
         ) AS student_name,
-        COALESCE(
-          NULLIF(TRIM(istd.email), ''),
-          NULLIF(TRIM(rl.email), ''),
-          NULLIF(TRIM(rl.father_email), ''),
-          NULLIF(TRIM(rl.mother_email), '')
-        ) AS email,
-        COALESCE(
-          NULLIF(TRIM(istd.phone), ''),
-          NULLIF(TRIM(rl.phone), ''),
-          NULLIF(TRIM(rl.father_contact_whatsapp), ''),
-          NULLIF(TRIM(rl.mother_contact_whatsapp), '')
-        ) AS phone,
+        NULLIF(TRIM(istd.email), '') AS email,
+        NULLIF(TRIM(istd.phone), '') AS phone,
         COALESCE(
           NULLIF(TRIM(istd.class_level), ''),
-          NULLIF(TRIM(istd.class_applying_for), ''),
-          NULLIF(TRIM(rl.class_level), '')
+          NULLIF(TRIM(istd.class_applying_for), '')
         ) AS class_level,
-        COALESCE(
-          NULLIF(TRIM(istd.child_age), ''),
-          NULLIF(TRIM(rl.age::text), '')
-        ) AS student_age,
-        COALESCE(
-          NULLIF(TRIM(istd.city_country), ''),
-          NULLIF(TRIM(rl.city_country), ''),
-          NULLIF(TRIM(rl.city), ''),
-          NULLIF(TRIM(CONCAT_WS(', ', NULLIF(TRIM(rl.city), ''), NULLIF(TRIM(rl.country), ''))), '')
-        ) AS city_country,
+        NULLIF(TRIM(istd.child_age), '') AS student_age,
+        NULLIF(TRIM(istd.city_country), '') AS city_country,
         COALESCE(
           NULLIF(TRIM(istd.message), ''),
           NULLIF(TRIM(istd.why_interested), ''),
           NULLIF(TRIM(istd.questions_comments), ''),
-          NULLIF(TRIM(rl.interest_reason), ''),
-          NULLIF(TRIM(istd.notes), ''),
-          NULLIF(TRIM(rl.notes), '')
+          NULLIF(TRIM(istd.notes), '')
         ) AS message,
-        COALESCE(istd.source, rl.source, '') AS source,
+        COALESCE(istd.source, '') AS source,
         LOWER(istd.status::text) AS status,
         istd.admission_form_sent_at,
         istd.admission_form_due_at,
@@ -84,12 +56,30 @@ export async function GET() {
         istd.registration_link_generated_at,
         istd.registration_link_generated_by::text AS registration_link_generated_by,
         istd.registration_lead_id::text AS registration_lead_id,
-        COALESCE(NULLIF(TRIM(istd.notes), ''), NULLIF(TRIM(rl.notes), '')) AS notes,
+        pif.id::text AS parent_interview_form_id,
+        pif.status::text AS parent_interview_status,
+        pif.created_at AS parent_interview_created_at,
+        pif.submitted_at AS parent_interview_submitted_at,
+        pif.reviewed_at AS parent_interview_reviewed_at,
+        NULLIF(TRIM(istd.notes), '') AS notes,
         istd.created_at,
         istd.updated_at
       FROM interested_students istd
-      LEFT JOIN registration_leads rl
-        ON rl.id = istd.registration_lead_id
+      LEFT JOIN LATERAL (
+        SELECT
+          pif_inner.id,
+          pif_inner.status,
+          pif_inner.created_at,
+          pif_inner.submitted_at,
+          pif_inner.reviewed_at
+        FROM parent_interview_forms pif_inner
+        WHERE (
+          NULLIF(TRIM(pif_inner.registration_id), '') = istd.registration_lead_id::text
+          OR LOWER(NULLIF(TRIM(pif_inner.parent_email), '')) = LOWER(NULLIF(TRIM(istd.email), ''))
+        )
+        ORDER BY pif_inner.created_at DESC
+        LIMIT 1
+      ) pif ON TRUE
       ORDER BY istd.created_at DESC NULLS LAST, istd.id DESC
     `;
 

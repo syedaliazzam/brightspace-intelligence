@@ -167,7 +167,8 @@ export default function CoordinatorDashboardPage() {
       >
         <CoordinatorStatsCards
           items={[
-            { key: "newLeads", label: "New Admissions", value: state.loading ? "..." : stats.newLeads || 0 },
+            { key: "newLeads", label: "Parent Interview Form Not Submitted", value: state.loading ? "..." : stats.newLeads || 0 },
+            { key: "parentInterviewSubmitted", label: "Parent Interview Form Submitted", value: state.loading ? "..." : stats.parentInterviewSubmitted || 0 },
             { key: "pendingVouchers", label: "Pending vouchers", value: state.loading ? "..." : stats.pendingVouchers || 0 },
             { key: "pendingPaymentVerifications", label: "Pending payment verifications", value: state.loading ? "..." : stats.pendingPaymentVerifications || 0 },
             { key: "activeStudents", label: "Active students", value: state.loading ? "..." : stats.activeStudents || 0 },

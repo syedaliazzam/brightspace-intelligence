@@ -21,6 +21,13 @@ function addDays(dateValue, days) {
   return new Date(date.getTime() + days * 24 * 60 * 60 * 1000);
 }
 
+function getReminderBucket(daysSinceDue) {
+  if (daysSinceDue >= 30) return "30";
+  if (daysSinceDue >= 20) return "20";
+  if (daysSinceDue >= 10) return "10";
+  return "";
+}
+
 export async function GET(request) {
   const secret = String(request.nextUrl.searchParams.get("secret") || "");
   const expectedSecret = process.env.ADMISSION_FORM_REMINDER_SECRET || process.env.MONTHLY_REMINDER_SECRET || "";
@@ -61,14 +68,35 @@ export async function GET(request) {
       const dueAt = isValidDate(row.admission_form_due_at)
         ? new Date(row.admission_form_due_at)
         : sentAt
-          ? addDays(sentAt, 5)
+          ? addDays(sentAt, 10)
           : null;
 
       if (!dueAt || now < dueAt) continue;
       if (String(row.admission_form_status || "") === "submitted") continue;
 
-      const nextReminderCount = Number(row.admission_form_reminder_count || 0) + 1;
-      const isFinalReminder = nextReminderCount >= 2;
+      const reminderCount = Number(row.admission_form_reminder_count || 0);
+      const daysSinceDue = Math.max(0, Math.floor((now.getTime() - dueAt.getTime()) / (24 * 60 * 60 * 1000)));
+      const reminderBucket = getReminderBucket(daysSinceDue);
+
+      if (!reminderBucket) continue;
+
+      const targetReminderCount = reminderBucket === "10" ? 1 : reminderBucket === "20" ? 2 : 3;
+      if (reminderCount >= targetReminderCount) {
+        if (reminderBucket === "30" && reminderCount >= 3) {
+          await prisma.$executeRaw`
+            UPDATE interested_students
+            SET
+              admission_form_status = ${"not_submitted"},
+              admission_form_last_channel = COALESCE(admission_form_last_channel, ${row.phone ? "email_whatsapp" : "email"}),
+              updated_at = NOW()
+            WHERE id = ${row.id}::uuid
+          `;
+        }
+        continue;
+      }
+
+      const nextReminderCount = reminderCount + 1;
+      const isFinalReminder = nextReminderCount >= 3;
       const nextStatus = isFinalReminder ? "not_submitted" : "overdue";
       const studentName = row.student_name || "Student";
       const parentName = row.parent_name || "Parent";
