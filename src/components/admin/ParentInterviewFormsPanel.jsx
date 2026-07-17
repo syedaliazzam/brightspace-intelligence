@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { jsPDF } from "jspdf";
 import ClientPortal from "@/components/shared/ClientPortal";
-import { Search } from "lucide-react";
+import { Download, Search } from "lucide-react";
 import { OpenBookLoader } from "@/components/shared/AshShajrahLoaders";
 
 function formatDate(value) {
@@ -80,6 +81,7 @@ export default function ParentInterviewFormsPanel({ apiUrl = "/api/admin/parent-
   const [state, setState] = useState({ loading: true, error: "", items: [] });
   const [search, setSearch] = useState("");
   const [selectedResponse, setSelectedResponse] = useState(null);
+  const [downloadingId, setDownloadingId] = useState("");
   const responseSummary = useMemo(() => {
     const responses = selectedResponse?.responses;
     if (!responses || typeof responses !== "object") {
@@ -128,6 +130,156 @@ export default function ParentInterviewFormsPanel({ apiUrl = "/api/admin/parent-
 
     return { pairs, version: selectedResponse?.form_version || responses.FormVersion || responses.form_version || "-" };
   }, [selectedResponse]);
+
+  function buildPdfLines(item) {
+    const response = item?.responses;
+    const summary = item
+      ? [
+          ["Registration ID", textOrDash(item.registration_id)],
+          ["Parent Name", textOrDash(item.parent_name)],
+          ["Parent Email", textOrDash(item.parent_email)],
+          ["Child Name", textOrDash(item.child_name)],
+          ["Child Age", textOrDash(item.child_age)],
+          ["Interested Programme", textOrDash(item.interested_programme)],
+          ["Status", textOrDash(item.status)],
+          ["Submitted At", formatDate(item.submitted_at || item.created_at)],
+          ["Form Version", textOrDash(item.form_version)],
+        ]
+      : [];
+
+    const answerBlock = responseSummaryForItem(response, item?.form_version);
+
+    return {
+      summary,
+      answerBlock,
+    };
+  }
+
+  function responseSummaryForItem(responses, fallbackVersion = "-") {
+    if (!responses || typeof responses !== "object") {
+      return { pairs: [], version: fallbackVersion || "-" };
+    }
+
+    const questionsSource =
+      responses.Questions ||
+      responses.questions ||
+      responses.question ||
+      responses.FormQuestions ||
+      {};
+    const answersSource =
+      responses.Answers ||
+      responses.answers ||
+      responses.answer ||
+      responses.FormAnswers ||
+      responses;
+
+    const questionMap = questionsSource && typeof questionsSource === "object" ? questionsSource : {};
+    const answerMap = answersSource && typeof answersSource === "object" ? answersSource : {};
+
+    const answerKeys = Object.keys(answerMap).filter(
+      (key) => !["questions", "answers", "formversion", "form_version"].includes(String(key).toLowerCase())
+    );
+
+    const questionOrder = answerKeys.length ? answerKeys : Object.keys(questionMap);
+
+    const pairs = questionOrder.map((key) => {
+      const questionMeta = questionMap[key] || {};
+      const questionLabelValue =
+        questionMeta.Label ||
+        questionMeta.label ||
+        questionMeta.question ||
+        questionMeta.text ||
+        questionMap[key] ||
+        key;
+      const answerValue = answerMap[key];
+      return {
+        key,
+        questionNumber: String(key).replace(/^q/i, "").replace(/^question/i, "").trim(),
+        question: prettyLabel(questionLabelValue),
+        answer: answerValue,
+      };
+    });
+
+    return { pairs, version: fallbackVersion || responses.FormVersion || responses.form_version || "-" };
+  }
+
+  function normalizePdfText(value) {
+    return String(value || "")
+      .replace(/\u00a0/g, " ")
+      .replace(/[^\x09\x0A\x0D\x20-\x7E]/g, "");
+  }
+
+  function downloadParentInterviewPdf(item) {
+    if (!item) return;
+
+    setDownloadingId(item.id);
+    try {
+      const doc = new jsPDF({ unit: "pt", format: "a4" });
+      const marginX = 40;
+      let y = 44;
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      const maxWidth = pageWidth - marginX * 2;
+
+      const addLine = (text, size = 11, bold = false, color = [6, 63, 50]) => {
+        doc.setFont("helvetica", bold ? "bold" : "normal");
+        doc.setFontSize(size);
+        doc.setTextColor(color[0], color[1], color[2]);
+        const lines = doc.splitTextToSize(normalizePdfText(text), maxWidth);
+        lines.forEach((line) => {
+          if (y > pageHeight - 40) {
+            doc.addPage();
+            y = 44;
+          }
+          doc.text(line, marginX, y);
+          y += size + 6;
+        });
+      };
+
+      const addSectionTitle = (text) => {
+        y += 2;
+        addLine(text, 13, true, [13, 92, 72]);
+      };
+
+      const addDivider = () => {
+        if (y > pageHeight - 20) {
+          doc.addPage();
+          y = 44;
+        }
+        doc.setDrawColor(45, 138, 106);
+        doc.setLineWidth(0.7);
+        doc.line(marginX, y, pageWidth - marginX, y);
+        y += 14;
+      };
+
+      addLine("Ash-Shajrah Learning Hub", 16, true, [6, 63, 50]);
+      addLine("Parent Interview Form", 14, true, [13, 92, 72]);
+      addLine(`Generated for: ${item.parent_name || "-"}`, 11, false, [36, 92, 79]);
+      addLine(`Submitted: ${formatDate(item.submitted_at || item.created_at)}`, 11, false, [36, 92, 79]);
+      addDivider();
+
+      addSectionTitle("Record Details");
+      buildPdfLines(item).summary.forEach(([label, value]) => {
+        addLine(`${label}: ${value}`, 11, false, [36, 92, 79]);
+      });
+
+      if (item.responses && typeof item.responses === "object") {
+        addDivider();
+        addSectionTitle("Questions & Answers");
+        const pdfSummary = responseSummaryForItem(item.responses, item.form_version);
+        pdfSummary.pairs.forEach((entry, index) => {
+          addLine(`Question #${entry.questionNumber || index + 1}: ${entry.question}`, 11, true, [13, 92, 72]);
+          addLine(`Answer: ${formatFlatObject(entry.answer)}`, 11, false, [36, 92, 79]);
+          y += 6;
+        });
+      }
+
+      const fileName = `parent-interview-${String(item.parent_name || "record").replace(/[^a-z0-9]+/gi, "-").toLowerCase()}.pdf`;
+      doc.save(fileName);
+    } finally {
+      setDownloadingId("");
+    }
+  }
 
   useEffect(() => {
     let active = true;
@@ -232,6 +384,7 @@ export default function ParentInterviewFormsPanel({ apiUrl = "/api/admin/parent-
                 <th className="px-6 py-4">Status</th>
                 <th className="px-6 py-4">Submitted At</th>
                 <th className="px-6 py-4">See Answers</th>
+                <th className="px-6 py-4">Download PDF</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[#F1EADC]">
@@ -252,8 +405,19 @@ export default function ParentInterviewFormsPanel({ apiUrl = "/api/admin/parent-
                       type="button"
                       onClick={() => setSelectedResponse((current) => (current?.id === item.id ? null : item))}
                       className="max-w-[14rem] truncate rounded-full border border-[#2D8A6A]/20 bg-[#EAF6EF] px-4 py-2 text-left text-xs font-semibold text-[#0D5C48] transition hover:bg-[#DFF2E7]"
-                    >
+                      >
                       See Answers
+                    </button>
+                  </td>
+                  <td className="px-5 py-5 text-[#245C4F]">
+                    <button
+                      type="button"
+                      onClick={() => downloadParentInterviewPdf(item)}
+                      disabled={downloadingId === item.id}
+                      className="inline-flex items-center gap-2 rounded-full border border-[#2D8A6A]/20 bg-white px-4 py-2 text-xs font-semibold text-[#0D5C48] transition hover:bg-[#EAF6EF] disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      <Download className="h-3.5 w-3.5" />
+                      {downloadingId === item.id ? "Downloading..." : "Download PDF"}
                     </button>
                   </td>
                 </tr>

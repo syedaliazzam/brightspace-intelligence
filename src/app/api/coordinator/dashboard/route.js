@@ -17,8 +17,7 @@ export async function GET() {
 
     const [
       totalRegistrationRows,
-      parentInterviewTotalRows,
-      parentInterviewSubmittedRows,
+      parentInterviewStatsRows,
       pendingVoucherRows,
       pendingPaymentRows,
       activeStudentRows,
@@ -28,16 +27,50 @@ export async function GET() {
     ] = await Promise.all([
       prisma.$queryRaw`
         SELECT COUNT(*)::int AS total
-        FROM registration_leads
+        FROM interested_students
       `,
       prisma.$queryRaw`
-        SELECT COUNT(*)::int AS total
-        FROM parent_interview_forms
-      `,
-      prisma.$queryRaw`
-        SELECT COUNT(*)::int AS total
-        FROM parent_interview_forms
-        WHERE submitted_at IS NOT NULL
+        SELECT
+          COUNT(*) FILTER (
+            WHERE interview.parent_interview_status IS NULL
+              OR interview.parent_interview_status = 'pending'
+          )::int AS not_submitted_total,
+          COUNT(*) FILTER (
+            WHERE interview.parent_interview_status = 'sent'
+          )::int AS sent_total,
+          COUNT(*) FILTER (
+            WHERE interview.parent_interview_status = 'submitted'
+          )::int AS submitted_total
+        FROM interested_students istd
+        LEFT JOIN LATERAL (
+          SELECT
+            CASE
+              WHEN COUNT(*) FILTER (
+                WHERE LOWER(COALESCE(pif_inner.status::text, '')) IN ('submitted', 'reviewed')
+                  OR pif_inner.submitted_at IS NOT NULL
+              ) > 0 THEN 'submitted'
+              WHEN COUNT(*) FILTER (
+                WHERE LOWER(COALESCE(pif_inner.status::text, '')) = 'sent'
+              ) > 0 THEN 'sent'
+              WHEN COUNT(*) > 0 THEN 'pending'
+              ELSE NULL
+            END AS parent_interview_status
+          FROM parent_interview_forms pif_inner
+          WHERE (
+            NULLIF(TRIM(pif_inner.registration_id), '') = istd.registration_lead_id::text
+            OR NULLIF(TRIM(pif_inner.registration_id), '') = istd.id::text
+            OR (
+              NULLIF(TRIM(pif_inner.registration_id), '') IS NULL
+              AND LOWER(NULLIF(TRIM(pif_inner.parent_email), '')) = LOWER(NULLIF(TRIM(istd.email), ''))
+              AND LOWER(NULLIF(TRIM(pif_inner.child_name), '')) = LOWER(
+                COALESCE(
+                  NULLIF(TRIM(istd.child_name), ''),
+                  NULLIF(TRIM(istd.student_name), '')
+                )
+              )
+            )
+          )
+        ) interview ON TRUE
       `,
       prisma.$queryRaw`
         SELECT COUNT(*)::int AS total
@@ -92,12 +125,9 @@ export async function GET() {
     return json("Coordinator dashboard fetched.", 200, {
       stats: {
         totalRegistrations: Number(totalRegistrationRows?.[0]?.total || 0),
-        newLeads: Math.max(
-          Number(parentInterviewTotalRows?.[0]?.total || 0) -
-            Number(parentInterviewSubmittedRows?.[0]?.total || 0),
-          0
-        ),
-        parentInterviewSubmitted: Number(parentInterviewSubmittedRows?.[0]?.total || 0),
+        newLeads: Number(parentInterviewStatsRows?.[0]?.not_submitted_total || 0),
+        parentInterviewSent: Number(parentInterviewStatsRows?.[0]?.sent_total || 0),
+        parentInterviewSubmitted: Number(parentInterviewStatsRows?.[0]?.submitted_total || 0),
         pendingVouchers: Number(pendingVoucherRows?.[0]?.total || 0),
         pendingPaymentVerifications: Number(pendingPaymentRows?.[0]?.total || 0),
         activeStudents: Number(activeStudentRows?.[0]?.total || 0),

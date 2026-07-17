@@ -75,7 +75,7 @@ export async function GET() {
           COUNT(*) FILTER (
             WHERE LOWER(COALESCE(pif_inner.status::text, '')) = 'sent'
           )::int AS parent_interview_sent_count,
-          MAX(pif_inner.id)::text AS parent_interview_form_id,
+          STRING_AGG(pif_inner.id::text, ',' ORDER BY pif_inner.created_at DESC) AS parent_interview_form_id,
           CASE
             WHEN COUNT(*) FILTER (
               WHERE LOWER(COALESCE(pif_inner.status::text, '')) IN ('submitted', 'reviewed')
@@ -93,7 +93,17 @@ export async function GET() {
         FROM parent_interview_forms pif_inner
         WHERE (
           NULLIF(TRIM(pif_inner.registration_id), '') = istd.registration_lead_id::text
-          OR LOWER(NULLIF(TRIM(pif_inner.parent_email), '')) = LOWER(NULLIF(TRIM(istd.email), ''))
+          OR NULLIF(TRIM(pif_inner.registration_id), '') = istd.id::text
+          OR (
+            NULLIF(TRIM(pif_inner.registration_id), '') IS NULL
+            AND LOWER(NULLIF(TRIM(pif_inner.parent_email), '')) = LOWER(NULLIF(TRIM(istd.email), ''))
+            AND LOWER(NULLIF(TRIM(pif_inner.child_name), '')) = LOWER(
+              COALESCE(
+                NULLIF(TRIM(istd.child_name), ''),
+                NULLIF(TRIM(istd.student_name), '')
+              )
+            )
+          )
         )
       ) pif ON TRUE
       ORDER BY istd.created_at DESC NULLS LAST, istd.id DESC
