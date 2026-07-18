@@ -58,6 +58,8 @@ export async function GET() {
         istd.registration_lead_id::text AS registration_lead_id,
         pif.parent_interview_form_id,
         pif.parent_interview_status,
+        pif.parent_interview_sent_count,
+        pif.parent_interview_submitted_count,
         pif.parent_interview_created_at,
         pif.parent_interview_submitted_at,
         pif.parent_interview_reviewed_at,
