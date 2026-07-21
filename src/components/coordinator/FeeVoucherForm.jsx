@@ -29,7 +29,15 @@ function getDefaultDueDate() {
   return date.toISOString().slice(0, 10);
 }
 
-export default function FeeVoucherForm({ leads, initialLeadId = "", showTrigger = true, onCreated, onClose }) {
+export default function FeeVoucherForm({
+  leads,
+  initialLeadId = "",
+  showTrigger = true,
+  onCreated,
+  onClose,
+  scholarshipAmount = 0,
+  scholarshipFormId = "",
+}) {
   const [open, setOpen] = useState(false);
   const [pending, setPending] = useState(false);
   const [loadingOptions, setLoadingOptions] = useState(false);
@@ -51,6 +59,8 @@ export default function FeeVoucherForm({ leads, initialLeadId = "", showTrigger 
     regularFeeId: "",
     otherFeeId: "",
     admissionFeeAmount: "",
+    scholarshipAmount: "",
+    scholarshipFormId: "",
     discountId: "",
     discountPercent: "",
     dueDate: "",
@@ -104,9 +114,10 @@ export default function FeeVoucherForm({ leads, initialLeadId = "", showTrigger 
 
   const selectedRegularFee = Number(selectedRegularFeeRecord?.amount || 0);
   const admissionFeeAmount = Number(selectedAdmissionFee?.amount || 0);
+  const scholarshipAmountInput = Number(form.scholarshipAmount || 0);
   const discountPercent = Number(form.discountPercent || 0);
   const discountAmount = selectedRegularFee * (discountPercent / 100);
-  const totalAmount = selectedRegularFee + admissionFeeAmount - discountAmount;
+  const totalAmount = selectedRegularFee + admissionFeeAmount - discountAmount - scholarshipAmountInput;
   const eligibleLeads = useMemo(
     () =>
       leads.filter(
@@ -184,6 +195,15 @@ export default function FeeVoucherForm({ leads, initialLeadId = "", showTrigger 
     }
   }, [open, selectedAdmissionFee, selectedLead, form.otherFeeId]);
 
+  useEffect(() => {
+    if (!open) return;
+    setForm((current) => ({
+      ...current,
+      scholarshipAmount: scholarshipAmount ? String(scholarshipAmount) : "",
+      scholarshipFormId: scholarshipFormId || "",
+    }));
+  }, [open, scholarshipAmount, scholarshipFormId]);
+
   function updateField(name, value) {
     setForm((current) => ({ ...current, [name]: value }));
   }
@@ -204,6 +224,8 @@ export default function FeeVoucherForm({ leads, initialLeadId = "", showTrigger 
         regularFeeAmount: selectedRegularFee,
         otherFeeId: selectedAdmissionFee?.id || form.otherFeeId || "",
         admissionFeeAmount: admissionFeeAmount,
+        scholarshipAmount: scholarshipAmountInput,
+        scholarshipFormId: form.scholarshipFormId || "",
       };
 
       const response = await fetch("/api/coordinator/fee-vouchers", {
@@ -225,6 +247,8 @@ export default function FeeVoucherForm({ leads, initialLeadId = "", showTrigger 
         regularFeeId: "",
         otherFeeId: "",
         admissionFeeAmount: "",
+        scholarshipAmount: "",
+        scholarshipFormId: "",
         discountId: "",
         discountPercent: "",
         dueDate: "",
@@ -323,25 +347,28 @@ export default function FeeVoucherForm({ leads, initialLeadId = "", showTrigger 
 
                 <div className="grid gap-4 md:col-span-2 md:grid-cols-2">
                   <div className="rounded-2xl border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(250,247,240,0.98)_100%)] px-4 py-4">
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#245C4F]">Regular fee</p>
-                      </div>
-                      <span className="rounded-full bg-[#0D5C48] px-3 py-1 text-xs font-semibold text-[#FAF7F0]">Locked</span>
-                    </div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#245C4F]">Regular fee</p>
                     <p className="mt-3 text-sm text-[#245C4F]">PKR {selectedRegularFee.toFixed(2)}</p>
                   </div>
 
                   <div className="rounded-2xl border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(250,247,240,0.98)_100%)] px-4 py-4">
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#245C4F]">Admission fee</p>
-                      </div>
-                      <span className="rounded-full bg-[#0D5C48] px-3 py-1 text-xs font-semibold text-[#FAF7F0]">Locked</span>
-                    </div>
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#245C4F]">Admission fee</p>
                     <p className="mt-3 text-sm text-[#245C4F]">PKR {admissionFeeAmount.toFixed(2)}</p>
                   </div>
                 </div>
+
+                <label className="block rounded-2xl border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(250,247,240,0.98)_100%)] px-4 py-4 md:col-span-2">
+                  <span className="mb-2 block text-sm font-medium text-[#245C4F]">Need-based scholarship amount</span>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={form.scholarshipAmount}
+                    onChange={(event) => setForm((current) => ({ ...current, scholarshipAmount: event.target.value }))}
+                    className="w-full rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 text-sm text-[#063F32] outline-none transition focus:border-[#2D8A6A] focus:bg-white focus:ring-4 focus:ring-[#FFF5D6]"
+                    placeholder="Enter scholarship amount"
+                  />
+                </label>
 
                 <div className="grid gap-4 md:col-span-2 md:grid-cols-2">
                   <label className="block rounded-2xl border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(250,247,240,0.98)_100%)] px-4 py-4">
@@ -429,6 +456,9 @@ export default function FeeVoucherForm({ leads, initialLeadId = "", showTrigger 
                   <p>
                     Discount on Regular Fee: <span className="font-semibold text-[#063F32]">PKR {discountAmount.toFixed(2)}</span>
                   </p>
+                  <p>
+                    Scholarship Amount: <span className="font-semibold text-[#063F32]">PKR {scholarshipAmountInput.toFixed(2)}</span>
+                  </p>
                   <p className="sm:col-span-3">
                     Total Payable: <span className="font-semibold text-[#063F32]">PKR {totalAmount.toFixed(2)}</span>
                   </p>
@@ -454,7 +484,7 @@ export default function FeeVoucherForm({ leads, initialLeadId = "", showTrigger 
                     disabled={pending || loadingOptions}
                     className="rounded-2xl bg-[#0D5C48] px-4 py-3 text-sm font-semibold text-[#FAF7F0] transition hover:bg-[#063F32] disabled:cursor-not-allowed disabled:opacity-70"
                   >
-                    {pending ? "Sending..." : "Send Admission Form"}
+                    {pending ? "Sending..." : "Send Fee Voucher"}
                   </button>
                 </div>
               </form>

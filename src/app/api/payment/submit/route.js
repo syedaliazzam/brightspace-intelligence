@@ -6,6 +6,9 @@ import prisma from "@/lib/prisma";
 import { uploadPaymentProof } from "@/lib/supabaseStorage";
 
 const SUBMITTABLE_VOUCHER_STATUSES = new Set(["unpaid", "rejected"]);
+const NAME_PATTERN = /^[A-Za-zÀ-ÿ'’.-]{2,}(?:\s+[A-Za-zÀ-ÿ'’.-]{2,})+$/;
+const TRANSACTION_PATTERN = /^[A-Za-z0-9_-]{3,150}$/;
+const PHONE_PATTERN = /^(?:\+92|0)?[0-9]{10,12}$/;
 
 function json(message, status = 200, extra = {}) {
   return NextResponse.json({ message, ...extra }, { status });
@@ -44,8 +47,16 @@ export async function POST(request) {
       return json("Payer name is required.", 400);
     }
 
+    if (!NAME_PATTERN.test(payerName)) {
+      return json("Please enter a valid payer name with at least two name parts.", 400);
+    }
+
     if (!transactionId) {
       return json("Transaction ID is required.", 400);
+    }
+
+    if (!TRANSACTION_PATTERN.test(transactionId)) {
+      return json("Please enter a valid transaction ID.", 400);
     }
 
     if (!Number.isFinite(paidAmount) || paidAmount <= 0) {
@@ -54,6 +65,11 @@ export async function POST(request) {
 
     if (!paidAt) {
       return json("Valid paid date is required.", 400);
+    }
+
+    const payerPhone = normalizeText(formData.get("payerPhone"));
+    if (payerPhone && !PHONE_PATTERN.test(payerPhone)) {
+      return json("Please enter a valid payer phone number.", 400);
     }
 
     if (!(proofFile instanceof File) || !proofFile.size) {

@@ -17,6 +17,8 @@ const YES_NO_OPTIONS = ["Yes", "No"];
 const SUPPORT_OPTIONS = ["Mother", "Father", "Both", "Guardian"];
 const CONTACT_OPTIONS = ["Father", "Mother"];
 const DEVICE_OPTIONS = ["Laptop", "Desktop Computer", "External Monitor / Large Screen"];
+const RESIDENCE_OPTIONS = ["Owned", "Rented", "Shared", "Other"];
+const EMPLOYMENT_STATUS_OPTIONS = ["Salaried", "Business", "Daily Wage", "Unemployed", "Other"];
 
 const BASE_STEP_TITLES = [
   "Programme",
@@ -52,6 +54,15 @@ const initialForm = {
   developmentalConcern: "",
   developmentalConcernDetails: "",
   medicalConditions: "",
+  needBasedScholarshipRequested: false,
+  scholarshipMonthlyIncome: "",
+  scholarshipDependentsCount: "",
+  scholarshipSchoolGoingChildrenCount: "",
+  scholarshipResidenceType: "",
+  scholarshipGuardianEmploymentStatus: "",
+  scholarshipRequestedAmount: "",
+  scholarshipReason: "",
+  scholarshipSupportingDocumentFile: null,
   paymentMethod: "",
   admissionFee: "",
   discountPercent: "",
@@ -334,7 +345,21 @@ function getStepErrors(form, previewMode = false) {
   if (!form.childPhotographFile) errors.childPhotographFile = "Recent child photograph is required.";
   if (!form.previousSchoolReportFile) errors.previousSchoolReportFile = "Previous school report is required.";
   if (!form.medicalReportFile) errors.medicalReportFile = "Medical report is required.";
-  if (previewMode) {
+  if (!previewMode && form.needBasedScholarshipRequested) {
+    if (!String(form.scholarshipMonthlyIncome || "").trim()) errors.scholarshipMonthlyIncome = "Monthly income is required.";
+    else if (!isValidNumericValue(form.scholarshipMonthlyIncome)) errors.scholarshipMonthlyIncome = "Enter a valid monthly income.";
+    if (!String(form.scholarshipDependentsCount || "").trim()) errors.scholarshipDependentsCount = "Dependents count is required.";
+    else if (!/^\d+$/.test(String(form.scholarshipDependentsCount || "").trim())) errors.scholarshipDependentsCount = "Enter a valid dependents count.";
+    if (!String(form.scholarshipSchoolGoingChildrenCount || "").trim()) errors.scholarshipSchoolGoingChildrenCount = "School-going children count is required.";
+    else if (!/^\d+$/.test(String(form.scholarshipSchoolGoingChildrenCount || "").trim())) errors.scholarshipSchoolGoingChildrenCount = "Enter a valid children count.";
+    if (!form.scholarshipResidenceType) errors.scholarshipResidenceType = "Residence type is required.";
+    if (!form.scholarshipGuardianEmploymentStatus) errors.scholarshipGuardianEmploymentStatus = "Employment status is required.";
+    if (!String(form.scholarshipRequestedAmount || "").trim()) errors.scholarshipRequestedAmount = "Requested support amount is required.";
+    else if (!isValidNumericValue(form.scholarshipRequestedAmount)) errors.scholarshipRequestedAmount = "Enter a valid support amount.";
+    if (!String(form.scholarshipReason || "").trim()) errors.scholarshipReason = "Scholarship reason is required.";
+    else if (!isValidTextValue(form.scholarshipReason)) errors.scholarshipReason = "Enter a valid scholarship reason.";
+    if (!form.scholarshipSupportingDocumentFile) errors.scholarshipSupportingDocumentFile = "Supporting document is required.";
+  } else if (previewMode) {
     if (!form.paymentMethod) errors.paymentMethod = "Payment method is required.";
     if (!form.admissionFee) errors.admissionFee = "Admission fee is required.";
     if (!String(form.discountPercent || "").trim()) errors.discountPercent = "Discount is required.";
@@ -547,7 +572,18 @@ function AdmissionFormContent() {
       4: ["supportPersonDuringLearning", "deviceAvailable", "birthCertificateFile", "parentCnicFile", "childPhotographFile", "previousSchoolReportFile", "medicalReportFile"],
       5: isPreviewMode
         ? ["paymentMethod", "admissionFee", "discountPercent", "paymentInstructions"]
-        : ["payerName", "payerEmail", "payerPhone", "transactionId", "paidAmount", "paidAt", "paymentProofFile"],
+        : formValue.needBasedScholarshipRequested
+          ? [
+              "scholarshipMonthlyIncome",
+              "scholarshipDependentsCount",
+              "scholarshipSchoolGoingChildrenCount",
+              "scholarshipResidenceType",
+              "scholarshipGuardianEmploymentStatus",
+              "scholarshipRequestedAmount",
+              "scholarshipReason",
+              "scholarshipSupportingDocumentFile",
+            ]
+          : ["payerName", "payerEmail", "payerPhone", "transactionId", "paidAmount", "paidAt", "paymentProofFile"],
       6: ["whyJoinSchool", "schoolExpectations", "declarationAccepted"],
     };
 
@@ -568,7 +604,18 @@ function AdmissionFormContent() {
       4: ["supportPersonDuringLearning", "deviceAvailable", "birthCertificateFile", "parentCnicFile", "childPhotographFile", "previousSchoolReportFile", "medicalReportFile"],
       5: isPreviewMode
         ? ["paymentMethod", "admissionFee", "discountPercent", "paymentInstructions"]
-        : ["payerName", "payerEmail", "payerPhone", "transactionId", "paidAmount", "paidAt", "paymentProofFile"],
+        : form.needBasedScholarshipRequested
+          ? [
+              "scholarshipMonthlyIncome",
+              "scholarshipDependentsCount",
+              "scholarshipSchoolGoingChildrenCount",
+              "scholarshipResidenceType",
+              "scholarshipGuardianEmploymentStatus",
+              "scholarshipRequestedAmount",
+              "scholarshipReason",
+              "scholarshipSupportingDocumentFile",
+            ]
+          : ["payerName", "payerEmail", "payerPhone", "transactionId", "paidAmount", "paidAt", "paymentProofFile"],
       6: ["whyJoinSchool", "schoolExpectations", "declarationAccepted"],
     };
 
@@ -996,12 +1043,19 @@ function AdmissionFormContent() {
         file: form.medicalReportFile,
         applicationId,
       });
-      const paymentProofPath = await uploadAdmissionFormFile({
-        documentType: "payment_proof",
-        file: form.paymentProofFile,
+      const scholarshipSupportingDocumentPath = await uploadAdmissionFormFile({
+        documentType: "scholarship_supporting_document",
+        file: form.scholarshipSupportingDocumentFile,
         applicationId,
-        voucherNo: leadToken || applicationId,
       });
+      const paymentProofPath = form.needBasedScholarshipRequested
+        ? ""
+        : await uploadAdmissionFormFile({
+            documentType: "payment_proof",
+            file: form.paymentProofFile,
+            applicationId,
+            voucherNo: leadToken || applicationId,
+          });
 
       const payload = new FormData();
       Object.entries({
@@ -1057,6 +1111,15 @@ function AdmissionFormContent() {
         preferred_contact_person: form.preferredContactPerson,
         support_person_during_learning: form.supportPersonDuringLearning,
         device_available: form.deviceAvailable,
+        need_based_scholarship_requested: form.needBasedScholarshipRequested ? "Yes" : "No",
+        scholarship_monthly_income: form.scholarshipMonthlyIncome,
+        scholarship_dependents_count: form.scholarshipDependentsCount,
+        scholarship_school_going_children_count: form.scholarshipSchoolGoingChildrenCount,
+        scholarship_residence_type: form.scholarshipResidenceType,
+        scholarship_guardian_employment_status: form.scholarshipGuardianEmploymentStatus,
+        scholarship_requested_amount: form.scholarshipRequestedAmount,
+        scholarship_reason: form.scholarshipReason,
+        scholarship_supporting_document_file_path: scholarshipSupportingDocumentPath,
         payment_method: isPreviewMode ? form.paymentMethod : (liveSelectedPaymentMethod?.name || liveSelectedPaymentMethod?.method_key || ""),
         admission_fee: isPreviewMode ? form.admissionFee : String(liveAdmissionFeeAmount || ""),
         discount_percent: isPreviewMode ? form.discountPercent : String(liveDiscountPercent || ""),
@@ -1482,7 +1545,122 @@ function AdmissionFormContent() {
     );
   }
 
+  function renderScholarshipToggle() {
+    if (isPreviewMode) return null;
+
+    return (
+      <div className="rounded-[1.1rem] border border-[#2D8A6A]/10 bg-[#FAF7F0] p-4">
+        <label className="flex items-start gap-3 text-sm text-[#063F32]">
+          <input
+            type="checkbox"
+            checked={Boolean(form.needBasedScholarshipRequested)}
+            onChange={(event) => updateField("needBasedScholarshipRequested", event.target.checked)}
+            className="mt-1 h-4 w-4 rounded border-[#2D8A6A]/30 text-[#0D5C48] focus:ring-[#C9A227]"
+          />
+          <span>
+            <span className="block font-semibold">Do you willing to avail need based scholarship?</span>
+            <span className="mt-1 block text-[#245C4F]">
+              Need base scholarship is for Zakat, Khairat and Atiyah.
+            </span>
+          </span>
+        </label>
+      </div>
+    );
+  }
+
   function renderPaymentStep() {
+    if (!isPreviewMode && form.needBasedScholarshipRequested) {
+      return (
+        <div className="grid gap-5 rounded-[1.35rem] border border-[rgba(13,59,46,0.08)] bg-white/95 p-4 shadow-[0_12px_28px_rgba(13,59,46,0.05)] sm:p-6">
+          <div className="grid gap-4 rounded-[1.1rem] border border-[rgba(201,162,39,0.22)] bg-[#FFF5D6]/70 p-4">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]">Fee details</p>
+            <div className="grid gap-3 md:grid-cols-3">
+              <div className="rounded-[1rem] border border-[#2D8A6A]/15 bg-white p-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]">Regular fee</p>
+                <p className="mt-3 text-xl font-bold text-[#063F32]">PKR {previewRegularFeeAmount.toLocaleString("en-PK")}</p>
+                <p className="mt-2 text-sm text-[#245C4F]">{previewRegularFee?.title || previewRegularFee?.name || `Based on ${previewClassLevel || "the selected class"}.`}</p>
+              </div>
+              <div className="rounded-[1rem] border border-[#2D8A6A]/15 bg-white p-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]">Admission fee</p>
+                <p className="mt-3 text-xl font-bold text-[#063F32]">PKR {liveAdmissionFeeAmount.toLocaleString("en-PK")}</p>
+                <p className="mt-2 text-sm text-[#245C4F]">{liveSelectedAdmissionFee?.title || liveSelectedAdmissionFee?.name || "Default admission fee selected by coordinator."}</p>
+              </div>
+              <div className="rounded-[1rem] border border-[#2D8A6A]/15 bg-white p-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]">Coordinator discount</p>
+                <p className="mt-3 text-xl font-bold text-[#063F32]">{liveDiscountPercent ? `${liveDiscountPercent}%` : "No discount"}</p>
+                <p className="mt-2 text-sm text-[#245C4F]">This will be considered later in the scholarship voucher stage.</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-[1.1rem] border border-[rgba(201,162,39,0.22)] bg-[#FFF5D6]/70 p-4">
+            <label className="flex items-start gap-3 text-sm text-[#063F32]">
+              <input
+                type="checkbox"
+                checked={Boolean(form.needBasedScholarshipRequested)}
+                onChange={(event) => updateField("needBasedScholarshipRequested", event.target.checked)}
+                className="mt-1 h-4 w-4 rounded border-[#2D8A6A]/30 text-[#0D5C48] focus:ring-[#C9A227]"
+              />
+              <span>
+                <span className="block font-semibold">Do you willing to avail need based scholarship?</span>
+                <span className="mt-1 block text-[#245C4F]">
+                  Need base scholarship is for Zakat, Khairat and Atiyah.
+                </span>
+              </span>
+            </label>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="rounded-[1rem] border border-[#2D8A6A]/15 bg-white p-4">
+              <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]" htmlFor="scholarshipMonthlyIncome">Monthly household income</label>
+              <input id="scholarshipMonthlyIncome" type="number" min="0" step="0.01" value={form.scholarshipMonthlyIncome || ""} onChange={(event) => updateField("scholarshipMonthlyIncome", event.target.value)} className={inputClass(errors.scholarshipMonthlyIncome)} placeholder="50000" />
+              <FieldError error={errors.scholarshipMonthlyIncome} />
+            </div>
+            <div className="rounded-[1rem] border border-[#2D8A6A]/15 bg-white p-4">
+              <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]" htmlFor="scholarshipRequestedAmount">Requested scholarship amount</label>
+              <input id="scholarshipRequestedAmount" type="number" min="0" step="0.01" value={form.scholarshipRequestedAmount || ""} onChange={(event) => updateField("scholarshipRequestedAmount", event.target.value)} className={inputClass(errors.scholarshipRequestedAmount)} placeholder="10000" />
+              <FieldError error={errors.scholarshipRequestedAmount} />
+            </div>
+            <div className="rounded-[1rem] border border-[#2D8A6A]/15 bg-white p-4">
+              <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]" htmlFor="scholarshipDependentsCount">Number of dependents</label>
+              <input id="scholarshipDependentsCount" type="number" min="0" step="1" value={form.scholarshipDependentsCount || ""} onChange={(event) => updateField("scholarshipDependentsCount", event.target.value)} className={inputClass(errors.scholarshipDependentsCount)} placeholder="4" />
+              <FieldError error={errors.scholarshipDependentsCount} />
+            </div>
+            <div className="rounded-[1rem] border border-[#2D8A6A]/15 bg-white p-4">
+              <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]" htmlFor="scholarshipSchoolGoingChildrenCount">School-going children</label>
+              <input id="scholarshipSchoolGoingChildrenCount" type="number" min="0" step="1" value={form.scholarshipSchoolGoingChildrenCount || ""} onChange={(event) => updateField("scholarshipSchoolGoingChildrenCount", event.target.value)} className={inputClass(errors.scholarshipSchoolGoingChildrenCount)} placeholder="2" />
+              <FieldError error={errors.scholarshipSchoolGoingChildrenCount} />
+            </div>
+            <div className="rounded-[1rem] border border-[#2D8A6A]/15 bg-white p-4">
+              <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]" htmlFor="scholarshipResidenceType">Residence type</label>
+              <SelectField id="scholarshipResidenceType" value={form.scholarshipResidenceType || ""} onChange={(event) => updateField("scholarshipResidenceType", event.target.value)} error={errors.scholarshipResidenceType} className={inputClass(errors.scholarshipResidenceType)}>
+                <option value="">Select residence type</option>
+                {RESIDENCE_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
+              </SelectField>
+            </div>
+            <div className="rounded-[1rem] border border-[#2D8A6A]/15 bg-white p-4">
+              <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]" htmlFor="scholarshipGuardianEmploymentStatus">Guardian employment status</label>
+              <SelectField id="scholarshipGuardianEmploymentStatus" value={form.scholarshipGuardianEmploymentStatus || ""} onChange={(event) => updateField("scholarshipGuardianEmploymentStatus", event.target.value)} error={errors.scholarshipGuardianEmploymentStatus} className={inputClass(errors.scholarshipGuardianEmploymentStatus)}>
+                <option value="">Select employment status</option>
+                {EMPLOYMENT_STATUS_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
+              </SelectField>
+            </div>
+            <div className="rounded-[1rem] border border-[#2D8A6A]/15 bg-white p-4 md:col-span-2">
+              <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]" htmlFor="scholarshipReason">Why do you need this scholarship?</label>
+              <textarea id="scholarshipReason" rows={4} value={form.scholarshipReason || ""} onChange={(event) => updateField("scholarshipReason", event.target.value)} className={inputClass(errors.scholarshipReason)} placeholder="Share your financial need and why you are requesting support." />
+              <FieldError error={errors.scholarshipReason} />
+            </div>
+            <div className="rounded-[1rem] border border-[#2D8A6A]/15 bg-white p-4 md:col-span-2">
+              <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]" htmlFor="scholarshipSupportingDocumentFile">Supporting document</label>
+              <input id="scholarshipSupportingDocumentFile" type="file" accept="image/*,.pdf" onChange={(event) => void handleFileSelection("scholarshipSupportingDocumentFile", event.target.files?.[0] || null)} className={inputClass(errors.scholarshipSupportingDocumentFile)} />
+              <FieldError error={errors.scholarshipSupportingDocumentFile} />
+              <FilePreview file={form.scholarshipSupportingDocumentFile} />
+            </div>
+          </div>
+        </div>
+      );
+    }
+
     if (!isPreviewMode) {
       return (
         <div className="grid gap-5 rounded-[1.35rem] border border-[rgba(13,59,46,0.08)] bg-white/95 p-4 shadow-[0_12px_28px_rgba(13,59,46,0.05)] sm:p-6">
@@ -1534,12 +1712,36 @@ function AdmissionFormContent() {
                   <p className="mt-2 text-sm text-[#245C4F]">Regular fee minus discount plus admission fee.</p>
                 </div>
               </div>
-              <div className="rounded-[1rem] border border-[#2D8A6A]/10 bg-[#FAF7F0] p-4">
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]">Payment instructions</p>
-                <p className="mt-2 whitespace-pre-line text-sm text-[#245C4F]">
-                  {livePaymentInstructions || "No payment instructions added yet."}
-                </p>
-              </div>
+            <div className="rounded-[1rem] border border-[#2D8A6A]/10 bg-[#FAF7F0] p-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]">Payment instructions</p>
+              <p className="mt-2 whitespace-pre-line text-sm text-[#245C4F]">
+                {livePaymentInstructions || "No payment instructions added yet."}
+              </p>
+            </div>
+          </div>
+
+          <div className="rounded-[1.1rem] border border-[rgba(201,162,39,0.22)] bg-[#FFF5D6]/70 p-4">
+            <label className="flex items-start gap-3 text-sm text-[#063F32]">
+              <input
+                type="checkbox"
+                checked={Boolean(form.needBasedScholarshipRequested)}
+                onChange={(event) => updateField("needBasedScholarshipRequested", event.target.checked)}
+                className="mt-1 h-4 w-4 rounded border-[#2D8A6A]/30 text-[#0D5C48] focus:ring-[#C9A227]"
+              />
+              <span>
+                <span className="block font-semibold">Do you willing to avail need based scholarship?</span>
+                <span className="mt-1 block text-[#245C4F]">
+                  Need base scholarship is for Zakat, Khairat and Atiyah.
+                </span>
+              </span>
+            </label>
+          </div>
+
+            <div className="rounded-[1rem] border border-[#2D8A6A]/10 bg-[#FAF7F0] p-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]">Payment instructions</p>
+              <p className="mt-2 whitespace-pre-line text-sm text-[#245C4F]">
+                {livePaymentInstructions || "No payment instructions added yet."}
+              </p>
             </div>
 
             <div className="rounded-[1rem] border border-[#2D8A6A]/15 bg-white p-4">
@@ -1745,6 +1947,23 @@ function AdmissionFormContent() {
               <FieldError error={errors.paymentInstructions} />
             </div>
 
+          </div>
+
+          <div className="rounded-[1.1rem] border border-[rgba(201,162,39,0.22)] bg-[#FFF5D6]/70 p-4">
+            <label className="flex items-start gap-3 text-sm text-[#063F32]">
+              <input
+                type="checkbox"
+                checked={Boolean(form.needBasedScholarshipRequested)}
+                onChange={(event) => updateField("needBasedScholarshipRequested", event.target.checked)}
+                className="mt-1 h-4 w-4 rounded border-[#2D8A6A]/30 text-[#0D5C48] focus:ring-[#C9A227]"
+              />
+              <span>
+                <span className="block font-semibold">Do you willing to avail need based scholarship?</span>
+                <span className="mt-1 block text-[#245C4F]">
+                  Need base scholarship is for Zakat, Khairat and Atiyah.
+                </span>
+              </span>
+            </label>
           </div>
 
           <div className="grid gap-3 rounded-[1.1rem] border border-[rgba(201,162,39,0.22)] bg-[#FFF5D6]/70 p-4">

@@ -499,6 +499,15 @@ async function uploadAdmissionFiles(applicationId, files) {
     uploads.medicalReportPath = upload.storedPath;
   }
 
+  if (files.scholarshipSupportingDocumentFile) {
+    const upload = await uploadAdmissionDocument({
+      applicationId,
+      documentType: "scholarship_supporting_document",
+      file: files.scholarshipSupportingDocumentFile,
+    });
+    uploads.scholarshipSupportingDocumentPath = upload.storedPath;
+  }
+
   return uploads;
 }
 
@@ -533,6 +542,14 @@ export async function POST(request) {
     const developmentalConcern = normalizeBoolean(formData.get("developmental_concern"));
     const developmentalConcernDetails = normalizeText(formData.get("developmental_concern_details"));
     const medicalConditions = normalizeText(formData.get("medical_conditions"));
+    const needBasedScholarshipRequested = normalizeBoolean(formData.get("need_based_scholarship_requested")) === true;
+    const scholarshipMonthlyIncome = normalizeText(formData.get("scholarship_monthly_income"));
+    const scholarshipDependentsCount = normalizeText(formData.get("scholarship_dependents_count"));
+    const scholarshipSchoolGoingChildrenCount = normalizeText(formData.get("scholarship_school_going_children_count"));
+    const scholarshipResidenceType = normalizeText(formData.get("scholarship_residence_type"));
+    const scholarshipGuardianEmploymentStatus = normalizeText(formData.get("scholarship_guardian_employment_status"));
+    const scholarshipRequestedAmount = normalizeText(formData.get("scholarship_requested_amount"));
+    const scholarshipReason = normalizeText(formData.get("scholarship_reason"));
     const fatherNameEnglish = normalizeText(formData.get("father_name_english"));
     const fatherNameUrdu = normalizeText(formData.get("father_name_urdu"));
     const fatherCnic = normalizeText(formData.get("father_cnic"));
@@ -580,6 +597,7 @@ export async function POST(request) {
     const previousSchoolReportFilePath = normalizeText(formData.get("previous_school_report_file_path"));
     const medicalReportFilePath = normalizeText(formData.get("medical_report_file_path"));
     const paymentProofFilePath = normalizeText(formData.get("payment_proof_file_path"));
+    const scholarshipSupportingDocumentFilePath = normalizeText(formData.get("scholarship_supporting_document_file_path"));
 
     const files = {
       birthCertificateFile: getOptionalFile(formData, "birth_certificate_file"),
@@ -588,6 +606,7 @@ export async function POST(request) {
       previousSchoolReportFile: getOptionalFile(formData, "previous_school_report_file"),
       medicalReportFile: getOptionalFile(formData, "medical_report_file"),
       paymentProofFile: getOptionalFile(formData, "payment_proof_file"),
+      scholarshipSupportingDocumentFile: getOptionalFile(formData, "scholarship_supporting_document_file"),
     };
 
     if (!programName) return json(false, "Programme is required.", 400);
@@ -635,8 +654,20 @@ export async function POST(request) {
     if (!files.childPhotographFile && !childPhotographFilePath) {
       return json(false, "Recent child photograph is required.", 400);
     }
-    if (!files.paymentProofFile && !paymentProofFilePath) {
+    if (!needBasedScholarshipRequested && !files.paymentProofFile && !paymentProofFilePath) {
       return json(false, "Payment proof is required.", 400);
+    }
+    if (needBasedScholarshipRequested) {
+      if (!scholarshipMonthlyIncome) return json(false, "Monthly income is required.", 400);
+      if (!scholarshipDependentsCount) return json(false, "Dependents count is required.", 400);
+      if (!scholarshipSchoolGoingChildrenCount) return json(false, "School-going children count is required.", 400);
+      if (!scholarshipResidenceType) return json(false, "Residence type is required.", 400);
+      if (!scholarshipGuardianEmploymentStatus) return json(false, "Guardian employment status is required.", 400);
+      if (!scholarshipRequestedAmount) return json(false, "Requested scholarship amount is required.", 400);
+      if (!scholarshipReason) return json(false, "Scholarship reason is required.", 400);
+      if (!files.scholarshipSupportingDocumentFile && !scholarshipSupportingDocumentFilePath) {
+        return json(false, "Scholarship supporting document is required.", 400);
+      }
     }
 
     if (fatherEmail && !isValidEmail(fatherEmail)) {
@@ -681,6 +712,7 @@ export async function POST(request) {
       childPhotographPath: childPhotographFilePath || null,
       previousSchoolReportPath: previousSchoolReportFilePath || null,
       medicalReportPath: medicalReportFilePath || null,
+      scholarshipSupportingDocumentPath: scholarshipSupportingDocumentFilePath || null,
     };
 
     const needsAdmissionUpload =
@@ -688,7 +720,8 @@ export async function POST(request) {
       files.parentCnicFile ||
       files.childPhotographFile ||
       files.previousSchoolReportFile ||
-      files.medicalReportFile;
+      files.medicalReportFile ||
+      files.scholarshipSupportingDocumentFile;
 
     if (needsAdmissionUpload) {
       const uploadedFiles = await uploadAdmissionFiles(applicationId, files);
@@ -860,7 +893,7 @@ export async function POST(request) {
     `;
 
     let paymentSubmissionResult = null;
-    if (files.paymentProofFile || paymentProofFilePath) {
+    if (!needBasedScholarshipRequested && (files.paymentProofFile || paymentProofFilePath)) {
       const admissionPaymentVoucherNo = await generateVoucherNumber();
       const paymentProofStoredPath = paymentProofFilePath
         || (await uploadPaymentProof({
@@ -919,6 +952,45 @@ export async function POST(request) {
           totalAmount: voucher.totalAmount,
         };
       });
+    }
+
+    if (needBasedScholarshipRequested) {
+      await prisma.$executeRaw`
+        INSERT INTO need_based_scholarship_forms (
+          id,
+          registration_id,
+          interested_student_id,
+          lead_token,
+          monthly_income,
+          dependents_count,
+          school_going_children_count,
+          residence_type,
+          guardian_employment_status,
+          requested_amount,
+          reason,
+          supporting_document_file_path,
+          status,
+          created_at,
+          updated_at
+        )
+        VALUES (
+          ${crypto.randomUUID()}::uuid,
+          ${createdLead.id}::uuid,
+          ${linkedLead?.id || null}::uuid,
+          ${leadToken || null},
+          ${Number(scholarshipMonthlyIncome || 0)},
+          ${Number(scholarshipDependentsCount || 0)},
+          ${Number(scholarshipSchoolGoingChildrenCount || 0)},
+          ${scholarshipResidenceType},
+          ${scholarshipGuardianEmploymentStatus},
+          ${Number(scholarshipRequestedAmount || 0)},
+          ${scholarshipReason},
+          ${uploads.scholarshipSupportingDocumentPath || null},
+          ${"submitted"},
+          NOW(),
+          NOW()
+        )
+      `;
     }
 
     if (leadToken && linkedLead?.id && createdLead?.id) {

@@ -31,6 +31,19 @@ function normalizeStoredPath(path, bucket) {
   return normalized.startsWith(prefix) ? normalized.slice(prefix.length) : normalized;
 }
 
+function splitStoredPath(storedPath) {
+  const normalized = String(storedPath || "").replace(/^\/+/, "");
+  const parts = normalized.split("/").filter(Boolean);
+  if (parts.length < 2) {
+    return { bucket: "", objectPath: normalized };
+  }
+
+  return {
+    bucket: parts[0],
+    objectPath: parts.slice(1).join("/"),
+  };
+}
+
 export async function uploadPaymentProof({ voucherNo, file }) {
   const { url, serviceRoleKey, bucket } = getSupabaseConfig();
   const safeVoucherNo = sanitizeFilename(voucherNo);
@@ -157,8 +170,10 @@ export async function createSignedAdmissionDocumentUrl(storedPath, expiresIn = 3
   }
 
   const { url, serviceRoleKey, bucket } = getAdmissionSupabaseConfig();
-  const objectPath = normalizeStoredPath(storedPath, bucket);
-  const signUrl = `${url}/storage/v1/object/sign/${bucket}/${objectPath}`;
+  const inferred = splitStoredPath(storedPath);
+  const signingBucket = inferred.bucket || bucket;
+  const objectPath = normalizeStoredPath(storedPath, signingBucket);
+  const signUrl = `${url}/storage/v1/object/sign/${signingBucket}/${objectPath}`;
   const response = await fetch(signUrl, {
     method: "POST",
     headers: {
@@ -193,5 +208,5 @@ export async function createSignedAdmissionDocumentUrl(storedPath, expiresIn = 3
     return `${url}/storage/v1/${signedPath}`;
   }
 
-  return `${url}/storage/v1/object/public/${bucket}/${objectPath}`;
+  return `${url}/storage/v1/object/public/${signingBucket}/${objectPath}`;
 }

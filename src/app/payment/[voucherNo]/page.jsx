@@ -4,6 +4,23 @@ import prisma from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
 
+function normalizePaymentMethods(value) {
+  if (Array.isArray(value)) {
+    return value;
+  }
+
+  if (typeof value === "string" && value.trim()) {
+    try {
+      const parsed = JSON.parse(value);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  }
+
+  return [];
+}
+
 async function getVoucher(voucherNo) {
   const [item] = await prisma.$queryRaw`
       SELECT
@@ -107,9 +124,9 @@ export default async function PaymentVoucherPage({ params }) {
     payment_method: voucher.payment_method || "",
     payment_instructions: voucher.payment_instructions || "",
     payment_method_details: voucher.payment_method_details || null,
-    available_payment_methods: Array.isArray(voucher.payment_method_options)
-      ? voucher.payment_method_options
-      : [],
+    available_payment_methods: normalizePaymentMethods(
+      voucher.available_payment_methods || voucher.payment_method_options
+    ),
     student_name: voucher.student_name || "",
     parent_name: voucher.parent_name || "",
     class_level: voucher.class_level || "",

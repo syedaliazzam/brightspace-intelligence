@@ -3,7 +3,7 @@ import { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { normalizeClassLevel as normalizeAcademicClassLevel } from "@/lib/academicCatalog";
-import { sendEmail } from "@/lib/email";
+import { sendEmail, themedEmailShell } from "@/lib/email";
 import prisma from "@/lib/prisma";
 import { generateVoucherNumber } from "@/lib/voucherNumber";
 
@@ -23,6 +23,21 @@ function json(message, status = 200, extra = {}) {
 
 function normalizeText(value) {
   return typeof value === "string" ? value.trim() : "";
+}
+
+function formatEmailDate(value) {
+  if (!value) {
+    return "-";
+  }
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return "-";
+  }
+
+  return new Intl.DateTimeFormat("en-US", {
+    dateStyle: "medium",
+  }).format(date);
 }
 
 function normalizeBoolean(value) {
@@ -229,6 +244,27 @@ async function getPaymentMethodById(paymentMethodId, tx = prisma) {
   return row || null;
 }
 
+async function getActivePaymentMethods(tx = prisma) {
+  const rows = await tx.$queryRaw`
+    SELECT
+      pm.id::text AS id,
+      pm.name,
+      pm.method_key,
+      pm.account_title,
+      pm.account_number,
+      pm.iban,
+      pm.bank_name,
+      pm.branch_code,
+      pm.instructions,
+      LOWER(pm.status::text) AS status
+    FROM payment_methods pm
+    WHERE LOWER(pm.status::text) = 'active'
+    ORDER BY pm.name ASC
+  `;
+
+  return rows || [];
+}
+
 function addColumn(columns, values, name, value) {
   columns.push(Prisma.raw(`"${name}"`));
   values.push(value);
@@ -396,6 +432,7 @@ function buildVoucherEmailContent({
   voucherNo,
   regularFeeAmount,
   otherFeeAmount,
+  scholarshipAmount = 0,
   discountPercent,
   discountAmount,
   totalAmount,
@@ -406,46 +443,65 @@ function buildVoucherEmailContent({
   supportPhone,
   paymentSubmitUrl,
   paymentMethodName,
+  availablePaymentMethods = [],
 }) {
-  const details = [
-    studentName ? `<tr><td>Student</td><td>${studentName}</td></tr>` : "",
-    parentName ? `<tr><td>Parent</td><td>${parentName}</td></tr>` : "",
-    classLevel ? `<tr><td>Class</td><td>${classLevel}</td></tr>` : "",
-    `<tr><td>Voucher No</td><td>${voucherNo}</td></tr>`,
-    regularFeeAmount > 0 ? `<tr><td>Regular Fee</td><td>${regularFeeAmount}</td></tr>` : "",
-    otherFeeAmount > 0 ? `<tr><td>Other Fee</td><td>${otherFeeAmount}</td></tr>` : "",
-    `<tr><td>Subtotal</td><td>${Number(regularFeeAmount + otherFeeAmount).toFixed(2)}</td></tr>`,
-    `<tr><td>Discount on Regular Fee</td><td>${discountPercent}% (${discountAmount.toFixed(2)})</td></tr>`,
-    `<tr><td>Total Payable</td><td>${totalAmount.toFixed(2)}</td></tr>`,
-    dueDate ? `<tr><td>Due Date</td><td>${dueDate}</td></tr>` : "",
-    paymentMethod?.name || paymentMethodName ? `<tr><td>Payment Method</td><td>${paymentMethod?.name || paymentMethodName}</td></tr>` : "",
-    paymentMethod?.bank_name ? `<tr><td>Bank Name</td><td>${paymentMethod.bank_name}</td></tr>` : "",
-    paymentMethod?.account_title ? `<tr><td>Account Title</td><td>${paymentMethod.account_title}</td></tr>` : "",
-    paymentMethod?.account_number ? `<tr><td>Account Number</td><td>${paymentMethod.account_number}</td></tr>` : "",
-    paymentMethod?.iban ? `<tr><td>IBAN</td><td>${paymentMethod.iban}</td></tr>` : "",
-    paymentMethod?.branch_code ? `<tr><td>Branch Code</td><td>${paymentMethod.branch_code}</td></tr>` : "",
-    paymentInstructions ? `<tr><td>Instructions</td><td>${paymentInstructions}</td></tr>` : "",
-    supportEmail ? `<tr><td>Support Email</td><td>${supportEmail}</td></tr>` : "",
-    supportPhone ? `<tr><td>Support Phone</td><td>${supportPhone}</td></tr>` : "",
-  ]
-    .filter(Boolean)
-    .join("");
+  const formattedDueDate = formatEmailDate(dueDate);
 
-  const html = `
-    <div style="font-family:Arial,sans-serif;background:#f8fafc;padding:24px;color:#0f172a;">
-      <div style="max-width:720px;margin:0 auto;background:#fff;border:1px solid #e2e8f0;border-radius:18px;padding:24px;">
-        <h2 style="margin:0 0 16px;">Fee Voucher Created</h2>
-        <table style="width:100%;border-collapse:collapse;font-size:14px;">
-          ${details}
-        </table>
-        <div style="margin-top:20px;">
-          <a href="${paymentSubmitUrl}" style="display:inline-block;background:#2563eb;color:#ffffff;padding:12px 18px;border-radius:10px;text-decoration:none;font-weight:600;">Submit Payment</a>
-          <p style="margin:12px 0 0;font-size:12px;color:#64748b;">If the button does not work, open this link:</p>
-          <p style="margin:4px 0 0;font-size:12px;color:#2563eb;word-break:break-all;">${paymentSubmitUrl}</p>
-        </div>
-      </div>
-    </div>
-  `;
+  const html = themedEmailShell({
+    eyebrow: "Fee Voucher Ready",
+    title: "Your fee voucher is available",
+    intro: `Hello ${studentName || "there"}, your fee voucher has been created. Please review the details and use any of the available payment methods below to submit payment.`,
+    rows: [
+      ["Student", studentName || "-"],
+      ["Parent", parentName || "-"],
+      ["Class", classLevel || "-"],
+      ["Voucher No", voucherNo || "-"],
+      ["Regular Fee", regularFeeAmount > 0 ? regularFeeAmount.toFixed(2) : "0.00"],
+      ["Other Fee", otherFeeAmount > 0 ? otherFeeAmount.toFixed(2) : "0.00"],
+      ["Subtotal", Number(regularFeeAmount + otherFeeAmount).toFixed(2)],
+      ["Discount on Regular Fee", `${discountPercent}% (${discountAmount.toFixed(2)})`],
+      ["Need-based Scholarship", scholarshipAmount > 0 ? Number(scholarshipAmount).toFixed(2) : "0.00"],
+      ["Total Payable", totalAmount.toFixed(2)],
+      ["Due Date", formattedDueDate],
+      ["Payment Method", paymentMethod?.name || paymentMethodName || "-"],
+      ["Account Title", paymentMethod?.account_title || "-"],
+      ["Account Number", paymentMethod?.account_number || "-"],
+      ["IBAN", paymentMethod?.iban || "-"],
+      ["Branch Code", paymentMethod?.branch_code || "-"],
+      ["Instructions", paymentInstructions || paymentMethod?.instructions || "-"],
+      ["Support Email", supportEmail || "-"],
+      ["Support Phone", supportPhone || "-"],
+    ],
+    bodyBlocks: availablePaymentMethods?.length
+      ? [
+          `<div style="margin-top:18px;">
+            <h3 style="margin:0 0 10px;color:#063F32;font-size:16px;">Available payment methods</h3>
+            <div style="border:1px solid #2D8A6A;border-radius:18px;padding:14px;background:#fffaf0;">
+              ${availablePaymentMethods
+                .map(
+                  (method) => `
+                    <div style="border:1px solid rgba(45,138,106,0.18);border-radius:16px;background:#ffffff;padding:14px 16px;margin-bottom:12px;">
+                      <div style="font-weight:700;color:#0D5C48;font-size:15px;margin-bottom:8px;">${method?.name || "-"}</div>
+                      <table role="presentation" cellspacing="0" cellpadding="0" style="width:100%;border-collapse:collapse;font-size:14px;">
+                        ${method?.bank_name ? `<tr><td style="padding:4px 0;color:#245C4F;width:36%;vertical-align:top;">Bank</td><td style="padding:4px 0;color:#063F32;">${method.bank_name}</td></tr>` : ""}
+                        ${method?.account_title ? `<tr><td style="padding:4px 0;color:#245C4F;vertical-align:top;">Account title</td><td style="padding:4px 0;color:#063F32;">${method.account_title}</td></tr>` : ""}
+                        ${method?.account_number ? `<tr><td style="padding:4px 0;color:#245C4F;vertical-align:top;">Account number</td><td style="padding:4px 0;color:#063F32;">${method.account_number}</td></tr>` : ""}
+                        ${method?.iban ? `<tr><td style="padding:4px 0;color:#245C4F;vertical-align:top;">IBAN</td><td style="padding:4px 0;color:#063F32;">${method.iban}</td></tr>` : ""}
+                        ${method?.branch_code ? `<tr><td style="padding:4px 0;color:#245C4F;vertical-align:top;">Branch code</td><td style="padding:4px 0;color:#063F32;">${method.branch_code}</td></tr>` : ""}
+                        ${method?.instructions ? `<tr><td style="padding:4px 0;color:#245C4F;vertical-align:top;">Instructions</td><td style="padding:4px 0;color:#063F32;white-space:pre-line;">${method.instructions}</td></tr>` : ""}
+                      </table>
+                    </div>
+                  `
+                )
+                .join("")}
+            </div>
+          </div>`,
+        ]
+      : [],
+    buttonLabel: "Submit Payment",
+    buttonUrl: paymentSubmitUrl,
+    footerNote: `If the button does not work, open this link in your browser: ${paymentSubmitUrl}`,
+  });
 
   const text = `
 Fee Voucher Created
@@ -459,15 +515,19 @@ Regular Fee: ${regularFeeAmount > 0 ? regularFeeAmount.toFixed(2) : "0.00"}
 Other Fee: ${otherFeeAmount > 0 ? otherFeeAmount.toFixed(2) : "0.00"}
 Subtotal: ${Number(regularFeeAmount + otherFeeAmount).toFixed(2)}
 Discount on Regular Fee: ${discountPercent}% (${discountAmount.toFixed(2)})
+Need-based Scholarship: ${scholarshipAmount > 0 ? Number(scholarshipAmount).toFixed(2) : "0.00"}
 Total Payable: ${totalAmount.toFixed(2)}
-Due Date: ${dueDate || "-"}
+Due Date: ${formattedDueDate}
 
-Payment Method: ${paymentMethod?.name || "-"}
+Payment Method: ${paymentMethod?.name || paymentMethodName || "-"}
 Account Title: ${paymentMethod?.account_title || "-"}
 Account Number: ${paymentMethod?.account_number || "-"}
 IBAN: ${paymentMethod?.iban || "-"}
 Branch Code: ${paymentMethod?.branch_code || "-"}
 Instructions: ${paymentInstructions || paymentMethod?.instructions || "-"}
+
+Available payment methods:
+${(availablePaymentMethods || []).map((method) => `- ${method?.name || "-"}`).join("\n")}
 
 Submit Payment:
 ${paymentSubmitUrl}
@@ -641,6 +701,15 @@ async function buildVoucherInsertPayload(voucherNo, payload, tx) {
   if (columns.admission_fee_amount) {
     addColumn(insertColumns, insertValues, "admission_fee_amount", payload.admissionFeeAmount);
     supportedColumns.add("admission_fee_amount");
+  }
+  if (columns.scholarship_amount) {
+    addColumn(insertColumns, insertValues, "scholarship_amount", payload.scholarshipAmount || 0);
+    supportedColumns.add("scholarship_amount");
+  }
+  if (columns.scholarship_form_id && payload.scholarshipFormId) {
+    insertColumns.push(Prisma.raw(`"scholarship_form_id"`));
+    insertValues.push({ value: payload.scholarshipFormId, castType: "uuid" });
+    supportedColumns.add("scholarship_form_id");
   }
   if (columns.other_fee_id && payload.otherFeeId) {
     insertColumns.push(Prisma.raw(`"other_fee_id"`));
@@ -829,6 +898,8 @@ export async function POST(request) {
     const regularFeeId = normalizeText(body?.regular_fee_id ?? body?.regularFeeId);
     const otherFeeId = normalizeText(body?.other_fee_id ?? body?.otherFeeId);
     const admissionFeeAmountInput = toMoney(body?.admission_fee_amount ?? body?.admissionFeeAmount);
+    const scholarshipAmountInput = toMoney(body?.scholarship_amount ?? body?.scholarshipAmount);
+    const scholarshipFormId = normalizeText(body?.scholarship_form_id ?? body?.scholarshipFormId);
     const discountId = normalizeText(body?.discount_id ?? body?.discountId);
     const discountPercentInput = Number((body?.discount_percent ?? body?.discountPercent) || 0);
     const dueDate = normalizeDueDate(body?.dueDate);
@@ -913,6 +984,7 @@ export async function POST(request) {
     const { item, lead, emailMessage } = await prisma.$transaction(async (tx) => {
       const createdBy = session?.user?.id || null;
       const lead = await getLeadById(registrationLeadId, tx);
+      const availablePaymentMethods = await getActivePaymentMethods(tx);
 
       if (!lead?.id) {
         throw new Error("Registration lead not found.");
@@ -999,7 +1071,7 @@ export async function POST(request) {
 
       const subtotalAmount = Number((regularFeeAmount + admissionFeeAmount).toFixed(2));
       const discountAmount = Number((regularFeeAmount * discountPercent / 100).toFixed(2));
-      const totalAmount = Number((subtotalAmount - discountAmount).toFixed(2));
+      const totalAmount = Number((subtotalAmount - discountAmount - scholarshipAmountInput).toFixed(2));
       if (totalAmount <= 0) {
         throw new Error("Voucher total must be greater than zero.");
       }
@@ -1019,6 +1091,8 @@ export async function POST(request) {
         regularFeeAmount,
         otherFeeId: selectedOtherFee?.id || null,
         admissionFeeAmount,
+        scholarshipAmount: scholarshipAmountInput,
+        scholarshipFormId: scholarshipFormId || null,
         discountId: discount?.id || null,
         discountPercent,
         subtotalAmount,
@@ -1064,6 +1138,18 @@ export async function POST(request) {
         await tx.$executeRaw`
           INSERT INTO voucher_line_items (id, voucher_id, fee_type, title, amount, created_at)
           VALUES (${crypto.randomUUID()}::uuid, ${voucherId}::uuid, ${selectedOtherFee?.fee_type || 'admission_fee'}, ${selectedOtherFee?.name || "Other Fee"}, ${admissionFeeAmount}, NOW())
+        `;
+      }
+
+      if (scholarshipFormId) {
+        await tx.$executeRaw`
+          UPDATE need_based_scholarship_forms
+          SET
+            voucher_created = TRUE,
+            voucher_id = ${voucherId}::uuid,
+            scholarship_amount = ${scholarshipAmountInput},
+            updated_at = NOW()
+          WHERE id = ${scholarshipFormId}::uuid
         `;
       }
 
@@ -1150,6 +1236,7 @@ export async function POST(request) {
         voucherNo: created.voucher_no || voucherNo,
         regularFeeAmount,
         otherFeeAmount: admissionFeeAmount,
+        scholarshipAmount: scholarshipAmountInput,
         discountPercent,
         discountAmount,
         totalAmount,
@@ -1160,6 +1247,7 @@ export async function POST(request) {
         supportPhone,
         paymentSubmitUrl,
         paymentMethodName: resolvedPaymentMethod,
+        availablePaymentMethods,
       });
 
       const subject = `Fee voucher ${created.voucher_no || voucherNo}`;
@@ -1200,7 +1288,22 @@ export async function POST(request) {
         emailError instanceof Error ? emailError.message : "Voucher email dispatch failed.";
       console.error("VOUCHER_EMAIL_ERROR", {
         message: emailError?.message,
+        name: emailError?.name,
+        stack: emailError?.stack,
+        code: emailError?.code,
+        command: emailError?.command,
         response: emailError?.response?.body,
+        smtpConfigured: Boolean(
+          process.env.SMTP_HOST &&
+            process.env.SMTP_PORT &&
+            process.env.SMTP_USER &&
+            process.env.SMTP_PASS &&
+            (process.env.SMTP_FROM || process.env.SMTP_USER)
+        ),
+        smtpHost: process.env.SMTP_HOST || "",
+        smtpPort: process.env.SMTP_PORT || "",
+        smtpUser: process.env.SMTP_USER || "",
+        smtpFrom: process.env.SMTP_FROM || "",
       });
       if (emailMessage?.id) {
         await prisma.$executeRaw`
@@ -1243,7 +1346,22 @@ export async function POST(request) {
           : null,
         ...(emailSendStatus === "sent"
           ? {}
-          : { email_error: emailErrorMessage || "Email failed." }),
+          : {
+              email_error: emailErrorMessage || "Email failed.",
+              email_debug: {
+                smtpConfigured: Boolean(
+                  process.env.SMTP_HOST &&
+                    process.env.SMTP_PORT &&
+                    process.env.SMTP_USER &&
+                    process.env.SMTP_PASS &&
+                    (process.env.SMTP_FROM || process.env.SMTP_USER)
+                ),
+                smtpHost: process.env.SMTP_HOST || "",
+                smtpPort: process.env.SMTP_PORT || "",
+                smtpUser: process.env.SMTP_USER || "",
+                smtpFrom: process.env.SMTP_FROM || "",
+              },
+            }),
       }
     );
   } catch (error) {
