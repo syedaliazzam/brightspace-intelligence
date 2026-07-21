@@ -129,6 +129,18 @@ function isValidNumericValue(value) {
   return /^\d+(\.\d{1,2})?$/.test(text);
 }
 
+function isValidCnic(value) {
+  const text = String(value || "").trim();
+  return /^(\d{5}-\d{7}-\d{1}|\d{13})$/.test(text);
+}
+
+function formatCnic(value) {
+  const digits = String(value || "").replace(/\D/g, "").slice(0, 13);
+  if (digits.length <= 5) return digits;
+  if (digits.length <= 12) return `${digits.slice(0, 5)}-${digits.slice(5)}`;
+  return `${digits.slice(0, 5)}-${digits.slice(5, 12)}-${digits.slice(12, 13)}`;
+}
+
 function isValidTextName(value) {
   const text = String(value || "").trim();
   return /^[A-Za-zÀ-ÖØ-öø-ÿا-ي؀-ۿ][A-Za-zÀ-ÖØ-öø-ÿا-ي؀-ۿ\s.'()&/-]{1,98}[A-Za-zÀ-ÖØ-öø-ÿا-ي؀-ۿ.)]?$/.test(text);
@@ -184,7 +196,9 @@ function getStepErrors(form, previewMode = false) {
 
   if (!form.studentName.trim()) errors.studentName = "Student full name is required.";
   else if (!isValidPersonName(form.studentName)) errors.studentName = "Enter a valid student name.";
-  if (form.studentNameUrdu && !String(form.studentNameUrdu).trim()) errors.studentNameUrdu = "Enter a valid student name.";
+  if (String(form.studentNameUrdu || "").trim() && !isValidPersonName(form.studentNameUrdu)) {
+    errors.studentNameUrdu = "Enter a valid student name.";
+  }
   if (!form.gender) errors.gender = "Gender is required.";
   if (!form.dateOfBirth) errors.dateOfBirth = "Date of birth is required.";
   if (!form.country.trim()) errors.country = "Country is required.";
@@ -235,7 +249,9 @@ function getStepErrors(form, previewMode = false) {
   if (!String(form.fatherNameUrdu || "").trim()) errors.fatherNameUrdu = "Father name in Urdu is required.";
   if (!String(form.motherNameUrdu || "").trim()) errors.motherNameUrdu = "Mother name in Urdu is required.";
   if (!String(form.fatherCnic || "").trim()) errors.fatherCnic = "Father CNIC is required.";
+  else if (!isValidCnic(form.fatherCnic)) errors.fatherCnic = "Enter a valid CNIC number.";
   if (!String(form.motherCnic || "").trim()) errors.motherCnic = "Mother CNIC is required.";
+  else if (!isValidCnic(form.motherCnic)) errors.motherCnic = "Enter a valid CNIC number.";
   if (!String(form.fatherQualification || "").trim()) errors.fatherQualification = "Father qualification is required.";
   else if (!isValidTextName(form.fatherQualification)) errors.fatherQualification = "Enter a valid qualification.";
   if (!String(form.motherQualification || "").trim()) errors.motherQualification = "Mother qualification is required.";
@@ -252,6 +268,9 @@ function getStepErrors(form, previewMode = false) {
   else if (!isValidPhoneNumber(form.fatherContactHome)) errors.fatherContactHome = "Enter a valid home contact number.";
   if (!String(form.fatherContactOffice || "").trim()) errors.fatherContactOffice = "Father office contact is required.";
   else if (!isValidPhoneNumber(form.fatherContactOffice)) errors.fatherContactOffice = "Enter a valid office contact number.";
+  if (String(form.fatherEmergencyContact || "").trim() && !isValidPhoneNumber(form.fatherEmergencyContact)) {
+    errors.fatherEmergencyContact = "Enter a valid emergency contact number.";
+  }
   if (!String(form.fatherContactWhatsapp || "").trim() && !String(form.fatherEmergencyContact || "").trim()) {
     errors.fatherContactWhatsapp = "Father WhatsApp or emergency contact is required.";
   }
@@ -259,6 +278,9 @@ function getStepErrors(form, previewMode = false) {
   else if (!isValidPhoneNumber(form.motherContactHome)) errors.motherContactHome = "Enter a valid home contact number.";
   if (!String(form.motherContactOffice || "").trim()) errors.motherContactOffice = "Mother office contact is required.";
   else if (!isValidPhoneNumber(form.motherContactOffice)) errors.motherContactOffice = "Enter a valid office contact number.";
+  if (String(form.motherEmergencyContact || "").trim() && !isValidPhoneNumber(form.motherEmergencyContact)) {
+    errors.motherEmergencyContact = "Enter a valid emergency contact number.";
+  }
   if (!String(form.motherContactWhatsapp || "").trim() && !String(form.motherEmergencyContact || "").trim()) {
     errors.motherContactWhatsapp = "Mother WhatsApp or emergency contact is required.";
   }
@@ -277,6 +299,12 @@ function getStepErrors(form, previewMode = false) {
   }
   if (!getPrimaryParentName(form)) {
     errors.primaryParent = "Primary parent details are incomplete.";
+  }
+  if (String(form.fatherResidentialAddress || "").trim() && !isValidTextName(form.fatherResidentialAddress)) {
+    errors.fatherResidentialAddress = "Enter a valid residential address.";
+  }
+  if (String(form.motherResidentialAddress || "").trim() && !isValidTextName(form.motherResidentialAddress)) {
+    errors.motherResidentialAddress = "Enter a valid residential address.";
   }
   if (
     form.preferredContactPerson === "Father" &&
@@ -334,6 +362,49 @@ function getStepErrors(form, previewMode = false) {
 
 function FieldError({ error }) {
   return error ? <p className="mt-2 text-sm text-rose-600">{error}</p> : null;
+}
+
+function FilePreview({ file }) {
+  const [previewUrl, setPreviewUrl] = useState("");
+
+  useEffect(() => {
+    if (!(file instanceof File) || !file.type.startsWith("image/")) {
+      setPreviewUrl("");
+      return undefined;
+    }
+
+    const objectUrl = URL.createObjectURL(file);
+    setPreviewUrl(objectUrl);
+
+    return () => {
+      URL.revokeObjectURL(objectUrl);
+    };
+  }, [file]);
+
+  if (!(file instanceof File)) return null;
+
+  const isImage = file.type.startsWith("image/");
+
+  return isImage ? (
+    <div className="mt-3 overflow-hidden rounded-[1rem] border border-[#2D8A6A]/10 bg-[#FAF7F0]">
+      {previewUrl ? (
+        <img
+          src={previewUrl}
+          alt={file.name}
+          className="h-32 w-full object-cover"
+        />
+      ) : null}
+      <div className="px-3 py-3 text-sm text-[#245C4F]">
+        <p className="font-semibold text-[#063F32]">{file.name}</p>
+        <p className="mt-1 text-xs uppercase tracking-[0.16em] text-[#0D5C48]">Image selected</p>
+      </div>
+    </div>
+  ) : (
+    <div className="mt-3 rounded-[1rem] border border-[#2D8A6A]/10 bg-[#FAF7F0] px-3 py-3 text-sm text-[#245C4F]">
+      <p className="font-semibold text-[#063F32]">{file.name}</p>
+      <p className="mt-1 text-xs uppercase tracking-[0.16em] text-[#0D5C48]">File selected</p>
+    </div>
+  );
 }
 
 function SelectField({ id, value, onChange, error, className = "", children }) {
@@ -455,6 +526,10 @@ function AdmissionFormContent() {
     classLevels: [],
     coordinatorMaxDiscountPercent: 20,
   });
+  const [locationOptions, setLocationOptions] = useState({
+    countries: [],
+    cities: [],
+  });
   const searchParams = useSearchParams();
   const readinessErrorRef = useRef(null);
   const leadTokenParam = searchParams?.get("leadToken") || "";
@@ -468,7 +543,7 @@ function AdmissionFormContent() {
       0: ["programName", "classLevel", "preferredStartingMonth", "preferredStartingMonthOther"],
       1: ["studentName", "studentNameUrdu", "gender", "dateOfBirth", "country", "city", "nationality", "religion", "preferredLanguage", "currentSchool", "currentGrade"],
       2: ["shiftReason", "attendedOnlineClasses", "developmentalConcern", "developmentalConcernDetails", "childProfile", "childStrengths", "childSupportNeeds", "childSpecialInterests", "medicalConditions"],
-      3: ["parentNames", "fatherNameEnglish", "motherNameEnglish", "fatherNameUrdu", "motherNameUrdu", "fatherEmail", "motherEmail", "preferredContactPerson", "primaryParent", "fatherContactHome", "fatherContactOffice", "fatherContactWhatsapp", "fatherEmergencyContact", "motherContactHome", "motherContactOffice", "motherContactWhatsapp", "motherEmergencyContact"],
+      3: ["parentNames", "fatherNameEnglish", "motherNameEnglish", "fatherNameUrdu", "motherNameUrdu", "fatherCnic", "motherCnic", "fatherEmail", "motherEmail", "preferredContactPerson", "primaryParent", "fatherContactHome", "fatherContactOffice", "fatherContactWhatsapp", "fatherEmergencyContact", "motherContactHome", "motherContactOffice", "motherContactWhatsapp", "motherEmergencyContact"],
       4: ["supportPersonDuringLearning", "deviceAvailable", "birthCertificateFile", "parentCnicFile", "childPhotographFile", "previousSchoolReportFile", "medicalReportFile"],
       5: isPreviewMode
         ? ["paymentMethod", "admissionFee", "discountPercent", "paymentInstructions"]
@@ -489,7 +564,7 @@ function AdmissionFormContent() {
       0: ["programName", "classLevel", "preferredStartingMonth", "preferredStartingMonthOther"],
       1: ["studentName", "studentNameUrdu", "gender", "dateOfBirth", "country", "city", "nationality", "religion", "preferredLanguage", "currentSchool", "currentGrade"],
       2: ["shiftReason", "attendedOnlineClasses", "developmentalConcern", "developmentalConcernDetails", "childProfile", "childStrengths", "childSupportNeeds", "childSpecialInterests", "medicalConditions"],
-      3: ["parentNames", "fatherNameEnglish", "motherNameEnglish", "fatherNameUrdu", "motherNameUrdu", "fatherEmail", "motherEmail", "preferredContactPerson", "primaryParent", "fatherContactHome", "fatherContactOffice", "fatherContactWhatsapp", "fatherEmergencyContact", "motherContactHome", "motherContactOffice", "motherContactWhatsapp", "motherEmergencyContact"],
+      3: ["parentNames", "fatherNameEnglish", "motherNameEnglish", "fatherNameUrdu", "motherNameUrdu", "fatherCnic", "motherCnic", "fatherEmail", "motherEmail", "preferredContactPerson", "primaryParent", "fatherContactHome", "fatherContactOffice", "fatherContactWhatsapp", "fatherEmergencyContact", "motherContactHome", "motherContactOffice", "motherContactWhatsapp", "motherEmergencyContact"],
       4: ["supportPersonDuringLearning", "deviceAvailable", "birthCertificateFile", "parentCnicFile", "childPhotographFile", "previousSchoolReportFile", "medicalReportFile"],
       5: isPreviewMode
         ? ["paymentMethod", "admissionFee", "discountPercent", "paymentInstructions"]
@@ -577,6 +652,68 @@ function AdmissionFormContent() {
     };
   }, []);
 
+  useEffect(() => {
+    let active = true;
+
+    async function loadLocationOptions() {
+      try {
+        const response = await fetch("/api/public/location-options", { cache: "no-store" });
+        const data = await response.json().catch(() => null);
+        if (!response.ok || !data || !active) return;
+
+        setLocationOptions({
+          countries: Array.isArray(data.countries) ? data.countries : [],
+          cities: [],
+        });
+      } catch {
+        // Keep the form usable even if location options cannot be loaded.
+      }
+    }
+
+    void loadLocationOptions();
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    const selectedCountry = String(form.country || "").trim();
+
+    if (!selectedCountry) {
+      setLocationOptions((current) => ({ ...current, cities: [] }));
+      return () => {
+        active = false;
+      };
+    }
+
+    async function loadCities() {
+      try {
+        const response = await fetch(`/api/public/location-options?country=${encodeURIComponent(selectedCountry)}`, {
+          cache: "no-store",
+        });
+        const data = await response.json().catch(() => null);
+        if (!response.ok || !data || !active) return;
+
+        setLocationOptions((current) => ({
+          ...current,
+          cities: Array.isArray(data.cities) ? data.cities : [],
+        }));
+      } catch {
+        if (active) {
+          setLocationOptions((current) => ({ ...current, cities: [] }));
+        }
+      }
+    }
+
+    void loadCities();
+
+    return () => {
+      active = false;
+    };
+  }, [form.country]);
+
   const previewClassLevel = useMemo(() => String(leadClassLevel || form.classLevel || "").trim(), [leadClassLevel, form.classLevel]);
 
   const classLevelOptions = useMemo(() => {
@@ -586,6 +723,14 @@ function AdmissionFormContent() {
 
     return items.filter((item, index) => items.findIndex((entry) => entry.toLowerCase() === item.toLowerCase()) === index);
   }, [paymentOptions.classLevels]);
+
+  const countryOptions = useMemo(() => {
+    return Array.isArray(locationOptions.countries) ? locationOptions.countries : [];
+  }, [locationOptions.countries]);
+
+  const cityOptions = useMemo(() => {
+    return Array.isArray(locationOptions.cities) ? locationOptions.cities : [];
+  }, [locationOptions.cities]);
 
   const age = useMemo(() => calculateAgeFromDate(form.dateOfBirth), [form.dateOfBirth]);
   const matchingRegularFees = useMemo(() => {
@@ -693,7 +838,10 @@ function AdmissionFormContent() {
   const liveTotalAmount = Math.max(previewRegularFeeAmount - liveDiscountAmount + liveAdmissionFeeAmount, 0);
 
   function updateField(name, value) {
-    setForm((current) => ({ ...current, [name]: value }));
+    const nextValue = (name === "fatherCnic" || name === "motherCnic")
+      ? formatCnic(value)
+      : value;
+    setForm((current) => ({ ...current, [name]: nextValue }));
     setErrors((current) => ({ ...current, [name]: "" }));
   }
 
@@ -1032,18 +1180,36 @@ function AdmissionFormContent() {
         </div>
         <div>
           <label className="mb-2 block text-[11px] font-bold uppercase tracking-[0.18em] text-[#0D5C48]" htmlFor="country">Country</label>
-          <input id="country" value={form.country} onChange={(event) => updateField("country", event.target.value)} className={inputClass(errors.country)} />
-          <FieldError error={errors.country} />
+          <SelectField id="country" value={form.country} onChange={(event) => {
+            const nextCountry = event.target.value;
+            updateField("country", nextCountry);
+            if (form.city && !cityOptions.includes(String(form.city))) {
+              updateField("city", "");
+            }
+          }} error={errors.country} className={inputClass(errors.country)}>
+            <option value="">Select country</option>
+            {countryOptions.map((option) => (
+              <option key={option} value={option}>{option}</option>
+            ))}
+          </SelectField>
         </div>
         <div>
           <label className="mb-2 block text-[11px] font-bold uppercase tracking-[0.18em] text-[#0D5C48]" htmlFor="city">City</label>
-          <input id="city" value={form.city} onChange={(event) => updateField("city", event.target.value)} className={inputClass(errors.city)} />
-          <FieldError error={errors.city} />
+          <SelectField id="city" value={form.city} onChange={(event) => updateField("city", event.target.value)} error={errors.city} className={inputClass(errors.city)}>
+            <option value="">{form.country ? "Select city" : "Select country first"}</option>
+            {cityOptions.map((option) => (
+              <option key={option} value={option}>{option}</option>
+            ))}
+          </SelectField>
         </div>
         <div>
           <label className="mb-2 block text-[11px] font-bold uppercase tracking-[0.18em] text-[#0D5C48]" htmlFor="nationality">Nationality</label>
-          <input id="nationality" value={form.nationality} onChange={(event) => updateField("nationality", event.target.value)} className={inputClass(errors.nationality)} />
-          <FieldError error={errors.nationality} />
+          <SelectField id="nationality" value={form.nationality} onChange={(event) => updateField("nationality", event.target.value)} error={errors.nationality} className={inputClass(errors.nationality)}>
+            <option value="">Select nationality</option>
+            {countryOptions.map((option) => (
+              <option key={option} value={option}>{option}</option>
+            ))}
+          </SelectField>
         </div>
         <div>
           <label className="mb-2 block text-[11px] font-bold uppercase tracking-[0.18em] text-[#0D5C48]" htmlFor="religion">Religion</label>
@@ -1159,7 +1325,15 @@ function AdmissionFormContent() {
           </div>
           <div>
             <label className="mb-2 block text-[11px] font-bold uppercase tracking-[0.18em] text-[#0D5C48]">CNIC Number</label>
-            <input value={form[cnicKey]} onChange={(event) => updateField(cnicKey, event.target.value)} className={inputClass(false)} />
+            <input
+              value={form[cnicKey]}
+              onChange={(event) => updateField(cnicKey, event.target.value)}
+              inputMode="numeric"
+              autoComplete="off"
+              maxLength={15}
+              placeholder="12345-1234567-1"
+              className={inputClass(false)}
+            />
             <FieldError error={errors[cnicKey]} />
           </div>
           <div>
@@ -1242,7 +1416,15 @@ function AdmissionFormContent() {
   }
 
   function renderReadinessStep() {
-    const readinessErrors = ["supportPersonDuringLearning", "deviceAvailable", "birthCertificateFile", "parentCnicFile", "childPhotographFile"]
+    const readinessErrors = [
+      "supportPersonDuringLearning",
+      "deviceAvailable",
+      "birthCertificateFile",
+      "parentCnicFile",
+      "childPhotographFile",
+      "previousSchoolReportFile",
+      "medicalReportFile",
+    ]
       .filter((key) => errors[key])
       .map((key) => errors[key]);
 
@@ -1272,24 +1454,29 @@ function AdmissionFormContent() {
           <label className="mb-2 block text-[11px] font-bold uppercase tracking-[0.18em] text-[#0D5C48]" htmlFor="birthCertificateFile">Child B-Form / Birth Certificate</label>
           <input id="birthCertificateFile" type="file" accept="image/*,.pdf" onChange={(event) => void handleFileSelection("birthCertificateFile", event.target.files?.[0] || null)} className={inputClass(errors.birthCertificateFile)} />
           <FieldError error={errors.birthCertificateFile} />
+          <FilePreview file={form.birthCertificateFile} />
         </div>
         <div>
           <label className="mb-2 block text-[11px] font-bold uppercase tracking-[0.18em] text-[#0D5C48]" htmlFor="parentCnicFile">Parent CNIC</label>
           <input id="parentCnicFile" type="file" accept="image/*,.pdf" onChange={(event) => void handleFileSelection("parentCnicFile", event.target.files?.[0] || null)} className={inputClass(errors.parentCnicFile)} />
           <FieldError error={errors.parentCnicFile} />
+          <FilePreview file={form.parentCnicFile} />
         </div>
         <div>
           <label className="mb-2 block text-[11px] font-bold uppercase tracking-[0.18em] text-[#0D5C48]" htmlFor="childPhotographFile">Recent Child Photograph</label>
           <input id="childPhotographFile" type="file" accept="image/*,.pdf" onChange={(event) => void handleFileSelection("childPhotographFile", event.target.files?.[0] || null)} className={inputClass(errors.childPhotographFile)} />
           <FieldError error={errors.childPhotographFile} />
+          <FilePreview file={form.childPhotographFile} />
         </div>
         <div>
           <label className="mb-2 block text-[11px] font-bold uppercase tracking-[0.18em] text-[#0D5C48]" htmlFor="previousSchoolReportFile">Previous School Report (if applicable)</label>
           <input id="previousSchoolReportFile" type="file" accept="image/*,.pdf" onChange={(event) => void handleFileSelection("previousSchoolReportFile", event.target.files?.[0] || null)} className={inputClass(false)} />
+          <FilePreview file={form.previousSchoolReportFile} />
         </div>
         <div className="sm:col-span-2">
           <label className="mb-2 block text-[11px] font-bold uppercase tracking-[0.18em] text-[#0D5C48]" htmlFor="medicalReportFile">Medical Report (if applicable)</label>
           <input id="medicalReportFile" type="file" accept="image/*,.pdf" onChange={(event) => void handleFileSelection("medicalReportFile", event.target.files?.[0] || null)} className={inputClass(false)} />
+          <FilePreview file={form.medicalReportFile} />
         </div>
       </div>
     );
@@ -1462,6 +1649,7 @@ function AdmissionFormContent() {
                 className={inputClass(errors.paymentProofFile)}
               />
               <FieldError error={errors.paymentProofFile} />
+              <FilePreview file={form.paymentProofFile} />
             </div>
           </div>
         </div>
