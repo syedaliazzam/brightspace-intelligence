@@ -489,12 +489,10 @@ async function getSubmissionRecord(id, tx = prisma) {
       rl.address,
       rl.city,
       COALESCE(
-        NULLIF(TRIM(rl.class_level), ''),
-        NULLIF(TRIM(istd.class_level), ''),
-        NULLIF(TRIM(istd.class_applying_for), '')
+      NULLIF(TRIM(rl.class_level), ''),
+        NULLIF(TRIM(istd.class_level), '')
       ) AS class_level,
       NULLIF(TRIM(istd.class_level), '') AS interested_class_level,
-      NULLIF(TRIM(istd.class_applying_for), '') AS interested_class_applying_for,
       rl.age AS student_age,
       CASE WHEN rl.id IS NULL THEN true ELSE false END AS is_monthly_voucher
     FROM fee_submissions fs
@@ -642,8 +640,7 @@ export async function POST(request, { params }) {
 
     const resolvedClassLevel =
       normalizeText(submission.class_level) ||
-      normalizeText(submission.interested_class_level) ||
-      normalizeText(submission.interested_class_applying_for);
+      normalizeText(submission.interested_class_level);
 
     if (!resolvedClassLevel) {
       return json(

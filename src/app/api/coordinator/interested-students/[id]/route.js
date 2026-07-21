@@ -41,32 +41,68 @@ export async function DELETE(_request, context) {
       return json("This record can no longer be deleted.", 400);
     }
 
-    const interviewForms = await prisma.$queryRaw`
-      SELECT id::text AS id
-      FROM parent_interview_forms
-      WHERE registration_id = ${id}
-         OR registration_id = ${id}::text
-      ORDER BY created_at DESC NULLS LAST
+    const archivedAt = await prisma.$queryRaw`
+      UPDATE interested_students
+      SET status = 'archived',
+          admission_form_status = 'failed',
+          updated_at = NOW()
+      WHERE id = ${id}::uuid
+      RETURNING id::text AS id, status, admission_form_status
     `;
 
-    await prisma.$transaction(async (tx) => {
-      if (Array.isArray(interviewForms) && interviewForms.length) {
-        for (const interview of interviewForms) {
-          await tx.$executeRaw`
-            DELETE FROM parent_interview_forms
-            WHERE id = ${interview.id}::uuid
-          `;
-        }
-      }
+    if (!Array.isArray(archivedAt) || !archivedAt.length) {
+      return json("Interested student not found.", 404);
+    }
 
-      await tx.$executeRaw`
-        DELETE FROM interested_students
-        WHERE id = ${id}::uuid
-      `;
-    });
-
-    return json("Interested student deleted.", 200, { success: true });
+    return json("Interested student hidden.", 200, { success: true, archived: true, item: archivedAt[0] });
   } catch (error) {
-    return json(error instanceof Error ? error.message : "Unable to delete interested student.", 500);
+    return json(error instanceof Error ? error.message : "Unable to hide interested student.", 500);
+  }
+}
+
+export async function PATCH(request, context) {
+  const session = await auth();
+  const role = String(session?.user?.role || "").toLowerCase();
+
+  if (!session?.user) return json("Unauthorized.", 401);
+  if (!ALLOWED_ROLES.has(role)) return json("Forbidden.", 403);
+
+  const params = await context?.params;
+  const id = String(params?.id || "").trim();
+  if (!id) return json("Interested student id is required.", 400);
+
+  let body = {};
+  try {
+    body = await request.json();
+  } catch {
+    body = {};
+  }
+
+  const parentFormSentStatus = String(body?.parentFormSentStatus || "").trim().toLowerCase();
+  const allowedStatuses = new Set(["no", "checking issue", "resolved", "yes"]);
+
+  if (!allowedStatuses.has(parentFormSentStatus)) {
+    return json("Parent form sent status is required.", 400);
+  }
+
+  try {
+    const [updated] = await prisma.$queryRaw`
+      UPDATE interested_students
+      SET parent_form_sent_status = ${parentFormSentStatus},
+          updated_at = NOW()
+      WHERE id = ${id}::uuid
+      RETURNING id::text AS id, parent_form_sent_status
+    `;
+
+    if (!updated?.id) {
+      return json("Interested student not found.", 404);
+    }
+
+    return json("Parent form sent status updated.", 200, {
+      success: true,
+      item: updated,
+    });
+  } catch (error) {
+    return json(error instanceof Error ? error.message : "Unable to update parent form sent status.", 500);
   }
 }

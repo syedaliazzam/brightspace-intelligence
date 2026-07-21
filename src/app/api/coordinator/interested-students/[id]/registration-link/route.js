@@ -42,9 +42,19 @@ export async function POST(request, { params }) {
         COALESCE(NULLIF(TRIM(parent_name), ''), NULLIF(TRIM(parent_name), '')) AS parent_name,
         email,
         phone,
-        COALESCE(NULLIF(TRIM(class_level), ''), NULLIF(TRIM(class_applying_for), '')) AS class_level,
-        COALESCE(NULLIF(TRIM(child_age), ''), '') AS child_age,
-        COALESCE(NULLIF(TRIM(city_country), ''), '') AS city_country,
+        NULLIF(TRIM(class_level), '') AS class_level,
+        child_dob,
+        CASE
+          WHEN child_dob IS NULL THEN NULL
+          ELSE CONCAT(FLOOR(EXTRACT(YEAR FROM AGE(CURRENT_DATE, child_dob)))::int, ' years')
+        END AS child_age,
+        NULLIF(TRIM(city), '') AS city,
+        NULLIF(TRIM(country), '') AS country,
+        CASE
+          WHEN NULLIF(TRIM(city), '') IS NOT NULL AND NULLIF(TRIM(country), '') IS NOT NULL
+            THEN CONCAT(TRIM(city), ', ', TRIM(country))
+          ELSE COALESCE(NULLIF(TRIM(city), ''), NULLIF(TRIM(country), ''))
+        END AS city_country,
         COALESCE(NULLIF(TRIM(message), ''), NULLIF(TRIM(why_interested), ''), NULLIF(TRIM(questions_comments), '')) AS message,
         registration_token,
         registration_lead_id::text AS registration_lead_id,

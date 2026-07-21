@@ -21,6 +21,7 @@ export async function GET() {
       pendingVoucherRows,
       pendingPaymentRows,
       activeStudentRows,
+      classDistributionRows,
       lectureApprovalRows,
       recentLectures,
       recentLeads,
@@ -32,32 +33,40 @@ export async function GET() {
       prisma.$queryRaw`
         SELECT
           COUNT(*) FILTER (
-            WHERE interview.parent_interview_status IS NULL
-              OR interview.parent_interview_status = 'pending'
+            WHERE istd.parent_interview_link_sent_at IS NOT NULL
+              AND (
+                COALESCE(interview.parent_interview_status, 'pending') IN ('pending', 'sent')
+              )
           )::int AS not_submitted_total,
           COUNT(*) FILTER (
-            WHERE interview.parent_interview_status = 'sent'
+            WHERE istd.parent_interview_link_sent_at IS NOT NULL
+              AND (
+                COALESCE(interview.parent_interview_status, 'pending') IN ('pending', 'sent')
+              )
           )::int AS sent_total,
           COUNT(*) FILTER (
-            WHERE interview.parent_interview_status = 'submitted'
+            WHERE interview.parent_interview_status IN ('submitted', 'reviewed')
           )::int AS submitted_total
         FROM interested_students istd
         LEFT JOIN LATERAL (
           SELECT
-            CASE
-              WHEN COUNT(*) FILTER (
-                WHERE LOWER(COALESCE(pif_inner.status::text, '')) IN ('submitted', 'reviewed')
-                  OR pif_inner.submitted_at IS NOT NULL
-              ) > 0 THEN 'submitted'
-              WHEN COUNT(*) FILTER (
-                WHERE LOWER(COALESCE(pif_inner.status::text, '')) = 'sent'
-              ) > 0 THEN 'sent'
-              WHEN COUNT(*) > 0 THEN 'pending'
-              ELSE NULL
-            END AS parent_interview_status
+            LOWER(
+              COALESCE(
+                NULLIF(TRIM(pif_inner.status::text), ''),
+                CASE
+                  WHEN pif_inner.submitted_at IS NOT NULL THEN 'submitted'
+                  ELSE 'pending'
+                END
+              )
+            ) AS parent_interview_status
           FROM parent_interview_forms pif_inner
           WHERE (
-            NULLIF(TRIM(pif_inner.registration_id), '') = istd.registration_lead_id::text
+            NULLIF(TRIM(pif_inner.registration_id), '') = COALESCE(
+              NULLIF(TRIM(istd.registration_code), ''),
+              istd.registration_lead_id::text,
+              istd.id::text
+            )
+            OR NULLIF(TRIM(pif_inner.registration_id), '') = istd.registration_lead_id::text
             OR NULLIF(TRIM(pif_inner.registration_id), '') = istd.id::text
             OR (
               NULLIF(TRIM(pif_inner.registration_id), '') IS NULL
@@ -70,7 +79,10 @@ export async function GET() {
               )
             )
           )
+          ORDER BY pif_inner.created_at DESC
+          LIMIT 1
         ) interview ON TRUE
+        WHERE LOWER(COALESCE(istd.status::text, '')) <> 'archived'
       `,
       prisma.$queryRaw`
         SELECT COUNT(*)::int AS total
@@ -81,6 +93,15 @@ export async function GET() {
       `,
       prisma.$queryRaw`SELECT COUNT(*)::int AS total FROM fee_submissions WHERE status = 'pending'`,
       prisma.$queryRaw`SELECT COUNT(*)::int AS total FROM student_profiles WHERE status = 'active'`,
+      prisma.$queryRaw`
+        SELECT
+          COALESCE(NULLIF(TRIM(sp.grade_level), ''), 'Unassigned') AS class_level,
+          COUNT(*)::int AS total
+        FROM student_profiles sp
+        WHERE LOWER(COALESCE(sp.status::text, '')) = 'active'
+        GROUP BY COALESCE(NULLIF(TRIM(sp.grade_level), ''), 'Unassigned')
+        ORDER BY total DESC, class_level ASC
+      `,
       prisma.$queryRaw`
         SELECT COUNT(DISTINCT ls.id)::int AS lectures_needing_approval
         FROM lecture_schedules ls
@@ -133,6 +154,12 @@ export async function GET() {
         activeStudents: Number(activeStudentRows?.[0]?.total || 0),
         lectureNeedsApproval: Number(lectureApprovalRows?.[0]?.lectures_needing_approval || 0),
       },
+      classDistribution: Array.isArray(classDistributionRows)
+        ? classDistributionRows.map((item) => ({
+            classLevel: String(item.class_level || "Unassigned"),
+            total: Number(item.total || 0),
+          }))
+        : [],
       recentLectures,
       recentLeads,
     });

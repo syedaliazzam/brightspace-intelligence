@@ -64,6 +64,7 @@ function getIconForLabel(label) {
   if (key.includes("calendar")) return CalendarRange;
   if (key.includes("attendance")) return Activity;
   if (key.includes("profile")) return User;
+  if (key === "admin") return ShieldCheck;
   if (key.includes("class management")) return School;
   if (key.includes("subject")) return BookText;
   if (key.includes("headline")) return PanelTop;

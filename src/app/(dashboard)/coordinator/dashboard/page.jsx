@@ -60,6 +60,7 @@ export default function CoordinatorDashboardPage() {
     loading: true,
     error: "",
     stats: null,
+    classDistribution: [],
     recentLectures: [],
     recentLeads: [],
     reports: null,
@@ -76,6 +77,7 @@ export default function CoordinatorDashboardPage() {
             loading: false,
             error: "",
             stats: cached.stats || null,
+            classDistribution: cached.classDistribution || [],
             recentLectures: cached.recentLectures || [],
             recentLeads: cached.recentLeads || [],
             reports: cached.reports || null,
@@ -96,6 +98,7 @@ export default function CoordinatorDashboardPage() {
             loading: false,
             error: "",
             stats: data.stats,
+            classDistribution: data.classDistribution || [],
             recentLectures: data.recentLectures || [],
             recentLeads: data.recentLeads || [],
             reports: data.reports || null,
@@ -110,6 +113,7 @@ export default function CoordinatorDashboardPage() {
                 ? error.message
                 : "Unable to load coordinator dashboard.",
             stats: null,
+            classDistribution: [],
             recentLectures: [],
             recentLeads: [],
             reports: null,
@@ -126,6 +130,38 @@ export default function CoordinatorDashboardPage() {
 
   const stats = state.stats || {};
   const reportData = state.reports || null;
+  const classDistribution = Array.isArray(state.classDistribution) ? state.classDistribution : [];
+  const classColorPalette = ["#2D8A6A", "#2F6BFF", "#D94B4B", "#D4A017", "#7A5AF8", "#EF7D10"];
+  const preferredClasses = ["Prep-I", "Prep-II", "Play Group"];
+  const selectedClasses = preferredClasses.map((className) => {
+    const matchedClass = classDistribution.find(
+      (item) => String(item.classLevel || "").trim().toLowerCase() === className.toLowerCase()
+    );
+    return {
+      classLevel: className,
+      total: Number(matchedClass?.total || 0),
+    };
+  });
+  const chartItems = [
+    {
+      key: "total",
+      label: "Total",
+      value: selectedClasses.reduce((sum, item) => sum + Number(item.total || 0), 0),
+      color: "#2D8A6A",
+    },
+    ...selectedClasses.map((item, index) => ({
+      key: item.classLevel,
+      label: item.classLevel,
+      value: Number(item.total || 0),
+      color: classColorPalette[index + 1] || classColorPalette[index] || "#2D8A6A",
+    })),
+  ];
+  const maxChartValue = Math.max(...chartItems.map((item) => item.value), 1);
+  const getChartHeight = (value) => {
+    if (value <= 0) return 14;
+    const scaledHeight = Math.round((value / maxChartValue) * 112);
+    return Math.max(26, Math.min(112, scaledHeight));
+  };
 
   return (
     <div className="min-h-screen space-y-6 bg-[#FAF7F0]">
@@ -165,16 +201,63 @@ export default function CoordinatorDashboardPage() {
         description="Key operational counts in the same compact card style used across the portal."
         showBrand={false}
       >
-        <CoordinatorStatsCards
-          items={[
-            { key: "totalRegistrations", label: "Total registrations", value: state.loading ? "..." : stats.totalRegistrations || 0 },
-            { key: "newLeads", label: "Parent Interview Form Not Submitted", value: state.loading ? "..." : stats.newLeads || 0 },
-            { key: "parentInterviewSubmitted", label: "Parent Interview Form Submitted", value: state.loading ? "..." : stats.parentInterviewSubmitted || 0 },
-            { key: "pendingVouchers", label: "Pending vouchers", value: state.loading ? "..." : stats.pendingVouchers || 0 },
-            { key: "pendingPaymentVerifications", label: "Pending payment verifications", value: state.loading ? "..." : stats.pendingPaymentVerifications || 0 },
-            { key: "activeStudents", label: "Active students", value: state.loading ? "..." : stats.activeStudents || 0 },
-          ]}
-        />
+        <div className="grid gap-5 xl:grid-cols-2">
+          <div className="min-w-0">
+            <CoordinatorStatsCards
+              items={[
+                { key: "totalRegistrations", label: "Total registrations", value: state.loading ? "..." : stats.totalRegistrations || 0 },
+                { key: "newLeads", label: "Parent Interview Form Not Submitted", value: state.loading ? "..." : stats.newLeads || 0 },
+                { key: "parentInterviewSubmitted", label: "Parent Interview Form Submitted", value: state.loading ? "..." : stats.parentInterviewSubmitted || 0 },
+                { key: "pendingVouchers", label: "Pending vouchers", value: state.loading ? "..." : stats.pendingVouchers || 0 },
+                { key: "pendingPaymentVerifications", label: "Pending payment verifications", value: state.loading ? "..." : stats.pendingPaymentVerifications || 0 },
+                { key: "activeStudents", label: "Active students", value: state.loading ? "..." : stats.activeStudents || 0 },
+              ]}
+            />
+          </div>
+
+          <section className="relative overflow-hidden rounded-[1.75rem] border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(250,247,240,0.98)_100%)] p-5 shadow-[0_18px_60px_-36px_rgba(13,59,46,0.16)] backdrop-blur-xl">
+            <div className="pointer-events-none absolute inset-x-0 top-0 h-1 bg-[linear-gradient(90deg,#2D8A6A_0%,#2F6BFF_30%,#D94B4B_60%,#D4A017_100%)]" />
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#063F32] opacity-75">
+                  Class Wise Chart
+                </p>
+                <h3 className="mt-2 text-xl font-semibold tracking-tight text-[#063F32]">
+                  Active students by class
+                </h3>
+              </div>
+              <div className="grid gap-2 text-xs sm:min-w-[11rem]">
+                {chartItems.map((item) => (
+                  <div key={item.key} className="flex items-center gap-2 text-[#245C4F]">
+                    <span
+                      className="h-3 w-3 shrink-0 rounded-sm"
+                      style={{ backgroundColor: item.color }}
+                    />
+                    <span className="font-semibold">{item.label}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="mt-8 flex min-h-[210px] items-end justify-between gap-3 rounded-[1.5rem] border border-[#2D8A6A]/10 bg-[#FFFDF7] px-4 py-5">
+              {chartItems.map((item) => {
+                const height = getChartHeight(item.value);
+                return (
+                  <div key={item.key} className="flex flex-1 flex-col items-center justify-end gap-3">
+                    <span className="text-sm font-semibold text-[#063F32]">{item.value}</span>
+                    <div
+                      className="w-full max-w-[44px] rounded-t-[1rem] shadow-[0_12px_28px_-20px_rgba(13,59,46,0.3)] transition-all duration-300"
+                      style={{ height: `${height}px`, backgroundColor: item.color }}
+                    />
+                    <span className="text-center text-xs font-semibold uppercase tracking-[0.14em] text-[#245C4F]">
+                      {item.label}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+        </div>
       </CoordinatorPortalSection>
       <CoordinatorGoTopButton />
       </div>

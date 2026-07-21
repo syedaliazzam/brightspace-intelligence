@@ -56,6 +56,7 @@ export const dashboardNavigation = {
     { label: "Lecture Schedules", href: "/coordinator/lecture-schedules" },
     { label: "Lecture Verifications", href: "/coordinator/lecture-verifications" },
     { label: "Reports", href: "/coordinator/reports" },
+    { label: "Admin", href: "/coordinator/admin" },
   ],
   teacher: [
     { label: "Dashboard", href: "/teacher/dashboard" },
