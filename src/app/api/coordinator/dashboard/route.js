@@ -29,6 +29,7 @@ export async function GET() {
       prisma.$queryRaw`
         SELECT COUNT(*)::int AS total
         FROM interested_students
+        WHERE LOWER(COALESCE(status::text, '')) <> 'archived'
       `,
       prisma.$queryRaw`
         SELECT
@@ -89,6 +90,7 @@ export async function GET() {
         FROM interested_students
         WHERE admission_form_sent_at IS NOT NULL
           AND admission_form_submitted_at IS NULL
+          AND LOWER(COALESCE(status::text, '')) <> 'archived'
           AND LOWER(COALESCE(admission_form_status::text, '')) IN ('sent', 'reminded', 'overdue', 'not_submitted', 'pending')
       `,
       prisma.$queryRaw`SELECT COUNT(*)::int AS total FROM fee_submissions WHERE status = 'pending'`,

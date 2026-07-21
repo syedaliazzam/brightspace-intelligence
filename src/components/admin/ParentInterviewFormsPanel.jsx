@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { jsPDF } from "jspdf";
 import PaginationControls from "@/components/teacher/PaginationControls";
 import { ChevronDown, Download, Search } from "lucide-react";
@@ -82,6 +83,7 @@ function formatFlatObject(value) {
 export default function ParentInterviewFormsPanel({
   apiUrl = "/api/admin/parent-interview-forms",
   initialItems = null,
+  portalTargetId = "admin-page-portal-root",
 }) {
   const [state, setState] = useState({
     loading: !Array.isArray(initialItems),
@@ -93,6 +95,7 @@ export default function ParentInterviewFormsPanel({
   const [page, setPage] = useState(1);
   const [selectedResponse, setSelectedResponse] = useState(null);
   const [downloadingId, setDownloadingId] = useState("");
+  const [isMounted, setIsMounted] = useState(false);
   const responseSummary = useMemo(() => {
     const responses = selectedResponse?.responses;
     if (!responses || typeof responses !== "object") {
@@ -331,6 +334,10 @@ export default function ParentInterviewFormsPanel({
     };
   }, [apiUrl, initialItems]);
 
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
   const filteredItems = useMemo(() => {
     const query = search.trim().toLowerCase();
     const submittedItems = state.items.filter((item) => {
@@ -387,7 +394,7 @@ export default function ParentInterviewFormsPanel({
   }
 
   return (
-    <section className="w-full max-w-full min-w-0 space-y-4 overflow-hidden">
+    <section className="relative w-full max-w-full min-w-0 space-y-4 overflow-visible">
       <div className="flex w-full max-w-full min-w-0 flex-col gap-3 lg:flex-row lg:items-center">
         <div className="relative min-w-[16rem] lg:w-[18rem]">
           <select
@@ -489,51 +496,54 @@ export default function ParentInterviewFormsPanel({
         ) : null}
       </div>
 
-      {selectedResponse ? (
-        <div className="absolute inset-x-0 top-24 z-40 flex justify-center px-4">
-          <div className="flex max-h-[75vh] w-full max-w-4xl flex-col rounded-[1.75rem] border border-[#2D8A6A]/15 bg-[#FAF7F0] p-5 shadow-[0_16px_50px_-36px_rgba(13,59,46,0.18)]">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#C9A227]">
-                    Full questions/answer detials
-                  </p>
-                  <p className="mt-2 text-sm font-semibold text-[#063F32]">
-                    {textOrDash(selectedResponse.parent_name)}
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setSelectedResponse(null)}
-                  className="rounded-xl border border-[#2D8A6A]/20 bg-white px-3 py-2 text-xs font-semibold text-[#063F32] transition hover:bg-[#F1EADC]"
+      {isMounted && selectedResponse
+        ? createPortal(
+            <div className="absolute inset-0 z-[999] flex items-center justify-center bg-[rgba(13,59,46,0.10)] px-4 py-6 backdrop-blur-sm">
+              <section className="w-full max-w-4xl rounded-[1.75rem] border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(250,247,240,0.99)_100%)] p-5 shadow-[0_16px_50px_-36px_rgba(13,59,46,0.18)]">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#C9A227]">
+                  Full questions/answer detials
+                </p>
+                <p className="mt-2 text-sm font-semibold text-[#063F32]">
+                  {textOrDash(selectedResponse.parent_name)}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedResponse(null)}
+                className="rounded-xl border border-[#2D8A6A]/20 bg-white px-3 py-2 text-xs font-semibold text-[#063F32] transition hover:bg-[#F1EADC]"
+              >
+                Close
+              </button>
+            </div>
+            <div className="mt-4 max-h-[70vh] overflow-y-auto rounded-[1.25rem] border border-[#2D8A6A]/10 bg-white p-3">
+              <div className="mt-3 space-y-3">
+                {responseSummary.pairs.map((item, index) => (
+                  <div
+                    key={`${item.key}-${index}`}
+                    className="rounded-2xl border border-white bg-[#FAF7F0] p-4 shadow-[0_8px_20px_-18px_rgba(13,59,46,0.16)]"
                   >
-                  Close
-                  </button>
-                </div>
-              <div className="mt-4 min-h-0 flex-1 overflow-y-auto rounded-[1.25rem] border border-[#2D8A6A]/10 bg-white p-3">
-                  <div className="mt-3 space-y-3">
-                    {responseSummary.pairs.map((item, index) => (
-                      <div
-                        key={`${item.key}-${index}`}
-                        className="rounded-2xl border border-white bg-[#FAF7F0] p-4 shadow-[0_8px_20px_-18px_rgba(13,59,46,0.16)]"
-                      >
-                        <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#0D5C48]">
-                          Question #{item.questionNumber || index + 1}: {item.question}
-                        </p>
-                        <div className="mt-2 rounded-2xl border border-[#F1EADC] bg-[#FAF7F0] px-3 py-2">
-                          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#0D5C48]">
-                            Answer:
-                          </p>
-                          <p className="mt-1 whitespace-pre-wrap break-words text-sm leading-6 text-[#245C4F]">
-                            {formatFlatObject(item.answer)}
-                          </p>
-                        </div>
-                      </div>
-                    ))}
+                    <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#0D5C48]">
+                      Question #{item.questionNumber || index + 1}: {item.question}
+                    </p>
+                    <div className="mt-2 rounded-2xl border border-[#F1EADC] bg-[#FAF7F0] px-3 py-2">
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#0D5C48]">
+                        Answer:
+                      </p>
+                      <p className="mt-1 whitespace-pre-wrap break-words text-sm leading-6 text-[#245C4F]">
+                        {formatFlatObject(item.answer)}
+                      </p>
+                    </div>
                   </div>
+                ))}
               </div>
             </div>
-        </div>
-      ) : null}
+              </section>
+            </div>,
+            document.getElementById(portalTargetId) || document.body
+          )
+        : null}
     </section>
   );
 }

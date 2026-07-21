@@ -71,7 +71,7 @@ export default function CoordinatorAdminPage() {
               showTableControls={true}
               portalTargetId="admin-page-portal-root"
             />
-            <section className="overflow-hidden rounded-[2rem] border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(250,247,240,0.98)_100%)] shadow-[0_20px_70px_-36px_rgba(13,59,46,0.18)] backdrop-blur-xl">
+            <section className="overflow-visible rounded-[2rem] border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(250,247,240,0.98)_100%)] shadow-[0_20px_70px_-36px_rgba(13,59,46,0.18)] backdrop-blur-xl">
               <div className="border-b border-[#2D8A6A]/10 px-6 py-5">
                 <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-[#0D5C48]">
                   Parent Interview Forms
@@ -81,6 +81,7 @@ export default function CoordinatorAdminPage() {
                 <ParentInterviewFormsPanel
                   apiUrl="/api/coordinator/parent-interview-forms"
                   initialItems={parentInterviewItems}
+                  portalTargetId="admin-page-portal-root"
                 />
               </div>
             </section>
