@@ -3,6 +3,13 @@
 import { useEffect, useState } from "react";
 import { OpenBookLoader } from "@/components/shared/AshShajrahLoaders";
 
+function formatDate(value) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return String(value);
+  return new Intl.DateTimeFormat("en-US", { dateStyle: "medium" }).format(date);
+}
+
 function DetailRow({ label, value }) {
   return (
     <div className="rounded-[1.5rem] border border-[#2D8A6A]/12 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(233,248,241,0.72)_100%)] px-5 py-4">
@@ -82,7 +89,7 @@ export default function StudentProfilePage() {
           <DetailRow label="Current school" value={profile.current_school} />
           <DetailRow label="Current grade" value={profile.current_grade} />
           <DetailRow label="Gender" value={profile.gender} />
-          <DetailRow label="Date of birth" value={profile.date_of_birth} />
+          <DetailRow label="Date of birth" value={formatDate(profile.date_of_birth)} />
           <DetailRow label="City / country" value={profile.city_country} />
           <DetailRow label="Nationality" value={profile.nationality} />
           <DetailRow label="Religion" value={profile.religion} />

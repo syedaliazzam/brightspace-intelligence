@@ -3,6 +3,13 @@
 import { useEffect, useState } from "react";
 import ChildSwitcher from "@/components/parent/ChildSwitcher";
 
+function formatDate(value) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return String(value);
+  return new Intl.DateTimeFormat("en-US", { dateStyle: "medium" }).format(date);
+}
+
 function DetailRow({ label, value }) {
   return (
     <div className="rounded-[1.5rem] border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(250,247,240,0.98)_100%)] p-4 px-6 shadow-[0_16px_50px_-34px_rgba(13,59,46,0.16)] backdrop-blur-xl">
@@ -97,7 +104,7 @@ export default function ParentProfilePage() {
             <DetailRow label="Programme" value={selectedChild.program_name} />
             <DetailRow label="Current school" value={selectedChild.current_school} />
             <DetailRow label="Gender" value={selectedChild.gender} />
-            <DetailRow label="Date of birth" value={selectedChild.date_of_birth} />
+            <DetailRow label="Date of birth" value={formatDate(selectedChild.date_of_birth)} />
             <DetailRow label="City / country" value={selectedChild.city_country} />
             <DetailRow label="Nationality" value={selectedChild.nationality} />
             <DetailRow label="Religion" value={selectedChild.religion} />

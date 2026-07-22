@@ -33,6 +33,13 @@ function formatAgeValue(age, dateOfBirth) {
   return years > 0 ? `${years} year${years === 1 ? "" : "s"}` : "";
 }
 
+function formatDateValue(value) {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return String(value);
+  return new Intl.DateTimeFormat("en-US", { dateStyle: "medium" }).format(date);
+}
+
 export default function StudentDashboardPage() {
   const [state, setState] = useState({
     stats: {},
@@ -217,6 +224,10 @@ export default function StudentDashboardPage() {
               <p className="rounded-[1.5rem] border border-[#2D8A6A]/12 bg-[linear-gradient(180deg,#FAF7F0_0%,#F1EADC_100%)] px-5 py-4 text-sm leading-6 text-[#245C4F]">
                 <strong className="block text-xs font-semibold uppercase tracking-[0.16em] text-[#0D5C48]">Age</strong>
                 <span className="mt-1 block break-words text-[#063F32]">{formatAgeValue(profile.age, profile.date_of_birth) || "Not assigned"}</span>
+              </p>
+              <p className="rounded-[1.5rem] border border-[#2D8A6A]/12 bg-[linear-gradient(180deg,#FAF7F0_0%,#F1EADC_100%)] px-5 py-4 text-sm leading-6 text-[#245C4F]">
+                <strong className="block text-xs font-semibold uppercase tracking-[0.16em] text-[#0D5C48]">Date of birth</strong>
+                <span className="mt-1 block break-words text-[#063F32]">{formatDateValue(profile.date_of_birth) || "Not assigned"}</span>
               </p>
               <p className="rounded-[1.5rem] border border-[#2D8A6A]/12 bg-[linear-gradient(180deg,#FAF7F0_0%,#F1EADC_100%)] px-5 py-4 text-sm leading-6 text-[#245C4F]">
                 <strong className="block text-xs font-semibold uppercase tracking-[0.16em] text-[#0D5C48]">Class</strong>
