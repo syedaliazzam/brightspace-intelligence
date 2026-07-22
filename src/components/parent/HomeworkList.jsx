@@ -29,6 +29,7 @@ export default function HomeworkList({ items = [] }) {
               <th className="px-6 py-4">Subject</th>
               <th className="px-6 py-4">Teacher</th>
               <th className="px-6 py-4">Student</th>
+              <th className="px-6 py-4">Attachment</th>
               <th className="px-6 py-4">Submitted Text</th>
               <th className="px-6 py-4">Status</th>
               <th className="px-6 py-4">Due Date</th>
@@ -48,6 +49,24 @@ export default function HomeworkList({ items = [] }) {
                   <td className="px-6 py-4 text-[#245C4F]">{item.teacher_name || "-"}</td>
                   <td className="px-6 py-4 text-[#245C4F]">
                     {submitted ? item.student_name || "Submitted" : "Not submitted yet"}
+                  </td>
+                  <td className="px-6 py-4 text-[#245C4F]">
+                    {submitted && item.submission_attachment_url ? (
+                      <a
+                        href={item.submission_attachment_url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="block w-24 overflow-hidden rounded-xl border border-[#2D8A6A]/12 bg-[#FAF7F0]"
+                      >
+                        <img
+                          src={item.submission_attachment_url}
+                          alt={item.submission_attachment_name || "Homework submission"}
+                          className="h-16 w-full object-cover"
+                        />
+                      </a>
+                    ) : (
+                      "-"
+                    )}
                   </td>
                   <td className="px-6 py-4 text-[#245C4F]">{submitted ? item.submission_note || "No text submitted." : "-"}</td>
                   <td className="px-6 py-4 text-[#245C4F]">

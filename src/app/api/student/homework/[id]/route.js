@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireRole, roleGuardResponse } from "@/lib/roleGuard";
 import prisma from "@/lib/prisma";
+import { uploadHomeworkSubmission } from "@/lib/supabaseStorage";
 
 const ALLOWED_ROLES = ["student"];
 
@@ -12,8 +13,20 @@ export async function PATCH(request, { params }) {
   try {
     const session = await requireRole(ALLOWED_ROLES);
     const { id } = await params;
-    const body = await request.json().catch(() => ({}));
-    const note = typeof body?.note === "string" ? body.note.trim() : "";
+    const contentType = request.headers.get("content-type") || "";
+    let note = "";
+    let file = null;
+
+    if (contentType.includes("multipart/form-data")) {
+      const formData = await request.formData();
+      note = typeof formData.get("note") === "string" ? String(formData.get("note")).trim() : "";
+      const maybeFile = formData.get("file");
+      file = maybeFile instanceof File && maybeFile.size > 0 ? maybeFile : null;
+    } else {
+      const body = await request.json().catch(() => ({}));
+      note = typeof body?.note === "string" ? body.note.trim() : "";
+    }
+
     if (!note) {
       return json("Submission is required.", 400);
     }
@@ -31,10 +44,20 @@ export async function PATCH(request, { params }) {
       return json("Homework not found.", 404);
     }
 
+    let upload = null;
+    if (file) {
+      upload = await uploadHomeworkSubmission({ homeworkId: id, file });
+    }
+
     await prisma.$executeRaw`
       UPDATE homework
       SET
         status = 'submitted'::homework_status,
+        submission_note = ${note}::text,
+        submission_attachment_bucket = ${(upload?.bucket || null)}::text,
+        submission_attachment_path = ${(upload?.storedPath || null)}::text,
+        submission_attachment_name = ${(file?.name || null)}::text,
+        submitted_at = NOW(),
         updated_at = NOW()
       WHERE id = ${id}::uuid
     `;
@@ -48,7 +71,11 @@ export async function PATCH(request, { params }) {
         'homework',
         ${id}::uuid,
         NOW(),
-        jsonb_build_object('note', ${note})
+        jsonb_build_object(
+          'note', ${note}::text,
+          'attachment_path', ${(upload?.storedPath || null)}::text,
+          'attachment_name', ${(file?.name || null)}::text
+        )
       )
     `;
 

@@ -4,7 +4,6 @@ import { requireRole, roleGuardResponse } from "@/lib/roleGuard";
 
 const ALLOWED_ROLES = ["teacher", "admin"];
 const VALID_STATUS = new Set(["present", "absent", "leave"]);
-
 function json(message, status = 200, extra = {}) {
   return NextResponse.json({ message, ...extra }, { status });
 }
@@ -35,7 +34,16 @@ async function ensurePendingAttendanceColumn() {
 }
 
 function baseLectureConditions(teacherId, classLevel, subjectId) {
-  const conditions = ["ls.status::text = 'completed_by_teacher'"];
+  const conditions = [
+    `(
+      LOWER(ls.status::text) = 'live'
+      OR LOWER(ls.status::text) = 'completed_by_teacher'
+      OR (
+        ls.scheduled_start::timestamp <= timezone('Asia/Karachi', now())
+        AND ls.scheduled_end::timestamp >= timezone('Asia/Karachi', now())
+      )
+    )`,
+  ];
   const values = [];
 
   if (teacherId) {
@@ -56,6 +64,23 @@ function baseLectureConditions(teacherId, classLevel, subjectId) {
   return { conditions, values };
 }
 
+function baseSubjectConditions(teacherId, classLevel) {
+  const conditions = [];
+  const values = [];
+
+  if (teacherId) {
+    values.push(teacherId);
+    conditions.push(`tp.id = $${values.length}::uuid`);
+  }
+
+  if (classLevel) {
+    values.push(classLevel);
+    conditions.push(`LOWER(TRIM(COALESCE(c.class_level, ''))) = LOWER(TRIM($${values.length}::text))`);
+  }
+
+  return { conditions, values };
+}
+
 export async function GET(request) {
   try {
     const session = await requireRole(ALLOWED_ROLES);
@@ -66,7 +91,10 @@ export async function GET(request) {
     const subjectId = String(searchParams.get("subjectId") || "").trim();
     const lectureId = String(searchParams.get("lectureId") || "").trim();
     const { conditions, values } = baseLectureConditions(teacherId, classLevel, subjectId);
+    const { conditions: subjectConditions, values: subjectValues } = baseSubjectConditions(teacherId, classLevel);
     const whereClause = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
+    const subjectWhereClause = subjectConditions.length ? `WHERE ${subjectConditions.join(" AND ")}` : "";
+    const shouldLoadLectures = Boolean(classLevel && subjectId);
 
     const [classes, subjects, lectures] = await Promise.all([
       prisma.$queryRawUnsafe(
@@ -86,34 +114,42 @@ export async function GET(request) {
         `
         SELECT DISTINCT
           sub.id::text AS id,
-          sub.name
-        FROM lecture_schedules ls
-        INNER JOIN subjects sub ON sub.id = ls.subject_id
-        ${teacherId ? "WHERE ls.teacher_id = $1::uuid" : ""}
+          sub.name,
+          c.class_level
+        FROM teacher_assignments ta
+        INNER JOIN teacher_profiles tp ON tp.id = ta.teacher_id
+        INNER JOIN courses c ON c.id = ta.course_id
+        INNER JOIN subjects sub ON sub.id = ta.subject_id
+        ${subjectWhereClause}
+          AND ta.student_id IS NULL
+          AND ta.status = 'active'::user_status
+          AND COALESCE(sub.status, 'active'::user_status) = 'active'::user_status
         ORDER BY sub.name ASC
         `,
-        ...(teacherId ? [teacherId] : [])
+        ...subjectValues
       ),
-      prisma.$queryRawUnsafe(
-        `
-        SELECT
-          ls.id::text AS id,
-          ls.title,
-          ls.scheduled_start::text AS scheduled_start,
-          ls.scheduled_end::text AS scheduled_end,
-          ls.status::text AS status,
-          ls.pending_student_attendance,
-          sub.name AS subject_name,
-          c.class_level
-        FROM lecture_schedules ls
-        INNER JOIN enrollments e ON e.id = ls.enrollment_id
-        INNER JOIN courses c ON c.id = e.course_id
-        INNER JOIN subjects sub ON sub.id = ls.subject_id
-        ${whereClause}
-        ORDER BY ls.scheduled_start DESC, ls.id DESC
-        `,
-        ...values
-      ),
+      shouldLoadLectures
+        ? prisma.$queryRawUnsafe(
+            `
+            SELECT
+              ls.id::text AS id,
+              ls.title,
+              ls.scheduled_start::text AS scheduled_start,
+              ls.scheduled_end::text AS scheduled_end,
+              ls.status::text AS status,
+              ls.pending_student_attendance,
+              sub.name AS subject_name,
+              c.class_level
+            FROM lecture_schedules ls
+            INNER JOIN enrollments e ON e.id = ls.enrollment_id
+            INNER JOIN courses c ON c.id = e.course_id
+            INNER JOIN subjects sub ON sub.id = ls.subject_id
+            ${whereClause}
+            ORDER BY ls.scheduled_start DESC, ls.id DESC
+            `,
+            ...values
+          )
+        : Promise.resolve([]),
     ]);
 
     let selectedLecture = null;
@@ -228,19 +264,33 @@ export async function POST(request) {
     const teacherId = String(session.user.role).toLowerCase() === "admin" ? "" : await getTeacherId(session);
     const [lecture] = teacherId
       ? await prisma.$queryRaw`
-          SELECT ls.id::text AS id
-          FROM lecture_schedules ls
-          INNER JOIN teacher_profiles tp ON tp.id = ls.teacher_id
-          WHERE ls.id = ${lectureId}::uuid
+        SELECT ls.id::text AS id
+        FROM lecture_schedules ls
+        INNER JOIN teacher_profiles tp ON tp.id = ls.teacher_id
+        WHERE ls.id = ${lectureId}::uuid
             AND tp.user_id = ${session.user.id}::uuid
-            AND ls.status::text = 'completed_by_teacher'
+            AND (
+              LOWER(ls.status::text) = 'live'
+              OR LOWER(ls.status::text) = 'completed_by_teacher'
+              OR (
+                ls.scheduled_start::timestamp <= timezone('Asia/Karachi', now())
+                AND ls.scheduled_end::timestamp >= timezone('Asia/Karachi', now())
+              )
+            )
           LIMIT 1
         `
       : await prisma.$queryRaw`
           SELECT ls.id::text AS id
           FROM lecture_schedules ls
           WHERE ls.id = ${lectureId}::uuid
-            AND ls.status::text = 'completed_by_teacher'
+            AND (
+              LOWER(ls.status::text) = 'live'
+              OR LOWER(ls.status::text) = 'completed_by_teacher'
+              OR (
+                ls.scheduled_start::timestamp <= timezone('Asia/Karachi', now())
+                AND ls.scheduled_end::timestamp >= timezone('Asia/Karachi', now())
+              )
+            )
           LIMIT 1
         `;
 

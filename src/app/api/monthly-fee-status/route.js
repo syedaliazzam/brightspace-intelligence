@@ -91,7 +91,15 @@ async function getMonthlyFeesForStudents(studentIds) {
     LEFT JOIN fee_submissions fs ON fs.voucher_id = fv.id
     LEFT JOIN regular_monthly_fee_batches b ON b.id = item.batch_id
     LEFT JOIN courses c ON c.id = b.class_id
-    WHERE item.student_id = ANY(${studentIds}::uuid[])
+    WHERE (
+      item.student_id = ANY(${studentIds}::uuid[])
+      OR fv.registration_lead_id IN (
+         SELECT e.registration_id
+         FROM enrollments e
+         WHERE e.student_id = ANY(${studentIds}::uuid[])
+           AND e.registration_id IS NOT NULL
+      )
+    )
     ORDER BY item.student_id, item.due_date DESC NULLS LAST, item.created_at DESC
   `;
 

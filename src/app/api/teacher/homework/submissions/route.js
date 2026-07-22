@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireRole, roleGuardResponse } from "@/lib/roleGuard";
 import prisma from "@/lib/prisma";
+import { createSignedAdmissionDocumentUrl } from "@/lib/supabaseStorage";
 
 const ALLOWED_ROLES = ["teacher", "admin"];
 
@@ -22,7 +23,7 @@ export async function GET() {
     const session = await requireRole(ALLOWED_ROLES);
     const filter = await teacherFilter(session);
     const whereClause = filter.where ? `${filter.where} AND` : "WHERE";
-    const items = await prisma.$queryRawUnsafe(
+    const itemsRaw = await prisma.$queryRawUnsafe(
       `
       SELECT
         h.id::text AS id,
@@ -31,6 +32,9 @@ export async function GET() {
         h.description,
         h.due_date,
         h.status::text AS status,
+        h.submission_note,
+        h.submission_attachment_path,
+        h.submission_attachment_name,
         h.created_at,
         h.updated_at,
         h.teacher_id::text AS teacher_id,
@@ -45,7 +49,7 @@ export async function GET() {
         COALESCE(NULLIF(c.class_level, ''), c.title) AS class_level,
         teacher.full_name AS teacher_name,
         latest_submission.action AS latest_submission_action,
-        latest_submission.note AS submission_note
+        COALESCE(h.submission_note, latest_submission.note) AS submission_note
       FROM homework h
       INNER JOIN student_profiles sp ON sp.id = h.student_id
       INNER JOIN users su ON su.id = sp.user_id
@@ -74,6 +78,15 @@ export async function GET() {
       ORDER BY h.created_at DESC
       `,
       ...filter.values
+    );
+
+    const items = await Promise.all(
+      itemsRaw.map(async (item) => ({
+        ...item,
+        submission_attachment_url: item.submission_attachment_path
+          ? await createSignedAdmissionDocumentUrl(item.submission_attachment_path)
+          : "",
+      }))
     );
 
     return json("Homework submissions fetched.", 200, { items });

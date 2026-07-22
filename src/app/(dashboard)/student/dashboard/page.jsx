@@ -8,7 +8,6 @@ import HomeworkList from "@/components/student/HomeworkList";
 import AttendanceSummary from "@/components/student/AttendanceSummary";
 import NoteThreadsBoard from "@/components/shared/NoteThreadsBoard";
 import LMSCalendar from "@/components/calendar/LMSCalendar";
-import PaymentAccessGuard from "@/components/shared/PaymentAccessGuard";
 import ActiveHeadlinesBanner from "@/components/shared/ActiveHeadlinesBanner";
 import { OpenBookLoader } from "@/components/shared/AshShajrahLoaders";
 
@@ -122,8 +121,7 @@ export default function StudentDashboardPage() {
   const profile = state.profile || {};
 
   return (
-    <PaymentAccessGuard>
-      <div className="relative min-h-screen overflow-hidden bg-[#FAF7F0]">
+    <div className="relative min-h-screen overflow-hidden bg-[#FAF7F0]">
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(201,162,39,0.12),transparent_35%),radial-gradient(circle_at_top_right,rgba(45,138,106,0.12),transparent_32%),linear-gradient(180deg,#FAF7F0_0%,#F7F1E3_100%)]" />
         <div className="rounded-[2rem] relative mx-auto max-w-7xl space-y-6 px-4 py-4 sm:px-6 lg:px-8">
           <StudentPortalNavbar profile={profile} />
@@ -253,6 +251,5 @@ export default function StudentDashboardPage() {
           </motion.section>
         </div>
       </div>
-    </PaymentAccessGuard>
   );
 }

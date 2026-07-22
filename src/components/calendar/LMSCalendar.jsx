@@ -60,7 +60,7 @@ function getLectureTimeState(lecture) {
   return "ended";
 }
 
-export default function LMSCalendar({ apiUrl, filters = {}, extraParams = {}, onDateSelect, onEventClick, title = "Lecture calendar" }) {
+export default function LMSCalendar({ apiUrl, filters = {}, extraParams = {}, onDateSelect, onEventClick, title = "Lecture calendar", popupMode = "screen" }) {
   const calendarRef = useRef(null);
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -179,7 +179,7 @@ export default function LMSCalendar({ apiUrl, filters = {}, extraParams = {}, on
   }
 
   return (
-    <div className="rounded-[1.75rem] border border-[#2D8A6A]/15 bg-[#FAF7F0] p-4 px-6 shadow-[0_20px_70px_-36px_rgba(13,59,46,0.18)]">
+    <div className="relative rounded-[1.75rem] border border-[#2D8A6A]/15 bg-[#FAF7F0] p-4 px-6 shadow-[0_20px_70px_-36px_rgba(13,59,46,0.18)]">
       <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <h3 className="mt-0 text-xl font-semibold tracking-tight text-[#063F32]">{title || "Month, week and day view"}</h3>
@@ -208,61 +208,84 @@ export default function LMSCalendar({ apiUrl, filters = {}, extraParams = {}, on
 
       {error ? <div className="mb-4 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">{error}</div> : null}
 
-      <div className="grid gap-4 xl:grid-cols-[1fr_320px]">
-        <div className="overflow-hidden rounded-[1.5rem] border border-[#2D8A6A]/15 bg-white p-3">
-          <FullCalendar
-            key={view}
-            ref={calendarRef}
-            plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
-            initialView={view}
-            initialDate={activeDate}
-            headerToolbar={{ left: "prev,next today", center: "title", right: "dayGridMonth,timeGridWeek,timeGridDay" }}
-            events={events}
-            eventClick={handleEventClick}
-            dateClick={handleDateClick}
-            height="auto"
-            nowIndicator
-            selectable={false}
-            editable={false}
-            weekends
-            timeZone={APP_TIMEZONE}
-            eventDisplay="block"
-            eventTimeFormat={{ hour: "numeric", minute: "2-digit", hour12: true }}
-            loading={setLoading}
-            slotMinTime="00:00:00"
-            slotMaxTime="24:00:00"
-            eventClassNames={() => ["cursor-pointer"]}
-            eventContent={(arg) => (
-              <div className="overflow-hidden px-1 text-[11px] leading-tight text-white">
-                <div className="truncate font-semibold">{arg.event.title}</div>
-              </div>
-            )}
-          />
-          {loading ? <p className="mt-3 text-sm text-[#245C4F]">Loading lectures...</p> : null}
-        </div>
+      <div className="overflow-hidden rounded-[1.5rem] border border-[#2D8A6A]/15 bg-white p-3">
+        <FullCalendar
+          key={view}
+          ref={calendarRef}
+          plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
+          initialView={view}
+          initialDate={activeDate}
+          headerToolbar={{ left: "prev,next today", center: "title", right: "dayGridMonth,timeGridWeek,timeGridDay" }}
+          events={events}
+          eventClick={handleEventClick}
+          dateClick={handleDateClick}
+          height="auto"
+          nowIndicator
+          selectable={false}
+          editable={false}
+          weekends
+          timeZone={APP_TIMEZONE}
+          eventDisplay="block"
+          eventTimeFormat={{ hour: "numeric", minute: "2-digit", hour12: true }}
+          loading={setLoading}
+          slotMinTime="00:00:00"
+          slotMaxTime="24:00:00"
+          eventClassNames={() => ["cursor-pointer"]}
+          eventContent={(arg) => (
+            <div className="overflow-hidden px-1 text-[11px] leading-tight text-white">
+              <div className="truncate font-semibold">{arg.event.title}</div>
+            </div>
+          )}
+        />
+        {loading ? <p className="mt-3 text-sm text-[#245C4F]">Loading lectures...</p> : null}
+      </div>
 
-        <div className="rounded-[1.5rem] border border-[#2D8A6A]/15 bg-white p-4">
-          <p className="text-sm font-semibold uppercase tracking-[0.22em] text-[#C9A227]">Lecture details</p>
-          {selected ? (
-            <div className="mt-4 space-y-3 text-sm text-[#245C4F]">
-              <p><strong className="text-[#063F32]">Title:</strong> {selected.title || "Not available"}</p>
-              <p><strong className="text-[#063F32]">Subject:</strong> {selected.subject_name || "Not available"}</p>
+      {selected ? (
+        <div
+          className={
+            popupMode === "page"
+              ? "absolute inset-0 z-[9999] rounded-[2rem] flex items-center justify-center bg-[#063F32]/45 px-4 pt-16 backdrop-blur-sm"
+              : "fixed inset-0 z-[9999] rounded-[2rem] flex items-center justify-center bg-[#063F32]/45 px-4 pt-16 backdrop-blur-sm"
+          }
+        >
+          <div className={`w-full overflow-hidden rounded-[2rem] border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(250,247,240,0.98)_100%)] shadow-[0_24px_80px_-36px_rgba(13,59,46,0.24)] ${popupMode === "page" ? "max-w-lg" : "max-w-lg"}`}>
+            <div className="flex items-start justify-between gap-4 border-b border-[#F1EADC] px-6 py-4">
+              <div>
+                <p className="text-sm font-semibold uppercase tracking-[0.24em] text-[#C9A227]">Lecture details</p>
+                <h3 className="mt-2 text-2xl font-semibold tracking-tight text-[#063F32]">{selected.title || "Lecture"}</h3>
+                <p className="mt-1 text-sm text-[#245C4F]">{selected.subject_name || "Subject not available"}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setSelected(null);
+                  onEventClick?.(null);
+                }}
+                className="rounded-xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-2 text-sm font-semibold text-[#0D5C48] hover:bg-[#F1EADC]"
+              >
+                Close
+              </button>
+            </div>
+            <div className="space-y-3 p-6 text-sm text-[#245C4F]">
               <p><strong className="text-[#063F32]">Teacher:</strong> {selected.teacher_name || "Not available"}</p>
               <p><strong className="text-[#063F32]">Start:</strong> {formatLocalDateTime(selected.scheduled_start)}</p>
               <p><strong className="text-[#063F32]">End:</strong> {formatLocalDateTime(selected.scheduled_end)}</p>
               <p><strong className="text-[#063F32]">Status:</strong> {selected.display_status || selected.status || "Not available"}</p>
               <p className="whitespace-pre-line"><strong className="text-[#063F32]">Description:</strong> {selected.description || "Not available"}</p>
               {selected.event_detail_link ? (
-                <a href={selected.event_detail_link.href} target="_blank" rel="noreferrer" className={`inline-flex rounded-full px-4 py-2 text-sm font-semibold ${selected.event_detail_link.kind === "recording" ? "bg-[#FAF7F0] text-[#0D5C48] ring-1 ring-[#2D8A6A]/20" : "bg-[linear-gradient(135deg,#0D3B2E,#0D5C48)] text-[#FFF5D6]"}`}>
+                <a
+                  href={selected.event_detail_link.href}
+                  target="_blank"
+                  rel="noreferrer"
+                  className={`inline-flex rounded-full px-4 py-2 text-sm font-semibold ${selected.event_detail_link.kind === "recording" ? "bg-[#FAF7F0] text-[#0D5C48] ring-1 ring-[#2D8A6A]/20" : "bg-[linear-gradient(135deg,#0D3B2E,#0D5C48)] text-[#FFF5D6]"}`}
+                >
                   {selected.event_detail_link.label}
                 </a>
               ) : null}
             </div>
-          ) : (
-            <p className="mt-4 text-sm text-[#245C4F]">Click a lecture to view details.</p>
-          )}
+          </div>
         </div>
-      </div>
+      ) : null}
     </div>
   );
 }

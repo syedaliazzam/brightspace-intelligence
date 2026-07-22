@@ -107,7 +107,7 @@ export function getLecturePrimaryLink(lecture) {
   if (canShowJoinMeet(lecture)) {
     return {
       href: lecture?.google_meet_link,
-      label: "Join Meet",
+      label: "Join Class",
       kind: "meet",
     };
   }
@@ -141,7 +141,7 @@ export function getLectureEventDetailLink(lecture) {
   if (!hasEnded && lecture?.google_meet_link) {
     return {
       href: lecture.google_meet_link,
-      label: "Join Meet",
+      label: "Join Class",
       kind: "meet",
     };
   }
@@ -166,7 +166,7 @@ export function getTeacherLectureActionLink(lecture) {
   if (["upcoming", "live", "scheduled"].includes(displayStatus) && lecture?.google_meet_link) {
     return {
       href: lecture.google_meet_link,
-      label: "Join Meet",
+      label: "Join Class",
       kind: "meet",
     };
   }
@@ -174,7 +174,7 @@ export function getTeacherLectureActionLink(lecture) {
   if (lecture?.google_meet_link && canShowJoinMeet(lecture)) {
     return {
       href: lecture.google_meet_link,
-      label: "Join Meet",
+      label: "Join Class",
       kind: "meet",
     };
   }

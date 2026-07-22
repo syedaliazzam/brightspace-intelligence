@@ -10,17 +10,18 @@ export default function PaymentAccessGuard({ children }) {
 
   useEffect(() => {
     let active = true;
+    let timer = null;
 
     async function load() {
       try {
         const response = await fetch("/api/payment-access-status", { cache: "no-store" });
-        const data = await response.json();
+        const data = await response.json().catch(() => ({}));
         if (active) {
           setStatus(data || { blocked: false });
         }
       } catch {
         if (active) {
-          setStatus({ blocked: false });
+          setStatus({ blocked: true, message: "Payment status could not be verified. Please contact administration." });
         }
       } finally {
         if (active) setLoading(false);
@@ -28,8 +29,13 @@ export default function PaymentAccessGuard({ children }) {
     }
 
     void load();
+    timer = setInterval(() => {
+      void load();
+    }, 60000);
+
     return () => {
       active = false;
+      if (timer) clearInterval(timer);
     };
   }, []);
 

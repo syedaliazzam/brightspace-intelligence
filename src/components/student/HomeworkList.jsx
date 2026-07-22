@@ -15,15 +15,25 @@ export default function HomeworkList({ items = [], onRefresh }) {
   const [submittingId, setSubmittingId] = useState("");
   const [activeItem, setActiveItem] = useState(null);
   const [note, setNote] = useState("");
+  const [file, setFile] = useState(null);
+  const [filePreview, setFilePreview] = useState("");
   const [modalError, setModalError] = useState("");
   const [pending, setPending] = useState(false);
 
   useEffect(() => {
     if (activeItem) {
       setNote("");
+      setFile(null);
+      setFilePreview("");
       setModalError("");
     }
   }, [activeItem]);
+
+  useEffect(() => {
+    return () => {
+      if (filePreview) URL.revokeObjectURL(filePreview);
+    };
+  }, [filePreview]);
 
   async function submitHomework(event) {
     event.preventDefault();
@@ -35,10 +45,12 @@ export default function HomeworkList({ items = [], onRefresh }) {
     setPending(true);
     setSubmittingId(activeItem.id);
     try {
+      const formData = new FormData();
+      formData.append("note", note);
+      if (file) formData.append("file", file);
       const response = await fetch(`/api/student/homework/${activeItem.id}`, {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ note }),
+        body: formData,
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data?.message || "Unable to submit homework.");
@@ -113,7 +125,7 @@ export default function HomeworkList({ items = [], onRefresh }) {
       {activeItem ? (
         <ClientPortal>
           <div className="fixed inset-0 z-[9999] isolate flex min-h-screen items-start justify-center bg-[#063F32]/45 px-4 pb-8 pt-28 backdrop-blur-sm">
-            <div className="w-full max-w-2xl overflow-hidden rounded-[2rem] border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(250,247,240,0.98)_100%)] shadow-[0_24px_80px_-36px_rgba(13,59,46,0.24)]">
+            <div className="flex max-h-[calc(100vh-8rem)] w-full max-w-2xl flex-col overflow-hidden rounded-[2rem] border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(250,247,240,0.98)_100%)] shadow-[0_24px_80px_-36px_rgba(13,59,46,0.24)]">
               <div className="flex items-start justify-between gap-4 border-b border-[#F1EADC] px-6 py-4">
                 <div>
                   <p className="text-sm font-semibold uppercase tracking-[0.24em] text-[#C9A227]">Submit homework</p>
@@ -129,7 +141,7 @@ export default function HomeworkList({ items = [], onRefresh }) {
                 </button>
               </div>
 
-              <form onSubmit={submitHomework} className="space-y-4 p-6">
+              <form onSubmit={submitHomework} className="flex-1 space-y-4 overflow-y-auto p-6">
                 <div className="rounded-[1.5rem] border border-[#2D8A6A]/12 bg-[#FAF7F0] p-4 text-sm text-[#245C4F]">
                   <p className="font-semibold text-[#063F32]">Homework details</p>
                   <p className="mt-2">{activeItem.description || activeItem.lecture_title || "Homework details pending."}</p>
@@ -144,6 +156,27 @@ export default function HomeworkList({ items = [], onRefresh }) {
                     placeholder="Write your homework submission note here..."
                   />
                 </label>
+
+                <label className="block">
+                  <span className="mb-2 block text-sm font-medium text-[#063F32]">Upload picture</span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(event) => {
+                      const selected = event.target.files?.[0] || null;
+                      setFile(selected);
+                      if (filePreview) URL.revokeObjectURL(filePreview);
+                      setFilePreview(selected ? URL.createObjectURL(selected) : "");
+                    }}
+                    className="block w-full rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 text-sm text-[#063F32] file:mr-4 file:rounded-xl file:border-0 file:bg-[#0D5C48] file:px-4 file:py-2 file:text-sm file:font-semibold file:text-[#FAF7F0] focus:border-[#C9A227] focus:bg-white focus:ring-4 focus:ring-[#FFF5D6]"
+                  />
+                </label>
+
+                {filePreview ? (
+                  <a href={filePreview} target="_blank" rel="noreferrer" className="block overflow-hidden rounded-[1.5rem] border border-[#2D8A6A]/12 bg-[#FAF7F0]">
+                    <img src={filePreview} alt="Homework submission preview" className="max-h-56 w-full object-contain" />
+                  </a>
+                ) : null}
 
                 {modalError ? <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{modalError}</div> : null}
 

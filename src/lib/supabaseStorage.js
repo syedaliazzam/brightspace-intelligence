@@ -85,6 +85,39 @@ function getAdmissionSupabaseConfig() {
   };
 }
 
+async function uploadHomeworkSubmission({ homeworkId, file }) {
+  const { url, serviceRoleKey, bucket } = getAdmissionSupabaseConfig();
+  const safeHomeworkId = sanitizeFilename(homeworkId);
+  const timestamp = Date.now();
+  const safeFilename = sanitizeFilename(file?.name || "homework");
+  const objectPath = `${safeHomeworkId}/${timestamp}_${safeFilename}`;
+  const uploadUrl = `${url}/storage/v1/object/${bucket}/${objectPath}`;
+  const fileBuffer = Buffer.from(await file.arrayBuffer());
+
+  const response = await fetch(uploadUrl, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${serviceRoleKey}`,
+      apikey: serviceRoleKey,
+      "x-upsert": "false",
+      "Content-Type": file.type || "application/octet-stream",
+    },
+    body: fileBuffer,
+    cache: "no-store",
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Supabase upload failed: ${errorText}`);
+  }
+
+  return {
+    bucket,
+    objectPath,
+    storedPath: `${bucket}/${objectPath}`,
+  };
+}
+
 export async function uploadAdmissionDocument({ applicationId, documentType, file }) {
   const { url, serviceRoleKey, bucket } = getAdmissionSupabaseConfig();
   const safeApplicationId = sanitizeFilename(applicationId);
@@ -210,3 +243,9 @@ export async function createSignedAdmissionDocumentUrl(storedPath, expiresIn = 3
 
   return `${url}/storage/v1/object/public/${signingBucket}/${objectPath}`;
 }
+
+export async function createSignedHomeworkSubmissionUrl(storedPath, expiresIn = 3600) {
+  return createSignedAdmissionDocumentUrl(storedPath, expiresIn);
+}
+
+export { uploadHomeworkSubmission };

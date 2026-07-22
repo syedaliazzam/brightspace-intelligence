@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireRole, roleGuardResponse } from "@/lib/roleGuard";
 import prisma from "@/lib/prisma";
+import { createSignedAdmissionDocumentUrl } from "@/lib/supabaseStorage";
 
 const ALLOWED_ROLES = ["parent", "admin"];
 
@@ -20,7 +21,7 @@ export async function GET(request) {
       : childId ? "WHERE pp.user_id = $1::uuid AND sp.id = $2::uuid" : "WHERE pp.user_id = $1::uuid";
     const values = isAdmin ? childId ? [childId] : [] : childId ? [session.user.id, childId] : [session.user.id];
 
-    const items = await prisma.$queryRawUnsafe(
+    const itemsRaw = await prisma.$queryRawUnsafe(
       `
       SELECT
         h.id::text AS id,
@@ -28,11 +29,14 @@ export async function GET(request) {
         h.description,
         h.due_date,
         h.status::text AS status,
+        h.submission_note,
+        h.submission_attachment_path,
+        h.submission_attachment_name,
         ls.title AS lecture_title,
         sub.name AS subject_name,
         tu.full_name AS teacher_name,
         su.full_name AS student_name,
-        latest_submission.note AS submission_note
+        COALESCE(h.submission_note, latest_submission.note) AS submission_note
       FROM homework h
       INNER JOIN student_profiles sp ON sp.id = h.student_id
       INNER JOIN users su ON su.id = sp.user_id
@@ -56,6 +60,15 @@ export async function GET(request) {
       ORDER BY h.due_date ASC NULLS LAST, h.created_at DESC
       `,
       ...values
+    );
+
+    const items = await Promise.all(
+      itemsRaw.map(async (item) => ({
+        ...item,
+        submission_attachment_url: item.submission_attachment_path
+          ? await createSignedAdmissionDocumentUrl(item.submission_attachment_path)
+          : "",
+      }))
     );
 
     return json("Homework fetched.", 200, { items });

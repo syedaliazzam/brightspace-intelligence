@@ -228,21 +228,33 @@ export default function NoteThreadsBoard({ mode = "viewer", lectures = [], porta
       {mode === "teacher" ? (
         <form onSubmit={submitCompose} className={`grid gap-4 p-5 ${panel}`}>
           <div className="grid gap-3 md:grid-cols-3">
-            <SelectField value={compose.classLevel} onChange={(e) => setCompose((c) => ({ ...c, classLevel: e.target.value, subjectId: "" }))} className="rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 text-sm text-[#245C4F] outline-none focus:border-[#C9A227] focus:ring-4 focus:ring-[#FFF5D6]" required>
-              <option value="">Select class</option>
-              {Array.from(new Map(lectureOptions.map((item) => [item.classLevel, item])).values()).map((item) => <option key={item.classLevel} value={item.classLevel}>{item.classLevel}</option>)}
-            </SelectField>
-            <SelectField value={compose.subjectId} onChange={(e) => setCompose((c) => ({ ...c, subjectId: e.target.value }))} className="rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 text-sm text-[#245C4F] outline-none focus:border-[#C9A227] focus:ring-4 focus:ring-[#FFF5D6]" required disabled={!compose.classLevel}>
-              <option value="">Select subject</option>
-              {subjectOptions.map((item) => <option key={item.subjectId} value={item.subjectId}>{item.subjectName}</option>)}
-            </SelectField>
-            <SelectField value={compose.visibility} onChange={(e) => setCompose((c) => ({ ...c, visibility: e.target.value }))} className="rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 text-sm text-[#245C4F] outline-none focus:border-[#C9A227] focus:ring-4 focus:ring-[#FFF5D6]">
-              <option value="parent">Parent</option>
-              <option value="student">Student</option>
-              <option value="admin_only">Admin only</option>
-            </SelectField>
+            <label className="block">
+              <span className="mb-2 block text-sm font-medium text-[#063F32]">Class</span>
+              <SelectField value={compose.classLevel} onChange={(e) => setCompose((c) => ({ ...c, classLevel: e.target.value, subjectId: "" }))} className="rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 text-sm text-[#245C4F] outline-none focus:border-[#C9A227] focus:ring-4 focus:ring-[#FFF5D6]" required>
+                <option value="">Select class</option>
+                {Array.from(new Map(lectureOptions.map((item) => [item.classLevel, item])).values()).map((item) => <option key={item.classLevel} value={item.classLevel}>{item.classLevel}</option>)}
+              </SelectField>
+            </label>
+            <label className="block">
+              <span className="mb-2 block text-sm font-medium text-[#063F32]">Subject</span>
+              <SelectField value={compose.subjectId} onChange={(e) => setCompose((c) => ({ ...c, subjectId: e.target.value }))} className="rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 text-sm text-[#245C4F] outline-none focus:border-[#C9A227] focus:ring-4 focus:ring-[#FFF5D6]" required disabled={!compose.classLevel}>
+                <option value="">Select subject</option>
+                {subjectOptions.map((item) => <option key={item.subjectId} value={item.subjectId}>{item.subjectName}</option>)}
+              </SelectField>
+            </label>
+            <label className="block">
+              <span className="mb-2 block text-sm font-medium text-[#063F32]">Visibility</span>
+              <SelectField value={compose.visibility} onChange={(e) => setCompose((c) => ({ ...c, visibility: e.target.value }))} className="rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 text-sm text-[#245C4F] outline-none focus:border-[#C9A227] focus:ring-4 focus:ring-[#FFF5D6]">
+                <option value="parent">Parent</option>
+                <option value="student">Student</option>
+                <option value="admin_only">Admin only</option>
+              </SelectField>
+            </label>
           </div>
-          <textarea value={compose.message} onChange={(e) => setCompose((c) => ({ ...c, message: e.target.value }))} placeholder="Add note or message" className="min-h-[120px] rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 text-sm text-[#063F32] outline-none focus:border-[#C9A227] focus:ring-4 focus:ring-[#FFF5D6]" required />
+          <label className="block">
+            <span className="mb-2 block text-sm font-medium text-[#063F32]">Note / message</span>
+            <textarea value={compose.message} onChange={(e) => setCompose((c) => ({ ...c, message: e.target.value }))} placeholder="Add note or message" className="min-h-[120px] w-full rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 text-sm text-[#063F32] outline-none focus:border-[#C9A227] focus:ring-4 focus:ring-[#FFF5D6]" required />
+          </label>
           <div className="flex items-center justify-between gap-3">
             <div className="rounded-2xl bg-[#FAF7F0] px-4 py-3 text-xs text-[#245C4F]">Select class and subject first, then write the note.</div>
             <button className="rounded-2xl bg-[#0D5C48] px-4 py-3 text-sm font-semibold text-[#FAF7F0] hover:bg-[#063F32]">Add note</button>

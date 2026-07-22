@@ -41,6 +41,14 @@ function HomeworkSubmissionModal({ item, onClose, onAction }) {
             </div>
           </div>
 
+          {item.submission_attachment_url ? (
+            <div className="mt-4 overflow-hidden rounded-[1.5rem] border border-[#2D8A6A]/12 bg-[#FAF7F0]">
+              <a href={item.submission_attachment_url} target="_blank" rel="noreferrer" className="block">
+                <img src={item.submission_attachment_url} alt={item.submission_attachment_name || "Homework submission"} className="h-72 w-full object-contain" />
+              </a>
+            </div>
+          ) : null}
+
           <div className="flex items-center justify-end gap-3">
             <button
               type="button"

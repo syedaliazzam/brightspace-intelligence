@@ -125,6 +125,27 @@ export default function LectureVerificationTable({ items = [], onRefresh }) {
     return "";
   }
 
+  function formatAttendanceLabel(status, fallbackDuration) {
+    const normalized = String(status || "").trim().toLowerCase();
+    if (normalized) return normalized;
+    return getAttendanceStatus(fallbackDuration);
+  }
+
+  function getAttendanceTone(status, source) {
+    const normalized = String(status || "").trim().toLowerCase();
+    if (source === "manual") {
+      if (normalized === "present") return "bg-amber-100 text-amber-800";
+      if (normalized === "leave") return "bg-sky-100 text-sky-800";
+      if (normalized === "absent") return "bg-rose-100 text-rose-700";
+      return "bg-[#F1EADC] text-[#245C4F]";
+    }
+
+    if (normalized === "present") return "bg-emerald-100 text-emerald-800";
+    if (normalized === "leave") return "bg-sky-100 text-sky-800";
+    if (normalized === "absent") return "bg-rose-100 text-rose-700";
+    return "bg-[#F1EADC] text-[#245C4F]";
+  }
+
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="relative space-y-4">
       {items.length ? (
@@ -272,23 +293,37 @@ export default function LectureVerificationTable({ items = [], onRefresh }) {
             </div>
 
             <div className="mt-4 overflow-hidden rounded-2xl border border-[#2D8A6A]/15">
-              <div className="grid grid-cols-[1fr_1fr_1fr] bg-[#FAF7F0] px-4 py-3 text-xs font-semibold uppercase tracking-[0.16em] text-[#245C4F]">
+              <div className="grid grid-cols-[1fr_1fr_1fr_1fr] bg-[#FAF7F0] px-4 py-3 text-xs font-semibold uppercase tracking-[0.16em] text-[#245C4F]">
                 <span>Student Name</span>
                 <span>Username / Phone</span>
-                <span>Status</span>
+                <span>Teacher Marked</span>
+                <span>Stored Status</span>
               </div>
               {Array.isArray(item.attendance_rows) && item.attendance_rows.length ? (
                 item.attendance_rows.map((row) => (
-                  <div key={row.id || row.user_id} className="grid grid-cols-[1fr_1fr_1fr] px-4 py-3 text-sm text-[#245C4F]">
+                  <div key={row.id || row.user_id} className="grid grid-cols-[1fr_1fr_1fr_1fr] px-4 py-3 text-sm text-[#245C4F]">
                     <span>{row.student_name}</span>
                     <span>{row.username || row.student_phone || row.student_email || "-"}</span>
-                    <span>{row.status || getAttendanceStatus(row.duration_minutes)}</span>
+                    <span>
+                      <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold capitalize ${getAttendanceTone(row.pending_status || row.status, row.source)}`}>
+                        {formatAttendanceLabel(row.pending_status || row.status, row.duration_minutes)}
+                      </span>
+                      <span className="ml-2 text-[11px] uppercase tracking-[0.14em] text-[#8A7A63]">
+                        {row.source === "manual" ? "Teacher mark" : "Meet sync"}
+                      </span>
+                    </span>
+                    <span>
+                      <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold capitalize ${getAttendanceTone(row.status, row.pending_status ? "" : row.source)}`}>
+                        {formatAttendanceLabel(row.status, row.duration_minutes)}
+                      </span>
+                    </span>
                   </div>
                 ))
               ) : (
-                <div className="grid grid-cols-[1fr_1fr_1fr] px-4 py-3 text-sm text-[#245C4F]">
+                <div className="grid grid-cols-[1fr_1fr_1fr_1fr] px-4 py-3 text-sm text-[#245C4F]">
                   <span>{item.course_title || item.class_level || "Class roster"}</span>
                   <span>{item.total_students_count || 0} students</span>
+                  <span>-</span>
                   <span>{item.student_attendance_status || getAttendanceStatus(item.student_duration_minutes)}</span>
                 </div>
               )}

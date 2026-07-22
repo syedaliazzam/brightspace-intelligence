@@ -73,6 +73,7 @@ export default function ParentClassesPage() {
           filters={state.filters}
           extraParams={{ childId: state.selectedChildId }}
           onDateSelect={(date) => setState((current) => ({ ...current, filters: { ...current.filters, date, range: "selected_date" } }))}
+          popupMode="page"
         />
       )}
       </div>

@@ -23,9 +23,17 @@ async function getLatestMonthlyVoucherBlockForStudent(studentId) {
     FROM regular_monthly_fee_voucher_items item
     INNER JOIN fee_vouchers fv ON fv.id = item.voucher_id
     LEFT JOIN fee_submissions fs ON fs.voucher_id = fv.id
-    WHERE item.student_id = ${studentId}::uuid
+    WHERE (
+      item.student_id = ${studentId}::uuid
+      OR fv.registration_lead_id IN (
+        SELECT e.registration_id
+        FROM enrollments e
+        WHERE e.student_id = ${studentId}::uuid
+          AND e.registration_id IS NOT NULL
+      )
+    )
       AND COALESCE(fs.status::text, fv.status::text) IN ('unpaid', 'rejected', 'submitted')
-      AND item.due_date < CURRENT_DATE
+      AND item.due_date <= timezone('Asia/Karachi', now())::date
     ORDER BY item.due_date ASC NULLS LAST, item.created_at DESC
     LIMIT 1
   `;
@@ -77,7 +85,7 @@ export async function GET() {
         INNER JOIN student_profiles sp ON sp.id = fv.student_id
         WHERE sp.user_id = ${session.user.id}::uuid
           AND LOWER(fv.status::text) IN ('unpaid', 'rejected', 'submitted')
-          AND fv.due_date < CURRENT_DATE
+      AND fv.due_date <= timezone('Asia/Karachi', now())::date
         ORDER BY fv.due_date ASC NULLS LAST, fv.created_at DESC
         LIMIT 1
       `;
@@ -128,7 +136,7 @@ export async function GET() {
             INNER JOIN users u ON u.id = pp.user_id
             WHERE u.id = ${session.user.id}::uuid
               AND LOWER(fv.status::text) IN ('unpaid', 'rejected', 'submitted')
-              AND fv.due_date < CURRENT_DATE
+              AND fv.due_date <= timezone('Asia/Karachi', now())::date
             ORDER BY fv.due_date ASC NULLS LAST, fv.created_at DESC
             LIMIT 1
           `
@@ -143,7 +151,7 @@ export async function GET() {
             INNER JOIN users u ON u.id = pp.user_id
             WHERE u.id = ${session.user.id}::uuid
               AND LOWER(fv.status::text) IN ('unpaid', 'rejected', 'submitted')
-              AND fv.due_date < CURRENT_DATE
+              AND fv.due_date <= timezone('Asia/Karachi', now())::date
             ORDER BY fv.due_date ASC NULLS LAST, fv.created_at DESC
             LIMIT 1
           `;

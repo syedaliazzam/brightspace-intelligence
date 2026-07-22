@@ -12,10 +12,41 @@ function normalizeText(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 
+function mergePendingAttendanceRows(item) {
+  const attendanceRows = Array.isArray(item?.attendance_rows) ? item.attendance_rows : [];
+  const pendingRows = Array.isArray(item?.pending_student_attendance) ? item.pending_student_attendance : [];
+
+  if (!attendanceRows.length || !pendingRows.length) {
+    return attendanceRows;
+  }
+
+  const pendingMap = new Map(
+    pendingRows
+      .map((row) => [String(row?.studentUserId || row?.student_user_id || "").trim(), row])
+      .filter(([key]) => key)
+  );
+
+  return attendanceRows.map((row) => {
+    const pending = pendingMap.get(String(row?.user_id || "").trim());
+    if (!pending) return row;
+
+    return {
+      ...row,
+      status: String(pending.status || row.status || "absent").toLowerCase(),
+      source: "manual",
+      pending_status: String(pending.status || "").trim().toLowerCase() || null,
+    };
+  });
+}
+
 async function ensureLectureVerificationColumns() {
   await prisma.$executeRaw`
     ALTER TABLE lecture_schedules
     ADD COLUMN IF NOT EXISTS google_meet_sync_meta JSONB
+  `;
+  await prisma.$executeRaw`
+    ALTER TABLE lecture_schedules
+    ADD COLUMN IF NOT EXISTS pending_student_attendance JSONB
   `;
 }
 
@@ -98,6 +129,7 @@ export async function GET(request) {
           ls.google_meet_link,
           ls.recording_drive_url,
           ls.google_meet_sync_meta,
+          ls.pending_student_attendance,
           cu.full_name AS coordinator_name,
           cu.email AS coordinator_email,
           tu.full_name AS teacher_name,
@@ -198,12 +230,20 @@ export async function GET(request) {
     ]);
 
     const mergedItems = items.map((item) => {
+      const mergedAttendanceRows = mergePendingAttendanceRows(item);
+      const presentCount = mergedAttendanceRows.filter((row) =>
+        ["present", "partial"].includes(String(row?.status || "").toLowerCase())
+      ).length;
+      const absentCount = mergedAttendanceRows.filter((row) =>
+        String(row?.status || "").toLowerCase() === "absent"
+      ).length;
+
       return {
         ...item,
-        attendance_rows: Array.isArray(item.attendance_rows) ? item.attendance_rows : [],
-        total_students_count: Number(item.total_students_count || 0),
-        joined_students_count: Number(item.joined_students_count || 0),
-        absent_students_count: Number(item.absent_students_count || 0),
+        attendance_rows: mergedAttendanceRows,
+        total_students_count: mergedAttendanceRows.length || Number(item.total_students_count || 0),
+        joined_students_count: presentCount,
+        absent_students_count: absentCount,
       };
     });
 

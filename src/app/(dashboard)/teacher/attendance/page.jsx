@@ -33,6 +33,11 @@ export default function TeacherAttendancePage() {
   const [selectedSubjectLabel, setSelectedSubjectLabel] = useState("");
   const [selectedLectureId, setSelectedLectureId] = useState("");
   const [selectedLectureLabel, setSelectedLectureLabel] = useState("");
+  const filteredSubjects = useMemo(() => {
+    const selected = String(selectedClassLevel || "").trim().toLowerCase();
+    if (!selected) return [];
+    return state.subjects.filter((item) => String(item.class_level || "").trim().toLowerCase() === selected);
+  }, [selectedClassLevel, state.subjects]);
 
   async function readJson(response) {
     const contentType = response.headers.get("content-type") || "";
@@ -240,15 +245,15 @@ export default function TeacherAttendancePage() {
                   onFocus={() => setSubjectOpen(true)}
                   onBlur={() => setSubjectOpen(false)}
                   className="w-full appearance-none rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 pr-11 text-sm text-[#063F32] outline-none focus:border-[#2D8A6A] focus:ring-2 focus:ring-[#2D8A6A]/20"
-                  disabled={!selectedClassLevel && state.subjects.length === 0}
+                  disabled={!selectedClassLevel}
                 >
                   <option value="">Select subject</option>
                   {selectedSubjectId &&
-                  !state.subjects.some((item) => String(item.id) === String(selectedSubjectId)) &&
+                  !filteredSubjects.some((item) => String(item.id) === String(selectedSubjectId)) &&
                   selectedSubjectLabel ? (
                     <option value={selectedSubjectId}>{selectedSubjectLabel}</option>
                   ) : null}
-                  {state.subjects.map((item) => (
+                  {filteredSubjects.map((item) => (
                     <option key={item.id} value={item.id}>
                       {item.name}
                     </option>
@@ -282,7 +287,7 @@ export default function TeacherAttendancePage() {
                   onFocus={() => setLectureOpen(true)}
                   onBlur={() => setLectureOpen(false)}
                   className="w-full appearance-none rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 pr-11 text-sm text-[#063F32] outline-none focus:border-[#2D8A6A] focus:ring-2 focus:ring-[#2D8A6A]/20"
-                  disabled={!state.lectures.length}
+                  disabled={!selectedSubjectId || !state.lectures.length}
                 >
                   <option value="">Select lecture</option>
                   {selectedLectureId &&
