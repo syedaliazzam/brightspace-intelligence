@@ -29,6 +29,17 @@ function normalizePaidAt(value) {
   return Number.isNaN(date.getTime()) ? "" : date.toISOString();
 }
 
+function formatDateTime(value) {
+  const trimmed = normalizeText(value);
+  if (!trimmed) return "";
+  const date = new Date(trimmed);
+  if (Number.isNaN(date.getTime())) return trimmed;
+  return new Intl.DateTimeFormat("en-US", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(date);
+}
+
 export async function POST(request) {
   try {
     const formData = await request.formData();
@@ -205,6 +216,7 @@ export async function POST(request) {
     const portalUrl = `${String(appUrl || "").replace(/\/+$/, "")}/login`;
 
     const parentSubject = `Payment submitted for voucher ${voucherNo}`;
+    const formattedPaidAt = formatDateTime(paidAt);
     const parentText = `Assalamualaikum ${lead?.parent_name || payerName || "Parent"},
 
 Your payment submission has been received and is waiting for approval.
@@ -217,7 +229,7 @@ Class Level: ${lead?.class_level || "-"}
 Voucher No: ${voucherNo}
 Transaction ID: ${transactionId}
 Paid Amount: ${paidAmount}
-Paid At: ${paidAt}
+Paid At: ${formattedPaidAt}
 
 Please wait for coordinator approval.
 
@@ -235,7 +247,7 @@ Login: ${portalUrl}`;
         ["Voucher No", voucherNo],
         ["Transaction ID", transactionId],
         ["Paid Amount", paidAmount],
-        ["Paid At", paidAt],
+        ["Paid At", formattedPaidAt],
       ],
       footerNote: "Please wait for coordinator approval.",
     });
@@ -253,7 +265,7 @@ Class Level: ${lead?.class_level || "-"}
 Voucher No: ${voucherNo}
 Transaction ID: ${transactionId}
 Paid Amount: ${paidAmount}
-Paid At: ${paidAt}`;
+Paid At: ${formattedPaidAt}`;
     const coordinatorHtml = themedEmailShell({
       eyebrow: "Payment Submitted by User",
       title: "A payment submission is waiting for approval",
@@ -267,7 +279,7 @@ Paid At: ${paidAt}`;
         ["Voucher No", voucherNo],
         ["Transaction ID", transactionId],
         ["Paid Amount", paidAmount],
-        ["Paid At", paidAt],
+        ["Paid At", formattedPaidAt],
       ],
     });
 
@@ -297,7 +309,7 @@ Paid At: ${paidAt}`;
       if (coordinatorPhone) {
         await sendWhatsAppText({
           to: coordinatorPhone,
-          message: `Payment submitted for voucher ${voucherNo}\n\nStudent: ${lead?.student_name || "-"}\nParent: ${lead?.parent_name || "-"}\nPhone: ${lead?.phone || "-"}\nAmount: ${paidAmount}\nPaid At: ${paidAt}\nTransaction ID: ${transactionId}`,
+          message: `Payment submitted for voucher ${voucherNo}\n\nStudent: ${lead?.student_name || "-"}\nParent: ${lead?.parent_name || "-"}\nPhone: ${lead?.phone || "-"}\nAmount: ${paidAmount}\nPaid At: ${formattedPaidAt}\nTransaction ID: ${transactionId}`,
         });
       }
     } catch (whatsAppError) {

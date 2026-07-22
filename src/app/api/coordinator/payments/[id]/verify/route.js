@@ -20,6 +20,17 @@ function normalizePhoneDigits(value) {
   return normalizeText(value).replace(/\D/g, "");
 }
 
+function formatDateTime(value) {
+  const trimmed = normalizeText(value);
+  if (!trimmed) return "";
+  const date = new Date(trimmed);
+  if (Number.isNaN(date.getTime())) return trimmed;
+  return new Intl.DateTimeFormat("en-US", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(date);
+}
+
 async function getRoleId(roleName, tx) {
   const [row] = await tx.$queryRaw`
     SELECT id::text AS id
@@ -481,15 +492,21 @@ async function getSubmissionRecord(id, tx = prisma) {
       fv.amount AS voucher_amount,
       rl.id::text AS registration_lead_id,
       istd.id::text AS interested_student_id,
-      rl.student_name,
-      rl.parent_name,
+      COALESCE(rl.student_name, item.student_name, su.full_name, '') AS student_name,
+      COALESCE(rl.parent_name, item.parent_name, '') AS parent_name,
       rl.parent_relation,
-      rl.email,
-      rl.phone,
+      COALESCE(rl.email, item.parent_email, item.student_email, '') AS email,
+      COALESCE(rl.phone, item.parent_phone, item.student_phone, '') AS phone,
+      item.parent_email,
+      item.parent_phone,
+      item.student_email,
+      item.student_phone,
       rl.address,
       rl.city,
       COALESCE(
-      NULLIF(TRIM(rl.class_level), ''),
+        NULLIF(TRIM(rl.class_level), ''),
+        NULLIF(TRIM(c.class_level), ''),
+        NULLIF(TRIM(c.title), ''),
         NULLIF(TRIM(istd.class_level), '')
       ) AS class_level,
       NULLIF(TRIM(istd.class_level), '') AS interested_class_level,
@@ -499,6 +516,11 @@ async function getSubmissionRecord(id, tx = prisma) {
     INNER JOIN fee_vouchers fv ON fv.id = fs.voucher_id
     LEFT JOIN registration_leads rl ON rl.id = fv.registration_id
     LEFT JOIN interested_students istd ON istd.registration_lead_id = rl.id
+    LEFT JOIN regular_monthly_fee_voucher_items item ON item.voucher_id = fv.id
+    LEFT JOIN student_profiles sp ON sp.id = item.student_id
+    LEFT JOIN users su ON su.id = sp.user_id
+    LEFT JOIN regular_monthly_fee_batches b ON b.id = item.batch_id
+    LEFT JOIN courses c ON c.id = b.class_id
     WHERE fs.id = ${id}::uuid
     LIMIT 1;
   `;
@@ -631,6 +653,32 @@ export async function POST(request, { params }) {
           { entityType: "fee_vouchers", entityId: submission.fee_voucher_id || submission.voucher_id }
         );
       }, TRANSACTION_OPTIONS);
+
+      if (submission.email) {
+        try {
+          const portalUrl = getAppUrl()
+            ? `${getAppUrl().replace(/\/+$/, "")}/login`
+            : "http://localhost:3000/login";
+          const paidAtLabel = formatDateTime(submission.paid_at);
+          const html = buildPaymentDecisionEmailHtml({
+            eyebrow: "Payment Approved",
+            title: "Your monthly fee payment has been approved",
+            intro: `Hello, ${submission.student_name || submission.parent_name || "there"}. Your monthly fee payment for voucher ${submission.voucher_no} has been approved successfully.`,
+            voucherNo: submission.voucher_no,
+            reason: `Paid Amount: ${submission.paid_amount || "-"}${paidAtLabel ? `\nPaid At: ${paidAtLabel}` : ""}`,
+            portalUrl,
+            ctaLabel: "Open LMS",
+          });
+          await sendEmail({
+            to: submission.email,
+            subject: "Monthly fee payment approved",
+            text: `Monthly fee payment approved\n\nVoucher No: ${submission.voucher_no}\nPaid Amount: ${submission.paid_amount || "-"}\n${paidAtLabel ? `Paid At: ${paidAtLabel}\n` : ""}\nOpen LMS: ${portalUrl}`,
+            html,
+          });
+        } catch (emailError) {
+          console.error("Monthly payment approval email failed:", emailError);
+        }
+      }
 
       return json("Monthly payment verified. LMS access restored.", 200, {
         success: true,
