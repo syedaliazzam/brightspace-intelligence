@@ -892,6 +892,10 @@ function AdmissionFormContent() {
     setErrors((current) => ({ ...current, [name]: "" }));
   }
 
+  function controlledValue(value) {
+    return value ?? "";
+  }
+
   async function handleFileSelection(name, file) {
     if (!file) {
       updateField(name, null);
@@ -1613,41 +1617,41 @@ function AdmissionFormContent() {
           <div className="grid gap-4 md:grid-cols-2">
             <div className="rounded-[1rem] border border-[#2D8A6A]/15 bg-white p-4">
               <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]" htmlFor="scholarshipMonthlyIncome">Monthly household income</label>
-              <input id="scholarshipMonthlyIncome" type="number" min="0" step="0.01" value={form.scholarshipMonthlyIncome || ""} onChange={(event) => updateField("scholarshipMonthlyIncome", event.target.value)} className={inputClass(errors.scholarshipMonthlyIncome)} placeholder="50000" />
+              <input id="scholarshipMonthlyIncome" type="number" min="0" step="0.01" value={controlledValue(form.scholarshipMonthlyIncome)} onChange={(event) => updateField("scholarshipMonthlyIncome", event.target.value)} className={inputClass(errors.scholarshipMonthlyIncome)} placeholder="50000" />
               <FieldError error={errors.scholarshipMonthlyIncome} />
             </div>
             <div className="rounded-[1rem] border border-[#2D8A6A]/15 bg-white p-4">
               <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]" htmlFor="scholarshipRequestedAmount">Requested scholarship amount</label>
-              <input id="scholarshipRequestedAmount" type="number" min="0" step="0.01" value={form.scholarshipRequestedAmount || ""} onChange={(event) => updateField("scholarshipRequestedAmount", event.target.value)} className={inputClass(errors.scholarshipRequestedAmount)} placeholder="10000" />
+              <input id="scholarshipRequestedAmount" type="number" min="0" step="0.01" value={controlledValue(form.scholarshipRequestedAmount)} onChange={(event) => updateField("scholarshipRequestedAmount", event.target.value)} className={inputClass(errors.scholarshipRequestedAmount)} placeholder="10000" />
               <FieldError error={errors.scholarshipRequestedAmount} />
             </div>
             <div className="rounded-[1rem] border border-[#2D8A6A]/15 bg-white p-4">
               <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]" htmlFor="scholarshipDependentsCount">Number of dependents</label>
-              <input id="scholarshipDependentsCount" type="number" min="0" step="1" value={form.scholarshipDependentsCount || ""} onChange={(event) => updateField("scholarshipDependentsCount", event.target.value)} className={inputClass(errors.scholarshipDependentsCount)} placeholder="4" />
+              <input id="scholarshipDependentsCount" type="number" min="0" step="1" value={controlledValue(form.scholarshipDependentsCount)} onChange={(event) => updateField("scholarshipDependentsCount", event.target.value)} className={inputClass(errors.scholarshipDependentsCount)} placeholder="4" />
               <FieldError error={errors.scholarshipDependentsCount} />
             </div>
             <div className="rounded-[1rem] border border-[#2D8A6A]/15 bg-white p-4">
               <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]" htmlFor="scholarshipSchoolGoingChildrenCount">School-going children</label>
-              <input id="scholarshipSchoolGoingChildrenCount" type="number" min="0" step="1" value={form.scholarshipSchoolGoingChildrenCount || ""} onChange={(event) => updateField("scholarshipSchoolGoingChildrenCount", event.target.value)} className={inputClass(errors.scholarshipSchoolGoingChildrenCount)} placeholder="2" />
+              <input id="scholarshipSchoolGoingChildrenCount" type="number" min="0" step="1" value={controlledValue(form.scholarshipSchoolGoingChildrenCount)} onChange={(event) => updateField("scholarshipSchoolGoingChildrenCount", event.target.value)} className={inputClass(errors.scholarshipSchoolGoingChildrenCount)} placeholder="2" />
               <FieldError error={errors.scholarshipSchoolGoingChildrenCount} />
             </div>
             <div className="rounded-[1rem] border border-[#2D8A6A]/15 bg-white p-4">
               <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]" htmlFor="scholarshipResidenceType">Residence type</label>
-              <SelectField id="scholarshipResidenceType" value={form.scholarshipResidenceType || ""} onChange={(event) => updateField("scholarshipResidenceType", event.target.value)} error={errors.scholarshipResidenceType} className={inputClass(errors.scholarshipResidenceType)}>
+              <SelectField id="scholarshipResidenceType" value={controlledValue(form.scholarshipResidenceType)} onChange={(event) => updateField("scholarshipResidenceType", event.target.value)} error={errors.scholarshipResidenceType} className={inputClass(errors.scholarshipResidenceType)}>
                 <option value="">Select residence type</option>
                 {RESIDENCE_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
               </SelectField>
             </div>
             <div className="rounded-[1rem] border border-[#2D8A6A]/15 bg-white p-4">
               <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]" htmlFor="scholarshipGuardianEmploymentStatus">Guardian employment status</label>
-              <SelectField id="scholarshipGuardianEmploymentStatus" value={form.scholarshipGuardianEmploymentStatus || ""} onChange={(event) => updateField("scholarshipGuardianEmploymentStatus", event.target.value)} error={errors.scholarshipGuardianEmploymentStatus} className={inputClass(errors.scholarshipGuardianEmploymentStatus)}>
+              <SelectField id="scholarshipGuardianEmploymentStatus" value={controlledValue(form.scholarshipGuardianEmploymentStatus)} onChange={(event) => updateField("scholarshipGuardianEmploymentStatus", event.target.value)} error={errors.scholarshipGuardianEmploymentStatus} className={inputClass(errors.scholarshipGuardianEmploymentStatus)}>
                 <option value="">Select employment status</option>
                 {EMPLOYMENT_STATUS_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
               </SelectField>
             </div>
             <div className="rounded-[1rem] border border-[#2D8A6A]/15 bg-white p-4 md:col-span-2">
               <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]" htmlFor="scholarshipReason">Why do you need this scholarship?</label>
-              <textarea id="scholarshipReason" rows={4} value={form.scholarshipReason || ""} onChange={(event) => updateField("scholarshipReason", event.target.value)} className={inputClass(errors.scholarshipReason)} placeholder="Share your financial need and why you are requesting support." />
+              <textarea id="scholarshipReason" rows={4} value={controlledValue(form.scholarshipReason)} onChange={(event) => updateField("scholarshipReason", event.target.value)} className={inputClass(errors.scholarshipReason)} placeholder="Share your financial need and why you are requesting support." />
               <FieldError error={errors.scholarshipReason} />
             </div>
             <div className="rounded-[1rem] border border-[#2D8A6A]/15 bg-white p-4 md:col-span-2">
@@ -1720,7 +1724,7 @@ function AdmissionFormContent() {
             </div>
           </div>
 
-          <div className="rounded-[1.1rem] border border-[rgba(201,162,39,0.22)] bg-[#FFF5D6]/70 p-4">
+          <div className="rounded-[1.1rem] border border-[rgba(201,162,39,0.22)] bg-[#FAF7F0] p-4">
             <label className="flex items-start gap-3 text-sm text-[#063F32]">
               <input
                 type="checkbox"
@@ -1737,13 +1741,6 @@ function AdmissionFormContent() {
             </label>
           </div>
 
-            <div className="rounded-[1rem] border border-[#2D8A6A]/10 bg-[#FAF7F0] p-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]">Payment instructions</p>
-              <p className="mt-2 whitespace-pre-line text-sm text-[#245C4F]">
-                {livePaymentInstructions || "No payment instructions added yet."}
-              </p>
-            </div>
-
             <div className="rounded-[1rem] border border-[#2D8A6A]/15 bg-white p-4">
               <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]" htmlFor="payerName">
                 Payer name
@@ -1751,7 +1748,7 @@ function AdmissionFormContent() {
               <input
                 id="payerName"
                 type="text"
-                value={form.payerName || ""}
+                value={controlledValue(form.payerName)}
                 onChange={(event) => updateField("payerName", event.target.value)}
                 className={inputClass(errors.payerName)}
                 placeholder="Enter payer name"
@@ -1767,7 +1764,7 @@ function AdmissionFormContent() {
                 <input
                   id="payerEmail"
                   type="email"
-                  value={form.payerEmail || ""}
+                  value={controlledValue(form.payerEmail)}
                   onChange={(event) => updateField("payerEmail", event.target.value)}
                   className={inputClass(errors.payerEmail)}
                   placeholder="payer@example.com"
@@ -1782,7 +1779,7 @@ function AdmissionFormContent() {
                 <input
                   id="payerPhone"
                   type="tel"
-                  value={form.payerPhone || ""}
+                  value={controlledValue(form.payerPhone)}
                   onChange={(event) => updateField("payerPhone", event.target.value)}
                   className={inputClass(errors.payerPhone)}
                   placeholder="03xx-xxxxxxx"
@@ -1799,7 +1796,7 @@ function AdmissionFormContent() {
                 <input
                   id="transactionId"
                   type="text"
-                  value={form.transactionId || ""}
+                  value={controlledValue(form.transactionId)}
                   onChange={(event) => updateField("transactionId", event.target.value)}
                   className={inputClass(errors.transactionId)}
                   placeholder="Bank reference or wallet transaction ID"
@@ -1816,7 +1813,7 @@ function AdmissionFormContent() {
                   type="number"
                   min="1"
                   step="0.01"
-                  value={form.paidAmount || ""}
+                  value={controlledValue(form.paidAmount)}
                   onChange={(event) => updateField("paidAmount", event.target.value)}
                   className={inputClass(errors.paidAmount)}
                   placeholder="5000"
@@ -1832,7 +1829,7 @@ function AdmissionFormContent() {
               <input
                 id="paidAt"
                 type="datetime-local"
-                value={form.paidAt || ""}
+                value={controlledValue(form.paidAt)}
                 onChange={(event) => updateField("paidAt", event.target.value)}
                 className={inputClass(errors.paidAt)}
               />
@@ -1893,7 +1890,7 @@ function AdmissionFormContent() {
                 </label>
                 <SelectField
                   id="previewAdmissionFee"
-                  value={form.admissionFee || ""}
+                  value={controlledValue(form.admissionFee)}
                   onChange={(event) => updateField("admissionFee", event.target.value)}
                   error={errors.admissionFee}
                   className={`${inputClass(errors.admissionFee)} text-xs`}
@@ -1914,7 +1911,7 @@ function AdmissionFormContent() {
                 </label>
                 <SelectField
                   id="previewDiscountPercent"
-                  value={form.discountPercent || ""}
+                  value={controlledValue(form.discountPercent)}
                   onChange={(event) => updateField("discountPercent", event.target.value)}
                   error={errors.discountPercent}
                   className={`${inputClass(errors.discountPercent)} text-xs`}
@@ -1939,7 +1936,7 @@ function AdmissionFormContent() {
               <textarea
                 id="paymentInstructions"
                 rows={4}
-                value={form.paymentInstructions || ""}
+                value={controlledValue(form.paymentInstructions)}
                 onChange={(event) => updateField("paymentInstructions", event.target.value)}
                 className={inputClass(errors.paymentInstructions)}
                 placeholder="Add payment instructions for this admission"

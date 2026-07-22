@@ -32,6 +32,7 @@ function statusLabel(value) {
 function admissionStatusLabel(value) {
   const normalized = String(value || "").toLowerCase();
   if (!normalized || normalized === "pending") return "New Registrations";
+  if (normalized === "live_students") return "Access Granted";
   if (normalized === "parent_interview_sent") return "Parent Interview Sent";
   if (normalized === "parent_interview_submitted") return "Parent Interview Submitted";
   if (normalized === "sent") return "Admission Form Sent";
@@ -45,6 +46,7 @@ function admissionStatusLabel(value) {
 
 function admissionStatusTone(value) {
   const normalized = String(value || "").toLowerCase();
+  if (normalized === "live_students") return "bg-[#EAF6EF] text-[#0D5C48]";
   if (["submitted", "sent", "registered", "pending", "parent_interview_submitted"].includes(normalized)) return "bg-[#EAF6EF] text-[#0D5C48]";
   if (["parent_interview_sent"].includes(normalized)) return "bg-[#FFF5D6] text-[#8A6A00]";
   if (["reminded"].includes(normalized)) return "bg-[#FFF5D6] text-[#8A6A00]";
@@ -363,20 +365,28 @@ export default function InterestedStudentsPanel({
     }
     const status = String(item.admission_form_status || item.status || "pending").toLowerCase();
     const interviewStatus = String(item.parent_interview_status || "").toLowerCase();
+    const registrationStatus = String(item.registration_status || item.status || "")
+      .toLowerCase()
+      .trim()
+      .replace(/[\s-]+/g, "_");
     const registered = Boolean(item.registration_code || item.registration_token || item.registration_lead_id || item.id);
     const sent = Boolean(item.admission_form_sent_at) || ["sent", "reminded", "submitted", "overdue", "not_submitted"].includes(status);
-    const submitted = Boolean(item.admission_form_submitted_at) || status === "submitted" || status === "registered";
+    const submittedBase = Boolean(item.admission_form_submitted_at) || status === "submitted" || status === "registered";
+    const liveStudent = registrationStatus === "access_granted" && submittedBase;
+    const submitted = submittedBase && !liveStudent;
     const reminded = Boolean(item.admission_form_last_reminder_at) || Number(item.admission_form_reminder_count || 0) > 0 || status === "reminded";
     const interviewSent = Boolean(item.parent_interview_form_id) || ["pending", "sent", "submitted", "reviewed"].includes(interviewStatus);
     const interviewSubmitted = Boolean(item.parent_interview_submitted_at) || ["submitted", "reviewed"].includes(interviewStatus);
     return {
       status,
       interviewStatus,
+      registrationStatus,
       registered,
       interviewSent,
       interviewSubmitted,
       sent,
       submitted,
+      liveStudent,
       reminded,
       overdue: status === "overdue" || (reminded && !submitted),
     };
@@ -385,6 +395,7 @@ export default function InterestedStudentsPanel({
   function getCurrentStage(item) {
     const stage = getLeadStage(item);
     if (!stage.registered) return "pending";
+    if (stage.liveStudent) return "live_students";
     if (stage.interviewSent && !stage.interviewSubmitted) return "parent_interview_sent";
     if (stage.interviewSubmitted && !stage.sent) return "parent_interview_submitted";
     if (stage.sent && stage.submitted) return "submitted";

@@ -116,9 +116,12 @@ export default function InterestedStudentsPageShell({
           const status = rawStatus === "registered" ? "submitted" : rawStatus;
           const interviewStatus = String(item.parent_interview_status || "").toLowerCase();
           const sent = Boolean(item.admission_form_sent_at) || ["sent", "reminded", "submitted", "overdue", "not_submitted"].includes(status);
-          const paymentStatus = String(item.registration_status || item.status || "").toLowerCase();
+          const paymentStatus = String(item.registration_status || item.status || "")
+            .toLowerCase()
+            .trim()
+            .replace(/[\s-]+/g, "_");
           const submittedBase = Boolean(item.admission_form_submitted_at) || status === "submitted" || status === "registered";
-          const liveStudent = submittedBase && paymentStatus === "access_granted";
+          const liveStudent = paymentStatus === "access_granted" && submittedBase;
           const submitted = submittedBase && !liveStudent;
           const interviewSent = Boolean(item.parent_interview_form_id) || ["pending", "sent", "submitted", "reviewed"].includes(interviewStatus);
           const interviewSubmitted = Boolean(item.parent_interview_submitted_at) || ["submitted", "reviewed"].includes(interviewStatus);

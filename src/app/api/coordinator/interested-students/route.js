@@ -112,7 +112,14 @@ export async function GET() {
             AND LOWER(NULLIF(TRIM(rl_inner.student_name), '')) = LOWER(NULLIF(TRIM(istd.child_name), ''))
           )
         )
-        ORDER BY rl_inner.created_at DESC NULLS LAST, rl_inner.id DESC
+        ORDER BY
+          CASE
+            WHEN rl_inner.id::text = istd.registration_lead_id::text THEN 0
+            WHEN LOWER(COALESCE(rl_inner.status::text, '')) = 'access_granted' THEN 1
+            ELSE 2
+          END,
+          rl_inner.created_at DESC NULLS LAST,
+          rl_inner.id DESC
         LIMIT 1
       ) rl ON TRUE
       LEFT JOIN LATERAL (

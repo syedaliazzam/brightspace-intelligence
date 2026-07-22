@@ -3,7 +3,7 @@ import { auth } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 import { createSignedAdmissionDocumentUrl } from "@/lib/supabaseStorage";
 
-const ALLOWED_ROLES = new Set(["admin", "coordinator"]);
+const ALLOWED_ROLES = new Set(["admin", "coordinator", "superadmin"]);
 
 function json(message, status = 200, extra = {}) {
   return NextResponse.json({ message, ...extra }, { status });
@@ -31,9 +31,20 @@ export async function GET() {
         nbsf.requested_amount::float8 AS requested_amount,
         nbsf.reason,
         nbsf.supporting_document_file_path,
-        LOWER(COALESCE(nbsf.status::text, 'submitted')) AS status,
+        LOWER(
+          COALESCE(
+            latest_submission.status::text,
+            fv.status::text,
+            CASE
+              WHEN COALESCE(nbsf.voucher_created, FALSE) THEN 'voucher_created'
+              ELSE nbsf.status::text
+            END,
+            'submitted'
+          )
+        ) AS status,
         COALESCE(nbsf.voucher_created, FALSE) AS voucher_created,
         nbsf.voucher_id::text AS voucher_id,
+        (latest_submission.status IS NOT NULL) AS has_fee_submission,
         COALESCE(nbsf.scholarship_amount::float8, 0) AS scholarship_amount,
         nbsf.created_at,
         nbsf.updated_at,
@@ -45,6 +56,14 @@ export async function GET() {
         LOWER(COALESCE(rl.status::text, 'new_lead')) AS lead_status
       FROM need_based_scholarship_forms nbsf
       INNER JOIN registration_leads rl ON rl.id = nbsf.registration_id
+      LEFT JOIN fee_vouchers fv ON fv.id = nbsf.voucher_id
+      LEFT JOIN LATERAL (
+        SELECT fs.status
+        FROM fee_submissions fs
+        WHERE fs.voucher_id = nbsf.voucher_id
+        ORDER BY fs.created_at DESC NULLS LAST, fs.id DESC
+        LIMIT 1
+      ) latest_submission ON TRUE
       ORDER BY nbsf.created_at DESC NULLS LAST, nbsf.id DESC
     `;
 
