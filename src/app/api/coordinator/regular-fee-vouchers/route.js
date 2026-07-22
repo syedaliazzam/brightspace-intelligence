@@ -196,7 +196,8 @@ export async function POST(request) {
     `;
     if (!classRow?.id) return json("Class not found.", 404);
 
-    const students = await prisma.$queryRaw`
+    const [students, paymentMethods] = await Promise.all([
+      prisma.$queryRaw`
       SELECT
         sp.id::text AS student_id,
         u.full_name AS student_name,
@@ -216,7 +217,9 @@ export async function POST(request) {
         AND COALESCE(sp.status, 'active'::user_status) = 'active'::user_status
         AND u.status = 'active'::user_status
       ORDER BY u.full_name ASC
-    `;
+    `,
+      getPaymentMethods(),
+    ]);
 
     if (!students.length) return json("No verified students found in this class.", 400);
 
