@@ -1,6 +1,7 @@
 export const dashboardNavigation = {
   superadmin: [
     { label: "Dashboard", href: "/superadmin/dashboard" },
+    { label: "Class Schedulers", href: "/superadmin/lectures" },
     { label: "Interested Students", href: "/superadmin/interested-students" },
     { label: "Parent Interview Forms", href: "/superadmin/parent-interview-forms" },
     { label: "Admission Records", href: "/superadmin/registration-leads" },
@@ -18,13 +19,13 @@ export const dashboardNavigation = {
     },
     { label: "Subject Catalog", href: "/superadmin/subjects" },
     { label: "Class Management", href: "/superadmin/courses" },
-    { label: "Lectures", href: "/superadmin/lectures" },
     { label: "Notes", href: "/superadmin/notes" },
     { label: "Headlines", href: "/superadmin/headlines" },
     { label: "Audit History", href: "/superadmin/audit-logs" },
   ],
   admin: [
     { label: "Dashboard", href: "/admin/dashboard" },
+    { label: "Class Schedulers", href: "/admin/lectures" },
     { label: "Interested Students", href: "/admin/interested-students" },
     { label: "Parent Interview Forms", href: "/admin/parent-interview-forms" },
     { label: "Admission Records", href: "/admin/registration-leads" },
@@ -41,7 +42,6 @@ export const dashboardNavigation = {
     },
     { label: "Subject Catalog", href: "/admin/subjects" },
     { label: "Class Management", href: "/admin/courses" },
-    { label: "Lectures", href: "/admin/lectures" },
     { label: "Notes", href: "/admin/notes" },
     { label: "Headlines", href: "/admin/headlines" },
     { label: "Audit History", href: "/admin/audit-logs" },

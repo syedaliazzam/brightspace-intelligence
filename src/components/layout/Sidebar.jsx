@@ -57,6 +57,7 @@ function getIconForLabel(label) {
   if (key.includes("student")) return GraduationCap;
   if (key.includes("parent")) return UserRound;
   if (key.includes("teacher assignments")) return UserCog;
+  if (key.includes("class schedul")) return CalendarDays;
   if (key.includes("lecture schedule")) return CalendarDays;
   if (key.includes("lecture verification")) return ClipboardCheck;
   if (key.includes("reports")) return FileText;
