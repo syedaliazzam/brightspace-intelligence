@@ -141,7 +141,7 @@ export default function TeacherAttendancePage() {
 
   async function saveAttendance() {
     if (!state.selectedLecture?.id) {
-      setState((current) => ({ ...current, error: "Please select an ended lecture first." }));
+      setState((current) => ({ ...current, error: "Please select an lecture first." }));
       return;
     }
 
@@ -177,7 +177,7 @@ export default function TeacherAttendancePage() {
           <div className="relative max-w-6xl">
             <p className="inline-flex rounded-full border border-[#FFF5D6]/30 bg-[#FFF5D6]/10 px-3 py-1 text-[0.65rem] font-semibold uppercase tracking-[0.24em] text-[#FFF5D6]">Attendance</p>
             <h1 className="mb-2 mt-4 text-3xl font-bold text-[#FAF7F0] sm:text-4xl lg:text-4xl font-display">Manual student attendance</h1>
-            <p className="mt-2 max-w-5xl text-sm leading-7 text-[#EAF6EF] sm:text-base lg:whitespace-nowrap">Select a class, subject, and ended lecture to mark student attendance. Teacher Meet attendance remains synced separately.</p>
+            <p className="mt-2 max-w-5xl text-sm leading-7 text-[#EAF6EF] sm:text-base lg:whitespace-nowrap">Select a class, subject, and lecture to mark student attendance. Teacher Meet attendance remains synced separately.</p>
           </div>
         </section>
 
@@ -264,7 +264,7 @@ export default function TeacherAttendancePage() {
             </label>
 
             <label className="block">
-              <span className="mb-2 block text-sm font-medium text-[#245C4F]">Ended lecture</span>
+              <span className="mb-2 block text-sm font-medium text-[#245C4F]">Lecture</span>
               <div className="relative">
                 <select
                   value={selectedLectureId}

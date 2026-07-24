@@ -105,7 +105,7 @@ export async function GET(request) {
           ),
           ''
         ) AS student_relations,
-        COALESCE(MAX(rl.city_country), '') AS city_country,
+        COALESCE(MAX(rl.city), '') AS city,
         COALESCE(MAX(rl.father_name_english), '') AS father_name_english,
         COALESCE(MAX(rl.mother_name_english), '') AS mother_name_english,
         COALESCE(MAX(rl.preferred_contact_person), '') AS preferred_contact_person
@@ -188,6 +188,54 @@ export async function PUT(request) {
         UPDATE parent_profiles
         SET relation = ${relation}, updated_at = NOW()
         WHERE id = ${parent.id}::uuid
+      `;
+
+      await tx.$executeRaw`
+        UPDATE registration_leads rl
+        SET
+          parent_name = ${fullName},
+          parent_relation = ${relation},
+          email = COALESCE(NULLIF(${email}, ''), rl.email),
+          phone = COALESCE(NULLIF(${phone}, ''), rl.phone),
+          updated_at = NOW()
+        FROM student_parents spp
+        INNER JOIN enrollments e ON e.student_id = spp.student_id
+        WHERE spp.parent_id = ${parent.id}::uuid
+          AND e.registration_id = rl.id
+      `;
+
+      await tx.$executeRaw`
+        UPDATE interested_students istd
+        SET
+          parent_name = ${fullName},
+          parent_relation = ${relation},
+          email = COALESCE(NULLIF(${email}, ''), istd.email),
+          phone = COALESCE(NULLIF(${phone}, ''), istd.phone),
+          updated_at = NOW()
+        FROM student_parents spp
+        INNER JOIN enrollments e ON e.student_id = spp.student_id
+        WHERE spp.parent_id = ${parent.id}::uuid
+          AND istd.registration_lead_id = e.registration_id
+      `;
+
+      await tx.$executeRaw`
+        UPDATE parent_interview_forms pif
+        SET
+          parent_name = ${fullName},
+          parent_email = COALESCE(NULLIF(${email}, ''), pif.parent_email),
+          updated_at = NOW()
+        WHERE EXISTS (
+          SELECT 1
+          FROM student_parents spp
+          INNER JOIN enrollments e ON e.student_id = spp.student_id
+          LEFT JOIN interested_students istd ON istd.registration_lead_id = e.registration_id
+          WHERE spp.parent_id = ${parent.id}::uuid
+            AND (
+              pif.registration_id = e.registration_id::text
+              OR pif.registration_id = istd.id::text
+              OR pif.registration_id = istd.registration_code
+            )
+        )
       `;
 
       await tx.$executeRaw`

@@ -34,6 +34,10 @@ function formatAgeValue(age, dateOfBirth) {
   return years > 0 ? `${years} year${years === 1 ? "" : "s"}` : "";
 }
 
+function formatCityCountry(city, country) {
+  return [city, country].filter(Boolean).join(", ");
+}
+
 export default function StudentProfilePage() {
   const [state, setState] = useState({ profile: null, error: "", loading: true });
 
@@ -86,17 +90,13 @@ export default function StudentProfilePage() {
           <DetailRow label="Lead student name" value={profile.lead_student_name} />
           <DetailRow label="Parent relation" value={profile.lead_parent_relation} />
           <DetailRow label="Programme" value={profile.program_name} />
-          <DetailRow label="Current school" value={profile.current_school} />
-          <DetailRow label="Current grade" value={profile.current_grade} />
           <DetailRow label="Gender" value={profile.gender} />
           <DetailRow label="Date of birth" value={formatDate(profile.date_of_birth)} />
-          <DetailRow label="City / country" value={profile.city_country} />
+          <DetailRow label="City / country" value={formatCityCountry(profile.city, profile.country)} />
           <DetailRow label="Nationality" value={profile.nationality} />
           <DetailRow label="Religion" value={profile.religion} />
-          <DetailRow label="Preferred language" value={profile.preferred_language} />
           <DetailRow label="Support person" value={profile.support_person_during_learning} />
           <DetailRow label="Device available" value={profile.device_available} />
-          <DetailRow label="School expectations" value={profile.school_expectations} />
         </div>
       </section>
 

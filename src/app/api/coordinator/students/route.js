@@ -81,12 +81,10 @@ export async function GET(request) {
         rl.parent_relation,
         rl.phone AS lead_phone,
         rl.email AS lead_email,
-        rl.city_country,
-        rl.current_school,
+        rl.city,
         rl.gender,
         rl.date_of_birth,
         rl.program_name,
-        rl.preferred_language,
         rl.nationality,
         p.full_name AS parent_name,
         pu.phone AS parent_phone,
@@ -125,14 +123,12 @@ export async function PUT(request) {
     const fullName = normalizeText(body?.full_name);
     const email = normalizeText(body?.email).toLowerCase();
     const phone = normalizeText(body?.phone);
-    const admissionNo = normalizeText(body?.admission_no);
     const gradeLevel = normalizeText(body?.grade_level);
     const status = normalizeText(body?.status).toLowerCase();
     const age = body?.age === "" || body?.age == null ? null : Number(body.age);
 
     if (!id) return json("Student id is required.", 400);
     if (!fullName) return json("Student name is required.", 400);
-    if (!email && !phone) return json("Student email is required.", 400);
     if (age !== null && (!Number.isInteger(age) || age < 1 || age > 100)) {
       return json("Student age must be a valid number.", 400);
     }
@@ -141,7 +137,42 @@ export async function PUT(request) {
     }
 
     const [student] = await prisma.$queryRaw`
-      SELECT sp.id::text AS id, u.id::text AS user_id
+      SELECT
+        sp.id::text AS id,
+        u.id::text AS user_id,
+        (
+          SELECT e.registration_id::text
+          FROM enrollments e
+          WHERE e.student_id = sp.id
+            AND e.registration_id IS NOT NULL
+          ORDER BY
+            CASE WHEN LOWER(COALESCE(e.status, '')) = 'active' THEN 0 ELSE 1 END,
+            e.created_at DESC NULLS LAST,
+            e.id DESC
+          LIMIT 1
+        ) AS registration_id,
+        (
+          SELECT istd.id::text
+          FROM enrollments e
+          INNER JOIN interested_students istd ON istd.registration_lead_id = e.registration_id
+          WHERE e.student_id = sp.id
+          ORDER BY
+            CASE WHEN LOWER(COALESCE(e.status, '')) = 'active' THEN 0 ELSE 1 END,
+            e.created_at DESC NULLS LAST,
+            e.id DESC
+          LIMIT 1
+        ) AS interested_student_id,
+        (
+          SELECT istd.registration_code
+          FROM enrollments e
+          INNER JOIN interested_students istd ON istd.registration_lead_id = e.registration_id
+          WHERE e.student_id = sp.id
+          ORDER BY
+            CASE WHEN LOWER(COALESCE(e.status, '')) = 'active' THEN 0 ELSE 1 END,
+            e.created_at DESC NULLS LAST,
+            e.id DESC
+          LIMIT 1
+        ) AS interested_student_registration_code
       FROM student_profiles sp
       INNER JOIN users u ON u.id = sp.user_id
       WHERE sp.id = ${id}::uuid
@@ -149,6 +180,20 @@ export async function PUT(request) {
     `;
 
     if (!student?.id) return json("Student not found.", 404);
+
+    const [targetCourse] = gradeLevel
+      ? await prisma.$queryRaw`
+          SELECT id::text AS id
+          FROM courses
+          WHERE LOWER(TRIM(COALESCE(class_level, title, ''))) = LOWER(TRIM(${gradeLevel}))
+            AND LOWER(COALESCE(status::text, 'active')) = 'active'
+          LIMIT 1
+        `
+      : [];
+
+    if (gradeLevel && !targetCourse?.id) {
+      return json("Selected class was not found in class management.", 400);
+    }
 
     await prisma.$transaction(async (tx) => {
       await tx.$executeRaw`
@@ -165,13 +210,105 @@ export async function PUT(request) {
       await tx.$executeRaw`
         UPDATE student_profiles
         SET
-          admission_no = ${admissionNo || null},
           age = ${age},
           grade_level = ${gradeLevel || null},
           status = ${status || "active"}::user_status,
           updated_at = NOW()
         WHERE id = ${student.id}::uuid
       `;
+
+      if (targetCourse?.id) {
+        await tx.$executeRaw`
+          UPDATE enrollments
+          SET
+            status = 'archived',
+            end_date = CURRENT_DATE,
+            updated_at = NOW()
+          WHERE student_id = ${student.id}::uuid
+            AND course_id <> ${targetCourse.id}::uuid
+            AND LOWER(COALESCE(status, 'active')) = 'active'
+        `;
+
+        await tx.$executeRaw`
+          INSERT INTO enrollments (
+            id,
+            student_id,
+            course_id,
+            registration_id,
+            status,
+            start_date,
+            end_date,
+            created_at,
+            updated_at
+          )
+          VALUES (
+            gen_random_uuid(),
+            ${student.id}::uuid,
+            ${targetCourse.id}::uuid,
+            ${student.registration_id || null}::uuid,
+            'active',
+            CURRENT_DATE,
+            NULL,
+            NOW(),
+            NOW()
+          )
+          ON CONFLICT (student_id, course_id)
+          DO UPDATE SET
+            registration_id = COALESCE(enrollments.registration_id, EXCLUDED.registration_id),
+            status = 'active',
+            end_date = NULL,
+            updated_at = NOW()
+        `;
+      }
+
+      await tx.$executeRaw`
+        UPDATE registration_leads rl
+        SET
+          student_name = ${fullName},
+          email = COALESCE(NULLIF(${email}, ''), rl.email),
+          phone = COALESCE(NULLIF(${phone}, ''), rl.phone),
+          age = ${age},
+          class_level = ${gradeLevel || null},
+          updated_at = NOW()
+        FROM enrollments e
+        WHERE e.registration_id = rl.id
+          AND e.student_id = ${student.id}::uuid
+      `;
+
+      if (student.interested_student_id) {
+        await tx.$executeRaw`
+          UPDATE interested_students
+          SET
+            student_name = ${fullName},
+            child_name = ${fullName},
+            email = COALESCE(NULLIF(${email}, ''), email),
+            phone = COALESCE(NULLIF(${phone}, ''), phone),
+            class_level = ${gradeLevel || null},
+            updated_at = NOW()
+          WHERE id = ${student.interested_student_id}::uuid
+        `;
+      }
+
+      if (student.registration_id || student.interested_student_id || student.interested_student_registration_code) {
+        await tx.$executeRaw`
+          UPDATE parent_interview_forms
+          SET
+            child_name = ${fullName},
+            child_age = ${age === null ? null : String(age)},
+            interested_programme = ${gradeLevel || null},
+            updated_at = NOW()
+          WHERE registration_id = ANY(
+            ARRAY_REMOVE(
+              ARRAY[
+                ${student.registration_id || null},
+                ${student.interested_student_id || null},
+                ${student.interested_student_registration_code || null}
+              ]::text[],
+              NULL
+            )
+          )
+        `;
+      }
 
       await tx.$executeRaw`
         INSERT INTO audit_logs (id, actor_user_id, entity_type, entity_id, action)

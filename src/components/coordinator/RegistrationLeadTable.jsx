@@ -47,7 +47,15 @@ function getDisplayStatus(lead) {
   return lead?.status || "";
 }
 
+function hasDisplayValue(value) {
+  if (value === null || value === undefined) return false;
+  if (typeof value === "boolean") return true;
+  return String(value).trim() !== "";
+}
+
 function DetailRow({ label, value }) {
+  if (!hasDisplayValue(value)) return null;
+
   return (
     <div>
       <dt className="text-xs font-semibold uppercase tracking-[0.18em] text-[#245C4F]">{label}</dt>
@@ -73,6 +81,31 @@ function DocumentLink({ label, href }) {
 
 function LeadDetailsModal({ lead, onClose, portalTargetId }) {
   if (!lead) return null;
+
+  const childProfileRows = [
+    hasDisplayValue(lead.child_profile) ? ["Child profile", lead.child_profile] : null,
+    hasDisplayValue(lead.child_strengths) ? ["Strengths", lead.child_strengths] : null,
+    hasDisplayValue(lead.child_support_needs) ? ["Support needs", lead.child_support_needs] : null,
+    hasDisplayValue(lead.child_special_interests) ? ["Special interests", lead.child_special_interests] : null,
+    ["Development concern", lead.developmental_concern ? "Yes" : "No"],
+    hasDisplayValue(lead.developmental_concern_details) ? ["Concern details", lead.developmental_concern_details] : null,
+    hasDisplayValue(lead.medical_conditions) ? ["Medical conditions", lead.medical_conditions] : null,
+  ].filter(Boolean);
+
+  const documentLinks = [
+    { label: "Birth certificate", href: lead.birth_certificate_file_url },
+    { label: "Parent CNIC", href: lead.parent_cnic_file_url },
+    { label: "Child photograph", href: lead.child_photograph_file_url },
+    { label: "Medical report", href: lead.medical_report_file_url },
+  ].filter((item) => item.href);
+
+  const notesRows = [
+    hasDisplayValue(lead.hear_about_other || lead.hear_about_source)
+      ? ["How did you hear about us", lead.hear_about_other || lead.hear_about_source]
+      : null,
+    ["Declaration accepted", lead.declaration_accepted ? "Yes" : "No"],
+    hasDisplayValue(lead.notes) ? ["Coordinator notes", lead.notes] : null,
+  ].filter(Boolean);
 
   return (
     <ClientPortal targetId={portalTargetId}>
@@ -104,14 +137,11 @@ function LeadDetailsModal({ lead, onClose, portalTargetId }) {
                 <DetailRow label="Programme" value={lead.program_name} />
                 <DetailRow
                   label="Preferred start"
-                  value={lead.preferred_starting_month_other || lead.preferred_starting_month}
+                  value={lead.preferred_starting_month}
                 />
                 <DetailRow label="Status" value={formatStatus(lead.status)} />
                 <DetailRow label="Source" value={lead.hear_about_source || lead.source} />
                 <DetailRow label="Class" value={lead.class_level} />
-                <DetailRow label="Current grade" value={lead.current_grade} />
-                <DetailRow label="Shift reason" value={lead.shift_reason} />
-                <DetailRow label="Online classes before" value={lead.attended_online_classes ? "Yes" : "No"} />
               </dl>
             </section>
 
@@ -119,30 +149,22 @@ function LeadDetailsModal({ lead, onClose, portalTargetId }) {
               <h3 className="text-lg font-semibold text-[#063F32]">Student details</h3>
               <dl className="mt-4 grid gap-4 sm:grid-cols-2">
                 <DetailRow label="Student name" value={lead.student_name} />
-                <DetailRow label="Student name Urdu" value={lead.student_name_urdu} />
                 <DetailRow label="Gender" value={lead.gender} />
                 <DetailRow label="Date of birth" value={formatDate(lead.date_of_birth)} />
                 <DetailRow label="Age" value={lead.student_age ? String(lead.student_age) : ""} />
-                <DetailRow label="Current school" value={lead.current_school} />
                 <DetailRow label="Country" value={lead.country} />
-                <DetailRow label="City" value={lead.city_country} />
+                <DetailRow label="City" value={lead.city} />
                 <DetailRow label="Nationality" value={lead.nationality} />
                 <DetailRow label="Religion" value={lead.religion} />
-                <DetailRow label="Preferred language" value={lead.preferred_language} />
-                <DetailRow label="Interested in school" value={lead.interest_reason} />
               </dl>
             </section>
 
             <section className="rounded-[1.75rem] border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(250,247,240,0.98)_100%)] p-5 shadow-[0_18px_60px_-40px_rgba(13,59,46,0.12)]">
               <h3 className="text-lg font-semibold text-[#063F32]">Child profile</h3>
               <dl className="mt-4 grid gap-4">
-                <DetailRow label="Child profile" value={lead.child_profile} />
-                <DetailRow label="Strengths" value={lead.child_strengths} />
-                <DetailRow label="Support needs" value={lead.child_support_needs} />
-                <DetailRow label="Special interests" value={lead.child_special_interests} />
-                <DetailRow label="Development concern" value={lead.developmental_concern ? "Yes" : "No"} />
-                <DetailRow label="Concern details" value={lead.developmental_concern_details} />
-                <DetailRow label="Medical conditions" value={lead.medical_conditions} />
+                {childProfileRows.map(([label, value]) => (
+                  <DetailRow key={label} label={label} value={value} />
+                ))}
               </dl>
             </section>
 
@@ -156,7 +178,6 @@ function LeadDetailsModal({ lead, onClose, portalTargetId }) {
                 <DetailRow label="Preferred contact person" value={lead.preferred_contact_person} />
                 <DetailRow label="Support person during learning" value={lead.support_person_during_learning} />
                 <DetailRow label="Device available" value={lead.device_available} />
-                <DetailRow label="School expectations" value={lead.school_expectations} />
               </dl>
             </section>
 
@@ -164,13 +185,11 @@ function LeadDetailsModal({ lead, onClose, portalTargetId }) {
               <h3 className="text-lg font-semibold text-[#063F32]">Father details</h3>
               <dl className="mt-4 grid gap-4 sm:grid-cols-2 break-words">
                 <DetailRow label="Name English" value={lead.father_name_english} />
-                <DetailRow label="Name Urdu" value={lead.father_name_urdu} />
                 <DetailRow label="CNIC" value={lead.father_cnic} />
                 <DetailRow label="Qualification" value={lead.father_qualification} />
                 <DetailRow label="Occupation" value={lead.father_occupation} />
                 <DetailRow label="Mother tongue" value={lead.father_mother_tongue} />
                 <DetailRow label="Home contact" value={lead.father_contact_home} />
-                <DetailRow label="Office contact" value={lead.father_contact_office} />
                 <DetailRow label="WhatsApp" value={lead.father_contact_whatsapp} />
                 <DetailRow label="Emergency contact" value={lead.father_emergency_contact} />
                 <DetailRow label="Email" value={lead.father_email} />
@@ -182,13 +201,11 @@ function LeadDetailsModal({ lead, onClose, portalTargetId }) {
               <h3 className="text-lg font-semibold text-[#063F32]">Mother details</h3>
               <dl className="mt-4 grid gap-4 sm:grid-cols-2 break-words">
                 <DetailRow label="Name English" value={lead.mother_name_english} />
-                <DetailRow label="Name Urdu" value={lead.mother_name_urdu} />
                 <DetailRow label="CNIC" value={lead.mother_cnic} />
                 <DetailRow label="Qualification" value={lead.mother_qualification} />
                 <DetailRow label="Occupation" value={lead.mother_occupation} />
                 <DetailRow label="Mother tongue" value={lead.mother_mother_tongue} />
                 <DetailRow label="Home contact" value={lead.mother_contact_home} />
-                <DetailRow label="Office contact" value={lead.mother_contact_office} />
                 <DetailRow label="WhatsApp" value={lead.mother_contact_whatsapp} />
                 <DetailRow label="Emergency contact" value={lead.mother_emergency_contact} />
                 <DetailRow label="Email" value={lead.mother_email} />
@@ -199,17 +216,15 @@ function LeadDetailsModal({ lead, onClose, portalTargetId }) {
 
           <section className="mt-6 rounded-[1.75rem] border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(250,247,240,0.98)_100%)] p-5 shadow-[0_18px_60px_-40px_rgba(13,59,46,0.12)]">
             <h3 className="text-lg font-semibold text-[#063F32]">Documents and notes</h3>
-            <div className="mt-4 flex flex-wrap gap-3">
-              <DocumentLink label="Birth certificate" href={lead.birth_certificate_file_url} />
-              <DocumentLink label="Parent CNIC" href={lead.parent_cnic_file_url} />
-              <DocumentLink label="Child photograph" href={lead.child_photograph_file_url} />
-              <DocumentLink label="Previous school report" href={lead.previous_school_report_file_url} />
-              <DocumentLink label="Medical report" href={lead.medical_report_file_url} />
-            </div>
+            {documentLinks.length ? <div className="mt-4 flex flex-wrap gap-3">
+              {documentLinks.map((item) => (
+                <DocumentLink key={item.label} label={item.label} href={item.href} />
+              ))}
+            </div> : null}
             <dl className="mt-5 grid gap-4 lg:grid-cols-2">
-              <DetailRow label="How did you hear about us" value={lead.hear_about_other || lead.hear_about_source} />
-              <DetailRow label="Declaration accepted" value={lead.declaration_accepted ? "Yes" : "No"} />
-              <DetailRow label="Coordinator notes" value={lead.notes} />
+              {notesRows.map(([label, value]) => (
+                <DetailRow key={label} label={label} value={value} />
+              ))}
             </dl>
           </section>
         </div>

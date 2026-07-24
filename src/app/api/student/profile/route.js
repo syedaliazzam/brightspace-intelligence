@@ -50,14 +50,12 @@ export async function GET() {
         rl.parent_name AS lead_parent_name,
         rl.parent_relation AS lead_parent_relation,
         rl.program_name,
-        rl.current_school,
-        rl.current_grade,
         rl.gender,
         rl.date_of_birth,
-        rl.city_country,
+        rl.city,
+        rl.country,
         rl.nationality,
         rl.religion,
-        rl.preferred_language,
         rl.child_profile,
         rl.child_strengths,
         rl.child_support_needs,
@@ -66,8 +64,7 @@ export async function GET() {
         rl.developmental_concern_details,
         rl.medical_conditions,
         rl.support_person_during_learning,
-        rl.device_available,
-        rl.school_expectations
+        rl.device_available
       FROM student_profiles sp
       INNER JOIN users u ON u.id = sp.user_id
       LEFT JOIN enrollments e ON e.student_id = sp.id AND e.status = 'active'
@@ -165,14 +162,12 @@ export async function PATCH(request) {
         rl.parent_name AS lead_parent_name,
         rl.parent_relation AS lead_parent_relation,
         rl.program_name,
-        rl.current_school,
-        rl.current_grade,
         rl.gender,
         rl.date_of_birth,
-        rl.city_country,
+        rl.city,
+        rl.country,
         rl.nationality,
         rl.religion,
-        rl.preferred_language,
         rl.child_profile,
         rl.child_strengths,
         rl.child_support_needs,
@@ -181,8 +176,7 @@ export async function PATCH(request) {
         rl.developmental_concern_details,
         rl.medical_conditions,
         rl.support_person_during_learning,
-        rl.device_available,
-        rl.school_expectations
+        rl.device_available
       FROM student_profiles sp
       INNER JOIN users u ON u.id = sp.user_id
       LEFT JOIN enrollments e ON e.student_id = sp.id AND e.status = 'active'

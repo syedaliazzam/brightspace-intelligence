@@ -36,12 +36,8 @@ async function ensurePendingAttendanceColumn() {
 function baseLectureConditions(teacherId, classLevel, subjectId) {
   const conditions = [
     `(
-      LOWER(ls.status::text) = 'live'
-      OR LOWER(ls.status::text) = 'completed_by_teacher'
-      OR (
-        ls.scheduled_start::timestamp <= timezone('Asia/Karachi', now())
-        AND ls.scheduled_end::timestamp >= timezone('Asia/Karachi', now())
-      )
+      ls.scheduled_start::timestamp <= timezone('Asia/Karachi', now())
+      AND LOWER(COALESCE(ls.status::text, 'scheduled')) NOT IN ('scheduled', 'upcoming', 'cancelled')
     )`,
   ];
   const values = [];

@@ -481,15 +481,6 @@ async function uploadAdmissionFiles(applicationId, files) {
     uploads.childPhotographPath = upload.storedPath;
   }
 
-  if (files.previousSchoolReportFile) {
-    const upload = await uploadAdmissionDocument({
-      applicationId,
-      documentType: "previous_school_report",
-      file: files.previousSchoolReportFile,
-    });
-    uploads.previousSchoolReportPath = upload.storedPath;
-  }
-
   if (files.medicalReportFile) {
     const upload = await uploadAdmissionDocument({
       applicationId,
@@ -520,9 +511,7 @@ export async function POST(request) {
     const requestedClassLevel = normalizeText(formData.get("class_level"));
     const classLevel = normalizeClassLevel(requestedClassLevel) || requestedClassLevel;
     const preferredStartingMonth = normalizeText(formData.get("preferred_starting_month"));
-    const preferredStartingMonthOther = normalizeText(formData.get("preferred_starting_month_other"));
     const studentName = normalizeText(formData.get("student_name"));
-    const studentNameUrdu = normalizeText(formData.get("student_name_urdu"));
     const gender = normalizeText(formData.get("gender"));
     const dateOfBirth = normalizeDate(formData.get("date_of_birth"));
     const age = calculateAgeFromDate(dateOfBirth);
@@ -530,11 +519,6 @@ export async function POST(request) {
     const city = normalizeText(formData.get("city"));
     const nationality = normalizeText(formData.get("nationality"));
     const religion = normalizeText(formData.get("religion"));
-    const preferredLanguage = normalizeText(formData.get("preferred_language"));
-    const currentSchool = normalizeText(formData.get("current_school"));
-    const currentGrade = normalizeText(formData.get("current_grade"));
-    const shiftReason = normalizeText(formData.get("shift_reason"));
-    const attendedOnlineClasses = normalizeBoolean(formData.get("attended_online_classes"));
     const childProfile = normalizeText(formData.get("child_profile"));
     const childStrengths = normalizeText(formData.get("child_strengths"));
     const childSupportNeeds = normalizeText(formData.get("child_support_needs"));
@@ -551,25 +535,21 @@ export async function POST(request) {
     const scholarshipRequestedAmount = normalizeText(formData.get("scholarship_requested_amount"));
     const scholarshipReason = normalizeText(formData.get("scholarship_reason"));
     const fatherNameEnglish = normalizeText(formData.get("father_name_english"));
-    const fatherNameUrdu = normalizeText(formData.get("father_name_urdu"));
     const fatherCnic = normalizeText(formData.get("father_cnic"));
     const fatherQualification = normalizeText(formData.get("father_qualification"));
     const fatherOccupation = normalizeText(formData.get("father_occupation"));
     const fatherMotherTongue = normalizeText(formData.get("father_mother_tongue"));
     const fatherContactHome = normalizeText(formData.get("father_contact_home"));
-    const fatherContactOffice = normalizeText(formData.get("father_contact_office"));
     const fatherContactWhatsapp = normalizeText(formData.get("father_contact_whatsapp"));
     const fatherEmergencyContact = normalizeText(formData.get("father_emergency_contact"));
     const fatherEmail = normalizeEmail(formData.get("father_email"));
     const fatherResidentialAddress = normalizeText(formData.get("father_residential_address"));
     const motherNameEnglish = normalizeText(formData.get("mother_name_english"));
-    const motherNameUrdu = normalizeText(formData.get("mother_name_urdu"));
     const motherCnic = normalizeText(formData.get("mother_cnic"));
     const motherQualification = normalizeText(formData.get("mother_qualification"));
     const motherOccupation = normalizeText(formData.get("mother_occupation"));
     const motherMotherTongue = normalizeText(formData.get("mother_mother_tongue"));
     const motherContactHome = normalizeText(formData.get("mother_contact_home"));
-    const motherContactOffice = normalizeText(formData.get("mother_contact_office"));
     const motherContactWhatsapp = normalizeText(formData.get("mother_contact_whatsapp"));
     const motherEmergencyContact = normalizeText(formData.get("mother_emergency_contact"));
     const motherEmail = normalizeEmail(formData.get("mother_email"));
@@ -589,12 +569,10 @@ export async function POST(request) {
     const paidAmount = normalizeText(formData.get("paid_amount"));
     const paidAt = normalizeText(formData.get("paid_at"));
     const whyJoinSchool = normalizeText(formData.get("why_join_school"));
-    const schoolExpectations = normalizeText(formData.get("school_expectations"));
     const declarationAccepted = normalizeBoolean(formData.get("declaration_accepted")) === true;
     const birthCertificateFilePath = normalizeText(formData.get("birth_certificate_file_path"));
     const parentCnicFilePath = normalizeText(formData.get("parent_cnic_file_path"));
     const childPhotographFilePath = normalizeText(formData.get("child_photograph_file_path"));
-    const previousSchoolReportFilePath = normalizeText(formData.get("previous_school_report_file_path"));
     const medicalReportFilePath = normalizeText(formData.get("medical_report_file_path"));
     const paymentProofFilePath = normalizeText(formData.get("payment_proof_file_path"));
     const scholarshipSupportingDocumentFilePath = normalizeText(formData.get("scholarship_supporting_document_file_path"));
@@ -603,7 +581,6 @@ export async function POST(request) {
       birthCertificateFile: getOptionalFile(formData, "birth_certificate_file"),
       parentCnicFile: getOptionalFile(formData, "parent_cnic_file"),
       childPhotographFile: getOptionalFile(formData, "child_photograph_file"),
-      previousSchoolReportFile: getOptionalFile(formData, "previous_school_report_file"),
       medicalReportFile: getOptionalFile(formData, "medical_report_file"),
       paymentProofFile: getOptionalFile(formData, "payment_proof_file"),
       scholarshipSupportingDocumentFile: getOptionalFile(formData, "scholarship_supporting_document_file"),
@@ -612,9 +589,6 @@ export async function POST(request) {
     if (!programName) return json(false, "Programme is required.", 400);
     if (!classLevel) return json(false, "Applying class is required.", 400);
     if (!preferredStartingMonth) return json(false, "Preferred starting month is required.", 400);
-    if (preferredStartingMonth === "Other" && !preferredStartingMonthOther) {
-      return json(false, "Please specify the preferred starting month.", 400);
-    }
     if (!studentName) return json(false, "Student full name is required.", 400);
     if (!gender) return json(false, "Gender is required.", 400);
     if (!dateOfBirth) return json(false, "Date of birth is required.", 400);
@@ -623,7 +597,6 @@ export async function POST(request) {
     if (!city) return json(false, "City is required.", 400);
     if (!nationality) return json(false, "Nationality is required.", 400);
     if (!religion) return json(false, "Religion is required.", 400);
-    if (!preferredLanguage) return json(false, "Preferred language of instruction is required.", 400);
     if (!fatherNameEnglish && !motherNameEnglish) {
       return json(false, "At least one parent name is required.", 400);
     }
@@ -635,12 +608,6 @@ export async function POST(request) {
     }
     if (!supportPersonDuringLearning) {
       return json(false, "Please select who will support the child during learning.", 400);
-    }
-    if (!whyJoinSchool) {
-      return json(false, "Please share why you wish your child to join Ash-Shajarah.", 400);
-    }
-    if (!schoolExpectations) {
-      return json(false, "Please share your expectations from the school.", 400);
     }
     if (!declarationAccepted) {
       return json(false, "You must accept the declaration before submitting the admission form.", 400);
@@ -658,16 +625,10 @@ export async function POST(request) {
       return json(false, "Payment proof is required.", 400);
     }
     if (needBasedScholarshipRequested) {
-      if (!scholarshipMonthlyIncome) return json(false, "Monthly income is required.", 400);
       if (!scholarshipDependentsCount) return json(false, "Dependents count is required.", 400);
       if (!scholarshipSchoolGoingChildrenCount) return json(false, "School-going children count is required.", 400);
       if (!scholarshipResidenceType) return json(false, "Residence type is required.", 400);
-      if (!scholarshipGuardianEmploymentStatus) return json(false, "Guardian employment status is required.", 400);
       if (!scholarshipRequestedAmount) return json(false, "Requested scholarship amount is required.", 400);
-      if (!scholarshipReason) return json(false, "Scholarship reason is required.", 400);
-      if (!files.scholarshipSupportingDocumentFile && !scholarshipSupportingDocumentFilePath) {
-        return json(false, "Scholarship supporting document is required.", 400);
-      }
     }
 
     if (fatherEmail && !isValidEmail(fatherEmail)) {
@@ -683,13 +644,11 @@ export async function POST(request) {
       fatherEmail,
       fatherWhatsapp: fatherContactWhatsapp,
       fatherEmergency: fatherEmergencyContact,
-      fatherOffice: fatherContactOffice,
       fatherHome: fatherContactHome,
       motherNameEnglish,
       motherEmail,
       motherWhatsapp: motherContactWhatsapp,
       motherEmergency: motherEmergencyContact,
-      motherOffice: motherContactOffice,
       motherHome: motherContactHome,
     });
 
@@ -710,7 +669,6 @@ export async function POST(request) {
       birthCertificatePath: birthCertificateFilePath || null,
       parentCnicPath: parentCnicFilePath || null,
       childPhotographPath: childPhotographFilePath || null,
-      previousSchoolReportPath: previousSchoolReportFilePath || null,
       medicalReportPath: medicalReportFilePath || null,
       scholarshipSupportingDocumentPath: scholarshipSupportingDocumentFilePath || null,
     };
@@ -719,7 +677,6 @@ export async function POST(request) {
       files.birthCertificateFile ||
       files.parentCnicFile ||
       files.childPhotographFile ||
-      files.previousSchoolReportFile ||
       files.medicalReportFile ||
       files.scholarshipSupportingDocumentFile;
 
@@ -743,22 +700,15 @@ export async function POST(request) {
         city_country,
         gender,
         date_of_birth,
-        current_school,
         interest_reason,
         notes,
         source,
         status,
         program_name,
         preferred_starting_month,
-        preferred_starting_month_other,
-        student_name_urdu,
         country,
         nationality,
         religion,
-        preferred_language,
-        current_grade,
-        shift_reason,
-        attended_online_classes,
         child_profile,
         child_strengths,
         child_support_needs,
@@ -767,25 +717,21 @@ export async function POST(request) {
         developmental_concern_details,
         medical_conditions,
         father_name_english,
-        father_name_urdu,
         father_cnic,
         father_qualification,
         father_occupation,
         father_mother_tongue,
         father_contact_home,
-        father_contact_office,
         father_contact_whatsapp,
         father_emergency_contact,
         father_email,
         father_residential_address,
         mother_name_english,
-        mother_name_urdu,
         mother_cnic,
         mother_qualification,
         mother_occupation,
         mother_mother_tongue,
         mother_contact_home,
-        mother_contact_office,
         mother_contact_whatsapp,
         mother_emergency_contact,
         mother_email,
@@ -793,12 +739,10 @@ export async function POST(request) {
         preferred_contact_person,
         support_person_during_learning,
         device_available,
-        school_expectations,
         declaration_accepted,
         birth_certificate_file_path,
         parent_cnic_file_path,
         child_photograph_file_path,
-        previous_school_report_file_path,
         medical_report_file_path,
         created_at,
         updated_at
@@ -816,22 +760,15 @@ export async function POST(request) {
         ${cityCountry || null},
         ${gender},
         ${dateOfBirth}::date,
-        ${currentSchool || null},
         ${whyJoinSchool},
-        ${schoolExpectations || null},
+        ${null},
         ${"admission_form"},
         CAST(${"new_lead"} AS registration_status),
         ${programName},
         ${preferredStartingMonth},
-        ${preferredStartingMonthOther || null},
-        ${studentNameUrdu || null},
         ${country},
         ${nationality},
         ${religion},
-        ${preferredLanguage},
-        ${currentGrade || null},
-        ${shiftReason || null},
-        ${attendedOnlineClasses},
         ${childProfile || null},
         ${childStrengths || null},
         ${childSupportNeeds || null},
@@ -840,25 +777,21 @@ export async function POST(request) {
         ${developmentalConcernDetails || null},
         ${medicalConditions || null},
         ${fatherNameEnglish || null},
-        ${fatherNameUrdu || null},
         ${fatherCnic || null},
         ${fatherQualification || null},
         ${fatherOccupation || null},
         ${fatherMotherTongue || null},
         ${fatherContactHome || null},
-        ${fatherContactOffice || null},
         ${fatherContactWhatsapp || null},
         ${fatherEmergencyContact || null},
         ${fatherEmail || null},
         ${fatherResidentialAddress || null},
         ${motherNameEnglish || null},
-        ${motherNameUrdu || null},
         ${motherCnic || null},
         ${motherQualification || null},
         ${motherOccupation || null},
         ${motherMotherTongue || null},
         ${motherContactHome || null},
-        ${motherContactOffice || null},
         ${motherContactWhatsapp || null},
         ${motherEmergencyContact || null},
         ${motherEmail || null},
@@ -866,12 +799,10 @@ export async function POST(request) {
         ${preferredContactPerson},
         ${supportPersonDuringLearning},
         ${deviceAvailable},
-        ${schoolExpectations},
         ${declarationAccepted},
         ${uploads.birthCertificatePath || null},
         ${uploads.parentCnicPath || null},
         ${uploads.childPhotographPath || null},
-        ${uploads.previousSchoolReportPath || null},
         ${uploads.medicalReportPath || null},
         NOW(),
         NOW()
@@ -961,14 +892,10 @@ export async function POST(request) {
           registration_id,
           interested_student_id,
           lead_token,
-          monthly_income,
           dependents_count,
           school_going_children_count,
           residence_type,
-          guardian_employment_status,
           requested_amount,
-          reason,
-          supporting_document_file_path,
           status,
           created_at,
           updated_at
@@ -978,14 +905,10 @@ export async function POST(request) {
           ${createdLead.id}::uuid,
           ${linkedLead?.id || null}::uuid,
           ${leadToken || null},
-          ${Number(scholarshipMonthlyIncome || 0)},
           ${Number(scholarshipDependentsCount || 0)},
           ${Number(scholarshipSchoolGoingChildrenCount || 0)},
           ${scholarshipResidenceType},
-          ${scholarshipGuardianEmploymentStatus},
           ${Number(scholarshipRequestedAmount || 0)},
-          ${scholarshipReason},
-          ${uploads.scholarshipSupportingDocumentPath || null},
           ${"submitted"},
           NOW(),
           NOW()
@@ -1018,7 +941,7 @@ Your child's admission form has been submitted successfully.
 Student: ${studentName}
 Programme: ${programName}
 Class: ${classLevel}
-Preferred Starting Month: ${preferredStartingMonth}${preferredStartingMonthOther ? ` (${preferredStartingMonthOther})` : ""}
+Preferred Starting Month: ${preferredStartingMonth}
 Primary Contact: ${parentSummary.parentName}
 Phone: ${parentSummary.parentPhone}
 
@@ -1031,7 +954,7 @@ Our admissions team will review the application and contact you with the next st
           ["Student", studentName],
           ["Programme", programName],
           ["Class", classLevel],
-          ["Preferred Starting Month", `${preferredStartingMonth}${preferredStartingMonthOther ? ` (${preferredStartingMonthOther})` : ""}`],
+          ["Preferred Starting Month", preferredStartingMonth],
           ["Primary Contact", parentSummary.parentName],
           ["Phone", parentSummary.parentPhone],
         ],
@@ -1055,12 +978,11 @@ A new admission form has been submitted.
 Student: ${studentName}
 Programme: ${programName}
 Class: ${classLevel}
-Preferred Starting Month: ${preferredStartingMonth}${preferredStartingMonthOther ? ` (${preferredStartingMonthOther})` : ""}
+Preferred Starting Month: ${preferredStartingMonth}
 Primary Parent: ${parentSummary.parentName}
 Email: ${parentSummary.parentEmail || linkedLead?.email || "Not provided"}
 Phone: ${parentSummary.parentPhone}
 City & Country: ${cityCountry}
-Preferred Language: ${preferredLanguage}
 Interested Lead Token: ${leadToken || "N/A"}`;
       const coordinatorHtml = themedEmailShell({
         eyebrow: "New Admission Submitted",
@@ -1070,12 +992,11 @@ Interested Lead Token: ${leadToken || "N/A"}`;
           ["Student", studentName],
           ["Programme", programName],
           ["Class", classLevel],
-          ["Preferred Starting Month", `${preferredStartingMonth}${preferredStartingMonthOther ? ` (${preferredStartingMonthOther})` : ""}`],
+          ["Preferred Starting Month", preferredStartingMonth],
           ["Primary Parent", parentSummary.parentName],
           ["Email", parentSummary.parentEmail || linkedLead?.email || "Not provided"],
           ["Phone", parentSummary.parentPhone],
           ["City & Country", cityCountry],
-          ["Preferred Language", preferredLanguage],
         ],
         footerNote: `Interested lead token: ${leadToken || "N/A"}`,
       });

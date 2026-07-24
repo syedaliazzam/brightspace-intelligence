@@ -107,13 +107,15 @@ export default function CareerApplicationsPanel() {
         key: "message",
         label: "Message",
         render: (row) => (
-          <button
-            type="button"
-            onClick={() => setSelectedMessage((current) => (current?.id === row.id ? null : row))}
-            className="max-w-[20rem] text-left font-medium text-[#0D5C48] underline decoration-dotted underline-offset-4 transition hover:text-[#063F32]"
-          >
-            {(row.message || "-").length > 64 ? `${row.message.slice(0, 61)}...` : row.message || "-"}
-          </button>
+          <div className="inline-block">
+            <button
+              type="button"
+              onClick={() => setSelectedMessage((current) => (current?.id === row.id ? null : row))}
+              className="inline-flex w-max whitespace-nowrap rounded-full border border-[#2D8A6A]/20 bg-[#EAF6EF] px-3 py-2 text-left text-sm font-semibold text-[#0D5C48] transition hover:bg-[#DFF2E7] hover:text-[#063F32]"
+            >
+              Message View
+            </button>
+          </div>
         ),
       },
       { key: "source", label: "Source" },
@@ -185,24 +187,21 @@ export default function CareerApplicationsPanel() {
           />
 
           {selectedMessage ? (
-            <div className="absolute min-h-screen inset-0 z-[10000] isolate flex items-start justify-center bg-[#063F32]/45 px-4 pb-10 pt-10">
-              <div className="lg:w-[80%] w-full max-w-6xl rounded-[2rem] border border-[#2D8A6A]/15 bg-[#FAF7F0] p-6 shadow-[0_24px_80px_-36px_rgba(13,59,46,0.24)] sm:p-8">
+            <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-[#063F32]/45 px-4 py-6 backdrop-blur-sm">
+              <div className="w-full max-w-3xl rounded-[2rem] border border-[#2D8A6A]/15 bg-[#FAF7F0] p-6 shadow-[0_24px_80px_-36px_rgba(13,59,46,0.24)] sm:p-8">
                 <div className="flex items-start justify-between gap-4">
                   <div>
                     <p className="text-sm font-semibold uppercase tracking-[0.24em] text-[#C9A227]">
-                      Career application details
+                      Full message
                     </p>
                     <h2 className="mt-3 font-display text-2xl font-bold tracking-tight text-[#063F32]">
-                      {selectedMessage.full_name || "Selected application"}
+                      {selectedMessage.full_name || "Career application"}
                     </h2>
-                    <p className="mt-2 text-sm text-[#245C4F]">
-                      Full application message and application details shown in one place.
-                    </p>
                   </div>
                   <button
                     type="button"
                     onClick={() => setSelectedMessage(null)}
-                    className="rounded-xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-3 py-2 text-sm font-semibold text-[#063F32] transition hover:bg-[#F1EADC]"
+                    className="rounded-xl border border-[#2D8A6A]/20 bg-white px-3 py-2 text-sm font-semibold text-[#063F32] transition hover:bg-[#F1EADC]"
                   >
                     Close
                   </button>

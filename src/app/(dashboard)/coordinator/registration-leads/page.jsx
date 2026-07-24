@@ -38,8 +38,7 @@ async function getLeads(status, search) {
         OR parent_name ILIKE $${values.length}
         OR email ILIKE $${values.length}
         OR phone ILIKE $${values.length}
-        OR COALESCE(rl.city_country, '') ILIKE $${values.length}
-        OR COALESCE(rl.current_school, '') ILIKE $${values.length}
+        OR COALESCE(rl.city, '') ILIKE $${values.length}
       )`);
   }
 
@@ -54,19 +53,12 @@ async function getLeads(status, search) {
       rl.created_at AS submitted_at,
       COALESCE(rl.program_name, '') AS program_name,
       COALESCE(rl.preferred_starting_month, '') AS preferred_starting_month,
-      COALESCE(rl.preferred_starting_month_other, '') AS preferred_starting_month_other,
       rl.student_name,
-      COALESCE(rl.student_name_urdu, '') AS student_name_urdu,
       COALESCE(rl.gender, '') AS gender,
       rl.date_of_birth,
       COALESCE(rl.country, '') AS country,
       COALESCE(rl.nationality, '') AS nationality,
       COALESCE(rl.religion, '') AS religion,
-      COALESCE(rl.preferred_language, '') AS preferred_language,
-      COALESCE(rl.current_school, '') AS current_school,
-      COALESCE(rl.current_grade, '') AS current_grade,
-      COALESCE(rl.shift_reason, '') AS shift_reason,
-      COALESCE(rl.attended_online_classes, false) AS attended_online_classes,
       COALESCE(rl.child_profile, '') AS child_profile,
       COALESCE(rl.child_strengths, '') AS child_strengths,
       COALESCE(rl.child_support_needs, '') AS child_support_needs,
@@ -81,28 +73,23 @@ async function getLeads(status, search) {
       rl.age AS student_age,
       rl.class_level,
       COALESCE(rl.city, '') AS city,
-      COALESCE(rl.city_country, CONCAT_WS(', ', rl.city, '')) AS city_country,
       COALESCE(rl.interest_reason, '') AS interest_reason,
       COALESCE(rl.father_name_english, '') AS father_name_english,
-      COALESCE(rl.father_name_urdu, '') AS father_name_urdu,
       COALESCE(rl.father_cnic, '') AS father_cnic,
       COALESCE(rl.father_qualification, '') AS father_qualification,
       COALESCE(rl.father_occupation, '') AS father_occupation,
       COALESCE(rl.father_mother_tongue, '') AS father_mother_tongue,
       COALESCE(rl.father_contact_home, '') AS father_contact_home,
-      COALESCE(rl.father_contact_office, '') AS father_contact_office,
       COALESCE(rl.father_contact_whatsapp, '') AS father_contact_whatsapp,
       COALESCE(rl.father_emergency_contact, '') AS father_emergency_contact,
       COALESCE(rl.father_email, '') AS father_email,
       COALESCE(rl.father_residential_address, '') AS father_residential_address,
       COALESCE(rl.mother_name_english, '') AS mother_name_english,
-      COALESCE(rl.mother_name_urdu, '') AS mother_name_urdu,
       COALESCE(rl.mother_cnic, '') AS mother_cnic,
       COALESCE(rl.mother_qualification, '') AS mother_qualification,
       COALESCE(rl.mother_occupation, '') AS mother_occupation,
       COALESCE(rl.mother_mother_tongue, '') AS mother_mother_tongue,
       COALESCE(rl.mother_contact_home, '') AS mother_contact_home,
-      COALESCE(rl.mother_contact_office, '') AS mother_contact_office,
       COALESCE(rl.mother_contact_whatsapp, '') AS mother_contact_whatsapp,
       COALESCE(rl.mother_emergency_contact, '') AS mother_emergency_contact,
       COALESCE(rl.mother_email, '') AS mother_email,
@@ -110,12 +97,10 @@ async function getLeads(status, search) {
       COALESCE(rl.preferred_contact_person, '') AS preferred_contact_person,
       COALESCE(rl.support_person_during_learning, '') AS support_person_during_learning,
       COALESCE(rl.device_available, '') AS device_available,
-      COALESCE(rl.school_expectations, '') AS school_expectations,
       COALESCE(rl.declaration_accepted, false) AS declaration_accepted,
       COALESCE(rl.birth_certificate_file_path, '') AS birth_certificate_file_path,
       COALESCE(rl.parent_cnic_file_path, '') AS parent_cnic_file_path,
       COALESCE(rl.child_photograph_file_path, '') AS child_photograph_file_path,
-      COALESCE(rl.previous_school_report_file_path, '') AS previous_school_report_file_path,
       COALESCE(rl.medical_report_file_path, '') AS medical_report_file_path,
       COALESCE(rl.hear_about_source, '') AS hear_about_source,
       COALESCE(rl.hear_about_other, '') AS hear_about_other,
@@ -172,9 +157,6 @@ export default async function CoordinatorRegistrationLeadsPage({ searchParams })
         : "",
       child_photograph_file_url: lead.child_photograph_file_path
         ? await createSignedAdmissionDocumentUrl(lead.child_photograph_file_path).catch(() => "")
-        : "",
-      previous_school_report_file_url: lead.previous_school_report_file_path
-        ? await createSignedAdmissionDocumentUrl(lead.previous_school_report_file_path).catch(() => "")
         : "",
       medical_report_file_url: lead.medical_report_file_path
         ? await createSignedAdmissionDocumentUrl(lead.medical_report_file_path).catch(() => "")

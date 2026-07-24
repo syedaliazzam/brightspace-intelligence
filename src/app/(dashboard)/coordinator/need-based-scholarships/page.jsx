@@ -1,6 +1,4 @@
 "use client";
-
-import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
 import { ChevronDown } from "lucide-react";
 import FeeVoucherForm from "@/components/coordinator/FeeVoucherForm";
@@ -77,14 +75,11 @@ export function NeedBasedScholarshipsPage({
           item.class_level,
           item.email,
           item.phone,
-          item.monthly_income,
           item.dependents_count,
           item.school_going_children_count,
           item.residence_type,
-          item.guardian_employment_status,
           item.requested_amount,
           item.scholarship_amount,
-          item.reason,
           formatScholarshipStatus(item),
           item.voucher_created ? "voucher created" : "submitted",
         ],
@@ -93,16 +88,13 @@ export function NeedBasedScholarshipsPage({
         class: item.class_level,
         email: item.email,
         phone: item.phone,
-        monthly_income: item.monthly_income,
         dependents_count: item.dependents_count,
         school_going_children_count: item.school_going_children_count,
         residence_type: item.residence_type,
-        employment_status: item.guardian_employment_status,
         requested: item.requested_amount,
         scholarship_amount: item.scholarship_amount,
         status: formatScholarshipStatus(item),
         submitted_at: item.created_at,
-        reason: item.reason,
         voucher_created: item.voucher_created ? "voucher created" : "not created",
       };
 
@@ -127,16 +119,13 @@ export function NeedBasedScholarshipsPage({
     { label: "Class", value: "class" },
     { label: "Email", value: "email" },
     { label: "Phone", value: "phone" },
-    { label: "Monthly Income", value: "monthly_income" },
     { label: "Dependents", value: "dependents_count" },
     { label: "School Children", value: "school_going_children_count" },
     { label: "Residence Type", value: "residence_type" },
-    { label: "Employment Status", value: "employment_status" },
     { label: "Requested", value: "requested" },
     { label: "Scholarship Amount", value: "scholarship_amount" },
     { label: "Status", value: "status" },
     { label: "Submitted At", value: "submitted_at" },
-    { label: "Reason", value: "reason" },
   ];
 
   const voucherLeads = voucherTarget
@@ -154,9 +143,6 @@ export function NeedBasedScholarshipsPage({
       ]
     : [];
 
-  const supportingDocumentPreviewUrl = selectedItem?.supporting_document_file_path
-    ? `/api/file-preview?path=${encodeURIComponent(selectedItem.supporting_document_file_path)}`
-    : "";
   const detailsPopupWrapperClassName = allowCreateVoucher
     ? "absolute inset-x-0 top-0 z-[9999] flex items-start justify-center px-4 pb-10 pt-10 sm:px-6 lg:-mx-10 lg:px-4"
     : "absolute inset-x-0 top-0 z-[9999] mx-auto flex min-h-full w-full max-w-7xl items-start justify-center px-4 pb-10 pt-10 sm:px-6 lg:px-8";
@@ -208,11 +194,9 @@ export function NeedBasedScholarshipsPage({
                   <th className="px-6 py-4">Class</th>
                   <th className="px-6 py-4">Email</th>
                   <th className="px-6 py-4">Phone</th>
-                  <th className="px-6 py-4">Monthly Income</th>
                   <th className="px-6 py-4">Dependents</th>
                   <th className="px-6 py-4">School Children</th>
                   <th className="px-6 py-4">Residence</th>
-                  <th className="px-6 py-4">Employment</th>
                   <th className="px-6 py-4">Requested</th>
                   <th className="px-6 py-4">Scholarship Amount</th>
                   <th className="px-6 py-4">Status</th>
@@ -229,11 +213,9 @@ export function NeedBasedScholarshipsPage({
                     <td className="px-6 py-4 text-[#245C4F]">{item.class_level}</td>
                     <td className="px-6 py-4 text-[#245C4F]">{item.email || "-"}</td>
                     <td className="px-6 py-4 text-[#245C4F]">{item.phone || "-"}</td>
-                    <td className="px-6 py-4 text-[#245C4F]">{item.monthly_income ? formatMoney(item.monthly_income) : "-"}</td>
                     <td className="px-6 py-4 text-[#245C4F]">{item.dependents_count ?? "-"}</td>
                     <td className="px-6 py-4 text-[#245C4F]">{item.school_going_children_count ?? "-"}</td>
                     <td className="px-6 py-4 text-[#245C4F]">{item.residence_type || "-"}</td>
-                    <td className="px-6 py-4 text-[#245C4F]">{item.guardian_employment_status || "-"}</td>
                     <td className="px-6 py-4 text-[#245C4F]">{formatMoney(item.requested_amount)}</td>
                     <td className="px-6 py-4 text-[#245C4F]">{formatMoney(item.scholarship_amount)}</td>
                     <td className="px-6 py-4 text-[#245C4F]">{formatScholarshipStatus(item)}</td>
@@ -275,8 +257,8 @@ export function NeedBasedScholarshipsPage({
         </section>
 
         {selectedItem ? (
-          <div className={detailsPopupWrapperClassName}>
-            <div className="absolute inset-0 min-h-[calc(100%+8rem)] bg-[#063F32]/45 backdrop-blur-sm" />
+          <div className={`${detailsPopupWrapperClassName} min-h-full`}>
+            <div className="absolute inset-0 -bottom-24 bg-[#063F32]/45 backdrop-blur-sm" />
             <div className="relative max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded-[2rem] border border-[#2D8A6A]/15 bg-[#FAF7F0] p-6 shadow-[0_24px_80px_-36px_rgba(13,59,46,0.24)] sm:p-8">
               <div className="flex items-start justify-between gap-4">
                 <div>
@@ -294,16 +276,13 @@ export function NeedBasedScholarshipsPage({
                       ["Class", selectedItem.class_level || "-"],
                       ["Email", selectedItem.email || "-"],
                       ["Phone", selectedItem.phone || "-"],
-                      ["Monthly income", formatMoney(selectedItem.monthly_income)],
                       ["Requested amount", formatMoney(selectedItem.requested_amount)],
                       ["Dependents", selectedItem.dependents_count ?? "-"],
                       ["School-going children", selectedItem.school_going_children_count ?? "-"],
                       ["Residence type", selectedItem.residence_type || "-"],
-                      ["Employment status", selectedItem.guardian_employment_status || "-"],
                       ["Scholarship amount", formatMoney(selectedItem.scholarship_amount)],
                       ["Status", formatScholarshipStatus(selectedItem)],
                       ["Submitted at", formatDate(selectedItem.created_at)],
-                      ["Reason", selectedItem.reason || "-"],
                     ].map(([label, value]) => (
                       <tr key={label} className="border-b border-[#F1EADC] last:border-b-0">
                         <td className="w-[38%] px-4 py-3 text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]">
@@ -312,33 +291,6 @@ export function NeedBasedScholarshipsPage({
                         <td className="px-4 py-3 text-[#245C4F]">{value}</td>
                       </tr>
                     ))}
-                    <tr className="border-b border-[#F1EADC] last:border-b-0">
-                      <td className="w-[38%] px-4 py-3 text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]">
-                        Supporting document
-                      </td>
-                      <td className="px-4 py-3 text-[#245C4F]">
-                        {selectedItem.supporting_document_preview_url || supportingDocumentPreviewUrl ? (
-                          <a
-                            href={selectedItem.supporting_document_preview_url || supportingDocumentPreviewUrl}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="block"
-                          >
-                            <div className="relative h-44 w-full overflow-hidden rounded-xl border border-[#2D8A6A]/15 bg-[#FAF7F0]">
-                              <Image
-                                src={selectedItem.supporting_document_preview_url || supportingDocumentPreviewUrl}
-                                alt="Supporting document preview"
-                                fill
-                                unoptimized
-                                className="object-cover transition hover:scale-[1.01]"
-                              />
-                            </div>
-                          </a>
-                        ) : (
-                          "-"
-                        )}
-                      </td>
-                    </tr>
                   </tbody>
                 </table>
               </div>

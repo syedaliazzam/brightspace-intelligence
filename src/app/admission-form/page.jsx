@@ -10,9 +10,8 @@ const PROGRAM_OPTIONS = [
   "Early Childhood Education (Parent Partnership Model)",
 ];
 
-const STARTING_MONTH_OPTIONS = ["August", "September", "Other"];
+const STARTING_MONTH_OPTIONS = ["August"];
 const GENDER_OPTIONS = ["Boy", "Girl"];
-const LANGUAGE_OPTIONS = ["English", "Urdu", "Bilingual"];
 const YES_NO_OPTIONS = ["Yes", "No"];
 const SUPPORT_OPTIONS = ["Mother", "Father", "Both", "Guardian"];
 const CONTACT_OPTIONS = ["Father", "Mother"];
@@ -32,21 +31,15 @@ const BASE_STEP_TITLES = [
 const initialForm = {
   programName: PROGRAM_OPTIONS[0],
   classLevel: "",
-  preferredStartingMonth: "",
+  preferredStartingMonth: "August",
   preferredStartingMonthOther: "",
   studentName: "",
-  studentNameUrdu: "",
   gender: "",
   dateOfBirth: "",
-  country: "",
+  country: "Pakistan",
   city: "",
-  nationality: "",
+  nationality: "Pakistan",
   religion: "",
-  preferredLanguage: "",
-  currentSchool: "",
-  currentGrade: "",
-  shiftReason: "",
-  attendedOnlineClasses: "",
   childProfile: "",
   childStrengths: "",
   childSupportNeeds: "",
@@ -55,13 +48,10 @@ const initialForm = {
   developmentalConcernDetails: "",
   medicalConditions: "",
   needBasedScholarshipRequested: false,
-  scholarshipMonthlyIncome: "",
   scholarshipDependentsCount: "",
   scholarshipSchoolGoingChildrenCount: "",
   scholarshipResidenceType: "",
-  scholarshipGuardianEmploymentStatus: "",
   scholarshipRequestedAmount: "",
-  scholarshipReason: "",
   scholarshipSupportingDocumentFile: null,
   paymentMethod: "",
   admissionFee: "",
@@ -75,25 +65,21 @@ const initialForm = {
   paidAt: "",
   paymentProofFile: null,
   fatherNameEnglish: "",
-  fatherNameUrdu: "",
   fatherCnic: "",
   fatherQualification: "",
   fatherOccupation: "",
   fatherMotherTongue: "",
   fatherContactHome: "",
-  fatherContactOffice: "",
   fatherContactWhatsapp: "",
   fatherEmergencyContact: "",
   fatherEmail: "",
   fatherResidentialAddress: "",
   motherNameEnglish: "",
-  motherNameUrdu: "",
   motherCnic: "",
   motherQualification: "",
   motherOccupation: "",
   motherMotherTongue: "",
   motherContactHome: "",
-  motherContactOffice: "",
   motherContactWhatsapp: "",
   motherEmergencyContact: "",
   motherEmail: "",
@@ -107,7 +93,6 @@ const initialForm = {
   birthCertificateFile: null,
   parentCnicFile: null,
   childPhotographFile: null,
-  previousSchoolReportFile: null,
   medicalReportFile: null,
 };
 
@@ -133,6 +118,53 @@ function isValidPersonName(value) {
 function isValidPhoneNumber(value) {
   const text = String(value || "").trim();
   return /^[+()0-9\s-]{7,20}$/.test(text) && /\d{7,}/.test(text);
+}
+
+function getPhoneDigitLimit(country) {
+  const normalized = String(country || "").trim().toLowerCase();
+  if (!normalized) return 15;
+  if (normalized === "pakistan") return 12;
+  if (normalized === "saudi arabia") return 12;
+  if (normalized === "united arab emirates") return 12;
+  if (normalized === "united kingdom") return 12;
+  if (normalized === "united states" || normalized === "canada") return 11;
+  return 15;
+}
+
+function countPhoneDigits(value) {
+  return String(value || "").replace(/\D/g, "").length;
+}
+
+function trimPhoneDigits(value, country) {
+  const text = String(value || "");
+  const limit = getPhoneDigitLimit(country);
+  let digitsSeen = 0;
+  let result = "";
+
+  for (const char of text) {
+    if (/\d/.test(char)) {
+      if (digitsSeen >= limit) continue;
+      digitsSeen += 1;
+      result += char;
+      continue;
+    }
+
+    if (char === "+" && result.length === 0) {
+      result += char;
+      continue;
+    }
+
+    if (/[\s()-]/.test(char)) {
+      result += char;
+    }
+  }
+
+  return result;
+}
+
+function isValidPhoneNumberForCountry(value, country) {
+  if (!isValidPhoneNumber(value)) return false;
+  return countPhoneDigits(value) <= getPhoneDigitLimit(country);
 }
 
 function isValidNumericValue(value) {
@@ -201,15 +233,8 @@ function getStepErrors(form, previewMode = false) {
   if (!form.programName) errors.programName = "Programme is required.";
   if (!form.classLevel) errors.classLevel = "Applying class is required.";
   if (!form.preferredStartingMonth) errors.preferredStartingMonth = "Preferred starting month is required.";
-  if (form.preferredStartingMonth === "Other" && !form.preferredStartingMonthOther.trim()) {
-    errors.preferredStartingMonthOther = "Please specify the preferred starting month.";
-  }
-
   if (!form.studentName.trim()) errors.studentName = "Student full name is required.";
   else if (!isValidPersonName(form.studentName)) errors.studentName = "Enter a valid student name.";
-  if (String(form.studentNameUrdu || "").trim() && !isValidPersonName(form.studentNameUrdu)) {
-    errors.studentNameUrdu = "Enter a valid student name.";
-  }
   if (!form.gender) errors.gender = "Gender is required.";
   if (!form.dateOfBirth) errors.dateOfBirth = "Date of birth is required.";
   if (!form.country.trim()) errors.country = "Country is required.";
@@ -220,24 +245,9 @@ function getStepErrors(form, previewMode = false) {
   else if (!isValidTextName(form.nationality)) errors.nationality = "Enter a valid nationality.";
   if (!form.religion.trim()) errors.religion = "Religion is required.";
   else if (!isValidTextName(form.religion)) errors.religion = "Enter a valid religion.";
-  if (!form.preferredLanguage) errors.preferredLanguage = "Preferred language is required.";
-  if (!form.currentSchool.trim()) errors.currentSchool = "Current school is required.";
-  else if (!isValidTextName(form.currentSchool)) errors.currentSchool = "Enter a valid school name.";
-  if (!form.currentGrade.trim()) errors.currentGrade = "Current grade is required.";
-  else if (!isValidTextValue(form.currentGrade)) errors.currentGrade = "Enter a valid grade.";
-  if (!form.shiftReason.trim()) errors.shiftReason = "Reason for shifting is required.";
-
-  if (!form.whyJoinSchool?.trim()) errors.whyJoinSchool = "Please share why you wish your child to join Ash-Shajarah.";
-  if (!form.schoolExpectations?.trim()) errors.schoolExpectations = "Please share your expectations from the school.";
   if (!form.supportPersonDuringLearning) errors.supportPersonDuringLearning = "Please select who will support the child.";
   if (!form.deviceAvailable) errors.deviceAvailable = "Device availability is required.";
-  if (!form.attendedOnlineClasses) errors.attendedOnlineClasses = "Please select whether the child attended online classes.";
   if (!form.developmentalConcern) errors.developmentalConcern = "Please select whether there is any diagnosed concern.";
-  if (!form.childProfile.trim()) errors.childProfile = "Child profile is required.";
-  if (!form.childStrengths.trim()) errors.childStrengths = "Child strengths are required.";
-  if (!form.childSupportNeeds.trim()) errors.childSupportNeeds = "Areas needing support are required.";
-  if (!form.childSpecialInterests.trim()) errors.childSpecialInterests = "Special interests are required.";
-  if (!form.medicalConditions.trim()) errors.medicalConditions = "Medical conditions field is required.";
   if (form.developmentalConcern === "Yes" && !String(form.developmentalConcernDetails || "").trim()) {
     errors.developmentalConcernDetails = "Please share the diagnosed concern details.";
   }
@@ -257,8 +267,6 @@ function getStepErrors(form, previewMode = false) {
   if (!String(form.motherNameEnglish || "").trim()) {
     errors.motherNameEnglish = "Mother name is required.";
   }
-  if (!String(form.fatherNameUrdu || "").trim()) errors.fatherNameUrdu = "Father name in Urdu is required.";
-  if (!String(form.motherNameUrdu || "").trim()) errors.motherNameUrdu = "Mother name in Urdu is required.";
   if (!String(form.fatherCnic || "").trim()) errors.fatherCnic = "Father CNIC is required.";
   else if (!isValidCnic(form.fatherCnic)) errors.fatherCnic = "Enter a valid CNIC number.";
   if (!String(form.motherCnic || "").trim()) errors.motherCnic = "Mother CNIC is required.";
@@ -276,20 +284,18 @@ function getStepErrors(form, previewMode = false) {
   if (!String(form.motherMotherTongue || "").trim()) errors.motherMotherTongue = "Mother mother tongue is required.";
   else if (!isValidTextName(form.motherMotherTongue)) errors.motherMotherTongue = "Enter a valid language.";
   if (!String(form.fatherContactHome || "").trim()) errors.fatherContactHome = "Father home contact is required.";
-  else if (!isValidPhoneNumber(form.fatherContactHome)) errors.fatherContactHome = "Enter a valid home contact number.";
-  if (!String(form.fatherContactOffice || "").trim()) errors.fatherContactOffice = "Father office contact is required.";
-  else if (!isValidPhoneNumber(form.fatherContactOffice)) errors.fatherContactOffice = "Enter a valid office contact number.";
-  if (String(form.fatherEmergencyContact || "").trim() && !isValidPhoneNumber(form.fatherEmergencyContact)) {
+  else if (!isValidPhoneNumberForCountry(form.fatherContactHome, form.country)) errors.fatherContactHome = `Enter a valid home contact number for ${form.country || "the selected country"}.`;
+  if (!String(form.fatherEmergencyContact || "").trim()) errors.fatherEmergencyContact = "Father emergency contact is required.";
+  else if (!isValidPhoneNumberForCountry(form.fatherEmergencyContact, form.country)) {
     errors.fatherEmergencyContact = "Enter a valid emergency contact number.";
   }
   if (!String(form.fatherContactWhatsapp || "").trim() && !String(form.fatherEmergencyContact || "").trim()) {
     errors.fatherContactWhatsapp = "Father WhatsApp or emergency contact is required.";
   }
   if (!String(form.motherContactHome || "").trim()) errors.motherContactHome = "Mother home contact is required.";
-  else if (!isValidPhoneNumber(form.motherContactHome)) errors.motherContactHome = "Enter a valid home contact number.";
-  if (!String(form.motherContactOffice || "").trim()) errors.motherContactOffice = "Mother office contact is required.";
-  else if (!isValidPhoneNumber(form.motherContactOffice)) errors.motherContactOffice = "Enter a valid office contact number.";
-  if (String(form.motherEmergencyContact || "").trim() && !isValidPhoneNumber(form.motherEmergencyContact)) {
+  else if (!isValidPhoneNumberForCountry(form.motherContactHome, form.country)) errors.motherContactHome = `Enter a valid home contact number for ${form.country || "the selected country"}.`;
+  if (!String(form.motherEmergencyContact || "").trim()) errors.motherEmergencyContact = "Mother emergency contact is required.";
+  else if (!isValidPhoneNumberForCountry(form.motherEmergencyContact, form.country)) {
     errors.motherEmergencyContact = "Enter a valid emergency contact number.";
   }
   if (!String(form.motherContactWhatsapp || "").trim() && !String(form.motherEmergencyContact || "").trim()) {
@@ -311,10 +317,12 @@ function getStepErrors(form, previewMode = false) {
   if (!getPrimaryParentName(form)) {
     errors.primaryParent = "Primary parent details are incomplete.";
   }
-  if (String(form.fatherResidentialAddress || "").trim() && !isValidTextName(form.fatherResidentialAddress)) {
+  if (!String(form.fatherResidentialAddress || "").trim()) errors.fatherResidentialAddress = "Father residential address is required.";
+  else if (!isValidTextName(form.fatherResidentialAddress)) {
     errors.fatherResidentialAddress = "Enter a valid residential address.";
   }
-  if (String(form.motherResidentialAddress || "").trim() && !isValidTextName(form.motherResidentialAddress)) {
+  if (!String(form.motherResidentialAddress || "").trim()) errors.motherResidentialAddress = "Mother residential address is required.";
+  else if (!isValidTextName(form.motherResidentialAddress)) {
     errors.motherResidentialAddress = "Enter a valid residential address.";
   }
   if (
@@ -322,7 +330,6 @@ function getStepErrors(form, previewMode = false) {
     !(
       String(form.fatherContactWhatsapp || "").trim() ||
       String(form.fatherEmergencyContact || "").trim() ||
-      String(form.fatherContactOffice || "").trim() ||
       String(form.fatherContactHome || "").trim()
     )
   ) {
@@ -333,7 +340,6 @@ function getStepErrors(form, previewMode = false) {
     !(
       String(form.motherContactWhatsapp || "").trim() ||
       String(form.motherEmergencyContact || "").trim() ||
-      String(form.motherContactOffice || "").trim() ||
       String(form.motherContactHome || "").trim()
     )
   ) {
@@ -343,26 +349,17 @@ function getStepErrors(form, previewMode = false) {
   if (!form.birthCertificateFile) errors.birthCertificateFile = "Child B-Form / Birth Certificate is required.";
   if (!form.parentCnicFile) errors.parentCnicFile = "Parent CNIC is required.";
   if (!form.childPhotographFile) errors.childPhotographFile = "Recent child photograph is required.";
-  if (!form.previousSchoolReportFile) errors.previousSchoolReportFile = "Previous school report is required.";
-  if (!form.medicalReportFile) errors.medicalReportFile = "Medical report is required.";
   if (!previewMode && form.needBasedScholarshipRequested) {
-    if (!String(form.scholarshipMonthlyIncome || "").trim()) errors.scholarshipMonthlyIncome = "Monthly income is required.";
-    else if (!isValidNumericValue(form.scholarshipMonthlyIncome)) errors.scholarshipMonthlyIncome = "Enter a valid monthly income.";
     if (!String(form.scholarshipDependentsCount || "").trim()) errors.scholarshipDependentsCount = "Dependents count is required.";
     else if (!/^\d+$/.test(String(form.scholarshipDependentsCount || "").trim())) errors.scholarshipDependentsCount = "Enter a valid dependents count.";
     if (!String(form.scholarshipSchoolGoingChildrenCount || "").trim()) errors.scholarshipSchoolGoingChildrenCount = "School-going children count is required.";
     else if (!/^\d+$/.test(String(form.scholarshipSchoolGoingChildrenCount || "").trim())) errors.scholarshipSchoolGoingChildrenCount = "Enter a valid children count.";
     if (!form.scholarshipResidenceType) errors.scholarshipResidenceType = "Residence type is required.";
-    if (!form.scholarshipGuardianEmploymentStatus) errors.scholarshipGuardianEmploymentStatus = "Employment status is required.";
     if (!String(form.scholarshipRequestedAmount || "").trim()) errors.scholarshipRequestedAmount = "Requested support amount is required.";
     else if (!isValidNumericValue(form.scholarshipRequestedAmount)) errors.scholarshipRequestedAmount = "Enter a valid support amount.";
-    if (!String(form.scholarshipReason || "").trim()) errors.scholarshipReason = "Scholarship reason is required.";
-    else if (!isValidTextValue(form.scholarshipReason)) errors.scholarshipReason = "Enter a valid scholarship reason.";
-    if (!form.scholarshipSupportingDocumentFile) errors.scholarshipSupportingDocumentFile = "Supporting document is required.";
   } else if (previewMode) {
     if (!form.paymentMethod) errors.paymentMethod = "Payment method is required.";
     if (!form.admissionFee) errors.admissionFee = "Admission fee is required.";
-    if (!String(form.discountPercent || "").trim()) errors.discountPercent = "Discount is required.";
     if (!String(form.paymentInstructions || "").trim()) errors.paymentInstructions = "Payment instructions are required.";
   } else {
     if (!String(form.payerName || "").trim()) errors.payerName = "Payer name is required.";
@@ -390,21 +387,21 @@ function FieldError({ error }) {
 }
 
 function FilePreview({ file }) {
-  const [previewUrl, setPreviewUrl] = useState("");
-
-  useEffect(() => {
+  const previewUrl = useMemo(() => {
     if (!(file instanceof File) || !file.type.startsWith("image/")) {
-      setPreviewUrl("");
-      return undefined;
+      return "";
     }
 
-    const objectUrl = URL.createObjectURL(file);
-    setPreviewUrl(objectUrl);
-
-    return () => {
-      URL.revokeObjectURL(objectUrl);
-    };
+    return URL.createObjectURL(file);
   }, [file]);
+
+  useEffect(() => {
+    return () => {
+      if (previewUrl) {
+        URL.revokeObjectURL(previewUrl);
+      }
+    };
+  }, [previewUrl]);
 
   if (!(file instanceof File)) return null;
 
@@ -565,26 +562,22 @@ function AdmissionFormContent() {
   function getErrorsForCurrentStep(formValue, currentStep) {
     const allErrors = getStepErrors(formValue, isPreviewMode);
     const keysByStep = {
-      0: ["programName", "classLevel", "preferredStartingMonth", "preferredStartingMonthOther"],
-      1: ["studentName", "studentNameUrdu", "gender", "dateOfBirth", "country", "city", "nationality", "religion", "preferredLanguage", "currentSchool", "currentGrade"],
-      2: ["shiftReason", "attendedOnlineClasses", "developmentalConcern", "developmentalConcernDetails", "childProfile", "childStrengths", "childSupportNeeds", "childSpecialInterests", "medicalConditions"],
-      3: ["parentNames", "fatherNameEnglish", "motherNameEnglish", "fatherNameUrdu", "motherNameUrdu", "fatherCnic", "motherCnic", "fatherEmail", "motherEmail", "preferredContactPerson", "primaryParent", "fatherContactHome", "fatherContactOffice", "fatherContactWhatsapp", "fatherEmergencyContact", "motherContactHome", "motherContactOffice", "motherContactWhatsapp", "motherEmergencyContact"],
-      4: ["supportPersonDuringLearning", "deviceAvailable", "birthCertificateFile", "parentCnicFile", "childPhotographFile", "previousSchoolReportFile", "medicalReportFile"],
+      0: ["programName", "classLevel", "preferredStartingMonth"],
+      1: ["studentName", "gender", "dateOfBirth", "country", "city", "nationality", "religion"],
+      2: ["developmentalConcern", "developmentalConcernDetails"],
+      3: ["parentNames", "fatherNameEnglish", "motherNameEnglish", "fatherCnic", "motherCnic", "fatherQualification", "motherQualification", "fatherOccupation", "motherOccupation", "fatherMotherTongue", "motherMotherTongue", "fatherEmail", "motherEmail", "preferredContactPerson", "primaryParent", "fatherContactHome", "fatherContactWhatsapp", "fatherEmergencyContact", "motherContactHome", "motherContactWhatsapp", "motherEmergencyContact", "fatherResidentialAddress", "motherResidentialAddress", "supportPersonDuringLearning"],
+      4: ["deviceAvailable", "birthCertificateFile", "parentCnicFile", "childPhotographFile"],
       5: isPreviewMode
         ? ["paymentMethod", "admissionFee", "discountPercent", "paymentInstructions"]
         : formValue.needBasedScholarshipRequested
           ? [
-              "scholarshipMonthlyIncome",
               "scholarshipDependentsCount",
               "scholarshipSchoolGoingChildrenCount",
               "scholarshipResidenceType",
-              "scholarshipGuardianEmploymentStatus",
               "scholarshipRequestedAmount",
-              "scholarshipReason",
-              "scholarshipSupportingDocumentFile",
             ]
           : ["payerName", "payerEmail", "payerPhone", "transactionId", "paidAmount", "paidAt", "paymentProofFile"],
-      6: ["whyJoinSchool", "schoolExpectations", "declarationAccepted"],
+      6: ["declarationAccepted"],
     };
 
     return (keysByStep[currentStep] || []).reduce((accumulator, key) => {
@@ -597,26 +590,22 @@ function AdmissionFormContent() {
 
   function stepHasCurrentErrors(currentStep, errorsValue) {
     const map = {
-      0: ["programName", "classLevel", "preferredStartingMonth", "preferredStartingMonthOther"],
-      1: ["studentName", "studentNameUrdu", "gender", "dateOfBirth", "country", "city", "nationality", "religion", "preferredLanguage", "currentSchool", "currentGrade"],
-      2: ["shiftReason", "attendedOnlineClasses", "developmentalConcern", "developmentalConcernDetails", "childProfile", "childStrengths", "childSupportNeeds", "childSpecialInterests", "medicalConditions"],
-      3: ["parentNames", "fatherNameEnglish", "motherNameEnglish", "fatherNameUrdu", "motherNameUrdu", "fatherCnic", "motherCnic", "fatherEmail", "motherEmail", "preferredContactPerson", "primaryParent", "fatherContactHome", "fatherContactOffice", "fatherContactWhatsapp", "fatherEmergencyContact", "motherContactHome", "motherContactOffice", "motherContactWhatsapp", "motherEmergencyContact"],
-      4: ["supportPersonDuringLearning", "deviceAvailable", "birthCertificateFile", "parentCnicFile", "childPhotographFile", "previousSchoolReportFile", "medicalReportFile"],
+      0: ["programName", "classLevel", "preferredStartingMonth"],
+      1: ["studentName", "gender", "dateOfBirth", "country", "city", "nationality", "religion"],
+      2: ["developmentalConcern", "developmentalConcernDetails"],
+      3: ["parentNames", "fatherNameEnglish", "motherNameEnglish", "fatherCnic", "motherCnic", "fatherQualification", "motherQualification", "fatherOccupation", "motherOccupation", "fatherMotherTongue", "motherMotherTongue", "fatherEmail", "motherEmail", "preferredContactPerson", "primaryParent", "fatherContactHome", "fatherContactWhatsapp", "fatherEmergencyContact", "motherContactHome", "motherContactWhatsapp", "motherEmergencyContact", "fatherResidentialAddress", "motherResidentialAddress", "supportPersonDuringLearning"],
+      4: ["deviceAvailable", "birthCertificateFile", "parentCnicFile", "childPhotographFile"],
       5: isPreviewMode
         ? ["paymentMethod", "admissionFee", "discountPercent", "paymentInstructions"]
         : form.needBasedScholarshipRequested
           ? [
-              "scholarshipMonthlyIncome",
               "scholarshipDependentsCount",
               "scholarshipSchoolGoingChildrenCount",
               "scholarshipResidenceType",
-              "scholarshipGuardianEmploymentStatus",
               "scholarshipRequestedAmount",
-              "scholarshipReason",
-              "scholarshipSupportingDocumentFile",
             ]
           : ["payerName", "payerEmail", "payerPhone", "transactionId", "paidAmount", "paidAt", "paymentProofFile"],
-      6: ["whyJoinSchool", "schoolExpectations", "declarationAccepted"],
+      6: ["declarationAccepted"],
     };
 
     return (map[currentStep] || []).some((key) => Boolean(errorsValue[key]));
@@ -708,10 +697,10 @@ function AdmissionFormContent() {
         const data = await response.json().catch(() => null);
         if (!response.ok || !data || !active) return;
 
-        setLocationOptions({
+        setLocationOptions((current) => ({
           countries: Array.isArray(data.countries) ? data.countries : [],
-          cities: [],
-        });
+          cities: Array.isArray(current.cities) ? current.cities : [],
+        }));
       } catch {
         // Keep the form usable even if location options cannot be loaded.
       }
@@ -887,6 +876,16 @@ function AdmissionFormContent() {
   function updateField(name, value) {
     const nextValue = (name === "fatherCnic" || name === "motherCnic")
       ? formatCnic(value)
+      : (
+        name === "fatherContactHome" ||
+        name === "fatherContactWhatsapp" ||
+        name === "fatherEmergencyContact" ||
+        name === "motherContactHome" ||
+        name === "motherContactWhatsapp" ||
+        name === "motherEmergencyContact" ||
+        name === "payerPhone"
+      )
+        ? trimPhoneDigits(value, form.country)
       : value;
     setForm((current) => ({ ...current, [name]: nextValue }));
     setErrors((current) => ({ ...current, [name]: "" }));
@@ -1037,11 +1036,6 @@ function AdmissionFormContent() {
         file: form.childPhotographFile,
         applicationId,
       });
-      const previousSchoolReportPath = await uploadAdmissionFormFile({
-        documentType: "previous_school_report",
-        file: form.previousSchoolReportFile,
-        applicationId,
-      });
       const medicalReportPath = await uploadAdmissionFormFile({
         documentType: "medical_report",
         file: form.medicalReportFile,
@@ -1066,9 +1060,9 @@ function AdmissionFormContent() {
         program_name: form.programName,
         class_level: form.classLevel,
         preferred_starting_month: form.preferredStartingMonth,
-        preferred_starting_month_other: form.preferredStartingMonthOther,
+        preferred_starting_month_other: "",
         student_name: form.studentName,
-        student_name_urdu: form.studentNameUrdu,
+        student_name_urdu: "",
         gender: form.gender,
         date_of_birth: form.dateOfBirth,
         age: String(age || ""),
@@ -1076,11 +1070,11 @@ function AdmissionFormContent() {
         city: form.city,
         nationality: form.nationality,
         religion: form.religion,
-        preferred_language: form.preferredLanguage,
-        current_school: form.currentSchool,
-        current_grade: form.currentGrade,
-        shift_reason: form.shiftReason,
-        attended_online_classes: form.attendedOnlineClasses,
+        preferred_language: "",
+        current_school: "",
+        current_grade: "",
+        shift_reason: "",
+        attended_online_classes: "",
         child_profile: form.childProfile,
         child_strengths: form.childStrengths,
         child_support_needs: form.childSupportNeeds,
@@ -1089,25 +1083,25 @@ function AdmissionFormContent() {
         developmental_concern_details: form.developmentalConcernDetails,
         medical_conditions: form.medicalConditions,
         father_name_english: form.fatherNameEnglish,
-        father_name_urdu: form.fatherNameUrdu,
+        father_name_urdu: "",
         father_cnic: form.fatherCnic,
         father_qualification: form.fatherQualification,
         father_occupation: form.fatherOccupation,
         father_mother_tongue: form.fatherMotherTongue,
         father_contact_home: form.fatherContactHome,
-        father_contact_office: form.fatherContactOffice,
+        father_contact_office: "",
         father_contact_whatsapp: form.fatherContactWhatsapp,
         father_emergency_contact: form.fatherEmergencyContact,
         father_email: form.fatherEmail,
         father_residential_address: form.fatherResidentialAddress,
         mother_name_english: form.motherNameEnglish,
-        mother_name_urdu: form.motherNameUrdu,
+        mother_name_urdu: "",
         mother_cnic: form.motherCnic,
         mother_qualification: form.motherQualification,
         mother_occupation: form.motherOccupation,
         mother_mother_tongue: form.motherMotherTongue,
         mother_contact_home: form.motherContactHome,
-        mother_contact_office: form.motherContactOffice,
+        mother_contact_office: "",
         mother_contact_whatsapp: form.motherContactWhatsapp,
         mother_emergency_contact: form.motherEmergencyContact,
         mother_email: form.motherEmail,
@@ -1116,13 +1110,13 @@ function AdmissionFormContent() {
         support_person_during_learning: form.supportPersonDuringLearning,
         device_available: form.deviceAvailable,
         need_based_scholarship_requested: form.needBasedScholarshipRequested ? "Yes" : "No",
-        scholarship_monthly_income: form.scholarshipMonthlyIncome,
+        scholarship_monthly_income: "",
         scholarship_dependents_count: form.scholarshipDependentsCount,
         scholarship_school_going_children_count: form.scholarshipSchoolGoingChildrenCount,
         scholarship_residence_type: form.scholarshipResidenceType,
-        scholarship_guardian_employment_status: form.scholarshipGuardianEmploymentStatus,
+        scholarship_guardian_employment_status: "",
         scholarship_requested_amount: form.scholarshipRequestedAmount,
-        scholarship_reason: form.scholarshipReason,
+        scholarship_reason: "",
         scholarship_supporting_document_file_path: scholarshipSupportingDocumentPath,
         payment_method: isPreviewMode ? form.paymentMethod : (liveSelectedPaymentMethod?.name || liveSelectedPaymentMethod?.method_key || ""),
         admission_fee: isPreviewMode ? form.admissionFee : String(liveAdmissionFeeAmount || ""),
@@ -1134,14 +1128,13 @@ function AdmissionFormContent() {
         transaction_id: form.transactionId,
         paid_amount: form.paidAmount,
         paid_at: form.paidAt,
-        why_join_school: form.whyJoinSchool,
-        school_expectations: form.schoolExpectations,
+        why_join_school: "",
+        school_expectations: "",
         declaration_accepted: form.declarationAccepted ? "Yes" : "No",
         leadToken,
         birth_certificate_file_path: birthCertificatePath,
         parent_cnic_file_path: parentCnicPath,
         child_photograph_file_path: childPhotographPath,
-        previous_school_report_file_path: previousSchoolReportPath,
         medical_report_file_path: medicalReportPath,
         payment_proof_file_path: paymentProofPath,
       }).forEach(([key, value]) => payload.append(key, value || ""));
@@ -1205,13 +1198,6 @@ function AdmissionFormContent() {
             {STARTING_MONTH_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
           </SelectField>
         </div>
-        {form.preferredStartingMonth === "Other" ? (
-          <div className="sm:col-span-2">
-            <label className="mb-2 block text-[11px] font-bold uppercase tracking-[0.18em] text-[#0D5C48]" htmlFor="preferredStartingMonthOther">Other Starting Month</label>
-            <input id="preferredStartingMonthOther" value={form.preferredStartingMonthOther} onChange={(event) => updateField("preferredStartingMonthOther", event.target.value)} className={inputClass(errors.preferredStartingMonthOther)} placeholder="Enter preferred month" />
-            <FieldError error={errors.preferredStartingMonthOther} />
-          </div>
-        ) : null}
       </div>
     );
   }
@@ -1223,11 +1209,6 @@ function AdmissionFormContent() {
           <label className="mb-2 block text-[11px] font-bold uppercase tracking-[0.18em] text-[#0D5C48]" htmlFor="studentName">Student Full Name (English)</label>
           <input id="studentName" value={form.studentName} onChange={(event) => updateField("studentName", event.target.value)} className={inputClass(errors.studentName)} />
           <FieldError error={errors.studentName} />
-        </div>
-        <div className="sm:col-span-2">
-          <label className="mb-2 block text-[11px] font-bold uppercase tracking-[0.18em] text-[#0D5C48]" htmlFor="studentNameUrdu">Student Name (Urdu)</label>
-          <input id="studentNameUrdu" value={form.studentNameUrdu} onChange={(event) => updateField("studentNameUrdu", event.target.value)} className={inputClass(false)} />
-          <FieldError error={errors.studentNameUrdu} />
         </div>
         <div>
           <label className="mb-2 block text-[11px] font-bold uppercase tracking-[0.18em] text-[#0D5C48]" htmlFor="gender">Gender</label>
@@ -1283,23 +1264,6 @@ function AdmissionFormContent() {
           <input id="religion" value={form.religion} onChange={(event) => updateField("religion", event.target.value)} className={inputClass(errors.religion)} />
           <FieldError error={errors.religion} />
         </div>
-        <div>
-          <label className="mb-2 block text-[11px] font-bold uppercase tracking-[0.18em] text-[#0D5C48]" htmlFor="preferredLanguage">Preferred Language of Instruction</label>
-          <SelectField id="preferredLanguage" value={form.preferredLanguage} onChange={(event) => updateField("preferredLanguage", event.target.value)} error={errors.preferredLanguage} className={inputClass(errors.preferredLanguage)}>
-            <option value="">Select language</option>
-            {LANGUAGE_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
-          </SelectField>
-        </div>
-        <div>
-          <label className="mb-2 block text-[11px] font-bold uppercase tracking-[0.18em] text-[#0D5C48]" htmlFor="currentSchool">Current School (if applicable)</label>
-          <input id="currentSchool" value={form.currentSchool} onChange={(event) => updateField("currentSchool", event.target.value)} className={inputClass(false)} />
-          <FieldError error={errors.currentSchool} />
-        </div>
-        <div>
-          <label className="mb-2 block text-[11px] font-bold uppercase tracking-[0.18em] text-[#0D5C48]" htmlFor="currentGrade">Current Grade</label>
-          <input id="currentGrade" value={form.currentGrade} onChange={(event) => updateField("currentGrade", event.target.value)} className={inputClass(false)} />
-          <FieldError error={errors.currentGrade} />
-        </div>
       </div>
     );
   }
@@ -1307,18 +1271,6 @@ function AdmissionFormContent() {
   function renderProfileStep() {
     return (
       <div className="grid gap-5 rounded-[1.35rem] border border-[rgba(13,59,46,0.08)] bg-white/95 p-4 shadow-[0_12px_28px_rgba(13,59,46,0.05)] sm:grid-cols-2 sm:p-6">
-        <div className="sm:col-span-2">
-          <label className="mb-2 block text-[11px] font-bold uppercase tracking-[0.18em] text-[#0D5C48]" htmlFor="shiftReason">Reason for shifting from physical to online schooling</label>
-          <textarea id="shiftReason" rows={3} value={form.shiftReason} onChange={(event) => updateField("shiftReason", event.target.value)} className={inputClass(false)} />
-          <FieldError error={errors.shiftReason} />
-        </div>
-        <div>
-          <label className="mb-2 block text-[11px] font-bold uppercase tracking-[0.18em] text-[#0D5C48]" htmlFor="attendedOnlineClasses">Has the child previously attended online classes?</label>
-          <SelectField id="attendedOnlineClasses" value={form.attendedOnlineClasses} onChange={(event) => updateField("attendedOnlineClasses", event.target.value)} error={errors.attendedOnlineClasses} className={inputClass(errors.attendedOnlineClasses)}>
-            <option value="">Select option</option>
-            {YES_NO_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
-          </SelectField>
-        </div>
         <div>
           <label className="mb-2 block text-[11px] font-bold uppercase tracking-[0.18em] text-[#0D5C48]" htmlFor="developmentalConcern">Any diagnosed learning difficulty or developmental concern?</label>
           <SelectField id="developmentalConcern" value={form.developmentalConcern} onChange={(event) => updateField("developmentalConcern", event.target.value)} error={errors.developmentalConcern} className={inputClass(errors.developmentalConcern)}>
@@ -1364,13 +1316,11 @@ function AdmissionFormContent() {
 
   function renderParentColumn(prefix, title) {
     const nameEnglishKey = `${prefix}NameEnglish`;
-    const nameUrduKey = `${prefix}NameUrdu`;
     const cnicKey = `${prefix}Cnic`;
     const qualificationKey = `${prefix}Qualification`;
     const occupationKey = `${prefix}Occupation`;
     const motherTongueKey = `${prefix}MotherTongue`;
     const homeKey = `${prefix}ContactHome`;
-    const officeKey = `${prefix}ContactOffice`;
     const whatsappKey = `${prefix}ContactWhatsapp`;
     const emergencyKey = `${prefix}EmergencyContact`;
     const emailKey = `${prefix}Email`;
@@ -1384,11 +1334,6 @@ function AdmissionFormContent() {
             <label className="mb-2 block text-[11px] font-bold uppercase tracking-[0.18em] text-[#0D5C48]">{title} Name (Block Letters)</label>
             <input value={form[nameEnglishKey]} onChange={(event) => updateField(nameEnglishKey, event.target.value)} className={inputClass(false)} />
             <FieldError error={errors[nameEnglishKey]} />
-          </div>
-          <div>
-            <label className="mb-2 block text-[11px] font-bold uppercase tracking-[0.18em] text-[#0D5C48]">{title} Name (Urdu)</label>
-            <input value={form[nameUrduKey]} onChange={(event) => updateField(nameUrduKey, event.target.value)} className={inputClass(false)} />
-            <FieldError error={errors[nameUrduKey]} />
           </div>
           <div>
             <label className="mb-2 block text-[11px] font-bold uppercase tracking-[0.18em] text-[#0D5C48]">CNIC Number</label>
@@ -1420,22 +1365,17 @@ function AdmissionFormContent() {
           </div>
           <div>
             <label className="mb-2 block text-[11px] font-bold uppercase tracking-[0.18em] text-[#0D5C48]">Contact No. (Home)</label>
-            <input value={form[homeKey]} onChange={(event) => updateField(homeKey, event.target.value)} className={inputClass(false)} />
+            <input value={form[homeKey]} onChange={(event) => updateField(homeKey, event.target.value)} maxLength={getPhoneDigitLimit(form.country) + 6} className={inputClass(false)} />
             <FieldError error={errors[homeKey]} />
           </div>
           <div>
-            <label className="mb-2 block text-[11px] font-bold uppercase tracking-[0.18em] text-[#0D5C48]">Contact No. (Office)</label>
-            <input value={form[officeKey]} onChange={(event) => updateField(officeKey, event.target.value)} className={inputClass(false)} />
-            <FieldError error={errors[officeKey]} />
-          </div>
-          <div>
             <label className="mb-2 block text-[11px] font-bold uppercase tracking-[0.18em] text-[#0D5C48]">Contact No. (WhatsApp)</label>
-            <input value={form[whatsappKey]} onChange={(event) => updateField(whatsappKey, event.target.value)} className={inputClass(errors[whatsappKey])} />
+            <input value={form[whatsappKey]} onChange={(event) => updateField(whatsappKey, event.target.value)} maxLength={getPhoneDigitLimit(form.country) + 6} className={inputClass(errors[whatsappKey])} />
             <FieldError error={errors[whatsappKey]} />
           </div>
           <div>
             <label className="mb-2 block text-[11px] font-bold uppercase tracking-[0.18em] text-[#0D5C48]">Emergency Contact No.</label>
-            <input value={form[emergencyKey]} onChange={(event) => updateField(emergencyKey, event.target.value)} className={inputClass(false)} />
+            <input value={form[emergencyKey]} onChange={(event) => updateField(emergencyKey, event.target.value)} maxLength={getPhoneDigitLimit(form.country) + 6} className={inputClass(false)} />
             <FieldError error={errors[emergencyKey]} />
           </div>
           <div>
@@ -1536,11 +1476,6 @@ function AdmissionFormContent() {
           <FilePreview file={form.childPhotographFile} />
         </div>
         <div>
-          <label className="mb-2 block text-[11px] font-bold uppercase tracking-[0.18em] text-[#0D5C48]" htmlFor="previousSchoolReportFile">Previous School Report (if applicable)</label>
-          <input id="previousSchoolReportFile" type="file" accept="image/*,.pdf" onChange={(event) => void handleFileSelection("previousSchoolReportFile", event.target.files?.[0] || null)} className={inputClass(false)} />
-          <FilePreview file={form.previousSchoolReportFile} />
-        </div>
-        <div className="sm:col-span-2">
           <label className="mb-2 block text-[11px] font-bold uppercase tracking-[0.18em] text-[#0D5C48]" htmlFor="medicalReportFile">Medical Report (if applicable)</label>
           <input id="medicalReportFile" type="file" accept="image/*,.pdf" onChange={(event) => void handleFileSelection("medicalReportFile", event.target.files?.[0] || null)} className={inputClass(false)} />
           <FilePreview file={form.medicalReportFile} />
@@ -1562,7 +1497,7 @@ function AdmissionFormContent() {
             className="mt-1 h-4 w-4 rounded border-[#2D8A6A]/30 text-[#0D5C48] focus:ring-[#C9A227]"
           />
           <span>
-            <span className="block font-semibold">Do you willing to avail need based scholarship?</span>
+            <span className="block font-semibold">Do you want to avail need based scholarship?</span>
             <span className="mt-1 block text-[#245C4F]">
               Need base scholarship is for Zakat, Khairat and Atiyah.
             </span>
@@ -1580,19 +1515,17 @@ function AdmissionFormContent() {
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]">Fee details</p>
             <div className="grid gap-3 md:grid-cols-3">
               <div className="rounded-[1rem] border border-[#2D8A6A]/15 bg-white p-4">
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]">Regular fee</p>
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]">Monthly fee</p>
                 <p className="mt-3 text-xl font-bold text-[#063F32]">PKR {previewRegularFeeAmount.toLocaleString("en-PK")}</p>
-                <p className="mt-2 text-sm text-[#245C4F]">{previewRegularFee?.title || previewRegularFee?.name || `Based on ${previewClassLevel || "the selected class"}.`}</p>
               </div>
               <div className="rounded-[1rem] border border-[#2D8A6A]/15 bg-white p-4">
                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]">Admission fee</p>
                 <p className="mt-3 text-xl font-bold text-[#063F32]">PKR {liveAdmissionFeeAmount.toLocaleString("en-PK")}</p>
-                <p className="mt-2 text-sm text-[#245C4F]">{liveSelectedAdmissionFee?.title || liveSelectedAdmissionFee?.name || "Default admission fee selected by coordinator."}</p>
               </div>
               <div className="rounded-[1rem] border border-[#2D8A6A]/15 bg-white p-4">
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]">Coordinator discount</p>
-                <p className="mt-3 text-xl font-bold text-[#063F32]">{liveDiscountPercent ? `${liveDiscountPercent}%` : "No discount"}</p>
-                <p className="mt-2 text-sm text-[#245C4F]">This will be considered later in the scholarship voucher stage.</p>
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]">Total amount</p>
+                <p className="mt-3 text-xl font-bold text-[#063F32]">PKR {liveTotalAmount.toLocaleString("en-PK")}</p>
+                <p className="mt-2 text-sm text-[#245C4F]">Monthly fee minus discount plus admission fee.</p>
               </div>
             </div>
           </div>
@@ -1606,7 +1539,7 @@ function AdmissionFormContent() {
                 className="mt-1 h-4 w-4 rounded border-[#2D8A6A]/30 text-[#0D5C48] focus:ring-[#C9A227]"
               />
               <span>
-                <span className="block font-semibold">Do you willing to avail need based scholarship?</span>
+                <span className="block font-semibold">Do you want to avail need based scholarship?</span>
                 <span className="mt-1 block text-[#245C4F]">
                   Need base scholarship is for Zakat, Khairat and Atiyah.
                 </span>
@@ -1615,11 +1548,6 @@ function AdmissionFormContent() {
           </div>
 
           <div className="grid gap-4 md:grid-cols-2">
-            <div className="rounded-[1rem] border border-[#2D8A6A]/15 bg-white p-4">
-              <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]" htmlFor="scholarshipMonthlyIncome">Monthly household income</label>
-              <input id="scholarshipMonthlyIncome" type="number" min="0" step="0.01" value={controlledValue(form.scholarshipMonthlyIncome)} onChange={(event) => updateField("scholarshipMonthlyIncome", event.target.value)} className={inputClass(errors.scholarshipMonthlyIncome)} placeholder="50000" />
-              <FieldError error={errors.scholarshipMonthlyIncome} />
-            </div>
             <div className="rounded-[1rem] border border-[#2D8A6A]/15 bg-white p-4">
               <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]" htmlFor="scholarshipRequestedAmount">Requested scholarship amount</label>
               <input id="scholarshipRequestedAmount" type="number" min="0" step="0.01" value={controlledValue(form.scholarshipRequestedAmount)} onChange={(event) => updateField("scholarshipRequestedAmount", event.target.value)} className={inputClass(errors.scholarshipRequestedAmount)} placeholder="10000" />
@@ -1641,24 +1569,6 @@ function AdmissionFormContent() {
                 <option value="">Select residence type</option>
                 {RESIDENCE_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
               </SelectField>
-            </div>
-            <div className="rounded-[1rem] border border-[#2D8A6A]/15 bg-white p-4">
-              <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]" htmlFor="scholarshipGuardianEmploymentStatus">Guardian employment status</label>
-              <SelectField id="scholarshipGuardianEmploymentStatus" value={controlledValue(form.scholarshipGuardianEmploymentStatus)} onChange={(event) => updateField("scholarshipGuardianEmploymentStatus", event.target.value)} error={errors.scholarshipGuardianEmploymentStatus} className={inputClass(errors.scholarshipGuardianEmploymentStatus)}>
-                <option value="">Select employment status</option>
-                {EMPLOYMENT_STATUS_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
-              </SelectField>
-            </div>
-            <div className="rounded-[1rem] border border-[#2D8A6A]/15 bg-white p-4 md:col-span-2">
-              <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]" htmlFor="scholarshipReason">Why do you need this scholarship?</label>
-              <textarea id="scholarshipReason" rows={4} value={controlledValue(form.scholarshipReason)} onChange={(event) => updateField("scholarshipReason", event.target.value)} className={inputClass(errors.scholarshipReason)} placeholder="Share your financial need and why you are requesting support." />
-              <FieldError error={errors.scholarshipReason} />
-            </div>
-            <div className="rounded-[1rem] border border-[#2D8A6A]/15 bg-white p-4 md:col-span-2">
-              <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]" htmlFor="scholarshipSupportingDocumentFile">Supporting document</label>
-              <input id="scholarshipSupportingDocumentFile" type="file" accept="image/*,.pdf" onChange={(event) => void handleFileSelection("scholarshipSupportingDocumentFile", event.target.files?.[0] || null)} className={inputClass(errors.scholarshipSupportingDocumentFile)} />
-              <FieldError error={errors.scholarshipSupportingDocumentFile} />
-              <FilePreview file={form.scholarshipSupportingDocumentFile} />
             </div>
           </div>
         </div>
@@ -1695,25 +1605,30 @@ function AdmissionFormContent() {
               <p className="text-sm text-[#245C4F]">Please use the selected payment details below before uploading your payment proof.</p>
               <div className="grid gap-3 md:grid-cols-3">
                 <div className="rounded-[1rem] border border-[#2D8A6A]/15 bg-[#FAF7F0] p-4">
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]">Monthly fee</p>
+                  <p className="mt-3 text-xl font-bold text-[#063F32]">
+                    {previewRegularFee ? `PKR ${previewRegularFeeAmount.toLocaleString("en-PK")}` : "No monthly fee selected"}
+                  </p>
+                </div>
+                <div className="rounded-[1rem] border border-[#2D8A6A]/15 bg-[#FAF7F0] p-4">
                   <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]">Admission fee</p>
                   <p className="mt-3 text-xl font-bold text-[#063F32]">
                     {liveSelectedAdmissionFee ? `PKR ${liveAdmissionFeeAmount.toLocaleString("en-PK")}` : "No admission fee selected"}
                   </p>
-                  <p className="mt-2 text-sm text-[#245C4F]">
-                    {liveSelectedAdmissionFee?.title || liveSelectedAdmissionFee?.name || "Choose an admission-fee item from fee management."}
-                  </p>
                 </div>
+                {liveDiscountPercent > 0 ? (
                 <div className="rounded-[1rem] border border-[#2D8A6A]/15 bg-[#FAF7F0] p-4">
                   <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]">Discount</p>
                   <p className="mt-3 text-xl font-bold text-[#063F32]">
-                    {liveDiscountPercent ? `${liveDiscountPercent}%` : "No discount selected"}
+                    {liveDiscountPercent}%
                   </p>
-                  <p className="mt-2 text-sm text-[#245C4F]">Allowed discounts are limited to coordinator-approved values up to 20%.</p>
+                  <p className="mt-2 text-sm text-[#245C4F]">Coordinator-approved discount applied on the monthly fee.</p>
                 </div>
+                ) : null}
                 <div className="rounded-[1rem] border border-[#2D8A6A]/15 bg-[#FAF7F0] p-4">
                   <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]">Total amount</p>
                   <p className="mt-3 text-xl font-bold text-[#063F32]">PKR {liveTotalAmount.toLocaleString("en-PK")}</p>
-                  <p className="mt-2 text-sm text-[#245C4F]">Regular fee minus discount plus admission fee.</p>
+                  <p className="mt-2 text-sm text-[#245C4F]">Monthly fee minus discount plus admission fee.</p>
                 </div>
               </div>
             <div className="rounded-[1rem] border border-[#2D8A6A]/10 bg-[#FAF7F0] p-4">
@@ -1733,7 +1648,7 @@ function AdmissionFormContent() {
                 className="mt-1 h-4 w-4 rounded border-[#2D8A6A]/30 text-[#0D5C48] focus:ring-[#C9A227]"
               />
               <span>
-                <span className="block font-semibold">Do you willing to avail need based scholarship?</span>
+                <span className="block font-semibold">Do you want to avail need based scholarship?</span>
                 <span className="mt-1 block text-[#245C4F]">
                   Need base scholarship is for Zakat, Khairat and Atiyah.
                 </span>
@@ -1905,7 +1820,7 @@ function AdmissionFormContent() {
                 <p className="mt-2 text-sm text-[#245C4F]">Choose an admission-fee item from fee management.</p>
               </div>
 
-              <div className="rounded-[1rem] border border-[#2D8A6A]/15 bg-white p-4">
+              {!form.needBasedScholarshipRequested ? <div className="rounded-[1rem] border border-[#2D8A6A]/15 bg-white p-4">
                 <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]" htmlFor="previewDiscountPercent">
                   Discount
                 </label>
@@ -1926,7 +1841,7 @@ function AdmissionFormContent() {
                     ))}
                 </SelectField>
                 <p className="mt-2 text-sm text-[#245C4F]">Allowed discounts are limited to coordinator-approved values up to 20%.</p>
-              </div>
+              </div> : null}
             </div>
 
             <div className="rounded-[1rem] border border-[#2D8A6A]/10 bg-white p-4">
@@ -1955,7 +1870,7 @@ function AdmissionFormContent() {
                 className="mt-1 h-4 w-4 rounded border-[#2D8A6A]/30 text-[#0D5C48] focus:ring-[#C9A227]"
               />
               <span>
-                <span className="block font-semibold">Do you willing to avail need based scholarship?</span>
+                <span className="block font-semibold">Do you want to avail need based scholarship?</span>
                 <span className="mt-1 block text-[#245C4F]">
                   Need base scholarship is for Zakat, Khairat and Atiyah.
                 </span>
@@ -1975,11 +1890,11 @@ function AdmissionFormContent() {
                   {previewAdmissionFee?.title || previewAdmissionFee?.name || "Choose an admission-fee item from fee management."}
                 </p>
               </div>
-              <div className="rounded-[1rem] border border-[#2D8A6A]/15 bg-white p-4">
+              {!form.needBasedScholarshipRequested ? <div className="rounded-[1rem] border border-[#2D8A6A]/15 bg-white p-4">
                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]">Discount</p>
                 <p className="mt-3 text-2xl font-bold text-[#063F32]">{previewDiscountPercent ? `${previewDiscountPercent}%` : "No discount selected"}</p>
                 <p className="mt-2 text-sm text-[#245C4F]">Allowed discounts are limited to coordinator-approved values up to 20%.</p>
-              </div>
+              </div> : null}
               <div className="rounded-[1rem] border border-[#2D8A6A]/15 bg-white p-4">
                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]">Regular fee</p>
                 <p className="mt-3 text-2xl font-bold text-[#063F32]">{previewRegularFee ? `PKR ${previewRegularFeeAmount.toLocaleString("en-PK")}` : "No regular fee selected"}</p>
@@ -2013,16 +1928,6 @@ function AdmissionFormContent() {
   function renderDeclarationStep() {
     return (
       <div className="grid gap-5 rounded-[1.35rem] border border-[rgba(13,59,46,0.08)] bg-white/95 p-4 shadow-[0_12px_28px_rgba(13,59,46,0.05)] sm:p-6">
-        <div>
-          <label className="mb-2 block text-[11px] font-bold uppercase tracking-[0.18em] text-[#0D5C48]" htmlFor="whyJoinSchool">Why do you wish your child to join Ash-Shajarah?</label>
-          <textarea id="whyJoinSchool" rows={4} value={form.whyJoinSchool} onChange={(event) => updateField("whyJoinSchool", event.target.value)} className={inputClass(errors.whyJoinSchool)} />
-          <FieldError error={errors.whyJoinSchool} />
-        </div>
-        <div>
-          <label className="mb-2 block text-[11px] font-bold uppercase tracking-[0.18em] text-[#0D5C48]" htmlFor="schoolExpectations">What are your expectations from this school?</label>
-          <textarea id="schoolExpectations" rows={4} value={form.schoolExpectations} onChange={(event) => updateField("schoolExpectations", event.target.value)} className={inputClass(errors.schoolExpectations)} />
-          <FieldError error={errors.schoolExpectations} />
-        </div>
         <div className="rounded-[1.5rem] border border-[rgba(201,162,39,0.22)] bg-[#FFF5D6]/80 p-5 text-sm leading-7 text-[#245C4F] shadow-[0_10px_22px_rgba(201,162,39,0.08)]">
           <p className="font-display font-semibold text-[#063F32]">Declaration & Parent Commitment</p>
           <p className="mt-3">I/We declare that all information provided in this application is true and correct to the best of our knowledge.</p>

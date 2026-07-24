@@ -33,8 +33,7 @@ export async function GET() {
         COALESCE(child_summary.student_statuses, '') AS child_statuses,
         COALESCE(child_summary.student_genders, '') AS child_genders,
         COALESCE(child_summary.student_birth_dates, '') AS child_birth_dates,
-        COALESCE(child_summary.student_programs, '') AS child_programs,
-        COALESCE(child_summary.student_schools, '') AS child_schools
+        COALESCE(child_summary.student_programs, '') AS child_programs
       FROM users u
       LEFT JOIN parent_profiles pp ON pp.user_id = u.id
       LEFT JOIN LATERAL (
@@ -47,8 +46,7 @@ export async function GET() {
           STRING_AGG(COALESCE(sp.status::text, ''), ', ' ORDER BY su.full_name) AS student_statuses,
           STRING_AGG(COALESCE(rl.gender, ''), ', ' ORDER BY su.full_name) AS student_genders,
           STRING_AGG(COALESCE(rl.date_of_birth::text, ''), ', ' ORDER BY su.full_name) AS student_birth_dates,
-          STRING_AGG(COALESCE(rl.program_name, ''), ', ' ORDER BY su.full_name) AS student_programs,
-          STRING_AGG(COALESCE(rl.current_school, ''), ', ' ORDER BY su.full_name) AS student_schools
+          STRING_AGG(COALESCE(rl.program_name, ''), ', ' ORDER BY su.full_name) AS student_programs
         FROM student_parents spp
         INNER JOIN student_profiles sp ON sp.id = spp.student_id
         INNER JOIN users su ON su.id = sp.user_id

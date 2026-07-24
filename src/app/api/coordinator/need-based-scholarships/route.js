@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import prisma from "@/lib/prisma";
-import { createSignedAdmissionDocumentUrl } from "@/lib/supabaseStorage";
 
 const ALLOWED_ROLES = new Set(["admin", "coordinator", "superadmin"]);
 
@@ -23,14 +22,10 @@ export async function GET() {
         nbsf.registration_id::text AS registration_id,
         nbsf.interested_student_id::text AS interested_student_id,
         nbsf.lead_token,
-        nbsf.monthly_income::float8 AS monthly_income,
         nbsf.dependents_count,
         nbsf.school_going_children_count,
         nbsf.residence_type,
-        nbsf.guardian_employment_status,
         nbsf.requested_amount::float8 AS requested_amount,
-        nbsf.reason,
-        nbsf.supporting_document_file_path,
         LOWER(
           COALESCE(
             latest_submission.status::text,
@@ -67,16 +62,7 @@ export async function GET() {
       ORDER BY nbsf.created_at DESC NULLS LAST, nbsf.id DESC
     `;
 
-    const itemsWithPreview = await Promise.all(
-      items.map(async (item) => ({
-        ...item,
-        supporting_document_preview_url: item.supporting_document_file_path
-          ? await createSignedAdmissionDocumentUrl(item.supporting_document_file_path).catch(() => "")
-          : "",
-      }))
-    );
-
-    return json("Need-based scholarship records fetched.", 200, { items: itemsWithPreview });
+    return json("Need-based scholarship records fetched.", 200, { items });
   } catch (error) {
     return json(error instanceof Error ? error.message : "Unable to fetch scholarship records.", 500);
   }

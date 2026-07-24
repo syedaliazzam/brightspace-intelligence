@@ -1043,6 +1043,7 @@ export default function AdminUsersPage() {
                 {
                   key: "student_names",
                   label: "Students",
+                  cellClassName: "min-w-[18rem]",
                   render: (row) => row.student_names || "-",
                 },
                 {
@@ -1252,11 +1253,9 @@ export default function AdminUsersPage() {
                           ["Age", detailModal.record.age],
                           ["Course", detailModal.record.course_title],
                           ["Program", detailModal.record.program_name],
-                          ["Current school", detailModal.record.current_school],
                           ["City / country", detailModal.record.city_country],
                           ["Religion", detailModal.record.religion],
                           ["Gender", detailModal.record.gender],
-                          ["Preferred language", detailModal.record.preferred_language],
                           ["Support person", detailModal.record.support_person_during_learning],
                           ["Device available", detailModal.record.device_available],
                         ].map(([label, value]) => (

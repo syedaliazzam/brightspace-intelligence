@@ -131,7 +131,8 @@ export default function StudentTable({ items = [], onRefresh, classOptions = [] 
 
   return (
     <div className="overflow-hidden rounded-[2rem] border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(250,247,240,0.98)_100%)] shadow-[0_20px_70px_-36px_rgba(13,59,46,0.18)] backdrop-blur-xl">
-      <div className="hidden grid-cols-[1.4fr_1fr_1fr_1fr_220px] gap-4 border-b border-[#F1EADC] bg-[linear-gradient(180deg,#FAF7F0_0%,#F1EADC_100%)] px-6 py-4 text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48] lg:grid">
+      <div className="hidden grid-cols-[0.9fr_1.4fr_1fr_1fr_1fr_220px] gap-4 border-b border-[#F1EADC] bg-[linear-gradient(180deg,#FAF7F0_0%,#F1EADC_100%)] px-6 py-4 text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48] lg:grid">
+        <span>Registration No</span>
         <span>Student</span>
         <span>Class</span>
         <span>Parent</span>
@@ -141,12 +142,18 @@ export default function StudentTable({ items = [], onRefresh, classOptions = [] 
       <div className="divide-y divide-[#F1EADC]">
         {items.length ? (
           items.map((item) => (
-            <div key={item.id} className="grid gap-3 px-5 py-4 lg:grid-cols-[1.4fr_1fr_1fr_1fr_220px] lg:items-center lg:gap-4">
+            <div key={item.id} className="grid gap-3 px-5 py-4 lg:grid-cols-[0.9fr_1.4fr_1fr_1fr_1fr_220px] lg:items-center lg:gap-4">
+              <p className="text-sm font-semibold text-[#063F32]">{item.admission_no || "-"}</p>
               <div>
                 <p className="font-semibold text-[#063F32]">{item.full_name}</p>
-                <p className="mt-1 text-sm text-[#245C4F]">
-                  {item.email || item.student_email || item.user_email || item.phone || item.student_phone || item.admission_no || "No contact"}
+                <p className="mt-1 text-xs font-semibold uppercase tracking-[0.16em] text-[#0D5C48] lg:hidden">
+                  Registration No: {item.admission_no || "-"}
                 </p>
+                {item.email || item.student_email || item.user_email || item.phone || item.student_phone ? (
+                  <p className="mt-1 text-sm text-[#245C4F]">
+                    {item.email || item.student_email || item.user_email || item.phone || item.student_phone}
+                  </p>
+                ) : null}
               </div>
               <p className="text-sm text-[#245C4F]">{item.grade_level || item.course_title || "-"}</p>
               <div className="text-sm text-[#245C4F]">
@@ -229,15 +236,12 @@ export default function StudentTable({ items = [], onRefresh, classOptions = [] 
                   <dl className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                     <DetailRow label="Lead student name" value={detailItem.lead_student_name} />
                     <DetailRow label="Programme" value={detailItem.program_name} />
-                    <DetailRow label="Current school" value={detailItem.current_school} />
                     <DetailRow label="Date of birth" value={formatDate(detailItem.date_of_birth)} />
                     <DetailRow label="Gender" value={detailItem.gender} />
-                    <DetailRow label="City" value={detailItem.city_country} />
+                    <DetailRow label="City" value={detailItem.city} />
                     <DetailRow label="Nationality" value={detailItem.nationality} />
-                    <DetailRow label="Preferred language" value={detailItem.preferred_language} />
                     <DetailRow label="Admission email" value={detailItem.lead_email} />
                     <DetailRow label="Admission phone" value={detailItem.lead_phone} />
-                    <DetailRow label="Registration lead id" value={detailItem.registration_lead_id} />
                   </dl> 
                 </section>
               </div>
@@ -290,14 +294,6 @@ export default function StudentTable({ items = [], onRefresh, classOptions = [] 
                   <input
                     value={form.full_name}
                     onChange={(e) => setForm((current) => ({ ...current, full_name: e.target.value }))}
-                    className="w-full rounded-2xl border border-[#2D8A6A]/20 bg-white px-4 py-3 text-sm text-[#063F32] outline-none transition focus:border-[#2D8A6A] focus:ring-4 focus:ring-[#C9A227]/20"
-                  />
-                </label>
-                <label className="space-y-2">
-                  <span className="text-sm font-medium text-[#245C4F]">Admission Number</span>
-                  <input
-                    value={form.admission_no}
-                    onChange={(e) => setForm((current) => ({ ...current, admission_no: e.target.value }))}
                     className="w-full rounded-2xl border border-[#2D8A6A]/20 bg-white px-4 py-3 text-sm text-[#063F32] outline-none transition focus:border-[#2D8A6A] focus:ring-4 focus:ring-[#C9A227]/20"
                   />
                 </label>

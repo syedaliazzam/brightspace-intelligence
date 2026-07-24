@@ -5,9 +5,9 @@ import { motion } from "framer-motion";
 import PaginationControls from "@/components/teacher/PaginationControls";
 import { OpenBookLoader } from "@/components/shared/AshShajrahLoaders";
 
-function renderValue(column, row) {
+function renderValue(column, row, index) {
   if (typeof column.render === "function") {
-    return column.render(row);
+    return column.render(row, index);
   }
 
   const value = row?.[column.key];
@@ -87,7 +87,7 @@ export default function AdminDataTable({
                       key={column.key}
                       className={`px-6 py-5 align-top text-sm text-[#245C4F] ${column.cellClassName || ""}`}
                     >
-                      {renderValue(column, row)}
+                      {renderValue(column, row, index)}
                     </td>
                   ))}
                   {effectiveActions ? (
@@ -126,7 +126,7 @@ export default function AdminDataTable({
                     {column.label}
                   </p>
                   <div className="mt-1 text-sm text-[#245C4F]">
-                    {renderValue(column, row)}
+                    {renderValue(column, row, index)}
                   </div>
                 </div>
               ))}
