@@ -48,6 +48,7 @@ export const dashboardNavigation = {
   ],
   coordinator: [
     { label: "Dashboard", href: "/coordinator/dashboard" },
+    { label: "Class Schedulars", href: "/coordinator/class-schedulers" },
     { label: "Interested Students", href: "/coordinator/interested-students" },
     { label: "Parent Interview Forms", href: "/coordinator/parent-interview-forms" },
     { label: "Admission Records", href: "/coordinator/registration-leads" },

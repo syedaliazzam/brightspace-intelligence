@@ -286,7 +286,7 @@ export default function LMSCalendar({ apiUrl, filters = {}, extraParams = {}, on
                 <div className="rounded-2xl border border-[#2D8A6A]/15 bg-[#FAF7F0] p-4">
                   <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                     <div className="min-w-0 flex-1">
-                      <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#C9A227]">Meet link</p>
+                      <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#C9A227]">Class Joining link</p>
                       <p className="mt-2 break-all text-sm text-[#245C4F]">{selected.google_meet_link}</p>
                     </div>
                     <div className="flex flex-wrap gap-2">
