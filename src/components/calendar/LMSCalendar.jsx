@@ -49,24 +49,30 @@ function pickActiveTime(lecture) {
   return { start, end };
 }
 
-function getLectureTimeState(lecture) {
-  const { start: startValue, end: endValue } = pickActiveTime(lecture);
-  const start = startValue ? new Date(String(startValue).replace(" ", "T")) : null;
-  const end = endValue ? new Date(String(endValue).replace(" ", "T")) : null;
-  if (!start || Number.isNaN(start.getTime()) || !end || Number.isNaN(end.getTime())) return "upcoming";
-  const now = new Date();
-  if (now < start) return "upcoming";
-  if (now >= start && now <= end) return "live";
-  return "ended";
+function getLectureClassLabel(lecture) {
+  return (
+    lecture?.class_level ||
+    lecture?.classLevel ||
+    lecture?.course_title ||
+    lecture?.courseTitle ||
+    lecture?.course_name ||
+    lecture?.courseName ||
+    lecture?.class_name ||
+    lecture?.className ||
+    lecture?.grade_level ||
+    lecture?.gradeLevel ||
+    ""
+  );
 }
 
-export default function LMSCalendar({ apiUrl, filters = {}, extraParams = {}, onDateSelect, onEventClick, title = "Lecture calendar", popupMode = "screen" }) {
+export default function LMSCalendar({ apiUrl, filters = {}, extraParams = {}, onDateSelect, onEventClick, popupMode = "screen" }) {
   const calendarRef = useRef(null);
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [selected, setSelected] = useState(null);
-  const [view, setView] = useState("dayGridMonth");
+  const [view, setView] = useState("timeGridWeek");
+  const [copyToast, setCopyToast] = useState("");
   const activeDate = filters.date || formatLocalDate(new Date());
   const firstEventDate = events[0]?.start ? String(events[0].start).slice(0, 10) : "";
 
@@ -120,6 +126,7 @@ export default function LMSCalendar({ apiUrl, filters = {}, extraParams = {}, on
             const startText = startDate ? new Date(startDate).toLocaleTimeString("en-PK", { timeZone: APP_TIMEZONE, hour: "2-digit", minute: "2-digit" }) : "";
             const endText = endDate ? new Date(endDate).toLocaleTimeString("en-PK", { timeZone: APP_TIMEZONE, hour: "2-digit", minute: "2-digit" }) : "";
             const palette = displayStatus === "live" ? ["#2563eb", "#1d4ed8"] : ["#75797D", "#666A6E"];
+            const classLevel = getLectureClassLabel(lecture);
             return {
               id: lecture.id,
               title: `${startText}${endText ? ` - ${endText}` : ""}${lecture.subject_name ? ` ${lecture.subject_name}` : ""}`,
@@ -132,6 +139,10 @@ export default function LMSCalendar({ apiUrl, filters = {}, extraParams = {}, on
                 lecture_id: lecture.id,
                 title: lecture.title,
                 subject_name: lecture.subject_name,
+                class_level: classLevel,
+                class_name: lecture.class_name || lecture.className || "",
+                course_title: lecture.course_title || lecture.courseTitle || "",
+                grade_level: lecture.grade_level || lecture.gradeLevel || "",
                 teacher_name: lecture.teacher_name,
                 scheduled_start: activeStartValue,
                 scheduled_end: activeEndValue,
@@ -170,42 +181,20 @@ export default function LMSCalendar({ apiUrl, filters = {}, extraParams = {}, on
     onDateSelect?.(info.dateStr);
   }
 
-  function changeView(nextView) {
-    setView(nextView);
-    const api = calendarRef.current?.getApi?.();
-    const targetDate = nextView === "timeGridDay" ? firstEventDate || activeDate : activeDate;
-    if (targetDate) api?.gotoDate?.(targetDate);
-    api?.changeView(nextView);
+  async function handleCopyMeetLink(link) {
+    if (!link) return;
+    try {
+      await navigator.clipboard.writeText(link);
+      setCopyToast("Meet link copied.");
+      window.setTimeout(() => setCopyToast(""), 2200);
+    } catch {
+      setCopyToast("Unable to copy meet link.");
+      window.setTimeout(() => setCopyToast(""), 2200);
+    }
   }
 
   return (
-    <div className="relative rounded-[1.75rem] border border-[#2D8A6A]/15 bg-[#FAF7F0] p-4 px-6 shadow-[0_20px_70px_-36px_rgba(13,59,46,0.18)]">
-      <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-        <div>
-          <h3 className="mt-0 text-xl font-semibold tracking-tight text-[#063F32]">{title || "Month, week and day view"}</h3>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {[
-            ["dayGridMonth", "Month"],
-            ["timeGridWeek", "Week"],
-            ["timeGridDay", "Day"],
-          ].map(([nextView, label]) => (
-            <button
-              key={nextView}
-              type="button"
-              onClick={() => changeView(nextView)}
-              className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
-                view === nextView
-                  ? "bg-[linear-gradient(135deg,#C9A227,#E4C766)] text-[#063F32] shadow-[0_10px_24px_-14px_rgba(201,162,39,0.5)]"
-                  : "bg-white text-[#245C4F] hover:bg-[#F1EADC]"
-              }`}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-      </div>
-
+    <div className="relative rounded-[1.75rem] bg-[#FAF7F0] p-0 px-0 shadow-[0_20px_70px_-36px_rgba(13,59,46,0.18)]">
       {error ? <div className="mb-4 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">{error}</div> : null}
 
       <div className="overflow-hidden rounded-[1.5rem] border border-[#2D8A6A]/15 bg-white p-3">
@@ -215,7 +204,7 @@ export default function LMSCalendar({ apiUrl, filters = {}, extraParams = {}, on
           plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
           initialView={view}
           initialDate={activeDate}
-          headerToolbar={{ left: "prev,next today", center: "title", right: "dayGridMonth,timeGridWeek,timeGridDay" }}
+          headerToolbar={{ left: "prev,next today", center: "title", right: "dayGridMonth,timeGridWeek" }}
           events={events}
           eventClick={handleEventClick}
           dateClick={handleDateClick}
@@ -224,21 +213,38 @@ export default function LMSCalendar({ apiUrl, filters = {}, extraParams = {}, on
           selectable={false}
           editable={false}
           weekends
+          allDaySlot={false}
           timeZone={APP_TIMEZONE}
           eventDisplay="block"
           eventTimeFormat={{ hour: "numeric", minute: "2-digit", hour12: true }}
           loading={setLoading}
-          slotMinTime="00:00:00"
-          slotMaxTime="24:00:00"
+          slotMinTime="08:00:00"
+          slotMaxTime="17:00:00"
+          scrollTime="08:00:00"
+          slotDuration="01:00:00"
+          expandRows
+          datesSet={(info) => {
+            const nextView = info?.view?.type;
+            if (nextView && nextView !== view) setView(nextView);
+          }}
           eventClassNames={() => ["cursor-pointer"]}
           eventContent={(arg) => (
             <div className="overflow-hidden px-1 text-[11px] leading-tight text-white">
               <div className="truncate font-semibold">{arg.event.title}</div>
+              {arg.event.extendedProps?.class_level ? (
+                <div className="truncate text-[10px] text-white/90">{arg.event.extendedProps.class_level}</div>
+              ) : null}
             </div>
           )}
         />
         {loading ? <p className="mt-3 text-sm text-[#245C4F]">Loading lectures...</p> : null}
       </div>
+
+      {copyToast ? (
+        <div className="absolute right-4 top-4 z-[10000] rounded-2xl border border-[#2D8A6A]/20 bg-[linear-gradient(135deg,#0D3B2E,#0D5C48)] px-4 py-3 text-sm font-semibold text-[#FFF5D6] shadow-[0_18px_40px_-24px_rgba(13,59,46,0.55)]">
+          {copyToast}
+        </div>
+      ) : null}
 
       {selected ? (
         <div
@@ -253,7 +259,10 @@ export default function LMSCalendar({ apiUrl, filters = {}, extraParams = {}, on
               <div>
                 <p className="text-sm font-semibold uppercase tracking-[0.24em] text-[#C9A227]">Lecture details</p>
                 <h3 className="mt-2 text-2xl font-semibold tracking-tight text-[#063F32]">{selected.title || "Lecture"}</h3>
-                <p className="mt-1 text-sm text-[#245C4F]">{selected.subject_name || "Subject not available"}</p>
+                <p className="mt-1 text-sm text-[#245C4F]">
+                  {selected.subject_name || "Subject not available"}
+                  {selected.class_level ? ` - ${selected.class_level}` : ""}
+                </p>
               </div>
               <button
                 type="button"
@@ -267,12 +276,40 @@ export default function LMSCalendar({ apiUrl, filters = {}, extraParams = {}, on
               </button>
             </div>
             <div className="space-y-3 p-6 text-sm text-[#245C4F]">
+              <p><strong className="text-[#063F32]">Class:</strong> {getLectureClassLabel(selected) || "Not available"}</p>
               <p><strong className="text-[#063F32]">Teacher:</strong> {selected.teacher_name || "Not available"}</p>
               <p><strong className="text-[#063F32]">Start:</strong> {formatLocalDateTime(selected.scheduled_start)}</p>
               <p><strong className="text-[#063F32]">End:</strong> {formatLocalDateTime(selected.scheduled_end)}</p>
               <p><strong className="text-[#063F32]">Status:</strong> {selected.display_status || selected.status || "Not available"}</p>
               <p className="whitespace-pre-line"><strong className="text-[#063F32]">Description:</strong> {selected.description || "Not available"}</p>
-              {selected.event_detail_link ? (
+              {selected.google_meet_link ? (
+                <div className="rounded-2xl border border-[#2D8A6A]/15 bg-[#FAF7F0] p-4">
+                  <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#C9A227]">Meet link</p>
+                      <p className="mt-2 break-all text-sm text-[#245C4F]">{selected.google_meet_link}</p>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <a
+                        href={selected.google_meet_link}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex rounded-full bg-[linear-gradient(135deg,#0D3B2E,#0D5C48)] px-4 py-2 text-sm font-semibold text-[#FFF5D6]"
+                      >
+                        Join Class
+                      </a>
+                      <button
+                        type="button"
+                        onClick={() => handleCopyMeetLink(selected.google_meet_link)}
+                        className="rounded-full border border-[#2D8A6A]/20 bg-white px-4 py-2 text-sm font-semibold text-[#0D5C48] hover:bg-[#F1EADC]"
+                      >
+                        Copy
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ) : null}
+              {selected.event_detail_link && selected.event_detail_link.href !== selected.google_meet_link ? (
                 <a
                   href={selected.event_detail_link.href}
                   target="_blank"
@@ -286,6 +323,114 @@ export default function LMSCalendar({ apiUrl, filters = {}, extraParams = {}, on
           </div>
         </div>
       ) : null}
+
+      <style jsx global>{`
+        .fc {
+          --fc-border-color: rgba(13, 92, 72, 0.12);
+          --fc-page-bg-color: #ffffff;
+          --fc-neutral-bg-color: #faf7f0;
+          --fc-today-bg-color: rgba(201, 162, 39, 0.08);
+          --fc-now-indicator-color: #c94f4f;
+        }
+
+        .fc .fc-toolbar.fc-header-toolbar {
+          margin-bottom: 1rem;
+        }
+
+        .fc .fc-toolbar-title {
+          color: #063f32;
+          font-size: 1.05rem;
+          font-weight: 700;
+          letter-spacing: -0.02em;
+        }
+
+        .fc .fc-button {
+          border-radius: 999px;
+          border: 1px solid rgba(45, 138, 106, 0.16);
+          background: #ffffff;
+          color: #245c4f;
+          box-shadow: none;
+          font-weight: 600;
+          text-transform: capitalize;
+        }
+
+        .fc .fc-button:hover,
+        .fc .fc-button:focus {
+          background: #f1eadc;
+          color: #063f32;
+          box-shadow: none;
+        }
+
+        .fc .fc-button-primary:not(:disabled).fc-button-active,
+        .fc .fc-button-primary:not(:disabled):active {
+          border-color: rgba(201, 162, 39, 0.45);
+          background: linear-gradient(135deg, #c9a227, #e4c766);
+          color: #063f32;
+          box-shadow: 0 10px 24px -14px rgba(201, 162, 39, 0.5);
+        }
+
+        .fc .fc-scrollgrid,
+        .fc .fc-timegrid-slot,
+        .fc .fc-timegrid-axis,
+        .fc .fc-col-header-cell,
+        .fc .fc-daygrid-day,
+        .fc .fc-daygrid-day-frame {
+          border-color: rgba(13, 92, 72, 0.12) !important;
+        }
+
+        .fc .fc-col-header-cell {
+          background: #faf7f0;
+        }
+
+        .fc .fc-col-header-cell-cushion {
+          padding: 0.9rem 0.35rem;
+          color: #063f32;
+          font-size: 0.82rem;
+          font-weight: 700;
+          letter-spacing: 0.08em;
+          text-transform: uppercase;
+        }
+
+        .fc .fc-timegrid-axis-cushion,
+        .fc .fc-timegrid-slot-label-cushion {
+          color: #245c4f;
+          font-size: 0.78rem;
+          font-weight: 600;
+        }
+
+        .fc .fc-timegrid-slot {
+          height: 4.2rem;
+          background-image: linear-gradient(to bottom, rgba(13, 92, 72, 0.03), rgba(13, 92, 72, 0.03));
+          background-size: 100% 1px;
+          background-repeat: no-repeat;
+          background-position: bottom;
+        }
+
+        .fc .fc-timegrid-col-frame {
+          min-height: 100%;
+        }
+
+        .fc .fc-timegrid-now-indicator-line {
+          border-color: #c94f4f;
+          border-width: 2px;
+        }
+
+        .fc .fc-timegrid-now-indicator-arrow {
+          border-top-color: #c94f4f;
+          border-bottom-color: #c94f4f;
+        }
+
+        .fc .fc-daygrid-day-number {
+          color: #245c4f;
+          font-weight: 600;
+          padding: 0.5rem;
+        }
+
+        .fc .fc-event {
+          border-radius: 0.9rem;
+          padding: 0.15rem;
+        }
+      `}</style>
     </div>
   );
 }

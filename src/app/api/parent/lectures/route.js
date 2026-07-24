@@ -134,7 +134,7 @@ export async function GET(request) {
     const items = await prisma.$queryRawUnsafe(
       `
       WITH allowed_students AS (
-        SELECT sp.id, u.full_name
+        SELECT sp.id, u.full_name, sp.grade_level
         FROM student_profiles sp
         INNER JOIN users u ON u.id = sp.user_id
         ${String(session.user.role).toLowerCase() === "admin" ? "" : "INNER JOIN student_parents spp ON spp.student_id = sp.id INNER JOIN parent_profiles pp ON pp.id = spp.parent_id"}
@@ -153,6 +153,7 @@ export async function GET(request) {
         sub.name AS subject_name,
         tu.full_name AS teacher_name,
         a.full_name AS student_name,
+        COALESCE(NULLIF(a.grade_level, ''), NULLIF(rl.class_level, ''), NULLIF(c.class_level, ''), NULLIF(c.title, ''), '') AS class_level,
         c.title AS course_title
       FROM lecture_schedules ls
       INNER JOIN enrollments e ON e.id = ls.enrollment_id
@@ -170,6 +171,7 @@ export async function GET(request) {
       INNER JOIN users tu ON tu.id = tp.user_id
       INNER JOIN subjects sub ON sub.id = ls.subject_id
       INNER JOIN courses c ON c.id = e.course_id
+      LEFT JOIN registration_leads rl ON rl.id = e.registration_id
       ${where}
       ORDER BY ls.id ASC, ls.scheduled_start ASC
       `,

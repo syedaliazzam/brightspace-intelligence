@@ -137,10 +137,13 @@ export async function GET(request) {
           ) AS display_status,
           sub.name AS subject_name,
           tu.full_name AS teacher_name,
+          COALESCE(NULLIF(sp.grade_level, ''), NULLIF(rl.class_level, ''), NULLIF(c.class_level, ''), NULLIF(c.title, ''), '') AS class_level,
           c.title AS course_title
         FROM lecture_schedules ls
         INNER JOIN enrollments e ON e.id = ls.enrollment_id
         INNER JOIN courses c ON c.id = e.course_id
+        LEFT JOIN student_profiles sp ON sp.id = COALESCE(ls.student_id, e.student_id)
+        LEFT JOIN registration_leads rl ON rl.id = e.registration_id
         INNER JOIN subjects sub ON sub.id = ls.subject_id
         INNER JOIN teacher_profiles tp ON tp.id = ls.teacher_id
         INNER JOIN users tu ON tu.id = tp.user_id
