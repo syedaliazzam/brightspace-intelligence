@@ -8,7 +8,7 @@ import { createCalendarLectureEvent, extractMeetCodeFromLink } from "@/lib/googl
 import { requireRole, roleGuardResponse } from "@/lib/roleGuard";
 import { CLASS_SUBJECTS } from "@/lib/academicCatalog";
 
-const ALLOWED_ROLES = ["admin", "coordinator"];
+const ALLOWED_ROLES = ["admin", "coordinator", "superadmin"];
 const LOCAL_NOW_SQL = "CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Karachi'";
 const DISPLAY_STATUS_SQL = `
   LOWER(

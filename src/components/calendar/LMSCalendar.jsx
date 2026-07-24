@@ -290,6 +290,13 @@ export default function LMSCalendar({ apiUrl, filters = {}, extraParams = {}, on
                       <p className="mt-2 break-all text-sm text-[#245C4F]">{selected.google_meet_link}</p>
                     </div>
                     <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handleCopyMeetLink(selected.google_meet_link)}
+                        className="rounded-full border border-[#2D8A6A]/20 bg-white px-4 py-2 text-sm font-semibold text-[#0D5C48] hover:bg-[#F1EADC]"
+                      >
+                        Copy
+                      </button>
                       <a
                         href={selected.google_meet_link}
                         target="_blank"
@@ -298,13 +305,6 @@ export default function LMSCalendar({ apiUrl, filters = {}, extraParams = {}, on
                       >
                         Join Class
                       </a>
-                      <button
-                        type="button"
-                        onClick={() => handleCopyMeetLink(selected.google_meet_link)}
-                        className="rounded-full border border-[#2D8A6A]/20 bg-white px-4 py-2 text-sm font-semibold text-[#0D5C48] hover:bg-[#F1EADC]"
-                      >
-                        Copy
-                      </button>
                     </div>
                   </div>
                 </div>
