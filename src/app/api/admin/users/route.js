@@ -143,6 +143,27 @@ function extractStudentTemporaryPassword(bodyText) {
   return matches.length > 1 ? matches[1][1].trim() : matches[0]?.[1]?.trim() || "";
 }
 
+function extractParentTemporaryPassword(bodyText) {
+  const text = String(bodyText || "");
+  const parentPasswordLabelMatch = text.match(
+    /Parent Temporary Password:\s*([^\n\r]+)/i
+  );
+
+  if (parentPasswordLabelMatch?.[1]) {
+    return parentPasswordLabelMatch[1].trim();
+  }
+
+  const parentSectionMatch = text.match(
+    /Parent Login[\s\S]*?Temporary Password:\s*([^\n\r]+)/i
+  );
+
+  if (parentSectionMatch?.[1]) {
+    return parentSectionMatch[1].trim();
+  }
+
+  return extractTemporaryPassword(text);
+}
+
 function extractStaffTemporaryPassword(bodyText) {
   const text = String(bodyText || "");
   const staffSectionMatch = text.match(
@@ -383,7 +404,9 @@ export async function GET(request) {
       ...user,
       temporary_password:
         String(user.role || "").toLowerCase() === "student"
-          ? extractStudentTemporaryPassword(user.latest_credentials_body_text)
+          ? String(user.password_hash || "") || extractStudentTemporaryPassword(user.latest_credentials_body_text)
+          : String(user.role || "").toLowerCase() === "parent"
+            ? String(user.password_hash || "") || extractParentTemporaryPassword(user.latest_credentials_body_text)
           : String(user.role || "").toLowerCase() === "superadmin" ||
               String(user.role || "").toLowerCase() === "admin" ||
               String(user.role || "").toLowerCase() === "coordinator" ||
