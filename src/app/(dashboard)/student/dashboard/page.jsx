@@ -149,7 +149,7 @@ export default function StudentDashboardPage() {
             {state.error ? <div className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">{state.error}</div> : null}
             <div className="mt-6">
               <StudentStatsCards items={[
-                { key: "subjects", label: "Total Subjects", value: state.stats.total_subjects || 0 },
+                { key: "subjects", label: "Assigned Teachers", value: state.stats.total_subjects || 0 },
                 { key: "homework", label: "Pending Homeworks", value: state.stats.pending_homeworks || 0 },
                 { key: "lectures", label: "Total Lectures", value: state.stats.total_lectures || 0 },
                 { key: "conducted", label: "Conducted Lectures", value: state.stats.conducted_lectures || 0 },

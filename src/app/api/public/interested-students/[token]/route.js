@@ -15,15 +15,25 @@ export async function GET(_request, { params }) {
         class_level,
         email,
         phone,
-        LOWER(status::text) AS status
+        LOWER(status::text) AS status,
+        LOWER(COALESCE(admission_form_status::text, '')) AS admission_form_status,
+        registration_lead_id::text AS registration_lead_id
       FROM interested_students
       WHERE registration_token = ${token}
-        AND LOWER(status::text) IN ('link_generated', 'registered')
       LIMIT 1
     `;
 
     if (!item) {
-      return json("Interested student not found.", 404);
+      return json("This admission form link is no longer valid. The admission form may already have been submitted.", 410);
+    }
+
+    const isAlreadySubmitted =
+      String(item.status || "").toLowerCase() === "registered" ||
+      String(item.admission_form_status || "").toLowerCase() === "submitted" ||
+      Boolean(item.registration_lead_id);
+
+    if (isAlreadySubmitted) {
+      return json("This admission form link is no longer valid because the form has already been submitted.", 410);
     }
 
     return json("Interested student fetched.", 200, {

@@ -534,6 +534,7 @@ function AdmissionFormContent() {
   const [leadToken, setLeadToken] = useState("");
   const [leadClassLevel, setLeadClassLevel] = useState("");
   const [tokenLoading, setTokenLoading] = useState(false);
+  const [leadTokenError, setLeadTokenError] = useState("");
   const [paymentOptions, setPaymentOptions] = useState({
     discounts: [],
     paymentMethods: [],
@@ -615,6 +616,7 @@ function AdmissionFormContent() {
     if (!token) return;
 
     setLeadToken(token);
+    setLeadTokenError("");
     setTokenLoading(true);
     let active = true;
 
@@ -625,7 +627,16 @@ function AdmissionFormContent() {
         });
         const data = await response.json();
 
-        if (!response.ok || !data?.item || !active) {
+        if (!active) {
+          return;
+        }
+
+        if (!response.ok || !data?.item) {
+          setLeadTokenError(data?.message || "This admission form link is no longer valid.");
+          setErrors((current) => ({
+            ...current,
+            form: data?.message || "This admission form link is no longer valid.",
+          }));
           return;
         }
 
@@ -997,6 +1008,15 @@ function AdmissionFormContent() {
 
   async function handleSubmit(event) {
     event.preventDefault();
+
+    if (leadTokenParam && leadTokenError) {
+      setErrors((current) => ({
+        ...current,
+        form: leadTokenError,
+      }));
+      return;
+    }
+
     const nextErrors = getAllCurrentErrors(form);
     setErrors({
       ...nextErrors,
@@ -1146,6 +1166,7 @@ function AdmissionFormContent() {
       setForm(initialForm);
       setErrors({});
       setStep(0);
+      setLeadTokenError("This admission form link has been used and is no longer valid.");
       setSuccessMessage(
         "Admission form submitted successfully. Our admissions team will review the application and contact you with the next steps, In Sha Allah."
       );
@@ -1963,6 +1984,39 @@ function AdmissionFormContent() {
       <div className="absolute left-[-6rem] top-24 h-56 w-56 rounded-full bg-[#2D8A6A]/10 blur-3xl" />
       <div className="absolute bottom-10 right-0 h-72 w-72 rounded-full bg-[#C9A227]/10 blur-3xl" />
 
+      {leadTokenParam && leadTokenError && !tokenLoading ? (
+        <div className="relative mx-auto flex min-h-screen max-w-4xl items-center justify-center px-4 py-8 sm:px-6">
+          <section className="w-full rounded-[2.2rem] border border-[rgba(13,59,46,0.12)] bg-[linear-gradient(180deg,_rgba(252,250,245,0.98)_0%,_rgba(247,241,231,0.96)_100%)] p-6 text-center shadow-[0_24px_60px_rgba(13,59,46,0.12)] backdrop-blur-xl sm:p-8 lg:p-10">
+            <div className="mx-auto max-w-2xl rounded-[1.6rem] bg-[linear-gradient(135deg,_#063F32_0%,_#0D5C48_45%,_#236B51_100%)] p-6 text-[#FAF7F0] shadow-[0_14px_32px_rgba(6,63,50,0.2)]">
+              <span className="inline-flex rounded-full border border-white/20 bg-white/10 px-4 py-1 text-[11px] font-semibold uppercase tracking-[0.24em] text-[#F7EFCF]">
+                Admission form
+              </span>
+              <h1 className="mt-6 font-display text-2xl font-semibold tracking-tight sm:text-3xl">
+                This admission form has already been submitted
+              </h1>
+              <p className="mt-4 text-base leading-7 text-[#F3EEDB]/85 sm:text-[1.02rem]">
+                This link has already been used to submit the admission form, or it is no longer active.
+              </p>
+            </div>
+
+            <div className="mx-auto mt-8 max-w-2xl rounded-[1.5rem] border border-[rgba(201,162,39,0.22)] bg-[#FFF5D6]/80 p-5 text-left text-sm leading-7 text-[#245C4F] shadow-[0_10px_22px_rgba(201,162,39,0.08)]">
+              <p className="font-display text-lg font-semibold text-[#063F32]">
+                What this means
+              </p>
+              <p className="mt-3">
+                Your admission form has most likely already been submitted successfully. For security and to avoid duplicate admissions, the same form link cannot be used again.
+              </p>
+              <p className="mt-3">
+                If you believe this happened by mistake, please contact Ash-Shajrah admissions support and request a fresh link.
+              </p>
+            </div>
+
+            <div className="mt-8">
+              <p className="text-sm font-medium text-rose-700">{leadTokenError}</p>
+            </div>
+          </section>
+        </div>
+      ) : (
       <div className="relative mx-auto flex min-h-screen max-w-7xl items-center px-2 py-2">
         <motion.div className="grid w-full items-stretch gap-8 lg:grid-cols-[0.8fr_1.2fr]" variants={container} initial="hidden" animate="show">
           <motion.section variants={item} className="flex w-full flex-col justify-start rounded-[2.2rem] border border-[rgba(13,59,46,0.12)] bg-[linear-gradient(180deg,_rgba(252,250,245,0.98)_0%,_rgba(245,240,232,0.96)_100%)] p-6 shadow-[0_24px_60px_rgba(13,59,46,0.12)] backdrop-blur-xl sm:p-7 lg:p-8">
@@ -2046,7 +2100,7 @@ function AdmissionFormContent() {
                     <button
                       type="button"
                       onClick={goNext}
-                      disabled={pending || tokenLoading || (isPreviewMode && step === 5 && !isPreviewPaymentReady)}
+                  disabled={pending || tokenLoading || Boolean(leadTokenError) || (isPreviewMode && step === 5 && !isPreviewPaymentReady)}
                       className="rounded-full bg-[#236B51] px-4 py-3 text-sm font-semibold text-[#FAF7F0] shadow-[0_12px_28px_rgba(45,138,106,0.25)] transition hover:bg-[#184A38] disabled:cursor-not-allowed disabled:opacity-70"
                     >
                       Next step
@@ -2059,7 +2113,7 @@ function AdmissionFormContent() {
                       disabled={pending || tokenLoading || isPreviewMode}
                       className="rounded-full bg-[#236B51] px-5 py-3 text-sm font-semibold text-[#FAF7F0] shadow-[0_12px_28px_rgba(45,138,106,0.25)] transition hover:bg-[#184A38] disabled:cursor-not-allowed disabled:opacity-70"
                     >
-                      {isPreviewMode ? "Preview only" : pending ? "Submitting..." : tokenLoading ? "Loading prefill..." : "Submit admission form"}
+                      {isPreviewMode ? "Preview only" : pending ? "Submitting..." : tokenLoading ? "Loading prefill..." : leadTokenError ? "Link invalid" : "Submit admission form"}
                     </motion.button>
                   )}
                 </div>
@@ -2068,6 +2122,7 @@ function AdmissionFormContent() {
           </motion.section>
         </motion.div>
       </div>
+      )}
     </main>
   );
 }

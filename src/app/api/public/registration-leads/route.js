@@ -662,7 +662,7 @@ export async function POST(request) {
 
     const linkedLead = await fetchInterestedStudentByToken(leadToken);
     if (linkedLead?.status === "registered" && linkedLead?.registration_lead_id) {
-      return json(true, "Admission form already completed.", 200);
+      return json(false, "This admission form link is no longer valid because the form has already been submitted.", 410);
     }
 
     const uploads = {
