@@ -629,6 +629,7 @@ export async function POST(request) {
       if (!scholarshipSchoolGoingChildrenCount) return json(false, "School-going children count is required.", 400);
       if (!scholarshipResidenceType) return json(false, "Residence type is required.", 400);
       if (!scholarshipRequestedAmount) return json(false, "Requested scholarship amount is required.", 400);
+      if (!scholarshipReason) return json(false, "Scholarship reason is required.", 400);
     }
 
     if (fatherEmail && !isValidEmail(fatherEmail)) {
@@ -896,6 +897,7 @@ export async function POST(request) {
           school_going_children_count,
           residence_type,
           requested_amount,
+          scholarship_reason,
           status,
           created_at,
           updated_at
@@ -909,6 +911,7 @@ export async function POST(request) {
           ${Number(scholarshipSchoolGoingChildrenCount || 0)},
           ${scholarshipResidenceType},
           ${Number(scholarshipRequestedAmount || 0)},
+          ${scholarshipReason},
           ${"submitted"},
           NOW(),
           NOW()

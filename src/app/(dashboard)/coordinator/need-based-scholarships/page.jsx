@@ -93,6 +93,7 @@ export function NeedBasedScholarshipsPage({
         residence_type: item.residence_type,
         requested: item.requested_amount,
         scholarship_amount: item.scholarship_amount,
+        scholarship_reason: item.scholarship_reason,
         status: formatScholarshipStatus(item),
         submitted_at: item.created_at,
         voucher_created: item.voucher_created ? "voucher created" : "not created",
@@ -281,6 +282,7 @@ export function NeedBasedScholarshipsPage({
                       ["School-going children", selectedItem.school_going_children_count ?? "-"],
                       ["Residence type", selectedItem.residence_type || "-"],
                       ["Scholarship amount", formatMoney(selectedItem.scholarship_amount)],
+                      ["Scholarship reason", selectedItem.scholarship_reason || "-"],
                       ["Status", formatScholarshipStatus(selectedItem)],
                       ["Submitted at", formatDate(selectedItem.created_at)],
                     ].map(([label, value]) => (

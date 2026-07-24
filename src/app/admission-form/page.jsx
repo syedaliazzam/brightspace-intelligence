@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
-import { ChevronDown } from "lucide-react";
+import { BadgePercent, Calculator, CalendarDays, ChevronDown, FileText, Info, School } from "lucide-react";
 import { normalizeClassLevel } from "@/lib/academicCatalog";
 
 const PROGRAM_OPTIONS = [
@@ -52,6 +52,7 @@ const initialForm = {
   scholarshipSchoolGoingChildrenCount: "",
   scholarshipResidenceType: "",
   scholarshipRequestedAmount: "",
+  scholarshipReason: "",
   scholarshipSupportingDocumentFile: null,
   paymentMethod: "",
   admissionFee: "",
@@ -351,6 +352,7 @@ function getStepErrors(form, previewMode = false) {
     if (!form.scholarshipResidenceType) errors.scholarshipResidenceType = "Residence type is required.";
     if (!String(form.scholarshipRequestedAmount || "").trim()) errors.scholarshipRequestedAmount = "Requested support amount is required.";
     else if (!isValidNumericValue(form.scholarshipRequestedAmount)) errors.scholarshipRequestedAmount = "Enter a valid support amount.";
+    if (!String(form.scholarshipReason || "").trim()) errors.scholarshipReason = "Scholarship reason is required.";
   } else if (previewMode) {
     if (!form.paymentMethod) errors.paymentMethod = "Payment method is required.";
     if (!form.admissionFee) errors.admissionFee = "Admission fee is required.";
@@ -444,6 +446,58 @@ function SelectField({ id, value, onChange, error, className = "", children }) {
         className={`pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#0D5C48] transition-transform duration-200 ${open ? "rotate-180" : "rotate-0"}`}
       />
       <FieldError error={error} />
+    </div>
+  );
+}
+
+function FormulaBox({ value, label }) {
+  return (
+    <div className="min-w-fit text-center">
+      <div className="rounded-lg border border-[#E4D9BE] bg-[#FCFAF5] px-1 py-2 text-[10px] font-bold text-[#063F32] sm:px-2 sm:text-[11px]">
+        {Number(value || 0).toLocaleString("en-PK")}
+      </div>
+      <p className="mt-1 text-[8px] font-medium leading-3 text-[#245C4F] sm:text-[9px]">{label}</p>
+    </div>
+  );
+}
+
+function FormulaBoxSmall({ value, label }) {
+  return (
+    <div className="flex items-center justify-between gap-2 rounded-lg border border-[#E4D9BE] bg-[#FCFAF5] px-2 py-2 sm:hidden">
+      <p className="text-[10px] font-semibold text-[#245C4F]">{label}</p>
+      <p className="whitespace-nowrap text-[11px] font-bold text-[#063F32]">
+        {Number(value || 0).toLocaleString("en-PK")}
+      </p>
+    </div>
+  );
+}
+
+function FormulaOperator({ value }) {
+  return (
+    <div className="pt-2 text-sm font-bold text-[#063F32] sm:text-base">
+      {value}
+    </div>
+  );
+}
+
+function FormulaTotal({ value }) {
+  return (
+    <div className="min-w-0 text-center">
+      <div className="rounded-lg bg-[linear-gradient(135deg,#063F32,#0D5C48)] px-1.5 py-2 text-[10px] font-bold text-[#FAF7F0] shadow-[0_10px_24px_rgba(13,59,46,0.16)] sm:px-2 sm:text-[11px]">
+        {Number(value || 0).toLocaleString("en-PK")}
+      </div>
+      <p className="mt-1 text-[8px] font-medium leading-3 text-[#245C4F] sm:text-[9px]">Total Amount</p>
+    </div>
+  );
+}
+
+function FormulaTotalSmall({ value }) {
+  return (
+    <div className="flex items-center justify-between gap-2 rounded-lg bg-[linear-gradient(135deg,#063F32,#0D5C48)] px-2 py-2 shadow-[0_10px_24px_rgba(13,59,46,0.16)] sm:hidden">
+      <p className="text-[10px] font-semibold text-[#FAF7F0]/85">Total Amount</p>
+      <p className="whitespace-nowrap text-[11px] font-bold text-[#FAF7F0]">
+        {Number(value || 0).toLocaleString("en-PK")}
+      </p>
     </div>
   );
 }
@@ -570,6 +624,7 @@ function AdmissionFormContent() {
               "scholarshipSchoolGoingChildrenCount",
               "scholarshipResidenceType",
               "scholarshipRequestedAmount",
+              "scholarshipReason",
             ]
           : ["payerName", "payerEmail", "payerPhone", "transactionId", "paidAmount", "paidAt", "paymentProofFile"],
       6: ["declarationAccepted"],
@@ -598,6 +653,7 @@ function AdmissionFormContent() {
               "scholarshipSchoolGoingChildrenCount",
               "scholarshipResidenceType",
               "scholarshipRequestedAmount",
+              "scholarshipReason",
             ]
           : ["payerName", "payerEmail", "payerPhone", "transactionId", "paidAmount", "paidAt", "paymentProofFile"],
       6: ["declarationAccepted"],
@@ -1130,7 +1186,7 @@ function AdmissionFormContent() {
         scholarship_residence_type: form.scholarshipResidenceType,
         scholarship_guardian_employment_status: "",
         scholarship_requested_amount: form.scholarshipRequestedAmount,
-        scholarship_reason: "",
+        scholarship_reason: form.scholarshipReason,
         scholarship_supporting_document_file_path: scholarshipSupportingDocumentPath,
         payment_method: isPreviewMode ? form.paymentMethod : (liveSelectedPaymentMethod?.name || liveSelectedPaymentMethod?.method_key || ""),
         admission_fee: isPreviewMode ? form.admissionFee : String(liveAdmissionFeeAmount || ""),
@@ -1522,28 +1578,154 @@ function AdmissionFormContent() {
     );
   }
 
+  function renderFeeDetailsCard({ mode = "live", scholarship = false } = {}) {
+    const monthlyFee = previewRegularFeeAmount;
+    const admissionFee = mode === "preview" ? previewAdmissionFeeAmount : liveAdmissionFeeAmount;
+    const discountPercent = scholarship ? 0 : mode === "preview" ? previewDiscountPercent : liveDiscountPercent;
+    const discountAmount = scholarship ? 0 : Math.round((monthlyFee * discountPercent) / 100);
+    const totalAmount = scholarship
+      ? Math.max(monthlyFee + admissionFee, 0)
+      : Math.max(monthlyFee - discountAmount + admissionFee, 0);
+    const nextMonthlyFee = Math.max(monthlyFee - discountAmount, 0);
+    const hasDiscount = discountPercent > 0 && discountAmount > 0;
+
+    return (
+      <section className="rounded-[1.5rem] border border-[#2D8A6A]/12 bg-[linear-gradient(180deg,#FFFFFF_0%,#FCFAF5_100%)] p-5 shadow-[0_18px_45px_rgba(13,59,46,0.08)] sm:p-6">
+        <div className="flex items-start gap-4">
+          <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-[#F1EADC] text-[#0D5C48] shadow-[inset_0_1px_0_rgba(255,255,255,0.7)]">
+            <FileText className="h-7 w-7" />
+          </div>
+          <div>
+            <h3 className="font-display text-xl font-bold uppercase text-[#063F32] sm:text-2xl">
+              Payment Details
+            </h3>
+            <p className="mt-2 text-xs leading-5 text-[#245C4F] sm:text-sm">
+              Please review your fee breakdown before uploading your payment proof.
+            </p>
+          </div>
+        </div>
+
+        <div className="mt-6 rounded-[1.25rem] border border-[#E4D9BE] bg-[#FCFAF5] p-4 sm:p-5">
+          <p className="text-sm font-bold uppercase tracking-[0.24em] text-[#0D5C48]">
+            Fee Breakdown
+          </p>
+
+          <div className="mt-5 divide-y divide-[#E4D9BE]">
+            <div className="flex items-center gap-4 py-4">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-[#F1EADC] text-[#0D5C48]">
+                <CalendarDays className="h-6 w-6" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-base font-bold text-[#063F32] sm:text-lg">Monthly Fee</p>
+              </div>
+              <p className="shrink-0 text-right text-base font-bold text-[#063F32] sm:text-lg">
+                PKR {monthlyFee.toLocaleString("en-PK")}
+              </p>
+            </div>
+
+            {hasDiscount ? (
+              <div className="flex items-center gap-4 py-4">
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-[#F1EADC] text-[#0D5C48]">
+                  <BadgePercent className="h-6 w-6" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-base font-bold text-[#063F32] sm:text-lg">Discount</p>
+                  <p className="mt-1 text-sm text-[#245C4F]">{discountPercent}% monthly fee discount</p>
+                </div>
+                <p className="shrink-0 text-right text-base font-bold text-[#063F32] sm:text-lg">
+                  - PKR {discountAmount.toLocaleString("en-PK")}
+                </p>
+              </div>
+            ) : null}
+
+            <div className="flex items-center gap-4 py-4">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-[#F1EADC] text-[#0D5C48]">
+                <School className="h-6 w-6" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-base font-bold text-[#063F32] sm:text-lg">Admission Fee</p>
+                <p className="mt-1 text-sm text-[#245C4F]">One-time fee only</p>
+              </div>
+              <p className="shrink-0 text-right text-base font-bold text-[#063F32] sm:text-lg">
+                PKR {admissionFee.toLocaleString("en-PK")}
+              </p>
+            </div>
+          </div>
+
+          <div className="my-4 border-t border-dashed border-[#D8CBAA]" />
+
+          <div className="rounded-[1.25rem] border border-[#E4D9BE] bg-white p-4">
+            <div className="grid gap-4 md:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)] md:items-center">
+              <div className="flex items-center gap-3">
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[linear-gradient(135deg,#063F32,#0D5C48)] text-[#FAF7F0] shadow-[0_12px_30px_rgba(13,59,46,0.22)]">
+                  <Calculator className="h-6 w-6" />
+                </div>
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-[0.18em] text-[#0D5C48] sm:text-xs">Total Amount</p>
+                  <p className="mt-1 text-xl font-bold leading-tight text-[#063F32] sm:text-xl">
+                    PKR {totalAmount.toLocaleString("en-PK")}
+                  </p>
+                </div>
+              </div>
+
+              <div className={`hidden items-start gap-1.5 text-center text-[#063F32] sm:grid ${
+                hasDiscount
+                  ? "grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)_auto_minmax(0,1fr)_auto_minmax(0,1fr)]"
+                  : "grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)_auto_minmax(0,1fr)]"
+              }`}>
+                  <FormulaBox value={monthlyFee} label="Monthly Fee" />
+                  {hasDiscount ? <FormulaOperator value="-" /> : <FormulaOperator value="+" />}
+                  {hasDiscount ? (
+                    <FormulaBox value={discountAmount} label={`Discount (${discountPercent}%)`} />
+                  ) : (
+                    <FormulaBox value={admissionFee} label="Admission Fee" />
+                  )}
+                  {hasDiscount ? <FormulaOperator value="+" /> : <FormulaOperator value="=" />}
+                  {hasDiscount ? (
+                    <FormulaBox value={admissionFee} label="Admission Fee" />
+                  ) : (
+                    <FormulaTotal value={totalAmount} />
+                  )}
+                  {hasDiscount ? <FormulaOperator value="=" /> : null}
+                  {hasDiscount ? <FormulaTotal value={totalAmount} /> : null}
+              </div>
+
+              <div className="grid gap-2 sm:hidden">
+                <FormulaBoxSmall value={monthlyFee} label="Monthly Fee" />
+                {hasDiscount ? <FormulaOperator value="-" /> : <FormulaOperator value="+" />}
+                {hasDiscount ? (
+                  <FormulaBoxSmall value={discountAmount} label={`Discount (${discountPercent}%)`} />
+                ) : (
+                  <FormulaBoxSmall value={admissionFee} label="Admission Fee" />
+                )}
+                {hasDiscount ? <FormulaOperator value="+" /> : <FormulaOperator value="=" />}
+                {hasDiscount ? (
+                  <FormulaBoxSmall value={admissionFee} label="Admission Fee" />
+                ) : (
+                  <FormulaTotalSmall value={totalAmount} />
+                )}
+                {hasDiscount ? <FormulaOperator value="=" /> : null}
+                {hasDiscount ? <FormulaTotalSmall value={totalAmount} /> : null}
+              </div>
+            </div>
+          </div>
+
+          {hasDiscount ? (
+            <div className="mt-3 flex items-start gap-3 rounded-[1rem] border border-[#E4D9BE] bg-[#FFF5D6]/65 px-4 py-3 text-sm text-[#063F32]">
+              <Info className="mt-0.5 h-5 w-5 shrink-0 text-[#0D5C48]" />
+              <p>From next month onward, the monthly fee will be PKR {nextMonthlyFee.toLocaleString("en-PK")}/month.</p>
+            </div>
+          ) : null}
+        </div>
+      </section>
+    );
+  }
+
   function renderPaymentStep() {
     if (!isPreviewMode && form.needBasedScholarshipRequested) {
       return (
         <div className="grid gap-5 rounded-[1.35rem] border border-[rgba(13,59,46,0.08)] bg-white/95 p-4 shadow-[0_12px_28px_rgba(13,59,46,0.05)] sm:p-6">
-          <div className="grid gap-4 rounded-[1.1rem] border border-[rgba(201,162,39,0.22)] bg-[#FFF5D6]/70 p-4">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]">Fee details</p>
-            <div className="grid gap-3 md:grid-cols-3">
-              <div className="rounded-[1rem] border border-[#2D8A6A]/15 bg-white p-4">
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]">Monthly fee</p>
-                <p className="mt-3 text-xl font-bold text-[#063F32]">PKR {previewRegularFeeAmount.toLocaleString("en-PK")}</p>
-              </div>
-              <div className="rounded-[1rem] border border-[#2D8A6A]/15 bg-white p-4">
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]">Admission fee</p>
-                <p className="mt-3 text-xl font-bold text-[#063F32]">PKR {liveAdmissionFeeAmount.toLocaleString("en-PK")}</p>
-              </div>
-              <div className="rounded-[1rem] border border-[#2D8A6A]/15 bg-white p-4">
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]">Total amount</p>
-                <p className="mt-3 text-xl font-bold text-[#063F32]">PKR {liveTotalAmount.toLocaleString("en-PK")}</p>
-                <p className="mt-2 text-sm text-[#245C4F]">Monthly fee minus discount plus admission fee.</p>
-              </div>
-            </div>
-          </div>
+          {renderFeeDetailsCard({ mode: "live", scholarship: true })}
 
           <div className="rounded-[1.1rem] border border-[rgba(201,162,39,0.22)] bg-[#FFF5D6]/70 p-4">
             <label className="flex items-start gap-3 text-sm text-[#063F32]">
@@ -1585,6 +1767,18 @@ function AdmissionFormContent() {
                 {RESIDENCE_OPTIONS.map((option) => <option key={option} value={option}>{option}</option>)}
               </SelectField>
             </div>
+            <div className="rounded-[1rem] border border-[#2D8A6A]/15 bg-white p-4 md:col-span-2">
+              <label className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]" htmlFor="scholarshipReason">Reason for scholarship</label>
+              <textarea
+                id="scholarshipReason"
+                rows={4}
+                value={controlledValue(form.scholarshipReason)}
+                onChange={(event) => updateField("scholarshipReason", event.target.value)}
+                className={inputClass(errors.scholarshipReason)}
+                placeholder="Please share why you need this scholarship"
+              />
+              <FieldError error={errors.scholarshipReason} />
+            </div>
           </div>
         </div>
       );
@@ -1615,44 +1809,14 @@ function AdmissionFormContent() {
               </div>
             </div>
 
-            <div className="grid gap-4 rounded-[1rem] border border-[#2D8A6A]/10 bg-white p-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]">Payment details</p>
-              <p className="text-sm text-[#245C4F]">Please use the selected payment details below before uploading your payment proof.</p>
-              <div className="grid gap-3 md:grid-cols-3">
-                <div className="rounded-[1rem] border border-[#2D8A6A]/15 bg-[#FAF7F0] p-4">
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]">Monthly fee</p>
-                  <p className="mt-3 text-xl font-bold text-[#063F32]">
-                    {previewRegularFee ? `PKR ${previewRegularFeeAmount.toLocaleString("en-PK")}` : "No monthly fee selected"}
-                  </p>
-                </div>
-                <div className="rounded-[1rem] border border-[#2D8A6A]/15 bg-[#FAF7F0] p-4">
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]">Admission fee</p>
-                  <p className="mt-3 text-xl font-bold text-[#063F32]">
-                    {liveSelectedAdmissionFee ? `PKR ${liveAdmissionFeeAmount.toLocaleString("en-PK")}` : "No admission fee selected"}
-                  </p>
-                </div>
-                {liveDiscountPercent > 0 ? (
-                <div className="rounded-[1rem] border border-[#2D8A6A]/15 bg-[#FAF7F0] p-4">
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]">Discount</p>
-                  <p className="mt-3 text-xl font-bold text-[#063F32]">
-                    {liveDiscountPercent}%
-                  </p>
-                  <p className="mt-2 text-sm text-[#245C4F]">Coordinator-approved discount applied on the monthly fee.</p>
-                </div>
-                ) : null}
-                <div className="rounded-[1rem] border border-[#2D8A6A]/15 bg-[#FAF7F0] p-4">
-                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]">Total amount</p>
-                  <p className="mt-3 text-xl font-bold text-[#063F32]">PKR {liveTotalAmount.toLocaleString("en-PK")}</p>
-                  <p className="mt-2 text-sm text-[#245C4F]">Monthly fee minus discount plus admission fee.</p>
-                </div>
-              </div>
+            {renderFeeDetailsCard({ mode: "live", scholarship: false })}
+
             <div className="rounded-[1rem] border border-[#2D8A6A]/10 bg-[#FAF7F0] p-4">
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]">Payment instructions</p>
               <p className="mt-2 whitespace-pre-line text-sm text-[#245C4F]">
                 {livePaymentInstructions || "No payment instructions added yet."}
               </p>
             </div>
-          </div>
 
           <div className="rounded-[1.1rem] border border-[rgba(201,162,39,0.22)] bg-[#FAF7F0] p-4">
             <label className="flex items-start gap-3 text-sm text-[#063F32]">
@@ -1893,48 +2057,7 @@ function AdmissionFormContent() {
             </label>
           </div>
 
-          <div className="grid gap-3 rounded-[1.1rem] border border-[rgba(201,162,39,0.22)] bg-[#FFF5D6]/70 p-4">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#0D5C48]">Payment summary</p>
-            <div className="grid gap-3 md:grid-cols-3">
-              <div className="rounded-[1rem] border border-[#2D8A6A]/15 bg-white p-4">
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]">Admission fee</p>
-                <p className="mt-3 text-2xl font-bold text-[#063F32]">
-                  {previewAdmissionFee ? `PKR ${Number(previewAdmissionFee.amount || 0).toLocaleString("en-PK")}` : "No admission fee selected"}
-                </p>
-                <p className="mt-2 text-sm text-[#245C4F]">
-                  {previewAdmissionFee?.title || previewAdmissionFee?.name || "Choose an admission-fee item from fee management."}
-                </p>
-              </div>
-              {!form.needBasedScholarshipRequested ? <div className="rounded-[1rem] border border-[#2D8A6A]/15 bg-white p-4">
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]">Discount</p>
-                <p className="mt-3 text-2xl font-bold text-[#063F32]">{previewDiscountPercent ? `${previewDiscountPercent}%` : "No discount selected"}</p>
-                <p className="mt-2 text-sm text-[#245C4F]">Allowed discounts are limited to coordinator-approved values up to 20%.</p>
-              </div> : null}
-              <div className="rounded-[1rem] border border-[#2D8A6A]/15 bg-white p-4">
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]">Regular fee</p>
-                <p className="mt-3 text-2xl font-bold text-[#063F32]">{previewRegularFee ? `PKR ${previewRegularFeeAmount.toLocaleString("en-PK")}` : "No regular fee selected"}</p>
-                <p className="mt-2 text-sm text-[#245C4F]">{previewRegularFee?.title || previewRegularFee?.name || `Based on ${previewClassLevel || "the selected class"}.`}</p>
-              </div>
-            </div>
-            <div className="grid gap-3 md:grid-cols-3">
-              <div className="rounded-[1rem] border border-[#2D8A6A]/10 bg-white p-4 text-sm text-[#245C4F]">
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]">Discount amount</p>
-                <p className="mt-2 text-lg font-bold text-[#063F32]">PKR {previewDiscountAmount.toLocaleString("en-PK")}</p>
-                <p className="mt-1">Applied on the regular fee only.</p>
-              </div>
-              <div className="rounded-[1rem] border border-[#2D8A6A]/10 bg-white p-4 text-sm text-[#245C4F]">
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]">Total after discount</p>
-                <p className="mt-2 text-lg font-bold text-[#063F32]">PKR {previewTotalAmount.toLocaleString("en-PK")}</p>
-                <p className="mt-1">Regular fee minus discount plus admission fee.</p>
-              </div>
-              <div className="rounded-[1rem] border border-[#2D8A6A]/10 bg-white p-4 text-sm text-[#245C4F]">
-                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]">Payment instructions</p>
-                <p className="mt-2 whitespace-pre-line">
-                  {previewPaymentInstructions || previewAdmissionFee?.instructions || "No payment instructions added yet."}
-                </p>
-              </div>
-            </div>
-          </div>
+          {renderFeeDetailsCard({ mode: "preview", scholarship: form.needBasedScholarshipRequested })}
         </div>
       </div>
     );

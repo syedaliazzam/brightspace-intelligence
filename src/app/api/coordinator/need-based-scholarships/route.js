@@ -26,6 +26,7 @@ export async function GET() {
         nbsf.school_going_children_count,
         nbsf.residence_type,
         nbsf.requested_amount::float8 AS requested_amount,
+        nbsf.scholarship_reason,
         LOWER(
           COALESCE(
             latest_submission.status::text,
