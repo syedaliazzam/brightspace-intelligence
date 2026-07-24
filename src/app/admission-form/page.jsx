@@ -194,6 +194,11 @@ function isValidTextValue(value) {
   return text.length > 0 && !/^\d+$/.test(text);
 }
 
+function isValidAddressValue(value) {
+  const text = String(value || "").trim();
+  return /^[A-Za-z0-9Ã€-Ã–Ã˜-Ã¶Ã¸-Ã¿Ø§-ÙŠØ€-Û¿][A-Za-z0-9Ã€-Ã–Ã˜-Ã¶Ã¸-Ã¿Ø§-ÙŠØ€-Û¿\s.,'()#&/\-]+$/.test(text);
+}
+
 function calculateAgeFromDate(dateValue) {
   if (!dateValue) return "";
 
@@ -318,11 +323,11 @@ function getStepErrors(form, previewMode = false) {
     errors.primaryParent = "Primary parent details are incomplete.";
   }
   if (!String(form.fatherResidentialAddress || "").trim()) errors.fatherResidentialAddress = "Father residential address is required.";
-  else if (!isValidTextName(form.fatherResidentialAddress)) {
+  else if (!isValidAddressValue(form.fatherResidentialAddress)) {
     errors.fatherResidentialAddress = "Enter a valid residential address.";
   }
   if (!String(form.motherResidentialAddress || "").trim()) errors.motherResidentialAddress = "Mother residential address is required.";
-  else if (!isValidTextName(form.motherResidentialAddress)) {
+  else if (!isValidAddressValue(form.motherResidentialAddress)) {
     errors.motherResidentialAddress = "Enter a valid residential address.";
   }
   if (
