@@ -37,7 +37,7 @@ function formatScholarshipStatus(item) {
 export function NeedBasedScholarshipsPage({
   portalLabel = "Coordinator portal",
   title = "Need based scholarship records",
-  description = "Review Step 6 scholarship applications, inspect the financial details, and create the follow-up voucher from one place.",
+  description = "Review scholarship applications, inspect the financial details, and create the follow-up voucher from one place.",
   allowCreateVoucher = true,
 } = {}) {
   const [items, setItems] = useState([]);
