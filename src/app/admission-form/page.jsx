@@ -1,7 +1,7 @@
 "use client";
 
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
 import { BadgePercent, Calculator, CalendarDays, ChevronDown, FileText, Info, School } from "lucide-react";
 import { normalizeClassLevel } from "@/lib/academicCatalog";
@@ -344,35 +344,6 @@ function getStepErrors(form, previewMode = false) {
   if (!form.birthCertificateFile) errors.birthCertificateFile = "Child B-Form / Birth Certificate is required.";
   if (!form.parentCnicFile) errors.parentCnicFile = "Parent CNIC is required.";
   if (!form.childPhotographFile) errors.childPhotographFile = "Recent child photograph is required.";
-  if (!previewMode && form.needBasedScholarshipRequested) {
-    if (!String(form.scholarshipDependentsCount || "").trim()) errors.scholarshipDependentsCount = "Dependents count is required.";
-    else if (!/^\d+$/.test(String(form.scholarshipDependentsCount || "").trim())) errors.scholarshipDependentsCount = "Enter a valid dependents count.";
-    if (!String(form.scholarshipSchoolGoingChildrenCount || "").trim()) errors.scholarshipSchoolGoingChildrenCount = "School-going children count is required.";
-    else if (!/^\d+$/.test(String(form.scholarshipSchoolGoingChildrenCount || "").trim())) errors.scholarshipSchoolGoingChildrenCount = "Enter a valid children count.";
-    if (!form.scholarshipResidenceType) errors.scholarshipResidenceType = "Residence type is required.";
-    if (!String(form.scholarshipRequestedAmount || "").trim()) errors.scholarshipRequestedAmount = "Requested support amount is required.";
-    else if (!isValidNumericValue(form.scholarshipRequestedAmount)) errors.scholarshipRequestedAmount = "Enter a valid support amount.";
-    if (!String(form.scholarshipReason || "").trim()) errors.scholarshipReason = "Scholarship reason is required.";
-  } else if (previewMode) {
-    if (!form.paymentMethod) errors.paymentMethod = "Payment method is required.";
-    if (!form.admissionFee) errors.admissionFee = "Admission fee is required.";
-    if (!String(form.paymentInstructions || "").trim()) errors.paymentInstructions = "Payment instructions are required.";
-  } else {
-    if (!String(form.payerName || "").trim()) errors.payerName = "Payer name is required.";
-    else if (!isValidPersonName(form.payerName)) errors.payerName = "Enter a valid payer name.";
-    if (String(form.payerEmail || "").trim() && !isValidEmail(String(form.payerEmail || "").trim())) {
-      errors.payerEmail = "Enter a valid payer email address.";
-    } else if (!String(form.payerEmail || "").trim()) {
-      errors.payerEmail = "Payer email is required.";
-    }
-    if (!String(form.payerPhone || "").trim()) errors.payerPhone = "Payer phone is required.";
-    else if (!isValidPhoneNumber(form.payerPhone)) errors.payerPhone = "Enter a valid payer phone number.";
-    if (!String(form.transactionId || "").trim()) errors.transactionId = "Transaction ID is required.";
-    if (!String(form.paidAmount || "").trim()) errors.paidAmount = "Paid amount is required.";
-    else if (!isValidNumericValue(form.paidAmount)) errors.paidAmount = "Enter a valid paid amount.";
-    if (!String(form.paidAt || "").trim()) errors.paidAt = "Paid at date/time is required.";
-    if (!form.paymentProofFile) errors.paymentProofFile = "Payment proof file is required.";
-  }
   if (!form.declarationAccepted) errors.declarationAccepted = "You must accept the declaration before submitting.";
 
   return errors;
@@ -602,10 +573,11 @@ function AdmissionFormContent() {
     cities: [],
   });
   const searchParams = useSearchParams();
+  const router = useRouter();
   const readinessErrorRef = useRef(null);
   const leadTokenParam = searchParams?.get("leadToken") || "";
   const isPreviewMode = searchParams?.get("preview") === "1";
-  const STEP_TITLES = ["Programme", "Student", "Profile", "Parents", "Readiness", "Payment", "Declaration"];
+  const STEP_TITLES = ["Programme", "Student", "Profile", "Parents", "Readiness", "Declaration"];
   const totalSteps = STEP_TITLES.length;
 
   function getErrorsForCurrentStep(formValue, currentStep) {
@@ -616,18 +588,7 @@ function AdmissionFormContent() {
       2: ["developmentalConcern", "developmentalConcernDetails"],
       3: ["parentNames", "fatherNameEnglish", "motherNameEnglish", "fatherCnic", "motherCnic", "fatherQualification", "motherQualification", "fatherOccupation", "motherOccupation", "fatherMotherTongue", "motherMotherTongue", "fatherEmail", "motherEmail", "preferredContactPerson", "primaryParent", "fatherContactHome", "fatherContactWhatsapp", "fatherEmergencyContact", "motherContactHome", "motherContactWhatsapp", "motherEmergencyContact", "fatherResidentialAddress", "motherResidentialAddress", "supportPersonDuringLearning"],
       4: ["deviceAvailable", "birthCertificateFile", "parentCnicFile", "childPhotographFile"],
-      5: isPreviewMode
-        ? ["paymentMethod", "admissionFee", "discountPercent", "paymentInstructions"]
-        : formValue.needBasedScholarshipRequested
-          ? [
-              "scholarshipDependentsCount",
-              "scholarshipSchoolGoingChildrenCount",
-              "scholarshipResidenceType",
-              "scholarshipRequestedAmount",
-              "scholarshipReason",
-            ]
-          : ["payerName", "payerEmail", "payerPhone", "transactionId", "paidAmount", "paidAt", "paymentProofFile"],
-      6: ["declarationAccepted"],
+      5: ["declarationAccepted"],
     };
 
     return (keysByStep[currentStep] || []).reduce((accumulator, key) => {
@@ -645,18 +606,7 @@ function AdmissionFormContent() {
       2: ["developmentalConcern", "developmentalConcernDetails"],
       3: ["parentNames", "fatherNameEnglish", "motherNameEnglish", "fatherCnic", "motherCnic", "fatherQualification", "motherQualification", "fatherOccupation", "motherOccupation", "fatherMotherTongue", "motherMotherTongue", "fatherEmail", "motherEmail", "preferredContactPerson", "primaryParent", "fatherContactHome", "fatherContactWhatsapp", "fatherEmergencyContact", "motherContactHome", "motherContactWhatsapp", "motherEmergencyContact", "fatherResidentialAddress", "motherResidentialAddress", "supportPersonDuringLearning"],
       4: ["deviceAvailable", "birthCertificateFile", "parentCnicFile", "childPhotographFile"],
-      5: isPreviewMode
-        ? ["paymentMethod", "admissionFee", "discountPercent", "paymentInstructions"]
-        : form.needBasedScholarshipRequested
-          ? [
-              "scholarshipDependentsCount",
-              "scholarshipSchoolGoingChildrenCount",
-              "scholarshipResidenceType",
-              "scholarshipRequestedAmount",
-              "scholarshipReason",
-            ]
-          : ["payerName", "payerEmail", "payerPhone", "transactionId", "paidAmount", "paidAt", "paymentProofFile"],
-      6: ["declarationAccepted"],
+      5: ["declarationAccepted"],
     };
 
     return (map[currentStep] || []).some((key) => Boolean(errorsValue[key]));
@@ -1029,17 +979,6 @@ function AdmissionFormContent() {
   }
 
   function goNext() {
-    if (isPreviewMode && step === 5 && !isPreviewPaymentReady) {
-      setErrors((current) => ({
-        ...current,
-        admissionFee: form.admissionFee ? "" : "Admission fee is required.",
-        discountPercent: String(form.discountPercent || "").trim() ? "" : "Discount is required.",
-        paymentInstructions: previewPaymentInstructions ? "" : "Payment instructions are required.",
-        form: "Please complete the payment details before continuing.",
-      }));
-      return;
-    }
-
     const nextErrors = getErrorsForCurrentStep(form, step);
     setErrors({
       ...nextErrors,
@@ -1116,14 +1055,6 @@ function AdmissionFormContent() {
         file: form.scholarshipSupportingDocumentFile,
         applicationId,
       });
-      const paymentProofPath = form.needBasedScholarshipRequested
-        ? ""
-        : await uploadAdmissionFormFile({
-            documentType: "payment_proof",
-            file: form.paymentProofFile,
-            applicationId,
-            voucherNo: leadToken || applicationId,
-          });
 
       const payload = new FormData();
       Object.entries({
@@ -1179,25 +1110,26 @@ function AdmissionFormContent() {
         preferred_contact_person: form.preferredContactPerson,
         support_person_during_learning: form.supportPersonDuringLearning,
         device_available: form.deviceAvailable,
-        need_based_scholarship_requested: form.needBasedScholarshipRequested ? "Yes" : "No",
+        need_based_scholarship_requested: "No",
         scholarship_monthly_income: "",
-        scholarship_dependents_count: form.scholarshipDependentsCount,
-        scholarship_school_going_children_count: form.scholarshipSchoolGoingChildrenCount,
-        scholarship_residence_type: form.scholarshipResidenceType,
+        scholarship_dependents_count: "",
+        scholarship_school_going_children_count: "",
+        scholarship_residence_type: "",
         scholarship_guardian_employment_status: "",
-        scholarship_requested_amount: form.scholarshipRequestedAmount,
-        scholarship_reason: form.scholarshipReason,
-        scholarship_supporting_document_file_path: scholarshipSupportingDocumentPath,
+        scholarship_requested_amount: "",
+        scholarship_reason: "",
+        scholarship_supporting_document_file_path: "",
+        payment_method_id: isPreviewMode ? "" : String(liveSelectedPaymentMethod?.id || ""),
         payment_method: isPreviewMode ? form.paymentMethod : (liveSelectedPaymentMethod?.name || liveSelectedPaymentMethod?.method_key || ""),
         admission_fee: isPreviewMode ? form.admissionFee : String(liveAdmissionFeeAmount || ""),
         discount_percent: isPreviewMode ? form.discountPercent : String(liveDiscountPercent || ""),
         payment_instructions: isPreviewMode ? form.paymentInstructions : livePaymentInstructions,
-        payer_name: form.payerName,
-        payer_email: form.payerEmail,
-        payer_phone: form.payerPhone,
-        transaction_id: form.transactionId,
-        paid_amount: form.paidAmount,
-        paid_at: form.paidAt,
+        payer_name: "",
+        payer_email: "",
+        payer_phone: "",
+        transaction_id: "",
+        paid_amount: "",
+        paid_at: "",
         why_join_school: "",
         school_expectations: "",
         declaration_accepted: form.declarationAccepted ? "Yes" : "No",
@@ -1206,7 +1138,7 @@ function AdmissionFormContent() {
         parent_cnic_file_path: parentCnicPath,
         child_photograph_file_path: childPhotographPath,
         medical_report_file_path: medicalReportPath,
-        payment_proof_file_path: paymentProofPath,
+        payment_proof_file_path: "",
       }).forEach(([key, value]) => payload.append(key, value || ""));
 
       const response = await fetch("/api/public/registration-leads", {
@@ -1223,9 +1155,15 @@ function AdmissionFormContent() {
       setErrors({});
       setStep(0);
       setLeadTokenError("This admission form link has been used and is no longer valid.");
-      setSuccessMessage(
-        "Admission form submitted successfully. Our admissions team will review the application and contact you with the next steps, In Sha Allah."
-      );
+      setSuccessMessage("Admission form submitted successfully. Redirecting to the payment and scholarship page...");
+      const nextStepUrl = String(data?.next_step_url || "").trim();
+      if (nextStepUrl) {
+        if (/^https?:\/\//i.test(nextStepUrl)) {
+          window.location.assign(nextStepUrl);
+        } else {
+          router.push(nextStepUrl);
+        }
+      }
     } catch (error) {
       setErrors((current) => ({
         ...current,
@@ -2088,7 +2026,6 @@ function AdmissionFormContent() {
         renderProfileStep(),
         renderParentsStep(),
         renderReadinessStep(),
-        renderPaymentStep(),
         renderDeclarationStep(),
       ]
     : [
@@ -2097,7 +2034,6 @@ function AdmissionFormContent() {
         renderProfileStep(),
         renderParentsStep(),
         renderReadinessStep(),
-        renderPaymentStep(),
         renderDeclarationStep(),
       ];
 
@@ -2223,7 +2159,7 @@ function AdmissionFormContent() {
                     <button
                       type="button"
                       onClick={goNext}
-                  disabled={pending || tokenLoading || Boolean(leadTokenError) || (isPreviewMode && step === 5 && !isPreviewPaymentReady)}
+                  disabled={pending || tokenLoading || Boolean(leadTokenError)}
                       className="rounded-full bg-[#236B51] px-4 py-3 text-sm font-semibold text-[#FAF7F0] shadow-[0_12px_28px_rgba(45,138,106,0.25)] transition hover:bg-[#184A38] disabled:cursor-not-allowed disabled:opacity-70"
                     >
                       Next step

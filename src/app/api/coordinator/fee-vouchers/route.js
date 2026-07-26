@@ -959,6 +959,292 @@ export async function POST(request) {
     `;
 
     if (existingVoucher?.id) {
+      if (scholarshipFormId || scholarshipAmountInput > 0) {
+        const updatedExistingVoucherResult = await prisma.$transaction(async (tx) => {
+          const selectedPaymentMethod = await getPaymentMethodById(paymentMethodId, tx);
+          const resolvedPaymentMethod = selectedPaymentMethod
+            ? selectedPaymentMethod.name || selectedPaymentMethod.method_key
+            : await resolvePaymentMethod(paymentMethod, tx);
+
+          if (!resolvedPaymentMethod) {
+            throw new Error("Invalid payment method.");
+          }
+
+          const existingSubtotalAmount = Number(
+            existingVoucher.subtotal_amount ||
+              (Number(existingVoucher.regular_fee_amount || 0) + Number(existingVoucher.admission_fee_amount || 0))
+          );
+          const existingDiscountAmount = Number(existingVoucher.discount_amount || 0);
+          const recalculatedTotalAmount = Number(
+            (existingSubtotalAmount - existingDiscountAmount - scholarshipAmountInput).toFixed(2)
+          );
+
+          if (recalculatedTotalAmount <= 0) {
+            throw new Error("Voucher total must be greater than zero.");
+          }
+
+          const voucherColumns = await getTableColumns("fee_vouchers", tx);
+          const setClauses = [];
+          const setValues = [];
+          const pushUpdate = (sql, value) => {
+            setClauses.push(sql.replace("__INDEX__", String(setValues.length + 1)));
+            setValues.push(value);
+          };
+
+          if (voucherColumns.scholarship_amount) {
+            pushUpdate(`scholarship_amount = $__INDEX__`, scholarshipAmountInput);
+          }
+          if (voucherColumns.amount) {
+            pushUpdate(`amount = $__INDEX__`, recalculatedTotalAmount);
+          }
+          if (voucherColumns.total_amount) {
+            pushUpdate(`total_amount = $__INDEX__`, recalculatedTotalAmount);
+          }
+          if (voucherColumns.due_date && dueDate) {
+            pushUpdate(`due_date = $__INDEX__`, new Date(dueDate));
+          }
+          if (voucherColumns.payment_method_id && selectedPaymentMethod?.id) {
+            pushUpdate(`payment_method_id = $__INDEX__::uuid`, selectedPaymentMethod.id);
+          } else if (voucherColumns.payment_method) {
+            pushUpdate(`payment_method = $__INDEX__::payment_method`, resolvedPaymentMethod);
+          }
+          if (voucherColumns.payment_instructions) {
+            pushUpdate(`payment_instructions = $__INDEX__`, paymentInstructions || null);
+          }
+
+          if (setClauses.length) {
+            await tx.$executeRawUnsafe(
+              `
+                UPDATE fee_vouchers
+                SET ${setClauses.join(", ")}
+                WHERE id = $${setValues.length + 1}::uuid
+              `,
+              ...setValues,
+              existingVoucher.id
+            );
+          }
+
+          const updatedScholarshipRows = await tx.$queryRaw`
+            UPDATE need_based_scholarship_forms
+            SET
+              status = 'voucher_created',
+              voucher_created = TRUE,
+              voucher_id = ${existingVoucher.id}::uuid,
+              scholarship_amount = ${scholarshipAmountInput},
+              updated_at = NOW()
+            WHERE (
+                ${scholarshipFormId || null}::uuid IS NOT NULL
+                AND id = ${scholarshipFormId || null}::uuid
+              )
+               OR registration_id = ${registrationLeadId}::uuid
+            RETURNING id::text AS id
+          `;
+
+          if (!Array.isArray(updatedScholarshipRows) || !updatedScholarshipRows.length) {
+            throw new Error("Need-based scholarship record was not updated with the existing voucher.");
+          }
+
+          await tx.$executeRaw`
+            UPDATE registration_leads
+            SET status = CAST('voucher_created' AS registration_status)
+            WHERE id = ${registrationLeadId}::uuid
+          `;
+
+          const [lead] = await tx.$queryRaw`
+            SELECT
+              rl.id::text AS id,
+              rl.student_name,
+              rl.parent_name,
+              rl.class_level,
+              rl.email,
+              rl.phone
+            FROM registration_leads rl
+            WHERE rl.id = ${registrationLeadId}::uuid
+            LIMIT 1
+          `;
+
+          const supportEmail =
+            (await tx.$queryRaw`
+              SELECT value::text AS value
+              FROM fee_settings
+              WHERE key = 'payment_support_email'
+              LIMIT 1
+            `)[0]?.value || "";
+          const supportPhone =
+            (await tx.$queryRaw`
+              SELECT value::text AS value
+              FROM fee_settings
+              WHERE key = 'payment_support_phone'
+              LIMIT 1
+            `)[0]?.value || "";
+
+          const [updatedVoucher] = await tx.$queryRaw`
+            SELECT
+              fv.id::text AS id,
+              fv.voucher_no,
+              fv.amount,
+              fv.due_date,
+              fv.payment_method,
+              pm.name AS payment_method_name,
+              pm.bank_name,
+              pm.account_title,
+              pm.account_number,
+              pm.iban,
+              pm.branch_code,
+              pm.instructions AS payment_method_instructions,
+              fv.payment_instructions,
+              LOWER(rl.status::text) AS lead_status,
+              LOWER(fv.status::text) AS voucher_status,
+              LOWER(fv.status::text) AS status,
+              rl.id::text AS registration_lead_id,
+              rl.student_name,
+              rl.parent_name,
+              rl.class_level,
+              rl.email,
+              rl.phone,
+              fv.regular_fee_applied,
+              fv.regular_fee_amount,
+              fv.admission_fee_amount,
+              fv.discount_percent,
+              fv.discount_amount,
+              fv.subtotal_amount,
+              fv.total_amount
+            FROM fee_vouchers fv
+            INNER JOIN registration_leads rl ON rl.id = fv.registration_id
+            LEFT JOIN payment_methods pm ON pm.id = fv.payment_method_id
+            WHERE fv.id = ${existingVoucher.id}::uuid
+            LIMIT 1
+          `;
+
+          const voucherItem = updatedVoucher || existingVoucher;
+          const paymentSubmitUrl = buildPaymentSubmitUrl(voucherItem.voucher_no || existingVoucher.voucher_no);
+          const availablePaymentMethods = await getActivePaymentMethods(tx);
+          const { html: emailHtml, text: emailText } = buildVoucherEmailContent({
+            studentName: lead?.student_name || "",
+            parentName: lead?.parent_name || "",
+            classLevel: lead?.class_level || "",
+            voucherNo: voucherItem.voucher_no || existingVoucher.voucher_no,
+            regularFeeAmount: Number(voucherItem.regular_fee_amount || 0),
+            otherFeeAmount: Number(voucherItem.admission_fee_amount || 0),
+            scholarshipAmount: scholarshipAmountInput,
+            discountPercent: Number(voucherItem.discount_percent || 0),
+            discountAmount: Number(voucherItem.discount_amount || 0),
+            totalAmount: Number(voucherItem.total_amount || voucherItem.amount || 0),
+            dueDate: voucherItem.due_date,
+            paymentMethod: selectedPaymentMethod || { name: resolvedPaymentMethod },
+            paymentInstructions,
+            supportEmail,
+            supportPhone,
+            paymentSubmitUrl,
+            paymentMethodName: resolvedPaymentMethod,
+            availablePaymentMethods,
+          });
+
+          const emailMessage = lead?.email
+            ? await insertOutboundMessage({
+                voucherId: existingVoucher.id,
+                recipientEmail: lead.email,
+                recipientPhone: lead.phone || "",
+                subject: `Fee voucher ${voucherItem.voucher_no || existingVoucher.voucher_no}`,
+                body: emailHtml,
+                bodyText: emailText,
+                paymentSubmitUrl,
+                createdBy: session.user.id,
+                tx,
+              })
+            : null;
+
+          return {
+            item: voucherItem,
+            lead,
+            emailMessage: emailMessage ? { ...emailMessage, sent_status: "pending" } : null,
+          };
+        });
+
+        let existingVoucherEmailStatus = "sent";
+        let existingVoucherEmailError = "";
+
+        try {
+          if (updatedExistingVoucherResult?.item?.id && updatedExistingVoucherResult?.lead?.email) {
+            await sendEmail({
+              to: updatedExistingVoucherResult.lead.email,
+              subject:
+                updatedExistingVoucherResult.emailMessage?.subject ||
+                `Fee voucher ${updatedExistingVoucherResult.item.voucher_no || existingVoucher.voucher_no}`,
+              html: updatedExistingVoucherResult.emailMessage?.body || "",
+              text: updatedExistingVoucherResult.emailMessage?.body_text || "",
+            });
+          }
+        } catch (emailError) {
+          existingVoucherEmailStatus = "failed";
+          existingVoucherEmailError =
+            emailError instanceof Error ? emailError.message : "Voucher email dispatch failed.";
+          if (updatedExistingVoucherResult?.emailMessage?.id) {
+            await prisma.$executeRaw`
+              UPDATE outbound_messages
+              SET sent_status = 'failed',
+                  updated_at = NOW()
+              WHERE id = ${updatedExistingVoucherResult.emailMessage.id}::uuid
+            `;
+          }
+        }
+
+        if (existingVoucherEmailStatus === "sent" && updatedExistingVoucherResult?.emailMessage?.id) {
+          await prisma.$executeRaw`
+            UPDATE outbound_messages
+            SET sent_status = 'sent',
+                sent_at = NOW(),
+                updated_at = NOW()
+            WHERE id = ${updatedExistingVoucherResult.emailMessage.id}::uuid
+          `;
+        }
+
+        return json(
+          existingVoucherEmailStatus === "sent"
+            ? "Existing voucher linked with need based scholarship and email sent successfully."
+            : "Existing voucher linked with need based scholarship, but email sending failed.",
+          200,
+          {
+            item: {
+              ...updatedExistingVoucherResult.item,
+              payment_method_details: {
+                name:
+                  updatedExistingVoucherResult.item.payment_method_name ||
+                  updatedExistingVoucherResult.item.payment_method ||
+                  "",
+                bank_name: updatedExistingVoucherResult.item.bank_name || "",
+                account_title: updatedExistingVoucherResult.item.account_title || "",
+                account_number: updatedExistingVoucherResult.item.account_number || "",
+                iban: updatedExistingVoucherResult.item.iban || "",
+                branch_code: updatedExistingVoucherResult.item.branch_code || "",
+                instructions:
+                  updatedExistingVoucherResult.item.payment_method_instructions ||
+                  updatedExistingVoucherResult.item.payment_instructions ||
+                  "",
+              },
+            },
+            existing: true,
+            updated: true,
+            email_sent: existingVoucherEmailStatus === "sent",
+            email: updatedExistingVoucherResult.emailMessage
+              ? {
+                  ...updatedExistingVoucherResult.emailMessage,
+                  body_html: updatedExistingVoucherResult.emailMessage.body,
+                  body_text: updatedExistingVoucherResult.emailMessage.body_text,
+                  payment_submit_url: updatedExistingVoucherResult.emailMessage.payment_submit_url,
+                  recipient_phone: updatedExistingVoucherResult.emailMessage.recipient_phone,
+                  sent_status: existingVoucherEmailStatus,
+                }
+              : null,
+            ...(existingVoucherEmailStatus === "sent"
+              ? {}
+              : {
+                  email_error: existingVoucherEmailError || "Email failed.",
+                }),
+          }
+        );
+      }
+
       return json("Fee voucher already exists for this registration lead.", 200, {
         item: {
           ...existingVoucher,
@@ -1141,16 +1427,26 @@ export async function POST(request) {
         `;
       }
 
-      if (scholarshipFormId) {
-        await tx.$executeRaw`
+      if (scholarshipFormId || scholarshipAmountInput > 0) {
+        const updatedScholarshipRows = await tx.$queryRaw`
           UPDATE need_based_scholarship_forms
           SET
+            status = 'voucher_created',
             voucher_created = TRUE,
             voucher_id = ${voucherId}::uuid,
             scholarship_amount = ${scholarshipAmountInput},
             updated_at = NOW()
-          WHERE id = ${scholarshipFormId}::uuid
+          WHERE (
+              ${scholarshipFormId || null}::uuid IS NOT NULL
+              AND id = ${scholarshipFormId || null}::uuid
+            )
+             OR registration_id = ${resolvedRegistrationLeadId}::uuid
+          RETURNING id::text AS id, voucher_created, voucher_id::text AS voucher_id
         `;
+
+        if (!Array.isArray(updatedScholarshipRows) || !updatedScholarshipRows.length) {
+          throw new Error("Need-based scholarship record was not updated with the created voucher.");
+        }
       }
 
       await tx.$executeRaw`

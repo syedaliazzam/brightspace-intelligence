@@ -6,7 +6,6 @@ import { sendEmail, themedEmailShell } from "@/lib/email";
 import prisma from "@/lib/prisma";
 import { generateVoucherNumber } from "@/lib/voucherNumber";
 import { uploadAdmissionDocument } from "@/lib/supabaseStorage";
-import { uploadPaymentProof } from "@/lib/supabaseStorage";
 
 function json(success, message, status, extra = {}) {
   return NextResponse.json({ success, message, ...extra }, { status });
@@ -241,7 +240,7 @@ async function insertFeeVoucherForAdmission({
   }
   if (columns.status) {
     insertColumns.push(Prisma.raw(`"status"`));
-    insertValues.push({ value: "submitted", castType: "voucher_status" });
+    insertValues.push({ value: "unpaid", castType: "voucher_status" });
     supportedColumns.add("status");
   }
   if (columns.created_at) {
@@ -621,17 +620,6 @@ export async function POST(request) {
     if (!files.childPhotographFile && !childPhotographFilePath) {
       return json(false, "Recent child photograph is required.", 400);
     }
-    if (!needBasedScholarshipRequested && !files.paymentProofFile && !paymentProofFilePath) {
-      return json(false, "Payment proof is required.", 400);
-    }
-    if (needBasedScholarshipRequested) {
-      if (!scholarshipDependentsCount) return json(false, "Dependents count is required.", 400);
-      if (!scholarshipSchoolGoingChildrenCount) return json(false, "School-going children count is required.", 400);
-      if (!scholarshipResidenceType) return json(false, "Residence type is required.", 400);
-      if (!scholarshipRequestedAmount) return json(false, "Requested scholarship amount is required.", 400);
-      if (!scholarshipReason) return json(false, "Scholarship reason is required.", 400);
-    }
-
     if (fatherEmail && !isValidEmail(fatherEmail)) {
       return json(false, "Please enter a valid father email address.", 400);
     }
@@ -824,100 +812,22 @@ export async function POST(request) {
       LIMIT 1
     `;
 
-    let paymentSubmissionResult = null;
-    if (!needBasedScholarshipRequested && (files.paymentProofFile || paymentProofFilePath)) {
-      const admissionPaymentVoucherNo = await generateVoucherNumber();
-      const paymentProofStoredPath = paymentProofFilePath
-        || (await uploadPaymentProof({
-          voucherNo: admissionPaymentVoucherNo,
-          file: files.paymentProofFile,
-        })).storedPath;
-      const paymentDueDate = new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString();
-
-      paymentSubmissionResult = await prisma.$transaction(async (tx) => {
-        const voucher = await insertFeeVoucherForAdmission({
-          registrationLeadId: createdLead.id,
-          classLevel,
-          voucherNo: admissionPaymentVoucherNo,
-          paymentMethodId,
-          paymentMethodName: paymentMethod || "",
-          admissionFeeAmount: toMoney(admissionFeeAmount),
-          discountPercent: Number(String(discountPercent || "0").replace("%", "")) || 0,
-          paymentInstructions,
-          dueDate: paymentDueDate,
-          tx,
-        });
-
-        const paidAmountValue = toMoney(paidAmount) || voucher.totalAmount;
-        const submissionId = await insertFeeSubmissionForAdmission({
-          voucherId: voucher.voucherId,
-          payerName: payerName || parentSummary.parentName || "",
-          payerEmail,
-          payerPhone,
-          transactionId,
-          paidAmount: paidAmountValue,
-          paidAt,
-          proofFilePath: paymentProofStoredPath,
-          remarks: JSON.stringify({
-            paymentMethod: paymentMethod || paymentMethodId || "",
-            admissionFeeAmount: toMoney(admissionFeeAmount),
-            discountPercent: Number(String(discountPercent || "0").replace("%", "")) || 0,
-            paymentInstructions: paymentInstructions || "",
-            payerEmail: payerEmail || "",
-            payerPhone: payerPhone || "",
-          }),
-          submittedBy: null,
-          tx,
-        });
-
-        await tx.$executeRaw`
-          UPDATE registration_leads
-          SET status = ${"fee_submitted"}::registration_status
-          WHERE id = ${createdLead.id}::uuid
-        `;
-
-        return {
-          voucherNo: voucher.voucherNo,
-          voucherId: voucher.voucherId,
-          submissionId,
-          proofFilePath: paymentProofStoredPath,
-          totalAmount: voucher.totalAmount,
-        };
+    const admissionPaymentVoucherNo = await generateVoucherNumber();
+    const paymentDueDate = new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString();
+    const voucher = await prisma.$transaction(async (tx) => {
+      return insertFeeVoucherForAdmission({
+        registrationLeadId: createdLead.id,
+        classLevel,
+        voucherNo: admissionPaymentVoucherNo,
+        paymentMethodId,
+        paymentMethodName: paymentMethod || "",
+        admissionFeeAmount: toMoney(admissionFeeAmount),
+        discountPercent: Number(String(discountPercent || "0").replace("%", "")) || 0,
+        paymentInstructions,
+        dueDate: paymentDueDate,
+        tx,
       });
-    }
-
-    if (needBasedScholarshipRequested) {
-      await prisma.$executeRaw`
-        INSERT INTO need_based_scholarship_forms (
-          id,
-          registration_id,
-          interested_student_id,
-          lead_token,
-          dependents_count,
-          school_going_children_count,
-          residence_type,
-          requested_amount,
-          scholarship_reason,
-          status,
-          created_at,
-          updated_at
-        )
-        VALUES (
-          ${crypto.randomUUID()}::uuid,
-          ${createdLead.id}::uuid,
-          ${linkedLead?.id || null}::uuid,
-          ${leadToken || null},
-          ${Number(scholarshipDependentsCount || 0)},
-          ${Number(scholarshipSchoolGoingChildrenCount || 0)},
-          ${scholarshipResidenceType},
-          ${Number(scholarshipRequestedAmount || 0)},
-          ${scholarshipReason},
-          ${"submitted"},
-          NOW(),
-          NOW()
-        )
-      `;
-    }
+    });
 
     if (leadToken && linkedLead?.id && createdLead?.id) {
       await prisma.$executeRaw`
@@ -934,6 +844,9 @@ export async function POST(request) {
       `;
     }
 
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL || request.nextUrl.origin;
+    const nextStepUrl = `${String(appUrl || "").replace(/\/+$/, "")}/admission-next-step/${createdLead.id}?voucherNo=${encodeURIComponent(voucher?.voucherNo || "")}&leadToken=${encodeURIComponent(leadToken || "")}&submitted=1`;
+
     const parentEmail = parentSummary.parentEmail || linkedLead?.email || "";
     if (parentEmail) {
       const parentSubject = `Admission form submitted for ${studentName}`;
@@ -948,7 +861,10 @@ Preferred Starting Month: ${preferredStartingMonth}
 Primary Contact: ${parentSummary.parentName}
 Phone: ${parentSummary.parentPhone}
 
-Our admissions team will review the application and contact you with the next steps, In Sha Allah.`;
+Our admissions team will review the application and contact you with the next steps, In Sha Allah.
+
+Payment & Scholarship Page:
+${nextStepUrl}`;
       const parentHtml = themedEmailShell({
         eyebrow: "Admission Form Submitted",
         title: "Your child's admission form was received",
@@ -961,7 +877,12 @@ Our admissions team will review the application and contact you with the next st
           ["Primary Contact", parentSummary.parentName],
           ["Phone", parentSummary.parentPhone],
         ],
-        footerNote: "Our admissions team will review the application and contact you with the next steps, In Sha Allah.",
+        bodyBlocks: [
+          `<div style="padding:16px;border:1px solid #2D8A6A;border-radius:18px;background:#fffaf0;"><p style="margin:0 0 6px;font-size:12px;letter-spacing:.16em;text-transform:uppercase;color:#0D5C48;font-weight:700;">Next Step Link</p><p style="margin:0;line-height:1.8;color:#245C4F;font-size:15px;word-break:break-word;">${nextStepUrl}</p></div>`,
+        ],
+        buttonLabel: "Open Payment & Scholarship Page",
+        buttonUrl: nextStepUrl,
+        footerNote: "You have been redirected to the payment and scholarship page. Our admissions team will review the application and contact you with the next steps, In Sha Allah.",
       });
 
       await sendEmail({
@@ -1014,13 +935,14 @@ Interested Lead Token: ${leadToken || "N/A"}`;
 
     return json(
       true,
-      "Admission form submitted successfully. Our admissions team will review the application and contact you with the next steps, In Sha Allah.",
+      "Admission form submitted successfully. You are being redirected to the payment and scholarship page.",
       201,
-      paymentSubmissionResult
-        ? {
-            payment_submission: paymentSubmissionResult,
-          }
-        : {}
+      {
+        registration_id: createdLead.id,
+        next_step_url: nextStepUrl,
+        voucher_no: voucher?.voucherNo || "",
+        voucher_id: voucher?.voucherId || "",
+      }
     );
   } catch (error) {
     return json(

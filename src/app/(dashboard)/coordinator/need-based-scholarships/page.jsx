@@ -26,6 +26,7 @@ function formatScholarshipStatus(item) {
   if (status === "voucher_created") return "Voucher Created";
   if (status === "rejected") return "Rejected";
   if (hasFeeSubmission && (status === "pending" || status === "submitted")) return "Submitted";
+  if (hasVoucher && status === "unpaid") return "Voucher Created";
   if (!hasVoucher) return "Pending";
   if (status === "pending") return "Voucher Created";
   if (status === "submitted") return "Pending";

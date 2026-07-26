@@ -2,11 +2,68 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { LeafSpinnerInline } from "@/components/shared/AshShajrahLoaders";
+import { BadgePercent, Calculator, CalendarDays, FileText, Info, School } from "lucide-react";
 
 const LOCKED_STATUSES = new Set(["submitted", "verified"]);
 const NAME_PATTERN = "^[A-Za-zÀ-ÿ'’.-]{2,}(?:\\s+[A-Za-zÀ-ÿ'’.-]{2,})+$";
 const PHONE_PATTERN = "^(?:\\+92|0)?[0-9]{10,12}$";
 const TRANSACTION_PATTERN = "^[A-Za-z0-9_-]{3,150}$";
+
+function FormulaOperator({ value }) {
+  return (
+    <div className="flex items-center justify-center pt-1 text-base font-bold text-[#063F32] sm:text-xl">
+      {value}
+    </div>
+  );
+}
+
+function FormulaBox({ value, label }) {
+  return (
+    <div className="min-w-0">
+      <div className="rounded-2xl border border-[#E4D9BE] bg-[#FFFEFB] px-1 py-2.5 shadow-[0_8px_18px_rgba(13,59,46,0.05)]">
+        <p className="text-center text-[11px] font-bold text-[#063F32] sm:text-xs">
+          {Number(value || 0).toLocaleString("en-PK")}
+        </p>
+      </div>
+      <p className="mt-1.5 text-center text-[9px] font-medium leading-3 text-[#245C4F] sm:text-[10px]">
+        {label}
+      </p>
+    </div>
+  );
+}
+
+function FormulaTotal({ value }) {
+  return (
+    <div className="min-w-0">
+      <div className="rounded-2xl bg-[linear-gradient(135deg,#063F32,#0D5C48)] px-2.5 py-2.5 text-[#FAF7F0] shadow-[0_14px_28px_rgba(13,59,46,0.24)]">
+        <p className="text-center text-[11px] font-bold sm:text-xs">
+          {Number(value || 0).toLocaleString("en-PK")}
+        </p>
+      </div>
+      <p className="mt-1.5 text-center text-[9px] font-medium leading-3 text-[#245C4F] sm:text-[10px]">
+        Total Amount
+      </p>
+    </div>
+  );
+}
+
+function FormulaBoxSmall({ value, label }) {
+  return (
+    <div className="flex items-center justify-between gap-3 rounded-2xl border border-[#E4D9BE] bg-[#FFFEFB] px-3 py-2 shadow-[0_8px_18px_rgba(13,59,46,0.05)]">
+      <p className="text-[9px] font-semibold leading-4 text-[#245C4F]">{label}</p>
+      <p className="text-xs font-bold text-[#063F32] sm:text-sm">{Number(value || 0).toLocaleString("en-PK")}</p>
+    </div>
+  );
+}
+
+function FormulaTotalSmall({ value }) {
+  return (
+    <div className="flex items-center justify-between gap-3 rounded-2xl bg-[linear-gradient(135deg,#063F32,#0D5C48)] px-3 py-2 text-[#FAF7F0] shadow-[0_14px_28px_rgba(13,59,46,0.24)]">
+      <p className="text-[9px] font-semibold leading-4 text-[#FAF7F0]/85">Total Amount</p>
+      <p className="text-xs font-bold sm:text-sm">{Number(value || 0).toLocaleString("en-PK")}</p>
+    </div>
+  );
+}
 
 function formatDate(value) {
   if (!value) {
@@ -33,6 +90,13 @@ export default function PaymentSubmissionForm({ voucher }) {
     () => voucher.available_payment_methods || [],
     [voucher.available_payment_methods]
   );
+  const regularFee = Number(voucher.regular_fee_amount || 0);
+  const admissionFee = Number(voucher.admission_fee_amount || 0);
+  const discountAmount = Number(voucher.discount_amount || 0);
+  const totalAmount = Number(voucher.total_amount || voucher.amount || 0);
+  const hasDiscount = regularFee > 0 && discountAmount > 0;
+  const discountPercent = hasDiscount ? Math.round((discountAmount / regularFee) * 100) : 0;
+  const nextMonthlyFee = Math.max(regularFee - discountAmount, 0);
 
   useEffect(() => {
     return () => {
@@ -102,94 +166,189 @@ export default function PaymentSubmissionForm({ voucher }) {
   }
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[0.92fr_1.08fr]">
-      <section className="rounded-[2rem] border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.94),rgba(250,247,240,0.98))] p-6 shadow-[0_24px_80px_-36px_rgba(13,59,46,0.18)] sm:p-8">
-        <p className="text-sm font-semibold uppercase tracking-[0.24em] text-[#C9A227]">
-          Voucher details
-        </p>
-        <div className="mt-6 space-y-4 text-sm text-[#245C4F]">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#245C4F]">Student</p>
-            <p className="mt-2 text-base font-semibold text-[#063F32]">{voucher.student_name}</p>
-          </div>
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#245C4F]">Parent</p>
-            <p className="mt-2 text-base font-semibold text-[#063F32]">
-              {voucher.parent_name || "Not provided"}
-            </p>
-          </div>
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#245C4F]">Class level</p>
-            <p className="mt-2 text-base font-semibold text-[#063F32]">
-              {voucher.class_level || "Not provided"}
-            </p>
-          </div>
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#245C4F]">Amount</p>
-            <p className="mt-2 text-base font-semibold text-[#063F32]">
-              PKR {Number(voucher.total_amount || voucher.amount || 0).toFixed(2)}
-            </p>
-          </div>
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#245C4F]">Due date</p>
-            <p className="mt-2 text-base font-semibold text-[#063F32]">{formatDate(voucher.due_date)}</p>
-          </div>
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#245C4F]">Payment method</p>
-            <div className="mt-3 grid gap-3 sm:grid-cols-2">
-              {paymentMethods.map((method) => (
-                <div
-                  key={method.id}
-                  className="rounded-2xl border border-[#0D5C48] bg-[#EAF6EF] p-4 text-sm text-[#245C4F] shadow-[0_12px_32px_-22px_rgba(13,92,72,0.35)]"
-                >
-                  <p className="text-base font-semibold text-[#063F32]">{method.name}</p>
-                  {method.bank_name ? (
-                    <p className="mt-1">
-                      <span className="font-semibold text-[#063F32]">Bank:</span> {method.bank_name}
-                    </p>
-                  ) : null}
-                  {method.account_title ? (
-                    <p className="mt-1">
-                      <span className="font-semibold text-[#063F32]">Account title:</span> {method.account_title}
-                    </p>
-                  ) : null}
-                  {method.account_number ? (
-                    <p className="mt-1">
-                      <span className="font-semibold text-[#063F32]">Account number:</span> {method.account_number}
-                    </p>
-                  ) : null}
-                  {method.iban ? (
-                    <p className="mt-1">
-                      <span className="font-semibold text-[#063F32]">IBAN:</span> {method.iban}
-                    </p>
-                  ) : null}
-                  {method.branch_code ? (
-                    <p className="mt-1">
-                      <span className="font-semibold text-[#063F32]">Branch code:</span> {method.branch_code}
-                    </p>
-                  ) : null}
-                  {method.instructions ? (
-                    <p className="mt-2 whitespace-pre-line">
-                      <span className="font-semibold text-[#063F32]">Instructions:</span> {method.instructions}
-                    </p>
-                  ) : null}
-                </div>
-              ))}
+    <div className="grid items-start gap-6 lg:grid-cols-[1.10fr_0.70fr]">
+      <section className="grid gap-5 rounded-[1.35rem] border border-[rgba(13,59,46,0.08)] bg-white/95 p-4 shadow-[0_12px_28px_rgba(13,59,46,0.05)] sm:p-6">
+        <div className="rounded-[1rem] border border-[#2D8A6A]/10 bg-white p-4">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#245C4F]">Student</p>
+              <p className="mt-2 text-sm font-semibold text-[#063F32]">{voucher.student_name || "Not provided"}</p>
             </div>
-            {!paymentMethods.length ? (
-              <p className="mt-3 text-sm text-[#245C4F]">No payment methods provided.</p>
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#245C4F]">Parent</p>
+              <p className="mt-2 text-sm font-semibold text-[#063F32]">{voucher.parent_name || "Not provided"}</p>
+            </div>
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#245C4F]">Class level</p>
+              <p className="mt-2 text-sm font-semibold text-[#063F32]">{voucher.class_level || "Not provided"}</p>
+            </div>
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#245C4F]">Due date</p>
+              <p className="mt-2 text-sm font-semibold text-[#063F32]">{formatDate(voucher.due_date)}</p>
+            </div>
+          </div>
+        </div>
+
+        <section className="rounded-[1.5rem] border border-[#2D8A6A]/12 bg-[linear-gradient(180deg,#FFFFFF_0%,#FCFAF5_100%)] p-4 shadow-[0_18px_45px_rgba(13,59,46,0.08)] sm:p-5">
+          <div className="flex items-start gap-4">
+            <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#F1EADC] text-[#0D5C48] shadow-[inset_0_1px_0_rgba(255,255,255,0.7)]">
+              <FileText className="h-6 w-6" />
+            </div>
+            <div>
+              <h3 className="font-display text-lg font-bold uppercase text-[#063F32] sm:text-xl">
+                Voucher Details
+              </h3>
+              <p className="mt-1.5 text-[11px] leading-5 text-[#245C4F] sm:text-xs">
+                Please review your voucher fee breakdown before uploading payment proof.
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-5 rounded-[1.25rem] border border-[#E4D9BE] bg-[#FCFAF5] p-4 sm:p-5">
+            <p className="text-xs font-bold uppercase tracking-[0.24em] text-[#0D5C48] sm:text-sm">
+              Fee Breakdown
+            </p>
+
+            <div className="mt-5 divide-y divide-[#E4D9BE]">
+              <div className="flex items-center gap-3 py-4">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#F1EADC] text-[#0D5C48]">
+                  <CalendarDays className="h-5 w-5" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-bold text-[#063F32] sm:text-base">Monthly Fee</p>
+                </div>
+                <p className="shrink-0 text-right text-sm font-bold text-[#063F32] sm:text-base">
+                  PKR {regularFee.toLocaleString("en-PK")}
+                </p>
+              </div>
+
+              {hasDiscount ? (
+                <div className="flex items-center gap-3 py-4">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#F1EADC] text-[#0D5C48]">
+                    <BadgePercent className="h-5 w-5" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-bold text-[#063F32] sm:text-base">Discount</p>
+                    <p className="mt-1 text-xs text-[#245C4F]">{discountPercent}% monthly fee discount</p>
+                  </div>
+                  <p className="shrink-0 text-right text-sm font-bold text-[#063F32] sm:text-base">
+                    - PKR {discountAmount.toLocaleString("en-PK")}
+                  </p>
+                </div>
+              ) : null}
+
+              <div className="flex items-center gap-3 py-4">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#F1EADC] text-[#0D5C48]">
+                  <School className="h-5 w-5" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-bold text-[#063F32] sm:text-base">Admission Fee</p>
+                  <p className="mt-1 text-xs text-[#245C4F]">One-time fee only</p>
+                </div>
+                <p className="shrink-0 text-right text-sm font-bold text-[#063F32] sm:text-base">
+                  PKR {admissionFee.toLocaleString("en-PK")}
+                </p>
+              </div>
+            </div>
+
+            <div className="my-4 border-t border-dashed border-[#D8CBAA]" />
+
+            <div className="rounded-[1.25rem] border border-[#E4D9BE] bg-white p-3.5 sm:p-4">
+              <div className="grid gap-3 md:grid-cols-[minmax(0,0.78fr)_minmax(0,1.22fr)] md:items-center">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[linear-gradient(135deg,#063F32,#0D5C48)] text-[#FAF7F0] shadow-[0_12px_30px_rgba(13,59,46,0.22)]">
+                    <Calculator className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-[#0D5C48] sm:text-[10px]">Total Amount</p>
+                    <p className="mt-1 text-lg font-bold leading-tight text-[#063F32] sm:text-xl">
+                      PKR {totalAmount.toLocaleString("en-PK")}
+                    </p>
+                  </div>
+                </div>
+                <div
+                  className={`hidden items-start gap-1 text-center text-[#063F32] xl:grid ${
+                    hasDiscount
+                      ? "grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)_auto_minmax(0,1fr)_auto_minmax(0,1fr)]"
+                      : "grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)_auto_minmax(0,1fr)]"
+                  }`}
+                >
+                  <FormulaBox value={regularFee} label="Monthly Fee" />
+                  {hasDiscount ? <FormulaOperator value="-" /> : <FormulaOperator value="+" />}
+                  {hasDiscount ? (
+                    <FormulaBox value={discountAmount} label={`Discount (${discountPercent}%)`} />
+                  ) : (
+                    <FormulaBox value={admissionFee} label="Admission Fee" />
+                  )}
+                  {hasDiscount ? <FormulaOperator value="+" /> : <FormulaOperator value="=" />}
+                  {hasDiscount ? (
+                    <FormulaBox value={admissionFee} label="Admission Fee" />
+                  ) : (
+                    <FormulaTotal value={totalAmount} />
+                  )}
+                  {hasDiscount ? <FormulaOperator value="=" /> : null}
+                  {hasDiscount ? <FormulaTotal value={totalAmount} /> : null}
+                </div>
+
+                <div className="grid gap-2 xl:hidden">
+                  <FormulaBoxSmall value={regularFee} label="Monthly Fee" />
+                  {hasDiscount ? <FormulaOperator value="-" /> : <FormulaOperator value="+" />}
+                  {hasDiscount ? (
+                    <FormulaBoxSmall value={discountAmount} label={`Discount (${discountPercent}%)`} />
+                  ) : (
+                    <FormulaBoxSmall value={admissionFee} label="Admission Fee" />
+                  )}
+                  {hasDiscount ? <FormulaOperator value="+" /> : <FormulaOperator value="=" />}
+                  {hasDiscount ? (
+                    <FormulaBoxSmall value={admissionFee} label="Admission Fee" />
+                  ) : (
+                    <FormulaTotalSmall value={totalAmount} />
+                  )}
+                  {hasDiscount ? <FormulaOperator value="=" /> : null}
+                  {hasDiscount ? <FormulaTotalSmall value={totalAmount} /> : null}
+                </div>
+              </div>
+            </div>
+
+            {hasDiscount ? (
+              <div className="mt-3 flex items-start gap-3 rounded-[1rem] border border-[#E4D9BE] bg-[#FFF5D6]/65 px-4 py-3 text-sm text-[#063F32]">
+                <Info className="mt-0.5 h-5 w-5 shrink-0 text-[#0D5C48]" />
+                <p>From next month onward, the monthly fee will be PKR {nextMonthlyFee.toLocaleString("en-PK")}/month.</p>
+              </div>
             ) : null}
           </div>
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#245C4F]">Instructions</p>
-            <p className="mt-2 whitespace-pre-line leading-7 text-[#245C4F]">
-              {voucher.payment_instructions || "No payment instructions were provided."}
-            </p>
+        </section>
+
+        <div className="rounded-[1rem] border border-[#2D8A6A]/10 bg-white p-4">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]">Payment methods</p>
+          <div className="mt-3 space-y-2">
+            {paymentMethods.length ? paymentMethods.map((method) => (
+              <div key={method.id || method.name} className="rounded-xl border border-[#2D8A6A]/10 bg-[#FAF7F0] px-3 py-3 text-sm text-[#063F32]">
+                <p className="text-sm font-semibold sm:text-[15px]">{method.name || "Payment method"}</p>
+                <div className="mt-2 grid gap-1.5 text-[13px] leading-5 text-[#245C4F] sm:text-sm">
+                  {method.bank_name ? <p><span className="font-semibold text-[#063F32]">Bank:</span> {method.bank_name}</p> : null}
+                  {method.account_title ? <p><span className="font-semibold text-[#063F32]">Account title:</span> {method.account_title}</p> : null}
+                  {method.account_number ? <p><span className="font-semibold text-[#063F32]">Account number:</span> {method.account_number}</p> : null}
+                  {method.iban ? <p><span className="font-semibold text-[#063F32]">IBAN:</span> {method.iban}</p> : null}
+                  {method.branch_code ? <p><span className="font-semibold text-[#063F32]">Branch code:</span> {method.branch_code}</p> : null}
+                  {method.instructions ? <p><span className="font-semibold text-[#063F32]">Instructions:</span> {method.instructions}</p> : null}
+                </div>
+              </div>
+            )) : (
+              <p className="text-sm text-[#245C4F]">No payment methods available.</p>
+            )}
           </div>
+        </div>
+
+        <div className="rounded-[1rem] border border-[#2D8A6A]/10 bg-[#FAF7F0] p-4">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]">Payment instructions</p>
+          <p className="mt-2 whitespace-pre-line text-sm text-[#245C4F]">
+            {voucher.payment_instructions || "No payment instructions were provided."}
+          </p>
         </div>
       </section>
 
-      <section className="rounded-[2rem] border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(250,247,240,0.98))] p-6 shadow-[0_24px_80px_-36px_rgba(13,59,46,0.18)] sm:p-8">
+      <section className="self-start rounded-[2rem] border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(250,247,240,0.98))] p-6 shadow-[0_24px_80px_-36px_rgba(13,59,46,0.18)] sm:p-8">
         <p className="text-sm font-semibold uppercase tracking-[0.24em] text-[#C9A227]">
           Submit payment
         </p>

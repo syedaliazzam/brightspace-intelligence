@@ -136,7 +136,7 @@ export default async function PaymentVoucherPage({ params }) {
 
   return (
     <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,rgba(201,162,39,0.12),transparent_28%),radial-gradient(circle_at_top_right,rgba(45,138,106,0.12),transparent_26%),linear-gradient(180deg,#FAF7F0_0%,#F7F1E3_100%)] px-4 py-10 text-[#063F32] sm:px-6 lg:px-8">
-      <div className="mx-auto max-w-4xl space-y-6">
+      <div className="mx-auto max-w-6xl space-y-6">
         <section className="rounded-[2rem] border border-[#2D8A6A]/15 bg-[linear-gradient(135deg,rgba(13,59,46,0.98),rgba(13,92,72,0.94))] p-6 shadow-[0_24px_80px_-36px_rgba(13,59,46,0.32)] sm:p-8">
           <p className="text-sm font-semibold uppercase tracking-[0.24em] text-[#E4C766]">
             Payment submission

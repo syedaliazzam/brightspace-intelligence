@@ -30,15 +30,15 @@ export async function GET() {
         LOWER(
           COALESCE(
             latest_submission.status::text,
-            fv.status::text,
             CASE
-              WHEN COALESCE(nbsf.voucher_created, FALSE) THEN 'voucher_created'
+              WHEN COALESCE(nbsf.voucher_created, FALSE) OR nbsf.voucher_id IS NOT NULL THEN 'voucher_created'
               ELSE nbsf.status::text
             END,
+            fv.status::text,
             'submitted'
           )
         ) AS status,
-        COALESCE(nbsf.voucher_created, FALSE) AS voucher_created,
+        (COALESCE(nbsf.voucher_created, FALSE) OR nbsf.voucher_id IS NOT NULL) AS voucher_created,
         nbsf.voucher_id::text AS voucher_id,
         (latest_submission.status IS NOT NULL) AS has_fee_submission,
         COALESCE(nbsf.scholarship_amount::float8, 0) AS scholarship_amount,
