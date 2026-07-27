@@ -194,6 +194,34 @@ export default function PaymentSubmissionForm({ voucher }) {
           </div>
         </div>
 
+        <div className="rounded-[1rem] border border-[#2D8A6A]/10 bg-white p-4">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]">Payment methods</p>
+          <div className="mt-3 space-y-2">
+            {paymentMethods.length ? paymentMethods.map((method) => (
+              <div key={method.id || method.name} className="rounded-xl border border-[#2D8A6A]/10 bg-[#FAF7F0] px-3 py-3 text-sm text-[#063F32]">
+                <p className="text-sm font-semibold sm:text-[15px]">{method.name || "Payment method"}</p>
+                <div className="mt-2 grid gap-1.5 text-[13px] leading-5 text-[#245C4F] sm:text-sm">
+                  {method.bank_name ? <p><span className="font-semibold text-[#063F32]">Bank:</span> {method.bank_name}</p> : null}
+                  {method.account_title ? <p><span className="font-semibold text-[#063F32]">Account title:</span> {method.account_title}</p> : null}
+                  {method.account_number ? <p><span className="font-semibold text-[#063F32]">Account number:</span> {method.account_number}</p> : null}
+                  {method.iban ? <p><span className="font-semibold text-[#063F32]">IBAN:</span> {method.iban}</p> : null}
+                  {method.branch_code ? <p><span className="font-semibold text-[#063F32]">Branch code:</span> {method.branch_code}</p> : null}
+                  {method.instructions ? <p><span className="font-semibold text-[#063F32]">Instructions:</span> {method.instructions}</p> : null}
+                </div>
+              </div>
+            )) : (
+              <p className="text-sm text-[#245C4F]">No payment methods available.</p>
+            )}
+          </div>
+        </div>
+
+        <div className="rounded-[1rem] border border-[#2D8A6A]/10 bg-[#FAF7F0] p-4">
+          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]">Payment instructions</p>
+          <p className="mt-2 whitespace-pre-line text-sm text-[#245C4F]">
+            {voucher.payment_instructions || "No payment instructions were provided."}
+          </p>
+        </div>
+
         <section className="rounded-[1.5rem] border border-[#2D8A6A]/12 bg-[linear-gradient(180deg,#FFFFFF_0%,#FCFAF5_100%)] p-4 shadow-[0_18px_45px_rgba(13,59,46,0.08)] sm:p-5">
           <div className="flex items-start gap-4">
             <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#F1EADC] text-[#0D5C48] shadow-[inset_0_1px_0_rgba(255,255,255,0.7)]">
@@ -323,34 +351,6 @@ export default function PaymentSubmissionForm({ voucher }) {
             ) : null}
           </div>
         </section>
-
-        <div className="rounded-[1rem] border border-[#2D8A6A]/10 bg-white p-4">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]">Payment methods</p>
-          <div className="mt-3 space-y-2">
-            {paymentMethods.length ? paymentMethods.map((method) => (
-              <div key={method.id || method.name} className="rounded-xl border border-[#2D8A6A]/10 bg-[#FAF7F0] px-3 py-3 text-sm text-[#063F32]">
-                <p className="text-sm font-semibold sm:text-[15px]">{method.name || "Payment method"}</p>
-                <div className="mt-2 grid gap-1.5 text-[13px] leading-5 text-[#245C4F] sm:text-sm">
-                  {method.bank_name ? <p><span className="font-semibold text-[#063F32]">Bank:</span> {method.bank_name}</p> : null}
-                  {method.account_title ? <p><span className="font-semibold text-[#063F32]">Account title:</span> {method.account_title}</p> : null}
-                  {method.account_number ? <p><span className="font-semibold text-[#063F32]">Account number:</span> {method.account_number}</p> : null}
-                  {method.iban ? <p><span className="font-semibold text-[#063F32]">IBAN:</span> {method.iban}</p> : null}
-                  {method.branch_code ? <p><span className="font-semibold text-[#063F32]">Branch code:</span> {method.branch_code}</p> : null}
-                  {method.instructions ? <p><span className="font-semibold text-[#063F32]">Instructions:</span> {method.instructions}</p> : null}
-                </div>
-              </div>
-            )) : (
-              <p className="text-sm text-[#245C4F]">No payment methods available.</p>
-            )}
-          </div>
-        </div>
-
-        <div className="rounded-[1rem] border border-[#2D8A6A]/10 bg-[#FAF7F0] p-4">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]">Payment instructions</p>
-          <p className="mt-2 whitespace-pre-line text-sm text-[#245C4F]">
-            {voucher.payment_instructions || "No payment instructions were provided."}
-          </p>
-        </div>
       </section>
 
       <section className="self-start rounded-[2rem] border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(250,247,240,0.98))] p-6 shadow-[0_24px_80px_-36px_rgba(13,59,46,0.18)] sm:p-8">
