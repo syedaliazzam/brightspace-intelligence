@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { getMeetAttendanceRecords } from "@/lib/googleMeet";
+import { getMeetAttendanceRecords, shareDriveFileWithUsers } from "@/lib/googleMeet";
 import prisma from "@/lib/prisma";
 
 const ALLOWED_ROLES = new Set(["admin", "coordinator", "superadmin", "teacher"]);
@@ -10,9 +10,15 @@ function json(message, status = 200, extra = {}) {
 }
 
 function buildRecordingUrl(recording) {
-  if (recording?.driveExportUri) return recording.driveExportUri;
   if (recording?.driveFileId) return `https://drive.google.com/file/d/${recording.driveFileId}/preview`;
+  if (recording?.driveExportUri) return recording.driveExportUri;
   return "";
+}
+
+function extractDriveFileId(url) {
+  const text = String(url || "").trim();
+  const match = text.match(/\/file\/d\/([^/]+)/i);
+  return match?.[1] || "";
 }
 
 export async function POST(_request, { params }) {
@@ -49,6 +55,14 @@ export async function POST(_request, { params }) {
     }
 
     if (event.recording_drive_url) {
+      const existingFileId = extractDriveFileId(event.recording_drive_url);
+      if (existingFileId) {
+        await shareDriveFileWithUsers({
+          fileId: existingFileId,
+          emails: [],
+          impersonateUserEmail: event.host_email || session.user.email || "",
+        });
+      }
       return json("Recording already available.", 200, {
         recording_drive_url: event.recording_drive_url,
       });
@@ -74,6 +88,13 @@ export async function POST(_request, { params }) {
     });
 
     const recording = Array.isArray(syncResult.recordings) ? syncResult.recordings[0] : null;
+    if (recording?.driveFileId) {
+      await shareDriveFileWithUsers({
+        fileId: recording.driveFileId,
+        emails: [],
+        impersonateUserEmail: event.host_email || session.user.email || "",
+      });
+    }
     const recordingUrl = buildRecordingUrl(recording);
 
     if (!recordingUrl) {
