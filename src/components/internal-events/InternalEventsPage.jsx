@@ -404,7 +404,6 @@ export default function InternalEventsPage({
                       ["Attendee", `${selected.attendee_name || "-"}${selected.attendee_role ? ` - ${roleLabel(selected.attendee_role)}` : ""}`],
                       ["Start", formatDateTime(selected.scheduled_start)],
                       ["End", formatDateTime(selected.scheduled_end)],
-                      ["Status", eventStatus(selected)],
                       ["Description", selected.description || "Not available"],
                     ].map(([label, value]) => (
                       <div key={label} className="rounded-2xl border border-[#2D8A6A]/12 bg-white px-4 py-3">

@@ -280,7 +280,6 @@ export default function LMSCalendar({ apiUrl, filters = {}, extraParams = {}, on
               <p><strong className="text-[#063F32]">Teacher:</strong> {selected.teacher_name || "Not available"}</p>
               <p><strong className="text-[#063F32]">Start:</strong> {formatLocalDateTime(selected.scheduled_start)}</p>
               <p><strong className="text-[#063F32]">End:</strong> {formatLocalDateTime(selected.scheduled_end)}</p>
-              <p><strong className="text-[#063F32]">Status:</strong> {selected.display_status || selected.status || "Not available"}</p>
               <p className="whitespace-pre-line"><strong className="text-[#063F32]">Description:</strong> {selected.description || "Not available"}</p>
               {selected.google_meet_link ? (
                 <div className="rounded-2xl border border-[#2D8A6A]/15 bg-[#FAF7F0] p-4">

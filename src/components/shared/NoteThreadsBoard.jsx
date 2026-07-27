@@ -18,6 +18,17 @@ function groupLectureOptions(lectures) {
   return Array.from(map.values());
 }
 
+function formatVisibilityLabel(value) {
+  const normalized = String(value || "").trim().toLowerCase();
+  if (normalized === "admin_only") return "Admin Only";
+  if (normalized === "parent") return "Parent";
+  if (normalized === "student") return "Student";
+  if (normalized === "admin") return "Admin";
+  return normalized
+    ? normalized.replace(/\b\w/g, (char) => char.toUpperCase())
+    : "-";
+}
+
 function MessageBubble({ message, mode }) {
   const senderRole = String(message.sender_role || "").toLowerCase();
   const mine =
@@ -111,6 +122,8 @@ export default function NoteThreadsBoard({ mode = "viewer", lectures = [], porta
   const [threads, setThreads] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [filterColumn, setFilterColumn] = useState("all");
+  const [filterText, setFilterText] = useState("");
   const [selected, setSelected] = useState(null);
   const [messages, setMessages] = useState([]);
   const [messagesLoading, setMessagesLoading] = useState(false);
@@ -127,6 +140,39 @@ export default function NoteThreadsBoard({ mode = "viewer", lectures = [], porta
   const selectedVisibility = String(selected?.visibility || "").toLowerCase();
   const isParentThread = ["parent", "parent_only"].includes(selectedVisibility);
   const isStudentThread = selectedVisibility === "student";
+  const threadFilterOptions = useMemo(
+    () => [
+      { value: "all", label: "All columns" },
+      { value: "class", label: "Class" },
+      { value: "subject", label: "Subject" },
+      { value: "teacher", label: "Teacher Name" },
+      { value: "visibility", label: "For Role" },
+      { value: "message", label: "Last Message" },
+    ],
+    []
+  );
+  const filteredThreads = useMemo(() => {
+    const query = String(filterText || "").trim().toLowerCase();
+    if (!query) return threads;
+
+    const matches = (value) => String(value || "").toLowerCase().includes(query);
+
+    return threads.filter((thread) => {
+      const values = {
+        class: thread.class_level || thread.course_title || "",
+        subject: thread.subject_name || "",
+        teacher: thread.teacher_name || "",
+        visibility: formatVisibilityLabel(thread.visibility),
+        message: thread.last_message || "",
+      };
+
+      if (filterColumn === "all") {
+        return Object.values(values).some(matches);
+      }
+
+      return matches(values[filterColumn] || "");
+    });
+  }, [filterColumn, filterText, threads]);
   const canReplyToSelected =
     (mode === "student" && isStudentThread) ||
     (mode === "parent" && isParentThread) ||
@@ -265,12 +311,41 @@ export default function NoteThreadsBoard({ mode = "viewer", lectures = [], porta
       {error ? <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">{error}</div> : null}
 
       <section className={`overflow-hidden ${panel}`}>
+        <div className="border-b border-[#F1EADC] px-5 py-4">
+          <div className="grid gap-3 md:grid-cols-[240px_minmax(0,1fr)]">
+            <label className="block">
+              <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]">Filter column</span>
+              <SelectField
+                value={filterColumn}
+                onChange={(e) => setFilterColumn(e.target.value)}
+                className="rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 text-sm text-[#245C4F] outline-none focus:border-[#C9A227] focus:ring-4 focus:ring-[#FFF5D6]"
+              >
+                {threadFilterOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </SelectField>
+            </label>
+            <label className="block">
+              <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]">Search</span>
+              <input
+                value={filterText}
+                onChange={(e) => setFilterText(e.target.value)}
+                placeholder="Filter notes by selected column"
+                className="w-full rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 text-sm text-[#245C4F] outline-none transition placeholder:text-[#7A938B] focus:border-[#C9A227] focus:ring-4 focus:ring-[#FFF5D6]"
+              />
+            </label>
+          </div>
+        </div>
         <div className="overflow-x-auto">
           <table className="min-w-full text-left text-sm">
             <thead className="bg-[linear-gradient(180deg,#FAF7F0_0%,#F1EADC_100%)] text-xs uppercase tracking-[0.18em] text-[#0D5C48]">
               <tr>
                 <th className="px-6 py-4">Class</th>
                 <th className="px-6 py-4">Subject</th>
+                <th className="px-6 py-4">Teacher Name</th>
+                <th className="px-6 py-4">For Role</th>
                 <th className="px-6 py-4">Last Message</th>
                 <th className="px-6 py-4">Date</th>
                 <th className="px-6 py-4">Actions</th>
@@ -279,14 +354,16 @@ export default function NoteThreadsBoard({ mode = "viewer", lectures = [], porta
             <tbody className="divide-y divide-[#F1EADC]">
               {loading ? (
                 <tr>
-                  <td colSpan={5} className="px-5 py-10">
+                  <td colSpan={7} className="px-5 py-10">
                     <OpenBookLoader title="Loading notes" subtitle="Preparing your notes threads..." />
                   </td>
                 </tr>
-              ) : threads.length ? threads.map((thread) => (
+              ) : filteredThreads.length ? filteredThreads.map((thread) => (
                 <tr key={thread.id}>
                   <td className="px-6 py-4 font-semibold text-[#063F32]">{thread.class_level || thread.course_title || "-"}</td>
                   <td className="px-6 py-4 text-[#245C4F]">{thread.subject_name || "-"}</td>
+                  <td className="px-6 py-4 text-[#245C4F]">{thread.teacher_name || "-"}</td>
+                  <td className="px-6 py-4 text-[#245C4F]">{formatVisibilityLabel(thread.visibility)}</td>
                   <td className="px-6 py-4 text-[#245C4F]">{thread.last_message || "-"}</td>
                   <td className="px-6 py-4 text-[#245C4F]">{thread.last_message_at ? new Date(thread.last_message_at).toLocaleString("en-PK", { timeZone: "Asia/Karachi" }) : "-"}</td>
                   <td className="px-6 py-4">
@@ -302,7 +379,7 @@ export default function NoteThreadsBoard({ mode = "viewer", lectures = [], porta
                   </td>
                 </tr>
               )) : (
-                <tr><td colSpan={5} className="px-4 py-10 text-center text-sm text-[#245C4F]">No notes yet.</td></tr>
+                <tr><td colSpan={7} className="px-4 py-10 text-center text-sm text-[#245C4F]">No notes matched the current filter.</td></tr>
               )}
             </tbody>
           </table>
