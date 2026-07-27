@@ -7,18 +7,7 @@ function json(message, status = 200, extra = {}) {
 
 export async function GET() {
   try {
-    const [discounts, paymentMethods, regularFees, admissionFees, classLevels, feeSettings] = await Promise.all([
-      prisma.$queryRaw`
-        SELECT
-          id::text AS id,
-          label,
-          percent::float8 AS percent,
-          LOWER(status::text) AS status
-        FROM discounts
-        WHERE LOWER(status::text) = 'active'
-          AND percent <= 20
-        ORDER BY percent ASC
-      `,
+    const [paymentMethods, regularFees, admissionFees, classLevels, feeSettings] = await Promise.all([
       prisma.$queryRaw`
         SELECT
           id::text AS id,
@@ -77,13 +66,26 @@ export async function GET() {
       `,
     ]);
 
+    const coordinatorMaxDiscountPercent = Number(feeSettings?.[0]?.value || 20);
+    const discounts = await prisma.$queryRaw`
+      SELECT
+        id::text AS id,
+        label,
+        percent::float8 AS percent,
+        LOWER(status::text) AS status
+      FROM discounts
+      WHERE LOWER(status::text) = 'active'
+        AND percent <= ${coordinatorMaxDiscountPercent}
+      ORDER BY percent ASC
+    `;
+
     return json("Admission form options fetched.", 200, {
       discounts,
       paymentMethods,
       regularFees,
       admissionFees,
       classLevels,
-      coordinatorMaxDiscountPercent: Number(feeSettings?.[0]?.value || 20),
+      coordinatorMaxDiscountPercent,
     });
   } catch (error) {
     return json(error instanceof Error ? error.message : "Unable to fetch admission form options.", 500);

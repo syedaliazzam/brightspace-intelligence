@@ -163,12 +163,17 @@ export default function InterestedStudentsPanel({
       }
     }
 
-    void loadPaymentOptions();
+    const shouldRefreshForSendPopup =
+      Boolean(selectedLead?.id) && selectedLeadViewMode === "send";
+
+    if (paymentOptions.discounts.length === 0 || shouldRefreshForSendPopup) {
+      void loadPaymentOptions();
+    }
 
     return () => {
       active = false;
     };
-  }, []);
+  }, [paymentOptions.discounts.length, selectedLead?.id, selectedLeadViewMode]);
 
   const selectedClassLevel = String(selectedLead?.class_level || "").trim();
   const regularFee = useMemo(() => {
@@ -1215,13 +1220,13 @@ export default function InterestedStudentsPanel({
                                 )
                                 .map((item) => (
                                   <option key={item.id || item.label} value={item.id}>
-                                    {item.label || `${Number(item.percent || 0)}%`}
+                                    {`${Number(item.percent || 0)}%`}
                                   </option>
                                 ))}
                             </select>
                           </div>
                           <p className="mt-2 text-sm text-[#245C4F]">
-                            Allowed discounts are limited to coordinator-approved values up to 20%.
+                            Allowed discounts are limited to coordinator-approved values up to {Number(paymentOptions.coordinatorMaxDiscountPercent || 20)}%.
                           </p>
                         </div>
                       </div>
