@@ -1159,7 +1159,7 @@ export async function POST(request) {
             lead,
             emailMessage: emailMessage ? { ...emailMessage, sent_status: "pending" } : null,
           };
-        });
+        }, { timeout: 30000 });
 
         let existingVoucherEmailStatus = "sent";
         let existingVoucherEmailError = "";
@@ -1564,7 +1564,7 @@ export async function POST(request) {
         lead,
         emailMessage: emailMessage ? { ...emailMessage, sent_status: "pending" } : null,
       };
-    }, { timeout: 15000 });
+    }, { timeout: 30000 });
 
     let emailSendStatus = "sent";
     let emailErrorMessage = "";

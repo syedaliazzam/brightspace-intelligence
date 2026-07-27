@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import PaymentSubmissionForm from "@/components/payment/PaymentSubmissionForm";
 import { BadgePercent, Calculator, CalendarDays, FileText, Info, School } from "lucide-react";
 
@@ -70,6 +71,7 @@ export default function AdmissionNextStepClient({
   lead = null,
   scholarship = null,
 }) {
+  const router = useRouter();
   const [useScholarship, setUseScholarship] = useState(Boolean(scholarship));
   const [form, setForm] = useState({
     dependentsCount: scholarship?.dependents_count ? String(scholarship.dependents_count) : "",
@@ -96,11 +98,15 @@ export default function AdmissionNextStepClient({
 
   useEffect(() => {
     if (!submitted || paymentAlreadySubmitted || scholarshipSubmitted) {
-      return;
+      return undefined;
     }
 
-    setTone("success");
-    setMessage("Admission form is submitted and you are also redirected to your payment page.");
+    const timer = window.setTimeout(() => {
+      setTone("success");
+      setMessage("Admission form is submitted and you are also redirected to your payment page.");
+    }, 0);
+
+    return () => window.clearTimeout(timer);
   }, [paymentAlreadySubmitted, scholarshipSubmitted, submitted]);
 
   useEffect(() => {
@@ -308,6 +314,9 @@ export default function AdmissionNextStepClient({
 
       setTone("success");
       setMessage("Need based scholarship form submitted successfully.");
+      window.setTimeout(() => {
+        router.refresh();
+      }, 800);
     } catch (error) {
       setTone("error");
       setMessage(error instanceof Error ? error.message : "Unable to submit need based scholarship form.");

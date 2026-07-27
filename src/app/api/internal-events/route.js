@@ -115,6 +115,26 @@ export async function GET(request) {
       )`);
     }
 
+    if (role === "teacher") {
+      values.push(session.user.id);
+      const teacherIdIndex = values.length;
+      values.push(session.user.email || "");
+      const teacherEmailIndex = values.length;
+      values.push(session.user.username || "");
+      const teacherUsernameIndex = values.length;
+      values.push(session.user.phone || "");
+      const teacherPhoneIndex = values.length;
+      values.push(session.user.full_name || session.user.name || "");
+      const teacherNameIndex = values.length;
+      conditions.push(`(
+        ie.attendee_user_id = $${teacherIdIndex}::uuid
+        OR LOWER(COALESCE(attendee.email, '')) = LOWER($${teacherEmailIndex})
+        OR LOWER(COALESCE(attendee.username, '')) = LOWER($${teacherUsernameIndex})
+        OR REGEXP_REPLACE(COALESCE(attendee.phone, ''), '\\D', '', 'g') = REGEXP_REPLACE($${teacherPhoneIndex}, '\\D', '', 'g')
+        OR LOWER(TRIM(COALESCE(attendee.full_name, ''))) = LOWER(TRIM($${teacherNameIndex}))
+      )`);
+    }
+
     if (search) {
       values.push(`%${search}%`);
       conditions.push(`(

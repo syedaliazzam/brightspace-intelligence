@@ -362,7 +362,7 @@ export default function InternalEventsPage({
               timeZone="local"
               eventDisplay="block"
               eventTimeFormat={{ hour: "numeric", minute: "2-digit", hour12: true }}
-              slotMinTime="04:00:00"
+              slotMinTime="08:00:00"
               slotMaxTime="18:00:00"
               scrollTime="08:00:00"
               slotDuration="01:00:00"

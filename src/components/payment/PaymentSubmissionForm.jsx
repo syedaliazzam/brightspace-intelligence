@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { LeafSpinnerInline } from "@/components/shared/AshShajrahLoaders";
 import { BadgePercent, Calculator, CalendarDays, FileText, Info, School } from "lucide-react";
 
@@ -81,6 +82,7 @@ function formatDate(value) {
 }
 
 export default function PaymentSubmissionForm({ voucher }) {
+  const router = useRouter();
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState("");
   const [tone, setTone] = useState("neutral");
@@ -139,6 +141,9 @@ export default function PaymentSubmissionForm({ voucher }) {
         URL.revokeObjectURL(proofPreview);
       }
       setProofPreview("");
+      window.setTimeout(() => {
+        router.refresh();
+      }, 800);
     } catch (error) {
       setTone("error");
       setMessage(error instanceof Error ? error.message : "Payment submission failed.");
