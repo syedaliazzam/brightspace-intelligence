@@ -37,6 +37,7 @@ function formatDateTime(value) {
 function roleLabel(value) {
   return String(value || "")
     .replace(/^superadmin$/i, "Super Admin")
+    .replace(/^cohost$/i, "Co-host")
     .replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
@@ -76,6 +77,7 @@ export default function InternalEventsPage({
   const [syncingId, setSyncingId] = useState("");
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
+  const [copiedMeetLink, setCopiedMeetLink] = useState("");
   const [selected, setSelected] = useState(null);
   const [attendeeOpen, setAttendeeOpen] = useState(false);
   const [search, setSearch] = useState("");
@@ -193,7 +195,9 @@ export default function InternalEventsPage({
     if (!value) return;
     try {
       await navigator.clipboard.writeText(value);
+      setCopiedMeetLink(value);
       setMessage(label);
+      window.setTimeout(() => setCopiedMeetLink(""), 2200);
     } catch {
       setMessage("Unable to copy link.");
     }
@@ -381,7 +385,7 @@ export default function InternalEventsPage({
           </div>
 
           {selected ? (
-            <div className="absolute inset-0 z-[9999] flex items-start justify-center rounded-[1.75rem] px-4 py-8 sm:px-6">
+            <div className="absolute inset-0 z-[9999] flex items-center justify-center rounded-[1.75rem] px-4 py-8 sm:px-6">
               <div className="absolute inset-0 rounded-[1.75rem] bg-[#063F32]/45 backdrop-blur-sm" />
               <div className="relative max-h-[calc(100%-4rem)] w-full max-w-4xl overflow-y-auto rounded-[2rem] border border-[#2D8A6A]/15 bg-[#FAF7F0] shadow-[0_24px_80px_-36px_rgba(13,59,46,0.24)]">
                 <div className="flex items-start justify-between gap-4 border-b border-[#F1EADC] px-6 py-4">
@@ -400,8 +404,8 @@ export default function InternalEventsPage({
                 <div className="space-y-4 p-6 text-sm text-[#245C4F]">
                   <div className="grid gap-3 md:grid-cols-3">
                     {[
-                      ["Host", selected.host_name || "Coordinator"],
-                      ["Attendee", `${selected.attendee_name || "-"}${selected.attendee_role ? ` - ${roleLabel(selected.attendee_role)}` : ""}`],
+                      ["Host", `${selected.host_name || "Coordinator"}${selected.host_meet_role ? ` - ${roleLabel(selected.host_meet_role)}` : ""}`],
+                      ["Attendee", `${selected.attendee_name || "-"}${selected.attendee_meet_role ? ` - ${roleLabel(selected.attendee_meet_role)}` : selected.attendee_role ? ` - ${roleLabel(selected.attendee_role)}` : ""}`],
                       ["Start", formatDateTime(selected.scheduled_start)],
                       ["End", formatDateTime(selected.scheduled_end)],
                       ["Description", selected.description || "Not available"],
@@ -430,7 +434,7 @@ export default function InternalEventsPage({
                         </a>
                         <button type="button" onClick={() => handleCopy(selected.google_meet_link, "Meet link copied.")} className="inline-flex items-center gap-2 rounded-full border border-[#2D8A6A]/20 bg-white px-4 py-2 text-sm font-semibold text-[#0D5C48]">
                           <Copy className="h-4 w-4" />
-                          Copy
+                          {copiedMeetLink && copiedMeetLink === selected.google_meet_link ? "Copied" : "Copy"}
                         </button>
                       </div>
                     </div>

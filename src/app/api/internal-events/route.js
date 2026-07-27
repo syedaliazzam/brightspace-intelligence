@@ -165,10 +165,12 @@ export async function GET(request) {
         host.id::text AS host_user_id,
         host.full_name AS host_name,
         host.email AS host_email,
+        'host'::text AS host_meet_role,
         attendee.id::text AS attendee_user_id,
         attendee.full_name AS attendee_name,
         attendee.email AS attendee_email,
-        attendee_role.name AS attendee_role
+        attendee_role.name AS attendee_role,
+        'cohost'::text AS attendee_meet_role
       FROM internal_events ie
       LEFT JOIN users host ON host.id = ie.host_user_id
       LEFT JOIN users attendee ON attendee.id = ie.attendee_user_id

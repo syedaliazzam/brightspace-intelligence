@@ -223,7 +223,7 @@ export async function createCalendarLectureEvent(payload) {
   }
 
   const data = await calendarRequest(
-    `/calendars/${calendarId}/events?conferenceDataVersion=1&sendUpdates=none`,
+    `/calendars/${calendarId}/events?conferenceDataVersion=1&sendUpdates=all`,
     {
       method: "POST",
       body: JSON.stringify(buildEventPayload(payload, canCreateMeet)),
@@ -252,7 +252,7 @@ export async function updateCalendarLectureEvent(eventId, payload) {
   const calendarId = encodeURIComponent(organizerEmail || getCalendarId());
   const fallbackMeetLink = assertValidMeetLink(getFallbackMeetLink());
   const data = await calendarRequest(
-    `/calendars/${calendarId}/events/${encodeURIComponent(eventId)}?conferenceDataVersion=1&sendUpdates=none`,
+    `/calendars/${calendarId}/events/${encodeURIComponent(eventId)}?conferenceDataVersion=1&sendUpdates=all`,
     {
       method: "PATCH",
       body: JSON.stringify(buildEventPayload(payload, false)),

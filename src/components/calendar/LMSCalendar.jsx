@@ -73,6 +73,7 @@ export default function LMSCalendar({ apiUrl, filters = {}, extraParams = {}, on
   const [selected, setSelected] = useState(null);
   const [view, setView] = useState("timeGridWeek");
   const [copyToast, setCopyToast] = useState("");
+  const [copiedMeetLink, setCopiedMeetLink] = useState("");
   const activeDate = filters.date || formatLocalDate(new Date());
   const firstEventDate = events[0]?.start ? String(events[0].start).slice(0, 10) : "";
 
@@ -185,7 +186,9 @@ export default function LMSCalendar({ apiUrl, filters = {}, extraParams = {}, on
     if (!link) return;
     try {
       await navigator.clipboard.writeText(link);
+      setCopiedMeetLink(link);
       setCopyToast("Meet link copied.");
+      window.setTimeout(() => setCopiedMeetLink(""), 2200);
       window.setTimeout(() => setCopyToast(""), 2200);
     } catch {
       setCopyToast("Unable to copy meet link.");
@@ -294,7 +297,7 @@ export default function LMSCalendar({ apiUrl, filters = {}, extraParams = {}, on
                         onClick={() => handleCopyMeetLink(selected.google_meet_link)}
                         className="rounded-full border border-[#2D8A6A]/20 bg-white px-4 py-2 text-sm font-semibold text-[#0D5C48] hover:bg-[#F1EADC]"
                       >
-                        Copy
+                        {copiedMeetLink && copiedMeetLink === selected.google_meet_link ? "Copied" : "Copy"}
                       </button>
                       <a
                         href={selected.google_meet_link}
