@@ -54,7 +54,7 @@ function eventStatus(item) {
 function getEventPalette(item) {
   const status = eventStatus(item).toLowerCase();
   if (status === "live") return { background: "#2563EB", border: "#1D4ED8", text: "#FFFFFF" };
-  if (status === "upcoming") return { background: "#0D5C48", border: "#063F32", text: "#FAF7F0" };
+  if (status === "upcoming") return { background: "#75797D", border: "#666A6E", text: "#FFFFFF" };
   if (status === "cancelled") return { background: "#B91C1C", border: "#991B1B", text: "#FFFFFF" };
   return { background: "#75797D", border: "#666A6E", text: "#FFFFFF" };
 }
@@ -362,7 +362,7 @@ export default function InternalEventsPage({
               timeZone="local"
               eventDisplay="block"
               eventTimeFormat={{ hour: "numeric", minute: "2-digit", hour12: true }}
-              slotMinTime="08:00:00"
+              slotMinTime="04:00:00"
               slotMaxTime="18:00:00"
               scrollTime="08:00:00"
               slotDuration="01:00:00"
