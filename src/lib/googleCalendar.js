@@ -243,6 +243,10 @@ export async function createCalendarLectureEvent(payload) {
   };
 }
 
+export async function createCalendarPublicEvent(payload) {
+  return createCalendarLectureEvent(payload);
+}
+
 export async function updateCalendarLectureEvent(eventId, payload) {
   if (!eventId) {
     return null;

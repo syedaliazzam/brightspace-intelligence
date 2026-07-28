@@ -5,7 +5,7 @@ import { signOut } from "next-auth/react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { getNavigationForRole } from "@/config/navigation";
 import {
   LayoutDashboard,
@@ -49,6 +49,8 @@ function getIconForLabel(label) {
   if (key.includes("staff")) return UserCog;
   if (key.includes("teacher create") || key.includes("create teacher")) return UserPlus;
   if (key.includes("interested students")) return Users;
+  if (key.includes("public events")) return CalendarRange;
+  if (key.includes("event registrations")) return ClipboardList;
   if (key.includes("admission records") || key.includes("registration")) return ClipboardList;
   if (key.includes("fee management")) return Wallet;
   if (key.includes("fee vouchers") || key.includes("fees")) return ReceiptText;
@@ -103,17 +105,6 @@ export default function Sidebar({
   const adminView = String(searchParams.get("view") || "").toLowerCase();
   const isUserManagementActive =
     pathname.startsWith(userManagementPathPrefix) || openGroups.userManagement;
-
-  useEffect(() => {
-    const currentUserManagementPathPrefix =
-      role === "superadmin" ? "/superadmin/users" : "/admin/users";
-
-    if (!pathname.startsWith(currentUserManagementPathPrefix)) {
-      setOpenGroups((current) =>
-        current.userManagement ? { ...current, userManagement: false } : current
-      );
-    }
-  }, [pathname]);
 
   const shell = (
     <aside

@@ -395,3 +395,82 @@ export function buildLectureJoinEmailHtml({
 export function getAppUrl() {
   return getBaseUrl();
 }
+
+export function buildPublicEventRegistrationEmailHtml({
+  recipientName,
+  registrationNo,
+  eventName,
+  eventSchedule,
+  eventFee,
+  coordinatorName,
+  coordinatorEmail,
+  coordinatorPhone,
+  paymentMethods = [],
+}) {
+  const paymentBlocks = paymentMethods.length
+    ? paymentMethods.map((method) => {
+        const lines = [
+          method?.name ? `<p style="margin:0 0 4px;"><strong>${escapeHtml(method.name)}</strong></p>` : "",
+          method?.bank_name ? `<p style="margin:0 0 4px;"><strong>Bank:</strong> ${escapeHtml(method.bank_name)}</p>` : "",
+          method?.account_title ? `<p style="margin:0 0 4px;"><strong>Account Title:</strong> ${escapeHtml(method.account_title)}</p>` : "",
+          method?.account_number ? `<p style="margin:0 0 4px;"><strong>Account Number:</strong> ${escapeHtml(method.account_number)}</p>` : "",
+          method?.iban ? `<p style="margin:0 0 4px;"><strong>IBAN:</strong> ${escapeHtml(method.iban)}</p>` : "",
+          method?.branch_code ? `<p style="margin:0 0 4px;"><strong>Branch Code:</strong> ${escapeHtml(method.branch_code)}</p>` : "",
+          method?.instructions ? `<p style="margin:8px 0 0;color:#245C4F;">${escapeHtml(method.instructions)}</p>` : "",
+        ]
+          .filter(Boolean)
+          .join("");
+
+        return `<div style="margin-top:14px;padding:14px 16px;border:1px solid #2D8A6A;border-radius:18px;background:#fffaf0;font-size:14px;line-height:1.7;color:#063F32;">${lines}</div>`;
+      }).join("")
+    : `<div style="margin-top:14px;padding:14px 16px;border:1px solid #2D8A6A;border-radius:18px;background:#fffaf0;font-size:14px;line-height:1.7;color:#063F32;">Payment methods will be shared by the coordinator.</div>`;
+
+  const coordinatorBlock = `
+    <div style="padding:16px;border:1px solid #2D8A6A;border-radius:18px;background:#fffaf0;font-size:14px;line-height:1.8;color:#063F32;">
+      <p style="margin:0 0 6px;"><strong>Coordinator:</strong> ${escapeHtml(coordinatorName || "-")}</p>
+      <p style="margin:0 0 6px;"><strong>Coordinator Email:</strong> ${escapeHtml(coordinatorEmail || "-")}</p>
+      <p style="margin:0;"><strong>Coordinator WhatsApp:</strong> ${escapeHtml(coordinatorPhone || "-")}</p>
+    </div>
+  `;
+
+  return themedEmailShell({
+    eyebrow: "Public Event Registration",
+    title: "Your event registration is pending review",
+    intro: `Hello, ${recipientName}. Your registration has been received successfully. Please use the payment details below and contact our coordinator after sending the payment confirmation.`,
+    rows: [
+      ["Registration No", registrationNo],
+      ["Event", eventName],
+      ["Schedule", eventSchedule],
+      ["Event Fee", eventFee],
+    ],
+    bodyBlocks: [
+      `<div style="margin-top:22px;"><p style="margin:0 0 8px;font-size:12px;letter-spacing:.16em;text-transform:uppercase;color:#0D5C48;font-weight:700;">Coordinator Details</p>${coordinatorBlock}</div>`,
+      `<div style="margin-top:22px;"><p style="margin:0 0 8px;font-size:12px;letter-spacing:.16em;text-transform:uppercase;color:#0D5C48;font-weight:700;">Payment Methods</p>${paymentBlocks}</div>`,
+      `<div style="padding:16px;border:1px solid #E4C766;border-radius:18px;background:#FFF5D6;color:#063F32;"><p style="margin:0;font-size:15px;line-height:1.8;">After sending the payment, kindly contact our coordinator with your registration number so your event registration can be verified.</p></div>`,
+    ],
+  });
+}
+
+export function buildPublicEventVerificationEmailHtml({
+  recipientName,
+  registrationNo,
+  eventName,
+  eventSchedule,
+  coordinatorName,
+  coordinatorEmail,
+  coordinatorPhone,
+}) {
+  return themedEmailShell({
+    eyebrow: "Public Event Registration Verified",
+    title: "Your event registration is verified",
+    intro: `Hello, ${recipientName}. Your payment has been confirmed and your event registration is now verified.`,
+    rows: [
+      ["Registration No", registrationNo],
+      ["Event", eventName],
+      ["Schedule", eventSchedule],
+      ["Coordinator", coordinatorName || "-"],
+      ["Coordinator Email", coordinatorEmail || "-"],
+      ["Coordinator WhatsApp", coordinatorPhone || "-"],
+    ],
+  });
+}
