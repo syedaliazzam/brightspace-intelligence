@@ -126,6 +126,8 @@ export default function InterestedStudentsPanel({
   const [manualPaymentFile, setManualPaymentFile] = useState(null);
   const [manualPaymentPreviewUrl, setManualPaymentPreviewUrl] = useState("");
   const [manualPaymentSubmitting, setManualPaymentSubmitting] = useState(false);
+  const [credentialsEmail, setCredentialsEmail] = useState(null);
+  const [refreshOnCredentialsClose, setRefreshOnCredentialsClose] = useState(false);
   const [paymentOptions, setPaymentOptions] = useState({
     discounts: [],
     paymentMethods: [],
@@ -462,6 +464,11 @@ export default function InterestedStudentsPanel({
     );
   }
 
+  async function copyParentPhone() {
+    const phone = credentialsEmail?.parent_phone || "";
+    if (!phone) return;
+    await navigator.clipboard.writeText(phone);
+  }
   async function approveManualPayment(item) {
     if (!item?.id || !manualPaymentFile) return;
 
@@ -486,7 +493,10 @@ export default function InterestedStudentsPanel({
       setMessage(data?.message || "Payment approved and credentials sent successfully.");
       setSelectedLead(null);
       setLocalItems((current) => current.filter((entry) => entry.id !== item.id));
-      if (typeof onRefresh === "function") {
+      if (data?.credentials_email) {
+        setCredentialsEmail(data.credentials_email);
+        setRefreshOnCredentialsClose(true);
+      } else if (typeof onRefresh === "function") {
         await onRefresh();
       }
     } catch (error) {
@@ -1514,6 +1524,63 @@ export default function InterestedStudentsPanel({
                     </div>
                   </section>
                 ) : null}
+              </div>
+            </div>
+          </div>
+        </ClientPortal>
+      ) : null}
+
+      {credentialsEmail ? (
+        <ClientPortal targetId={portalTargetId}>
+          <div className="absolute inset-x-0 top-0 z-[9999] isolate flex min-h-full items-start justify-center overflow-visible bg-[#063F32]/45 px-4 pb-10 pt-10">
+            <div className="w-full max-w-2xl rounded-[2rem] border border-[#2D8A6A]/15 bg-[#FAF7F0] p-6 shadow-[0_24px_80px_-36px_rgba(13,59,46,0.24)] sm:p-8">
+              <p className="text-sm font-semibold uppercase tracking-[0.24em] text-[#C9A227]">
+                Payment Approved Successfully
+              </p>
+              <div className="mt-4 space-y-3 rounded-2xl border border-[#2D8A6A]/15 bg-white/85 p-4 text-sm text-[#245C4F]">
+                <p><span className="font-semibold text-[#063F32]">Recipient Email:</span> {credentialsEmail.recipient_email || "-"}</p>
+                <p><span className="font-semibold text-[#063F32]">Subject:</span> {credentialsEmail.subject || "-"}</p>
+                <div className="flex flex-wrap items-center gap-3 rounded-2xl border border-[#2D8A6A]/15 bg-[#FAF7F0] px-4 py-3">
+                  <p className="text-sm text-[#245C4F]">
+                    <span className="font-semibold text-[#063F32]">Parent Phone:</span>{" "}
+                    {credentialsEmail.parent_phone || "-"}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => void copyParentPhone()}
+                    className="rounded-full border border-[#2D8A6A]/20 bg-white px-3 py-1.5 text-xs font-semibold text-[#0D5C48] transition hover:bg-[#F1EADC]"
+                  >
+                    Copy Number
+                  </button>
+                </div>
+                <div>
+                  <p className="font-semibold text-[#063F32]">Credentials Email Content</p>
+                  <pre className="mt-2 max-h-72 overflow-auto whitespace-pre-wrap rounded-2xl border border-[#2D8A6A]/15 bg-[#FAF7F0] p-4 text-xs text-[#245C4F]">
+                    {credentialsEmail.body_text || ""}
+                  </pre>
+                </div>
+              </div>
+              <div className="mt-6 flex flex-wrap justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => navigator.clipboard.writeText(credentialsEmail.body_text || "")}
+                  className="rounded-2xl bg-[#0D5C48] px-4 py-3 text-sm font-semibold text-[#FAF7F0] transition hover:bg-[#063F32]"
+                >
+                  Copy Message
+                </button>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    setCredentialsEmail(null);
+                    if (refreshOnCredentialsClose) {
+                      setRefreshOnCredentialsClose(false);
+                      await onRefresh?.();
+                    }
+                  }}
+                  className="rounded-2xl border border-[#2D8A6A]/20 bg-white px-4 py-3 text-sm font-semibold text-[#0D5C48] transition hover:bg-[#FAF7F0]"
+                >
+                  Close
+                </button>
               </div>
             </div>
           </div>

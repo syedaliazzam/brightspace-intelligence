@@ -11,11 +11,15 @@ function PaginationControls({ page, pageSize, totalItems, hrefBase }) {
   );
 
   function hrefFor(nextPage) {
-    const params = new URLSearchParams();
+    const [basePath, existingQuery = ""] = String(hrefBase || "").split("?");
+    const params = new URLSearchParams(existingQuery);
     if (nextPage > 1) {
       params.set("page", String(nextPage));
+    } else {
+      params.delete("page");
     }
-    return params.toString() ? `${hrefBase}?${params.toString()}` : hrefBase;
+    const query = params.toString();
+    return query ? `${basePath}?${query}` : basePath;
   }
 
   return (
