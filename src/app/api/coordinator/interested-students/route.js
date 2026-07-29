@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import prisma from "@/lib/prisma";
+import prisma from '@/lib/prisma';
+import { createSignedPaymentProofUrl } from '@/lib/supabaseStorage';
 
 const ALLOWED_ROLES = new Set(["superadmin", "admin", "coordinator"]);
 
@@ -81,6 +82,13 @@ export async function GET() {
         pif.parent_interview_submitted_at,
         pif.parent_interview_reviewed_at,
         NULLIF(TRIM(istd.notes), '') AS notes,
+        fv_info.fee_voucher_id,
+        fv_info.voucher_no,
+        fv_info.voucher_status,
+        fv_info.voucher_amount,
+        fv_info.payment_submission_id,
+        fv_info.payment_submission_status,
+        fv_info.proof_file_path,
         istd.created_at,
         istd.updated_at
       FROM interested_students istd
@@ -173,13 +181,50 @@ export async function GET() {
         ORDER BY pif_inner.created_at DESC
         LIMIT 1
         ) pif ON TRUE
-      WHERE COALESCE(LOWER(istd.status::text), '') <> 'archived'
+      LEFT JOIN LATERAL (
+        SELECT
+          fv.id::text AS fee_voucher_id,
+          fv.voucher_no,
+          LOWER(COALESCE(fv.status::text, 'unpaid')) AS voucher_status,
+          fv.amount::float8 AS voucher_amount,
+          fs.id::text AS payment_submission_id,
+          LOWER(COALESCE(fs.status::text, '')) AS payment_submission_status,
+          fs.proof_file_path
+        FROM fee_vouchers fv
+        LEFT JOIN LATERAL (
+          SELECT
+            fs_inner.id,
+            fs_inner.status,
+            fs_inner.proof_file_path,
+            fs_inner.created_at
+          FROM fee_submissions fs_inner
+          WHERE fs_inner.voucher_id = fv.id
+          ORDER BY fs_inner.created_at DESC NULLS LAST, fs_inner.id DESC
+          LIMIT 1
+        ) fs ON TRUE
+        WHERE (
+          rl.id IS NOT NULL
+          AND fv.registration_id = rl.id
+        )
+        ORDER BY fv.created_at DESC NULLS LAST, fv.id DESC
+        LIMIT 1
+      ) fv_info ON TRUE      WHERE COALESCE(LOWER(istd.status::text), '') <> 'archived'
         AND COALESCE(LOWER(istd.admission_form_status::text), '') <> 'failed'
       ORDER BY istd.created_at DESC NULLS LAST, istd.id DESC
     `;
 
-    return json("Interested students fetched.", 200, { items });
+    const hydratedItems = await Promise.all(
+      (items || []).map(async (item) => ({
+        ...item,
+        proof_file_url: item?.proof_file_path
+          ? await createSignedPaymentProofUrl(item.proof_file_path).catch(() => "")
+          : "",
+      }))
+    );
+
+    return json("Interested students fetched.", 200, { items: hydratedItems });
   } catch (error) {
     return json(error instanceof Error ? error.message : "Unable to fetch interested students.", 500);
   }
 }
+

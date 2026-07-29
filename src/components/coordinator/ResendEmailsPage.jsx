@@ -399,7 +399,7 @@ export default function ResendEmailsPage({
                 {emailPopupLoading ? (
                   <p className="text-sm text-[#245C4F]">Loading email content...</p>
                 ) : selectedEmail.html ? (
-                  <div className="rounded-[1.5rem] border border-[#2D8A6A]/14 bg-white p-5 text-sm leading-7 text-[#245C4F]" dangerouslySetInnerHTML={{ __html: selectedEmail.html }} />
+                  <div className="rounded-[1.5rem] border border-[#2D8A6A]/14 bg-white p-0 overflow-hidden text-sm leading-7 text-[#245C4F]" dangerouslySetInnerHTML={{ __html: selectedEmail.html }} />
                 ) : (
                   <div className="rounded-[1.5rem] border border-[#2D8A6A]/14 bg-white p-5 text-sm leading-7 whitespace-pre-wrap text-[#245C4F]">
                     {selectedEmail.text || "No email body content available."}

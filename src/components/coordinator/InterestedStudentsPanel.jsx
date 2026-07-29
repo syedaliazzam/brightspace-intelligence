@@ -3,7 +3,7 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import ClientPortal from "@/components/shared/ClientPortal";
 import PaginationControls from "@/components/teacher/PaginationControls";
-import { BadgeCheck, ChevronDown, Circle, Send, FileCheck2, ClipboardList } from "lucide-react";
+import { BadgeCheck, ChevronDown, Circle, Send, FileCheck2, ClipboardList, Image as ImageIcon } from "lucide-react";
 
 const PAGE_SIZE = 7;
 
@@ -123,6 +123,9 @@ export default function InterestedStudentsPanel({
   const [previewDiscountId, setPreviewDiscountId] = useState("");
   const [previewPaymentMethodId, setPreviewPaymentMethodId] = useState("");
   const [previewPaymentInstructions, setPreviewPaymentInstructions] = useState("");
+  const [manualPaymentFile, setManualPaymentFile] = useState(null);
+  const [manualPaymentPreviewUrl, setManualPaymentPreviewUrl] = useState("");
+  const [manualPaymentSubmitting, setManualPaymentSubmitting] = useState(false);
   const [paymentOptions, setPaymentOptions] = useState({
     discounts: [],
     paymentMethods: [],
@@ -302,6 +305,9 @@ export default function InterestedStudentsPanel({
 
   const selectedLeadStage = selectedLead ? getLeadStage(selectedLead) : null;
   const selectedLeadCanSend = selectedLeadStage ? selectedLeadStage.interviewSubmitted && !selectedLeadStage.sent && !selectedLeadStage.submitted : false;
+  const selectedLeadCanManualPayment = selectedLeadStage
+    ? selectedLeadStage.submitted && !selectedLead.payment_submission_id
+    : false;
 
   function openLeadDetails(item) {
     setMessage("");
@@ -315,6 +321,11 @@ export default function InterestedStudentsPanel({
     setSelectedLead(item);
   }
 
+  function openLeadManualPayment(item) {
+    setMessage("");
+    setSelectedLeadViewMode("manual_payment");
+    setSelectedLead(item);
+  }
   async function copyParentInterviewLink(link) {
     if (!link) return;
     try {
@@ -351,6 +362,12 @@ export default function InterestedStudentsPanel({
     setPreviewDiscountId("");
     setPreviewPaymentMethodId("");
     setPreviewPaymentInstructions("");
+    setManualPaymentFile(null);
+    setManualPaymentSubmitting(false);
+    setManualPaymentPreviewUrl((current) => {
+      if (current) URL.revokeObjectURL(current);
+      return "";
+    });
   }, [selectedLead]);
 
   function getLeadStage(item) {
@@ -445,8 +462,41 @@ export default function InterestedStudentsPanel({
     );
   }
 
-  async function sendAdmissionForm(item) {
-    if (!item?.id) return;
+  async function approveManualPayment(item) {
+    if (!item?.id || !manualPaymentFile) return;
+
+    setManualPaymentSubmitting(true);
+    setMessage("");
+
+    try {
+      const formData = new FormData();
+      formData.append("interestedStudentId", item.id);
+      formData.append("proofFile", manualPaymentFile);
+
+      const response = await fetch("/api/coordinator/interested-students/manual-payment-approve", {
+        method: "POST",
+        body: formData,
+      });
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        throw new Error(data?.message || "Unable to approve payment.");
+      }
+
+      setMessage(data?.message || "Payment approved and credentials sent successfully.");
+      setSelectedLead(null);
+      setLocalItems((current) => current.filter((entry) => entry.id !== item.id));
+      if (typeof onRefresh === "function") {
+        await onRefresh();
+      }
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Unable to approve payment.");
+    } finally {
+      setManualPaymentSubmitting(false);
+    }
+  }
+
+  async function sendAdmissionForm(item) {    if (!item?.id) return;
 
     setLoadingId(item.id);
     setMessage("");
@@ -597,6 +647,7 @@ export default function InterestedStudentsPanel({
           return (
             (allowDetailsAction && showDetailsButton && !stage.sent && !stage.submitted) ||
             (allowSendFormAction && stage.interviewSubmitted && !stage.sent && !stage.submitted) ||
+            (stage.submitted && !item.payment_submission_id) ||
             (showActionsColumn && !stage.interviewSubmitted && !stage.sent && !stage.submitted)
           );
         });
@@ -711,7 +762,8 @@ export default function InterestedStudentsPanel({
                   (
                     (allowDetailsAction && showDetailsButton && !stage.sent && !stage.submitted) ||
                     (allowSendFormAction && stage.interviewSubmitted && !stage.sent && !stage.submitted) ||
-                    (showActionsColumn && !stage.interviewSubmitted && !stage.sent && !stage.submitted)
+            (stage.submitted && !item.payment_submission_id) ||
+            (showActionsColumn && !stage.interviewSubmitted && !stage.sent && !stage.submitted)
                   );
                 const canDeleteRow = !hideDeleteAction && !readOnlyMode && !stage.interviewSubmitted && !stage.sent && !stage.submitted;
 
@@ -843,6 +895,18 @@ export default function InterestedStudentsPanel({
                               disabled={loadingId === item.id}
                             >
                               Send Form
+                            </button>
+                          ) : null}
+                          {readOnlyMode ? null : stage.submitted && !item.payment_submission_id ? (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                openLeadManualPayment(item);
+                              }}
+                              className="inline-flex w-max whitespace-nowrap rounded-full bg-[#0D5C48] px-4 py-2 text-sm font-semibold text-[#FAF7F0] transition hover:bg-[#063F32] disabled:cursor-not-allowed disabled:opacity-70"
+                              disabled={manualPaymentSubmitting}
+                            >
+                              Submit Payment
                             </button>
                           ) : null}
                           {hideDeleteAction || readOnlyMode ? null : canDeleteRow ? (
@@ -1093,6 +1157,18 @@ export default function InterestedStudentsPanel({
                     Send Form
                   </button>
                 ) : null}
+                {readOnlyMode ? null : stage.submitted && !item.payment_submission_id ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      openLeadManualPayment(item);
+                    }}
+                    className="inline-flex w-max whitespace-nowrap rounded-full border border-[#2D8A6A]/20 bg-[#EAF6EF] px-4 py-2 text-sm font-semibold text-[#0D5C48] transition hover:bg-[#DFF2E7] hover:text-[#063F32] disabled:cursor-not-allowed disabled:opacity-70"
+                    disabled={manualPaymentSubmitting}
+                  >
+                    Submit Payment
+                  </button>
+                ) : null}
                 {hideDeleteAction || readOnlyMode ? null : showActionsColumn && !stage.interviewSubmitted && !stage.sent && !stage.submitted ? (
                   <button
                     type="button"
@@ -1133,7 +1209,7 @@ export default function InterestedStudentsPanel({
                     {textOrDash(selectedLead.student_name)}
                   </h2>
                   <p className="mt-2 text-sm text-[#245C4F]">
-                    Send the admission form link and keep the registration record in one place.
+                    {selectedLeadViewMode === "manual_payment" ? "Upload the payment screenshot and approve the admission payment from here." : "Send the admission form link and keep the registration record in one place."}
                   </p>
                 </div>
                 <button
@@ -1166,6 +1242,96 @@ export default function InterestedStudentsPanel({
                       <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-7 text-[#245C4F]">
                         {textOrDash(selectedLead.message || selectedLead.notes)}
                       </p>
+                    </div>
+                  </section>
+                ) : null}
+
+                                {selectedLeadViewMode === "manual_payment" && selectedLeadCanManualPayment ? (
+                  <section className="rounded-[1.75rem] border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(250,247,240,0.98)_100%)] p-5 shadow-[0_18px_60px_-36px_rgba(13,59,46,0.18)]">
+                    <h3 className="text-lg font-semibold text-[#063F32]">Submit payment</h3>
+                    <p className="mt-2 text-sm text-[#245C4F]">
+                      Upload the required payment screenshot, review it, and approve the payment for this admission.
+                    </p>
+
+                    <div className="mt-4 grid gap-4 lg:grid-cols-2">
+                      <div className="rounded-[1rem] border border-[#2D8A6A]/15 bg-white p-4">
+                        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]">Voucher details</p>
+                        <dl className="mt-4 grid gap-4 sm:grid-cols-2">
+                          <InfoCell label="Voucher No" value={selectedLead.voucher_no} />
+                          <InfoCell label="Amount" value={selectedLead.voucher_amount ? `PKR ${Number(selectedLead.voucher_amount).toLocaleString("en-PK")}` : "-"} />
+                          <InfoCell label="Student" value={selectedLead.student_name} />
+                          <InfoCell label="Parent" value={selectedLead.parent_name} />
+                        </dl>
+                      </div>
+
+                      <div className="rounded-[1rem] border border-[#2D8A6A]/15 bg-white p-4">
+                        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]">Payment proof</p>
+                        <label className="mt-4 flex cursor-pointer items-center justify-between rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 text-sm font-medium text-[#063F32] transition hover:border-[#2D8A6A] hover:bg-white">
+                          <span className="inline-flex items-center gap-2"><ImageIcon className="h-4 w-4" /> {manualPaymentFile?.name || "Choose screenshot"}</span>
+                          <input
+                            type="file"
+                            accept="image/*,.pdf"
+                            className="hidden"
+                            onChange={(event) => {
+                              const file = event.target.files?.[0] || null;
+                              setManualPaymentFile(file);
+                              setManualPaymentPreviewUrl((current) => {
+                                if (current) URL.revokeObjectURL(current);
+                                return file ? URL.createObjectURL(file) : "";
+                              });
+                            }}
+                          />
+                        </label>
+                        <p className="mt-2 text-sm text-[#245C4F]">Payment screenshot is required before approval.</p>
+                        {!selectedLead.voucher_no ? (
+                          <p className="mt-2 rounded-2xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                            Fee voucher is not available for this admission yet. Create the voucher first from Admission Records, then return here.
+                          </p>
+                        ) : null}
+                      </div>
+                    </div>
+
+                    {manualPaymentPreviewUrl ? (
+                      <div className="mt-4 rounded-[1rem] border border-[#2D8A6A]/15 bg-white p-4">
+                        <div className="mb-3 flex items-center justify-between gap-3">
+                          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]">Payment proof view</p>
+                          <a
+                            href={manualPaymentPreviewUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex rounded-full border border-[#2D8A6A]/18 bg-[#EAF6EF] px-4 py-2 text-sm font-semibold text-[#0D5C48] transition hover:border-[#2D8A6A]/35 hover:bg-[#dff1e8]"
+                          >
+                            View Screenshot
+                          </a>
+                        </div>
+                        {manualPaymentFile?.type?.toLowerCase().includes("pdf") ? (
+                          <div className="rounded-2xl border border-[#2D8A6A]/10 bg-[#FAF7F0] p-4 text-sm text-[#245C4F]">
+                            PDF selected. Use View Screenshot to open it.
+                          </div>
+                        ) : (
+                          <img src={manualPaymentPreviewUrl} alt="Payment proof preview" className="max-h-[380px] w-full rounded-2xl border border-[#2D8A6A]/10 object-contain bg-[#FAF7F0]" />
+                        )}
+                      </div>
+                    ) : null}
+
+                    <div className="mt-5 flex flex-wrap justify-end gap-3">
+                      <button
+                        type="button"
+                        onClick={() => setSelectedLead(null)}
+                        className="rounded-full border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-2 text-sm font-semibold text-[#063F32] transition hover:bg-[#F1EADC]"
+                        disabled={manualPaymentSubmitting}
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void approveManualPayment(selectedLead)}
+                        disabled={manualPaymentSubmitting || !manualPaymentFile || !selectedLead.voucher_no}
+                        className="inline-flex items-center gap-2 rounded-full bg-[#0D5C48] px-4 py-2 text-sm font-semibold text-[#FAF7F0] transition hover:bg-[#063F32] disabled:cursor-not-allowed disabled:opacity-70"
+                      >
+                        <FileCheck2 className="h-4 w-4" />
+                        {manualPaymentSubmitting ? "Approving..." : "Approve"}
+                      </button>
                     </div>
                   </section>
                 ) : null}
@@ -1392,3 +1558,11 @@ export default function InterestedStudentsPanel({
     </>
   );
 }
+
+
+
+
+
+
+
+

@@ -8,6 +8,16 @@ function json(message, status = 200, extra = {}) {
   return NextResponse.json({ message, ...extra }, { status });
 }
 
+function buildDedupKey(item) {
+  const to = Array.isArray(item?.to)
+    ? item.to.map((value) => String(value || "").trim().toLowerCase()).sort().join("|")
+    : "";
+  const from = String(item?.from || "").trim().toLowerCase();
+  const subject = String(item?.subject || "").trim().toLowerCase();
+  const createdAt = String(item?.created_at || "").trim();
+  return [to, from, subject, createdAt].join("::");
+}
+
 export async function GET() {
   const session = await auth();
   const role = String(session?.user?.role || "").toLowerCase();
@@ -41,7 +51,7 @@ export async function GET() {
       );
     }
 
-    const items = Array.isArray(data?.data)
+    const rawItems = Array.isArray(data?.data)
       ? data.data.map((item) => ({
           id: String(item?.id || ""),
           to: Array.isArray(item?.to) ? item.to : [],
@@ -55,6 +65,15 @@ export async function GET() {
           reply_to: Array.isArray(item?.reply_to) ? item.reply_to : [],
         }))
       : [];
+
+    const seen = new Set();
+    const items = rawItems.filter((item) => {
+      const key = item.id || buildDedupKey(item);
+      if (!key) return true;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
 
     return json("Resend sent emails fetched.", 200, {
       items,

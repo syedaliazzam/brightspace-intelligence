@@ -89,19 +89,23 @@ export default function InterestedStudentsPageShell({
   const [followUpOpen, setFollowUpOpen] = useState(false);
   const [parentFormSentBucket, setParentFormSentBucket] = useState("all");
 
+  async function loadInterestedStudents(keepLoadingState = false) {
+    setState((current) => ({
+      ...current,
+      loading: keepLoadingState ? current.loading : !Array.isArray(initialItems),
+    }));
+
+    const response = await fetch(`/api/coordinator/interested-students?t=${Date.now()}`, { cache: "no-store" });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data?.message || "Unable to load interested students.");
+    setState({ items: Array.isArray(data.items) ? data.items : [], loading: false, error: "" });
+  }
+
   useEffect(() => {
     let active = true;
-    async function load() {
-      setState((current) => ({
-        ...current,
-        loading: Array.isArray(initialItems) ? current.loading : true,
-      }));
-      const response = await fetch(`/api/coordinator/interested-students?t=${Date.now()}`, { cache: "no-store" });
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(data?.message || "Unable to load interested students.");
-      if (active) setState({ items: Array.isArray(data.items) ? data.items : [], loading: false, error: "" });
-    }
-    load().catch((error) => active && setState({ items: [], loading: false, error: error.message }));
+    loadInterestedStudents().catch((error) => {
+      if (active) setState({ items: [], loading: false, error: error.message });
+    });
     return () => {
       active = false;
     };
@@ -246,7 +250,7 @@ export default function InterestedStudentsPageShell({
               <InterestedStudentsPanel
                 key={activeFilter}
                 items={filteredItems}
-                onRefresh={() => {}}
+                onRefresh={() => loadInterestedStudents(true)}
                 portalTargetId={resolvedPortalTargetId}
                 showDetailsButton={showDetailsButton}
                 showTableControls={showTableControls}
@@ -278,3 +282,4 @@ export default function InterestedStudentsPageShell({
     </div>
   );
 }
+
