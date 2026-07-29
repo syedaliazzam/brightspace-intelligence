@@ -25,6 +25,7 @@ export const dashboardNavigation = {
     { label: "Notes", href: "/superadmin/notes" },
     { label: "Headlines", href: "/superadmin/headlines" },
     { label: "Audit History", href: "/superadmin/audit-logs" },
+    { label: "Sent Emails", href: "/superadmin/sent-emails" },
   ],
   admin: [
     { label: "Dashboard", href: "/admin/dashboard" },
@@ -50,7 +51,8 @@ export const dashboardNavigation = {
     { label: "Class Management", href: "/admin/courses" },
     { label: "Notes", href: "/admin/notes" },
     { label: "Headlines", href: "/admin/headlines" },
-    { label: "Audit History", href: "/admin/audit-logs" },
+    { label: "Audit History", href: "/admin/audit-logs" },    
+    { label: "Sent Emails", href: "/admin/sent-emails" },
   ],
   coordinator: [
     { label: "Dashboard", href: "/coordinator/dashboard" },
@@ -71,6 +73,7 @@ export const dashboardNavigation = {
     { label: "Lecture Schedules", href: "/coordinator/lecture-schedules" },
     { label: "Lecture Verifications", href: "/coordinator/lecture-verifications" },
     { label: "Reports", href: "/coordinator/reports" },
+    { label: "Sent Emails", href: "/coordinator/sent-emails" },
     { label: "Admin", href: "/coordinator/admin" },
   ],
   teacher: [
@@ -118,3 +121,7 @@ export const roleMeta = {
 export function getNavigationForRole(role) {
   return dashboardNavigation[String(role || "").toLowerCase()] || dashboardNavigation.student;
 }
+
+
+
+

@@ -64,6 +64,7 @@ function getIconForLabel(label) {
   if (key.includes("lecture schedule")) return CalendarDays;
   if (key.includes("lecture verification")) return ClipboardCheck;
   if (key.includes("reports")) return FileText;
+  if (key.includes("sent emails") || key.includes("email logs") || key.includes("emails")) return MessageSquareText;
   if (key.includes("lectures")) return BookOpen;
   if (key.includes("notes")) return MessageSquareText;
   if (key.includes("homework")) return NotebookPen;
@@ -323,3 +324,4 @@ export default function Sidebar({
     </>
   );
 }
+
