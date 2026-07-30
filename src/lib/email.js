@@ -470,7 +470,7 @@ export function buildPublicEventVerificationEmailHtml({
       ["Schedule", eventSchedule],
       ["Coordinator", coordinatorName || "-"],
       ["Coordinator Email", coordinatorEmail || "-"],
-      ["Coordinator WhatsApp", coordinatorPhone || "-"],
+      ["Coordinator WhatsApp", coordinatorPhone || "+92 3473547036"],
     ],
   });
 }

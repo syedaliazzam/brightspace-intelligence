@@ -21,7 +21,11 @@ export async function PATCH(request, context) {
     const params = await context.params;
     const id = cleanText(params?.id);
     const body = await request.json();
-    const nextStatus = normalizeRegistrationStatus(body?.status);
+    const nextStatusRaw = cleanText(body?.status);
+    const hasStatusUpdate = Boolean(nextStatusRaw);
+    const nextStatus = hasStatusUpdate ? normalizeRegistrationStatus(nextStatusRaw) : null;
+    const hasAmountUpdate = body?.amountDue !== undefined || body?.amount_due !== undefined;
+    const nextAmount = hasAmountUpdate ? Number(body?.amountDue ?? body?.amount_due ?? 0) : null;
 
     if (!id) return json("Registration id is required.", 400);
 
@@ -32,6 +36,8 @@ export async function PATCH(request, context) {
         per.event_id::text AS event_id,
         per.participant_name,
         per.email,
+        per.amount_due::float8 AS amount_due,
+        per.status::text AS status,
         pe.title AS event_name,
         pe.start_at,
         pe.end_at,
@@ -47,17 +53,21 @@ export async function PATCH(request, context) {
 
     if (!registration?.id) return json("Registration record not found.", 404);
 
+    const statusToSave = hasStatusUpdate ? nextStatus : String(registration.status || "pending").toLowerCase();
+    const amountToSave = hasAmountUpdate ? nextAmount : Number(registration.amount_due || 0);
+
     await prisma.$executeRaw`
       UPDATE public_event_registrations
       SET
-        status = ${nextStatus},
-        verified_by = ${nextStatus === "verified" ? session.user.id : null}::uuid,
-        verified_at = ${nextStatus === "verified" ? new Date() : null},
+        status = ${statusToSave},
+        amount_due = ${amountToSave},
+        verified_by = ${statusToSave === "verified" ? session.user.id : null}::uuid,
+        verified_at = ${statusToSave === "verified" ? new Date() : null},
         updated_at = NOW()
       WHERE id = ${id}::uuid
     `;
 
-    if (nextStatus === "verified" && registration.email) {
+    if (statusToSave === "verified" && registration.email) {
       try {
         await sendEmail({
           to: registration.email,
@@ -85,3 +95,4 @@ export async function PATCH(request, context) {
     return json(error instanceof Error ? error.message : "Unable to update registration.", 500);
   }
 }
+

@@ -92,10 +92,10 @@ export default function PaymentSubmissionForm({ voucher }) {
     () => voucher.available_payment_methods || [],
     [voucher.available_payment_methods]
   );
-  const regularFee = Number(voucher.regular_fee_amount || 0);
+  const regularFee = Number(voucher.regular_fee_amount || voucher.amount || 0);
   const admissionFee = Number(voucher.admission_fee_amount || 0);
   const discountAmount = Number(voucher.discount_amount || 0);
-  const totalAmount = Number(voucher.total_amount || voucher.amount || 0);
+  const totalAmount = Number(voucher.total_amount || voucher.subtotal_amount || voucher.amount || 0);
   const hasDiscount = regularFee > 0 && discountAmount > 0;
   const discountPercent = hasDiscount ? Math.round((discountAmount / regularFee) * 100) : 0;
   const nextMonthlyFee = Math.max(regularFee - discountAmount, 0);
@@ -517,3 +517,4 @@ export default function PaymentSubmissionForm({ voucher }) {
     </div>
   );
 }
+

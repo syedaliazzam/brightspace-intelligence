@@ -29,8 +29,6 @@ export async function GET() {
         per.email,
         per.whatsapp,
         per.notes,
-        per.amount_due::float8 AS amount_due,
-        LOWER(COALESCE(per.status::text, 'pending')) AS status,
         per.submitted_at,
         per.verified_at,
         per.verified_by::text AS verified_by,
@@ -39,11 +37,20 @@ export async function GET() {
         creator.full_name AS coordinator_name,
         creator.email AS coordinator_email,
         creator.phone AS coordinator_phone,
-        LOWER(COALESCE(pe.publication_status::text, 'draft')) AS event_publication_status
+        LOWER(COALESCE(pe.publication_status::text, 'draft')) AS event_publication_status,
+        CASE
+          WHEN existing_user.id IS NOT NULL AND LOWER(COALESCE(per.status::text, 'pending')) <> 'verified' THEN 'free'
+          ELSE LOWER(COALESCE(per.status::text, 'pending'))
+        END AS status,
+        CASE
+          WHEN existing_user.id IS NOT NULL AND LOWER(COALESCE(per.status::text, 'pending')) <> 'verified' THEN 0
+          ELSE per.amount_due::float8
+        END AS amount_due
       FROM public_event_registrations per
       INNER JOIN public_events pe ON pe.id = per.event_id
       LEFT JOIN users verifier ON verifier.id = per.verified_by
       LEFT JOIN users creator ON creator.id = pe.created_by
+      LEFT JOIN users existing_user ON LOWER(COALESCE(existing_user.email, '')) = LOWER(COALESCE(per.email, ''))
       ORDER BY per.submitted_at DESC NULLS LAST, per.created_at DESC NULLS LAST
     `;
 
@@ -53,6 +60,8 @@ export async function GET() {
         pe.title,
         pe.start_at,
         pe.end_at,
+        pe.event_fee_amount::float8 AS event_fee_amount,
+        pe.registration_deadline,
         LOWER(COALESCE(pe.publication_status::text, 'draft')) AS publication_status
       FROM public_events pe
       ORDER BY pe.start_at DESC NULLS LAST, pe.created_at DESC NULLS LAST
@@ -69,3 +78,4 @@ export async function GET() {
     return json(error instanceof Error ? error.message : "Unable to fetch event registrations.", 500);
   }
 }
+

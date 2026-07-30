@@ -66,16 +66,24 @@ export async function POST(request) {
       FROM public_event_registrations
       WHERE event_id = ${eventId}::uuid
         AND LOWER(COALESCE(status::text, 'pending')) <> 'cancelled'
-        AND (
-          LOWER(COALESCE(email, '')) = ${email}
-          OR REGEXP_REPLACE(COALESCE(whatsapp, ''), '\D', '', 'g') = ${normalizePhone(whatsapp)}
-        )
+        AND LOWER(COALESCE(email, '')) = ${email}
       LIMIT 1
     `;
 
     if (duplicate?.id) {
-      return json("A registration already exists for this event with the same email or WhatsApp number.", 400);
+      return json("A registration already exists for this event with the same email address.", 400);
     }
+
+    const [existingUser] = await prisma.$queryRaw`
+      SELECT id::text AS id
+      FROM users
+      WHERE LOWER(COALESCE(email, '')) = ${email}
+      LIMIT 1
+    `;
+
+    const isFreeRegistration = Boolean(existingUser?.id);
+    const registrationAmount = isFreeRegistration ? 0 : Number(event.event_fee_amount || 0);
+    const registrationStatus = isFreeRegistration ? 'free' : 'pending';
 
     const [created] = await prisma.$queryRaw`
       INSERT INTO public_event_registrations (
@@ -98,8 +106,8 @@ export async function POST(request) {
         ${email},
         ${whatsapp},
         ${notes || null},
-        ${Number(event.event_fee_amount || 0)},
-        'pending',
+        ${registrationAmount},
+        ${registrationStatus},
         NOW(),
         NOW(),
         NOW()
@@ -132,7 +140,7 @@ export async function POST(request) {
             registrationNo: created?.registration_no || "-",
             eventName: event.title || "Public Event",
             eventSchedule: `${formatEventDateTime(event.start_at)} - ${formatEventDateTime(event.end_at)}`,
-            eventFee: formatMoney(event.event_fee_amount || 0),
+            eventFee: isFreeRegistration ? "Free" : formatMoney(event.event_fee_amount || 0),
             coordinatorName: event.coordinator_name || "Coordinator",
             coordinatorEmail: event.coordinator_email || "",
             coordinatorPhone: event.coordinator_phone || "",
@@ -148,9 +156,13 @@ export async function POST(request) {
     }
 
     return json("Public event registration submitted successfully.", 201, {
+      success: true,
       registrationId: created?.id || "",
       registrationNo: created?.registration_no || "",
-      status: "pending",
+      registrationNumber: created?.registration_no || "",
+      amountDue: registrationAmount,
+      eventTitle: event.title || "",
+      status: registrationStatus,
     });
   } catch (error) {
     return json(
@@ -159,3 +171,4 @@ export async function POST(request) {
     );
   }
 }
+

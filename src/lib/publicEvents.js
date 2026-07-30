@@ -63,6 +63,7 @@ export function formatMoney(value) {
 
 export function normalizeRegistrationStatus(value) {
   const normalized = String(value || "pending").toLowerCase();
+  if (normalized === "free") return "free";
   if (normalized === "verified") return "verified";
   if (normalized === "cancelled") return "cancelled";
   return "pending";
@@ -70,7 +71,9 @@ export function normalizeRegistrationStatus(value) {
 
 export function formatRegistrationStatusLabel(value) {
   const normalized = normalizeRegistrationStatus(value);
+  if (normalized === "free") return "Free";
   if (normalized === "verified") return "Verified";
   if (normalized === "cancelled") return "Cancelled";
   return "Pending";
 }
+

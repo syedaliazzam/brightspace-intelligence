@@ -5,6 +5,7 @@ import { auth } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 import { requireRole, roleGuardResponse } from "@/lib/roleGuard";
 import { buildFeeVoucherEmailHtml, sendEmail } from "@/lib/email";
+import { feeHistoryTableExists, getLatestFeeHistoryCarryForward, insertFeeHistoryRow } from "@/lib/feeHistory";
 
 const ALLOWED_ROLES = ["admin", "coordinator"];
 
@@ -200,6 +201,7 @@ export async function POST(request) {
       prisma.$queryRaw`
       SELECT
         sp.id::text AS student_id,
+        e.registration_id::text AS registration_id,
         u.full_name AS student_name,
         u.email AS student_email,
         u.phone AS student_phone,
@@ -228,6 +230,7 @@ export async function POST(request) {
     const createdRows = [];
     const emailJobs = [];
     const voucherColumns = await getTableColumns("fee_vouchers");
+    const historyTableReady = await feeHistoryTableExists(prisma);
     const paymentMethodSnapshot = paymentMethods.map((method) => ({
       id: String(method.id || ""),
       name: String(method.name || ""),
@@ -289,6 +292,23 @@ export async function POST(request) {
           )
         `;
 
+        if (historyTableReady) {
+          const previousMonthDue = await getLatestFeeHistoryCarryForward(tx, student.student_id);
+          await insertFeeHistoryRow({
+            tx,
+            studentId: student.student_id,
+            batchId,
+            voucherId: voucher.id,
+            registrationId: student.registration_id || null,
+            monthLabel: monthLabel || '',
+            dueDate,
+            previousMonthDue,
+            discountAmount: 0,
+            currentMonthFee: baseAmount,
+            thisMonthPaid: 0,
+          });
+        }
+
         createdRows.push({ ...student, voucher_no: voucherNo });
         emailJobs.push({
           to: isValidEmail(student.student_email)
@@ -331,3 +351,4 @@ export async function POST(request) {
     return json(error instanceof Error ? error.message : "Unable to create regular fee vouchers.", 500);
   }
 }
+

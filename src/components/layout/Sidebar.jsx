@@ -53,6 +53,7 @@ function getIconForLabel(label) {
   if (key.includes("event registrations")) return ClipboardList;
   if (key.includes("admission records") || key.includes("registration")) return ClipboardList;
   if (key.includes("fee management")) return Wallet;
+  if (key.includes("fee history")) return ReceiptText;
   if (key.includes("fee vouchers") || key.includes("fees")) return ReceiptText;
   if (key.includes("scholarship")) return BadgePercent;
   if (key.includes("payments")) return CreditCard;
@@ -283,7 +284,7 @@ export default function Sidebar({
             className={`hidden h-9 w-9 items-center justify-center rounded-xl bg-[#FFF5D6] text-base font-semibold text-[#063F32] ${collapsed ? "lg:flex" : "lg:hidden"
               }`}
           >
-            ↩
+            â†©
           </span>
           <span className={`transition-all duration-200 ${collapsed ? "lg:hidden" : "lg:inline"}`}>
             Logout
@@ -324,4 +325,5 @@ export default function Sidebar({
     </>
   );
 }
+
 

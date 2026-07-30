@@ -66,6 +66,7 @@ export const dashboardNavigation = {
     { label: "Need Based Scholarship", href: "/coordinator/need-based-scholarships" },
     { label: "Monthly Fee Vouchers", href: "/coordinator/regular-fee-vouchers" },
     { label: "Payments", href: "/coordinator/payments" },
+    { label: "Fee History", href: "/coordinator/fee-history" },
     { label: "Students", href: "/coordinator/students" },
     { label: "Parents", href: "/coordinator/parents" },
     { label: "Create teacher", href: "/coordinator/teacher-create" },
@@ -121,6 +122,7 @@ export const roleMeta = {
 export function getNavigationForRole(role) {
   return dashboardNavigation[String(role || "").toLowerCase()] || dashboardNavigation.student;
 }
+
 
 
 
