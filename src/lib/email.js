@@ -170,11 +170,11 @@ async function sendViaSmtp({ to, subject, html, text }) {
   const port = Number(process.env.SMTP_PORT || 587);
   const user = process.env.SMTP_USER;
   const pass = process.env.SMTP_PASS;
-  const fromAddress = process.env.SMTP_FROM || user;
+  const fromAddress = process.env.SMTP_EMAIL || user;
   const fromName = process.env.SMTP_FROM_NAME || "LMS Platform";
 
   if (!host || !user || !pass || !fromAddress) {
-    throw new Error("SMTP is not configured. Set SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, and SMTP_FROM.");
+    throw new Error("SMTP is not configured. Set SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, and SMTP_EMAIL.");
   }
 
   const destination = String(to || "").trim();

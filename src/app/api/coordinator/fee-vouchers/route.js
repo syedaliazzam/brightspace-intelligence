@@ -1594,12 +1594,12 @@ export async function POST(request) {
             process.env.SMTP_PORT &&
             process.env.SMTP_USER &&
             process.env.SMTP_PASS &&
-            (process.env.SMTP_FROM || process.env.SMTP_USER)
+            (process.env.SMTP_EMAIL || process.env.SMTP_USER)
         ),
         smtpHost: process.env.SMTP_HOST || "",
         smtpPort: process.env.SMTP_PORT || "",
         smtpUser: process.env.SMTP_USER || "",
-        smtpFrom: process.env.SMTP_FROM || "",
+        smtpFrom: process.env.SMTP_EMAIL || "",
       });
       if (emailMessage?.id) {
         await prisma.$executeRaw`
@@ -1650,12 +1650,12 @@ export async function POST(request) {
                     process.env.SMTP_PORT &&
                     process.env.SMTP_USER &&
                     process.env.SMTP_PASS &&
-                    (process.env.SMTP_FROM || process.env.SMTP_USER)
+                    (process.env.SMTP_EMAIL || process.env.SMTP_USER)
                 ),
                 smtpHost: process.env.SMTP_HOST || "",
                 smtpPort: process.env.SMTP_PORT || "",
                 smtpUser: process.env.SMTP_USER || "",
-                smtpFrom: process.env.SMTP_FROM || "",
+                smtpFrom: process.env.SMTP_EMAIL || "",
               },
             }),
       }
