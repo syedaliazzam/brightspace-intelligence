@@ -604,7 +604,7 @@ export default function AdminFeeSettingsPage() {
               className={fieldClass}
               placeholder="Reference"
               value={forms.other.discount_reference}
-              onChange={(event) => updateForm("other", "discount_reference", event.target.value.replace(/[^A-Za-z]/g, ""))}
+              onChange={(event) => updateForm("other", "discount_reference", event.target.value.replace(/[^A-Za-z ]/g, ""))}
               maxLength={50}
             />
             <div className="relative md:col-span-2">
