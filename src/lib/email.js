@@ -429,7 +429,7 @@ export function buildPublicEventRegistrationEmailHtml({
     <div style="padding:16px;border:1px solid #2D8A6A;border-radius:18px;background:#fffaf0;font-size:14px;line-height:1.8;color:#063F32;">
       <p style="margin:0 0 6px;"><strong>Coordinator:</strong> ${escapeHtml(coordinatorName || "-")}</p>
       <p style="margin:0 0 6px;"><strong>Coordinator Email:</strong> ${escapeHtml(coordinatorEmail || "-")}</p>
-      <p style="margin:0;"><strong>Coordinator WhatsApp:</strong> ${escapeHtml(coordinatorPhone || "-")}</p>
+      <p style="margin:0;"><strong>Coordinator WhatsApp:</strong> ${escapeHtml(coordinatorPhone || "+92 3473547036")}</p>
     </div>
   `;
 

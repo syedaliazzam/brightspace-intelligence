@@ -2,8 +2,10 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { ChevronDown, Search } from "lucide-react";
+import { jsPDF } from "jspdf";
 import ClientPortal from "@/components/shared/ClientPortal";
 import PaginationControls from "@/components/teacher/PaginationControls";
+import { applyCarryForwardHistoryRows, computeFeeHistoryAmounts } from "@/lib/feeHistory";
 
 const PAGE_SIZE = 7;
 
@@ -32,8 +34,49 @@ function computeAmounts(previousMonthDue, currentMonthFee, thisMonthPaid) {
   const current = Number(currentMonthFee || 0);
   const paid = Number(thisMonthPaid || 0);
   const total = previous + current;
-  const remaining = total - paid;
+  const remaining = Math.max(0, total - paid);
   return { total, remaining };
+}
+
+function buildCarryForwardHistoryRows(historyItems, drafts = {}) {
+  const rows = applyCarryForwardHistoryRows(historyItems);
+
+  return rows.map((row) => {
+    const draft = drafts[row.id] || {};
+    const currentMonthFee = Number(draft.current_month_fee ?? row.current_month_fee ?? 0);
+    const thisMonthPaid = Number(draft.this_month_paid ?? row.this_month_paid ?? 0);
+    const previousMonthDue = Number(row.computedPreviousMonthDue ?? row.previous_month_due ?? 0);
+    const computed = computeFeeHistoryAmounts({ previousMonthDue, currentMonthFee, thisMonthPaid });
+
+    return {
+      ...row,
+      computedPreviousMonthDue: previousMonthDue,
+      computedCurrentMonthFee: computed.currentMonthFee,
+      computedThisMonthPaid: computed.thisMonthPaid,
+      computedTotalAmount: computed.totalAmount,
+      computedRemainingDue: computed.remainingDue,
+    };
+  });
+}
+
+function getCurrentMonthFeeParts(row) {
+  const regularFee = Number(row?.regular_fee_amount || 0);
+  const admissionFee = Number(row?.admission_fee_amount || 0);
+  const discount = Number(row?.discount_amount || 0);
+  const scholarshipAmount = Number(row?.scholarship_amount || 0);
+  const hasBreakdown = regularFee > 0 || admissionFee > 0 || discount > 0 || scholarshipAmount > 0;
+  const derivedTotal = regularFee + admissionFee - discount - scholarshipAmount;
+  const currentMonthFee = hasBreakdown
+    ? derivedTotal
+    : Number(row?.current_month_fee || row?.total_amount || derivedTotal);
+
+  return {
+    regularFee,
+    admissionFee,
+    discount,
+    scholarshipAmount,
+    currentMonthFee,
+  };
 }
 
 export default function CoordinatorFeeHistoryPage() {
@@ -61,6 +104,7 @@ export default function CoordinatorFeeHistoryPage() {
   const [historyStatusOpen, setHistoryStatusOpen] = useState(false);
   const [drafts, setDrafts] = useState({});
   const [savingRowId, setSavingRowId] = useState("");
+  const [voucherPdfLoadingId, setVoucherPdfLoadingId] = useState("");
 
   async function loadSummaries() {
     setLoading(true);
@@ -84,6 +128,8 @@ export default function CoordinatorFeeHistoryPage() {
     setHistoryLoading(true);
     setHistoryError("");
     setHistoryMessage("");
+    setHistoryItems([]);
+    setDrafts({});
     setHistoryPage(1);
     setHistoryColumnFilter("all");
     setHistorySearchTerm("");
@@ -93,9 +139,10 @@ export default function CoordinatorFeeHistoryPage() {
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data?.message || "Unable to load student fee history.");
       const nextItems = Array.isArray(data.items) ? data.items : [];
+      const carryForwardRows = buildCarryForwardHistoryRows(nextItems);
       setHistoryItems(nextItems);
-      setDrafts(Object.fromEntries(nextItems.map((row) => [row.id, {
-        previous_month_due: moneyInputValue(row.previous_month_due),
+      setDrafts(Object.fromEntries(carryForwardRows.map((row) => [row.id, {
+        previous_month_due: moneyInputValue(row.computedPreviousMonthDue ?? row.previous_month_due),
         discount_amount: moneyInputValue(row.discount_amount),
         current_month_fee: moneyInputValue(row.current_month_fee),
         this_month_paid: moneyInputValue(row.this_month_paid),
@@ -136,14 +183,9 @@ export default function CoordinatorFeeHistoryPage() {
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data?.message || "Unable to update fee history row.");
-      const nextItems = Array.isArray(data.items) ? data.items : [];
-      setHistoryItems(nextItems);
-      setDrafts(Object.fromEntries(nextItems.map((item) => [item.id, {
-        previous_month_due: moneyInputValue(item.previous_month_due),
-        discount_amount: moneyInputValue(item.discount_amount),
-        current_month_fee: moneyInputValue(item.current_month_fee),
-        this_month_paid: moneyInputValue(item.this_month_paid),
-      }])));
+      if (selectedStudent?.student_id) {
+        await openStudentHistory(selectedStudent);
+      }
       setHistoryMessage(data?.message || "Fee history updated.");
       window.setTimeout(() => setHistoryMessage(""), 3000);
       await loadSummaries();
@@ -151,6 +193,167 @@ export default function CoordinatorFeeHistoryPage() {
       setHistoryError(saveError instanceof Error ? saveError.message : "Unable to update fee history row.");
     } finally {
       setSavingRowId("");
+    }
+  }
+
+
+  async function downloadVoucherPdf(row) {
+    if (!row?.voucher_id) return;
+    setVoucherPdfLoadingId(row.id);
+    setHistoryError("");
+    try {
+      const response = await fetch("/api/coordinator/fee-vouchers/" + encodeURIComponent(row.voucher_id), { cache: "no-store" });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data?.message || "Unable to load voucher details.");
+      const voucher = data?.item || {};
+      const parts = getCurrentMonthFeeParts(row);
+      const previousMonthDueValue = Number(row.computedPreviousMonthDue ?? row.previous_month_due ?? 0);
+      const computedTotalAmount = previousMonthDueValue + parts.currentMonthFee;
+      const paymentSummary = computeAmounts(previousMonthDueValue, parts.currentMonthFee, row.this_month_paid);
+      const doc = new jsPDF({ unit: "pt", format: "a4" });
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      const margin = 40;
+      const contentWidth = pageWidth - margin * 2;
+      let y = margin;
+      const safeText = (value) => String(value || "-");
+      const lines = [
+        ["Voucher No", safeText(voucher.voucher_no || row.voucher_no)],
+        ["Student", safeText(voucher.student_name || selectedStudent?.student_name || "-")],
+        ["Parent", safeText(voucher.parent_name || selectedStudent?.parent_name || "-")],
+        ["Class", safeText(voucher.class_level || selectedStudent?.class_level || "-")],
+        ["Due Date", formatDate(voucher.due_date || row.due_date)],
+        ["Monthly Fee", formatMoney(parts.regularFee)],
+        ["Admission Fee", formatMoney(parts.admissionFee)],
+        ["Discount", formatMoney(parts.discount)],
+        ["Scholarship", formatMoney(parts.scholarshipAmount)],
+        ["Current Month Fee", formatMoney(parts.currentMonthFee)],
+        ["This Month Paid", formatMoney(row.this_month_paid)],
+        ["Remaining Due", formatMoney(computeAmounts(row.previous_month_due, parts.currentMonthFee, row.this_month_paid).remaining)],
+      ];
+      const theme = {
+        background: [250, 247, 240],
+        surface: [255, 255, 255],
+        border: [45, 138, 106],
+        primary: [13, 92, 72],
+        text: [6, 63, 50],
+        muted: [36, 92, 79],
+        accent: [201, 162, 39],
+      };
+
+      const drawRoundedCard = (x, yPos, width, height) => {
+        doc.setDrawColor(...theme.border);
+        doc.setFillColor(...theme.surface);
+        doc.roundedRect(x, yPos, width, height, 12, 12, "FD");
+      };
+
+      const SECTION_BOTTOM_PADDING = 16; // space below the last label row
+
+      const addSection = (title, items, startY, rowGap = 18) => {
+        // header (28) + top padding before first row (14) + rows + bottom padding
+        const boxHeight = Math.max(
+          84,
+          28 + 14 + items.length * rowGap + SECTION_BOTTOM_PADDING
+        );
+        drawRoundedCard(margin, startY, contentWidth, boxHeight);
+        doc.setFillColor(...theme.primary);
+        doc.roundedRect(margin, startY, contentWidth, 28, 10, 10, "F");
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(11);
+        doc.setTextColor(250, 247, 240);
+        doc.text(title, margin + 16, startY + 18);
+
+        doc.setTextColor(...theme.text);
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(10.5);
+        const bodyY = startY + 42;
+        items.forEach(([label, value], index) => {
+          const labelText = `${label}:`;
+          const valueText = String(value || "-");
+          const labelWidth = doc.getTextWidth(labelText);
+          const safeMaxWidth = contentWidth - labelWidth - 24;
+          const wrappedValue = doc.splitTextToSize(valueText, safeMaxWidth);
+          const rowY = bodyY + index * rowGap;
+          doc.text(labelText, margin + 16, rowY);
+          doc.text(wrappedValue[0], margin + 16 + labelWidth + 10, rowY);
+          if (wrappedValue.length > 1) {
+            wrappedValue.slice(1).forEach((line, lineIndex) => {
+              doc.text(line, margin + 16 + labelWidth + 10, rowY + 12 + lineIndex * 10);
+            });
+          }
+        });
+
+        return boxHeight; // return so the caller can space the next section correctly
+      };
+
+      doc.setFillColor(...theme.background);
+      doc.rect(0, 0, pageWidth, pageHeight, "F");
+
+      doc.setFillColor(...theme.primary);
+      doc.roundedRect(margin, margin, contentWidth, 112, 16, 16, "F");
+      doc.setDrawColor(...theme.accent);
+      doc.setLineWidth(1.2);
+      doc.line(margin + 16, margin + 72, margin + contentWidth - 16, margin + 72);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(20);
+      doc.setTextColor(250, 247, 240);
+      doc.text("Ash-Shajrah Learning Hub (ALH)", margin + 18, margin + 32);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(11);
+      doc.setTextColor(255, 245, 214);
+      doc.text("Fee Voucher", margin + 18, margin + 54);
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(12);
+      doc.setTextColor(250, 247, 240);
+      doc.text(String(voucher.voucher_no || row.voucher_no || "Voucher"), margin + 18, margin + 98);
+
+      y = margin + 146;
+      const summaryItems = [
+        ["Student", safeText(voucher.student_name || selectedStudent?.student_name || "-")],
+        ["Parent", safeText(voucher.parent_name || selectedStudent?.parent_name || "-")],
+        ["Class", safeText(voucher.class_level || selectedStudent?.class_level || "-")],
+        ["Due Date", formatDate(voucher.due_date || row.due_date)],
+      ];
+      const summarySectionHeight = addSection("Voucher details", summaryItems, y);
+
+      y += summarySectionHeight + 24;
+      const feeItems = [
+        ["Monthly Fee", formatMoney(parts.regularFee)],
+        ["Admission Fee", formatMoney(parts.admissionFee)],
+        ["Discount", formatMoney(parts.discount)],
+        ["Scholarship", formatMoney(parts.scholarshipAmount)],
+        ["Previous Month Due", formatMoney(previousMonthDueValue)],
+        ["Current Month Fee", formatMoney(parts.currentMonthFee)],
+        ["Total Amount", formatMoney(computedTotalAmount)],
+      ];
+      const feeSectionHeight = addSection("Fee breakdown", feeItems, y, 20);
+
+      y += feeSectionHeight + 24;
+      const balanceItems = [
+        ["This Month Paid", formatMoney(row.this_month_paid)],
+        ["Remaining Due", formatMoney(paymentSummary.remaining)],
+      ];
+      addSection("Payment summary", balanceItems, y, 22);
+
+      const fileName = `${String(voucher.voucher_no || row.voucher_no || "voucher").replace(/[^\w.-]+/g, "_")}.pdf`;
+      const blob = doc.output("blob");
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = fileName;
+      anchor.target = "_blank";
+      anchor.rel = "noreferrer";
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      window.open(url, "_blank", "noopener,noreferrer");
+      window.setTimeout(() => URL.revokeObjectURL(url), 10000);
+      setHistoryMessage("Voucher PDF downloaded.");
+      window.setTimeout(() => setHistoryMessage(""), 3000);
+    } catch (downloadError) {
+      setHistoryError(downloadError instanceof Error ? downloadError.message : "Unable to download voucher PDF.");
+    } finally {
+      setVoucherPdfLoadingId("");
     }
   }
 
@@ -189,9 +392,11 @@ export default function CoordinatorFeeHistoryPage() {
     return filteredItems.slice(startIndex, startIndex + PAGE_SIZE);
   }, [filteredItems, safePage]);
 
+  const carryForwardHistoryRows = useMemo(() => buildCarryForwardHistoryRows(historyItems, drafts), [historyItems, drafts]);
+
   const filteredHistoryItems = useMemo(() => {
     const query = normalizeText(historySearchTerm);
-    return historyItems.filter((item) => {
+    return carryForwardHistoryRows.filter((item) => {
       if (historyStatusFilter !== "all" && normalizeText(item.payment_status) !== historyStatusFilter) return false;
       if (!query) return true;
       const fields = historyColumnFilter === "all"
@@ -199,7 +404,7 @@ export default function CoordinatorFeeHistoryPage() {
         : [item[historyColumnFilter]];
       return fields.some((value) => normalizeText(value).includes(query));
     });
-  }, [historyItems, historyColumnFilter, historySearchTerm, historyStatusFilter]);
+  }, [carryForwardHistoryRows, historyColumnFilter, historySearchTerm, historyStatusFilter]);
 
   const historyTotalPages = Math.max(1, Math.ceil(filteredHistoryItems.length / PAGE_SIZE));
   const safeHistoryPage = Math.min(historyPage, historyTotalPages);
@@ -406,12 +611,13 @@ export default function CoordinatorFeeHistoryPage() {
                         <th className="whitespace-nowrap px-4 py-3">Due Date</th>
                         <th className="whitespace-nowrap px-4 py-3">Voucher No</th>
                         <th className="whitespace-nowrap px-4 py-3">Previous Month Due</th>
-                        <th className="whitespace-nowrap px-4 py-3">Discount</th>
                         <th className="whitespace-nowrap px-4 py-3">Current Month Fee</th>
                         <th className="whitespace-nowrap px-4 py-3">Total Amount</th>
                         <th className="whitespace-nowrap px-4 py-3">This Month Paid</th>
                         <th className="whitespace-nowrap px-4 py-3">Remaining Due</th>
                         <th className="whitespace-nowrap px-4 py-3">Payment Status</th>
+                        <th className="whitespace-nowrap px-4 py-3">Payment Proof</th>
+                        <th className="whitespace-nowrap px-4 py-3">Voucher PDF</th>
                         <th className="whitespace-nowrap px-4 py-3 text-right">Action</th>
                       </tr>
                     </thead>
@@ -424,19 +630,98 @@ export default function CoordinatorFeeHistoryPage() {
                           current_month_fee: moneyInputValue(row.current_month_fee),
                           this_month_paid: moneyInputValue(row.this_month_paid),
                         };
-                        const computed = computeAmounts(draft.previous_month_due, draft.current_month_fee, draft.this_month_paid);
+                        const regularFee = Number(row?.regular_fee_amount || 0);
+                        const admissionFee = Number(row?.admission_fee_amount || 0);
+                        const draftDiscount = Number(draft.discount_amount || 0);
+                        const scholarshipAmount = Number(row?.scholarship_amount || 0);
+                        const currentMonthFeeValue = Number(draft.current_month_fee || row.current_month_fee || 0);
+                        const derivedTotal = regularFee + admissionFee - draftDiscount - scholarshipAmount;
+                        const hasBreakdown = regularFee > 0 || admissionFee > 0 || draftDiscount > 0 || scholarshipAmount > 0;
+                        const currentFeeParts = {
+                          regularFee: hasBreakdown ? regularFee : 0,
+                          admissionFee: hasBreakdown ? admissionFee : 0,
+                          discount: hasBreakdown ? draftDiscount : 0,
+                          scholarshipAmount: hasBreakdown ? scholarshipAmount : 0,
+                          currentMonthFee: hasBreakdown ? derivedTotal : currentMonthFeeValue,
+                        };
+                        const previousMonthDueValue = Number(row.computedPreviousMonthDue ?? row.previous_month_due ?? draft.previous_month_due ?? 0);
+                        const computed = computeAmounts(previousMonthDueValue, currentFeeParts.currentMonthFee, draft.this_month_paid);
                         return (
                           <tr key={row.id}>
                             <td className="px-4 py-4 font-semibold text-[#063F32]">{row.month_label || "-"}</td>
                             <td className="px-4 py-4 text-[#245C4F]">{formatDate(row.due_date)}</td>
                             <td className="px-4 py-4 text-[#245C4F]">{row.voucher_no || "-"}</td>
-                            <td className="px-4 py-4">{isEditableHistoryRow ? <input value={draft.previous_month_due} onChange={(event) => setDrafts((current) => ({ ...current, [row.id]: { ...draft, previous_month_due: event.target.value } }))} type="number" min="0" className="w-28 rounded-xl border border-[#2D8A6A]/20 bg-white px-3 py-2 text-sm text-[#063F32] outline-none focus:border-[#2D8A6A]" /> : <span className="text-[#245C4F]">{formatMoney(draft.previous_month_due)}</span>}</td>
-                            <td className="px-4 py-4 text-[#245C4F]">{formatMoney(draft.discount_amount)}</td>
-                            <td className="px-4 py-4">{isEditableHistoryRow ? <input value={draft.current_month_fee} onChange={(event) => setDrafts((current) => ({ ...current, [row.id]: { ...draft, current_month_fee: event.target.value } }))} type="number" min="0" className="w-28 rounded-xl border border-[#2D8A6A]/20 bg-white px-3 py-2 text-sm text-[#063F32] outline-none focus:border-[#2D8A6A]" /> : <span className="text-[#245C4F]">{formatMoney(draft.current_month_fee)}</span>}</td>
+                            <td className="px-4 py-4">
+                              <span className="text-[#245C4F]">{formatMoney(previousMonthDueValue)}</span>
+                            </td>
+                            <td className="px-4 py-4 align-top">
+                              <div className="min-w-[320px] space-y-2 rounded-2xl border border-[#2D8A6A]/12 bg-white px-0 py-0 shadow-[0_12px_30px_-24px_rgba(13,59,46,0.14)]">
+                                {hasBreakdown ? (
+                                  <div className="flex flex-nowrap items-center rounded-2xl justify-between gap-1 overflow-x-auto bg-[#FAF7F0] px-2 py-2 text-[10px] text-[#245C4F]">
+                                    <div className="min-w-[50px] text-center">
+                                      <p className="text-[8px] font-semibold uppercase tracking-[0.1em] text-[#0D5C48]">Monthly</p>
+                                      <p className="mt-0.5 whitespace-nowrap font-bold text-[#063F32]">{formatMoney(currentFeeParts.regularFee)}</p>
+                                    </div>
+                                    <span className="shrink-0 font-bold text-[#245C4F]">+</span>
+                                    <div className="min-w-[50px] text-center">
+                                      <p className="text-[8px] font-semibold uppercase tracking-[0.1em] text-[#0D5C48]">Admission</p>
+                                      <p className="mt-0.5 whitespace-nowrap font-bold text-[#063F32]">{formatMoney(currentFeeParts.admissionFee)}</p>
+                                    </div>
+                                    {currentFeeParts.discount > 0 ? <>
+                                      <span className="shrink-0 font-bold text-[#245C4F]">-</span>
+                                      <div className="min-w-[50px] text-center">
+                                        <p className="text-[8px] font-semibold uppercase tracking-[0.1em] text-[#0D5C48]">Discount</p>
+                                        <p className="mt-0.5 whitespace-nowrap font-bold text-[#063F32]">{formatMoney(currentFeeParts.discount)}</p>
+                                      </div>
+                                    </> : null}
+                                    {currentFeeParts.scholarshipAmount > 0 ? <>
+                                      <span className="shrink-0 font-bold text-[#245C4F]">-</span>
+                                      <div className="min-w-[50px] text-center">
+                                        <p className="text-[8px] font-semibold uppercase tracking-[0.1em] text-[#0D5C48]">Scholarship</p>
+                                        <p className="mt-0.5 whitespace-nowrap font-bold text-[#063F32]">{formatMoney(currentFeeParts.scholarshipAmount)}</p>
+                                      </div>
+                                    </> : null}
+                                    <span className="shrink-0 font-bold text-[#245C4F]">=</span>
+                                    <div className="min-w-[50px] text-center rounded-lg bg-[#0D5C48] px-1.5 py-1 text-[#FAF7F0]">
+                                      <p className="text-[8px] font-semibold uppercase tracking-[0.1em] text-[#FFF5D6]">Total</p>
+                                      <p className="mt-0.5 whitespace-nowrap text-xs font-bold leading-none">{formatMoney(currentFeeParts.currentMonthFee)}</p>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <div className="rounded-xl border border-[#F1EADC] bg-[#FAF7F0] px-3 py-2">
+                                    <p className="text-[8px] font-semibold uppercase tracking-[0.1em] text-[#0D5C48]">Current Month Fee</p>
+                                    <p className="mt-1 font-bold text-[#063F32]">{formatMoney(currentFeeParts.currentMonthFee)}</p>
+                                  </div>
+                                )}
+                              </div>
+                            </td>
                             <td className="px-4 py-4 font-semibold text-[#063F32]">{formatMoney(computed.total)}</td>
                             <td className="px-4 py-4">{isEditableHistoryRow ? <input value={draft.this_month_paid} onChange={(event) => setDrafts((current) => ({ ...current, [row.id]: { ...draft, this_month_paid: event.target.value } }))} type="number" min="0" className="w-28 rounded-xl border border-[#2D8A6A]/20 bg-white px-3 py-2 text-sm text-[#063F32] outline-none focus:border-[#2D8A6A]" /> : <span className="text-[#245C4F]">{formatMoney(draft.this_month_paid)}</span>}</td>
                             <td className="px-4 py-4 font-semibold text-[#063F32]">{formatMoney(computed.remaining)}</td>
                             <td className="px-4 py-4 text-[#245C4F]">{String(row.payment_status || "-").replace(/_/g, " ")}</td>
+                            <td className="px-4 py-4 text-[#245C4F]">
+                              {row.proof_file_url ? (
+                                <a href={row.proof_file_url} target="_blank" rel="noreferrer" className="inline-flex overflow-hidden rounded-xl border border-[#F1EADC] bg-white">
+                                  <img src={row.proof_file_url} alt={`Payment proof for ${row.voucher_no || row.month_label || "fee record"}`} className="h-14 w-14 object-cover" />
+                                </a>
+                              ) : (
+                                <span>-</span>
+                              )}
+                            </td>
+                            <td className="px-4 py-4 text-[#245C4F]">
+                              {row.voucher_id ? (
+                                <button
+                                  type="button"
+                                  onClick={() => void downloadVoucherPdf(row)}
+                                  disabled={voucherPdfLoadingId === row.id}
+                                  className="whitespace-nowrap rounded-xl border border-[#2D8A6A]/20 bg-white px-3 py-2 text-xs font-semibold text-[#063F32] transition hover:bg-[#F1EADC] disabled:opacity-60"
+                                >
+                                  {voucherPdfLoadingId === row.id ? "Downloading..." : "Download PDF"}
+                                </button>
+                              ) : (
+                                <span>-</span>
+                              )}
+                            </td>
                             <td className="px-4 py-4 text-right">
                               {true ? (
                                 <button
@@ -455,7 +740,7 @@ export default function CoordinatorFeeHistoryPage() {
                         );
                       }) : (
                         <tr>
-                          <td className="px-4 py-8 text-center text-[#245C4F]" colSpan={11}>{historyLoading ? "Loading student fee history..." : "No fee history rows found for this student."}</td>
+                          <td className="px-4 py-8 text-center text-[#245C4F]" colSpan={13}>{historyLoading ? "Loading student fee history..." : "No fee history rows found for this student."}</td>
                         </tr>
                       )}
                     </tbody>

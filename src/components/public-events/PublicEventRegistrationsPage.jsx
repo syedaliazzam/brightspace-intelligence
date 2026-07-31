@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { ChevronDown, Eye, PencilLine, RotateCcw, Search } from "lucide-react";
+import { ChevronDown, Eye, RotateCcw, Search } from "lucide-react";
 import { formatEventDate, formatEventDateTime, formatMoney, formatRegistrationStatusLabel, normalizeRegistrationStatus } from "@/lib/publicEvents";
 
 const INITIAL_CREATE_FORM = {
@@ -38,6 +38,8 @@ function matchesSearch(item, query) {
 
 export default function PublicEventRegistrationsPage({ portalLabel = "Coordinator portal", title = "Event registrations", description = "Review public event registrations, verify payments, and track each registration from one LMS table.", canManage = true, }) {
   const pageSize = 7;
+  const normalizedPortalLabel = String(portalLabel).toLowerCase().trim();
+  const showReceivedAmountColumn = normalizedPortalLabel === "coordinator portal" || normalizedPortalLabel === "super admin portal" || normalizedPortalLabel === "superadmin portal";
   const [items, setItems] = useState([]);
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -50,8 +52,7 @@ export default function PublicEventRegistrationsPage({ portalLabel = "Coordinato
   const [createSubmitError, setCreateSubmitError] = useState("");
   const [createEventOpen, setCreateEventOpen] = useState(false);
   const [selected, setSelected] = useState(null);
-  const [amountEditor, setAmountEditor] = useState(null);
-  const [amountDraft, setAmountDraft] = useState("");
+  const [receivedAmountDrafts, setReceivedAmountDrafts] = useState({});
   const [actionLoadingId, setActionLoadingId] = useState("");
   const [draftStatuses, setDraftStatuses] = useState({});
   const [openFilterSelect, setOpenFilterSelect] = useState("");
@@ -168,30 +169,28 @@ export default function PublicEventRegistrationsPage({ portalLabel = "Coordinato
     }
   }
 
-  function openAmountEditor(item) {
-    setAmountEditor(item);
-    setAmountDraft(String(Number(item?.amount_due || 0)));
+  function updateReceivedAmountDraft(itemId, value) {
+    setReceivedAmountDrafts((current) => ({ ...current, [itemId]: value }));
   }
 
-  async function saveAmountEdit() {
-    if (!amountEditor?.id) return;
-    setActionLoadingId(amountEditor.id);
+  async function saveReceivedAmount(item) {
+    if (!item?.id) return;
+    const nextAmount = Number(receivedAmountDrafts[item.id] ?? item.amount_due ?? 0);
+    setActionLoadingId(item.id);
     try {
-      const response = await fetch("/api/coordinator/public-event-registrations/" + encodeURIComponent(amountEditor.id), {
+      const response = await fetch("/api/coordinator/public-event-registrations/" + encodeURIComponent(item.id), {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ amountDue: Number(amountDraft || 0) }),
+        body: JSON.stringify({ amountDue: nextAmount }),
       });
       const data = await response.json();
-      if (!response.ok) throw new Error(data?.message || "Unable to update amount.");
+      if (!response.ok) throw new Error(data?.message || "Unable to update received amount.");
       setTone("success");
-      setMessage("Registration amount updated.");
-      setAmountEditor(null);
-      setAmountDraft("");
+      setMessage("Received amount updated.");
       await load();
     } catch (error) {
       setTone("error");
-      setMessage(error instanceof Error ? error.message : "Unable to update amount.");
+      setMessage(error instanceof Error ? error.message : "Unable to update received amount.");
     } finally {
       setActionLoadingId("");
     }
@@ -409,7 +408,7 @@ export default function PublicEventRegistrationsPage({ portalLabel = "Coordinato
             <div className="text-sm font-semibold text-[#245C4F]">Showing {filteredItems.length === 0 ? 0 : (safePage - 1) * pageSize + 1}-{Math.min(safePage * pageSize, filteredItems.length)} of {filteredItems.length}</div>
           </div>
           <div className="overflow-x-auto">
-            <table className="min-w-full text-left text-sm">
+            <table className="min-w-full table-fixed text-left text-sm">
               <thead className="bg-[linear-gradient(180deg,#FAF7F0_0%,#F1EADC_100%)] text-xs uppercase tracking-[0.18em] text-[#0D5C48]">
                 <tr>
                   <th className="whitespace-nowrap px-6 py-4">Registration No</th>
@@ -418,10 +417,10 @@ export default function PublicEventRegistrationsPage({ portalLabel = "Coordinato
                   <th className="whitespace-nowrap px-6 py-4">Participant</th>
                   <th className="whitespace-nowrap px-6 py-4">Email</th>
                   <th className="whitespace-nowrap px-6 py-4">WhatsApp</th>
-                  <th className="whitespace-nowrap px-6 py-4">Amount</th>
+                  {showReceivedAmountColumn ? <th className="whitespace-nowrap px-6 py-4">Received Amount</th> : null}
                   <th className="whitespace-nowrap px-6 py-4">Status</th>
                   <th className="whitespace-nowrap px-6 py-4">Submitted</th>
-                  <th className="whitespace-nowrap px-6 py-4">Actions</th>
+                  <th className="w-[280px] min-w-[280px] whitespace-nowrap px-6 py-4">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#F1EADC]">
@@ -433,31 +432,51 @@ export default function PublicEventRegistrationsPage({ portalLabel = "Coordinato
                     <td className="px-6 py-4 text-[#245C4F]">{item.participant_name || "-"}</td>
                     <td className="px-6 py-4 text-[#245C4F]">{item.email || "-"}</td>
                     <td className="px-6 py-4 text-[#245C4F]">{item.whatsapp || "-"}</td>
-                    <td className="px-6 py-4 text-[#245C4F]">
-                      <div className="flex items-center gap-2 whitespace-nowrap">
-                        <span>{formatMoney(item.amount_due || 0)}</span>
-                        {canManage && normalizeRegistrationStatus(item.status) !== "free" ? (
-                          <button type="button" onClick={() => openAmountEditor(item)} className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full border border-[#2D8A6A]/20 bg-white px-3 py-1.5 text-[11px] font-semibold text-[#063F32] transition hover:bg-[#F1EADC]">
-                            <PencilLine className="h-3.5 w-3.5" />
-                            Edit
-                          </button>
-                        ) : null}
-                      </div>
-                    </td>
+                    {showReceivedAmountColumn ? (
+                      <td className="px-6 py-4">
+                        {normalizeRegistrationStatus(item.status) === "free" ? (
+                          <div className="flex min-w-max flex-nowrap items-center gap-2 sm:min-w-[220px]">
+                            <div className="w-full min-w-[130px] rounded-full border border-[#2D8A6A]/10 bg-[#F7F2E8] px-3 py-2 text-sm font-semibold text-[#063F32]">
+                              0.00
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="flex min-w-max flex-nowrap items-center gap-2 sm:min-w-[220px]">
+                            <input
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              value={receivedAmountDrafts[item.id] ?? String(Number(item.amount_due || 0))}
+                              placeholder="Enter received amount"
+                              onChange={(event) => updateReceivedAmountDraft(item.id, event.target.value)}
+                              className="w-full min-w-[130px] rounded-full border border-[#2D8A6A]/20 bg-white px-3 py-2 text-sm text-[#063F32] outline-none focus:border-[#2D8A6A]"
+                            />
+                            <button
+                              type="button"
+                              onClick={() => saveReceivedAmount(item)}
+                              disabled={actionLoadingId === item.id}
+                              className="inline-flex w-fit shrink-0 items-center justify-center rounded-full border whitespace-nowrap border-[#2D8A6A]/20 bg-[#FAF7F0] px-3 py-1.5 text-xs font-semibold text-[#063F32] transition hover:bg-[#F1EADC] disabled:opacity-70"
+                            >
+                              {actionLoadingId === item.id ? "Saving..." : "Save"}
+                            </button>
+                          </div>
+                        )}
+                      </td>
+                    ) : null}
                     <td className="px-6 py-4"><span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${statusTone(item.status)}`}>{item.status_label || formatRegistrationStatusLabel(item.status)}</span></td>
                     <td className="px-6 py-4 text-[#245C4F]">{formatEventDateTime(item.submitted_at)}</td>
-                    <td className="px-6 py-4">
-                      <div className="flex min-w-max flex-nowrap gap-2 whitespace-nowrap">
-                        <button type="button" onClick={() => setSelected(item)} className="inline-flex shrink-0 items-center rounded-full border border-[#2D8A6A]/20 bg-white px-4 py-2 text-xs font-semibold text-[#063F32] whitespace-nowrap transition hover:bg-[#F1EADC]"><span className="inline-flex items-center gap-2 whitespace-nowrap"><Eye className="h-3.5 w-3.5" /> View</span></button>
+                    <td className="w-[280px] min-w-[280px] max-w-[280px] px-6 py-4">
+                      <div className="flex max-w-full flex-nowrap items-center gap-2 whitespace-nowrap">
+                        <button type="button" onClick={() => setSelected(item)} className="inline-flex shrink-0 items-center rounded-full border border-[#2D8A6A]/20 bg-white px-2.5 py-1.5 text-[10px] font-semibold text-[#063F32] whitespace-nowrap transition hover:bg-[#F1EADC]"><span className="inline-flex items-center gap-1 whitespace-nowrap"><Eye className="h-3 w-3" />View</span></button>
                         {canManage && normalizeRegistrationStatus(item.status) !== "free" ? (
-                          <div className="flex min-w-max flex-nowrap items-center gap-2 whitespace-nowrap">
-                            <select value={draftStatuses[item.id] || normalizeRegistrationStatus(item.status)} onChange={(event) => setDraftStatuses((current) => ({ ...current, [item.id]: event.target.value }))} className="rounded-full border border-[#2D8A6A]/20 bg-white px-4 py-2 text-xs font-semibold text-[#063F32] outline-none focus:border-[#2D8A6A]">
+                          <div className="flex min-w-0 flex-nowrap items-center gap-2 overflow-hidden whitespace-nowrap">
+                            <select value={draftStatuses[item.id] || normalizeRegistrationStatus(item.status)} onChange={(event) => setDraftStatuses((current) => ({ ...current, [item.id]: event.target.value }))} className="w-[90px] min-w-[90px] shrink-0 rounded-full border border-[#2D8A6A]/20 bg-white px-3 py-2 text-[11px] font-semibold text-[#063F32] outline-none focus:border-[#2D8A6A]">
                               <option value="pending">Pending</option>
                               <option value="verified">Verified</option>
                               <option value="free">Free</option>
                               <option value="cancelled">Cancelled</option>
                             </select>
-                            <button type="button" disabled={actionLoadingId === item.id || (draftStatuses[item.id] || normalizeRegistrationStatus(item.status)) === normalizeRegistrationStatus(item.status)} onClick={() => updateStatus(item.id, draftStatuses[item.id] || normalizeRegistrationStatus(item.status))} className="rounded-full bg-[#0D5C48] px-4 py-2 text-xs font-semibold text-[#FAF7F0] transition hover:bg-[#063F32] disabled:opacity-70">
+                            <button type="button" disabled={actionLoadingId === item.id || (draftStatuses[item.id] || normalizeRegistrationStatus(item.status)) === normalizeRegistrationStatus(item.status)} onClick={() => updateStatus(item.id, draftStatuses[item.id] || normalizeRegistrationStatus(item.status))} className="shrink-0 rounded-full bg-[#0D5C48] px-3 py-2 text-[11px] font-semibold text-[#FAF7F0] transition hover:bg-[#063F32] disabled:opacity-70">
                               {actionLoadingId === item.id ? "Saving..." : "Save"}
                             </button>
                           </div>
@@ -467,7 +486,7 @@ export default function PublicEventRegistrationsPage({ portalLabel = "Coordinato
                   </tr>
                 )) : (
                   <tr>
-                    <td colSpan={10} className="px-6 py-10 text-center text-[#245C4F]">{loading ? "Loading event registrations..." : "No registrations matched the selected filters."}</td>
+                    <td colSpan={showReceivedAmountColumn ? 10 : 9} className="px-6 py-10 text-center text-[#245C4F]">{loading ? "Loading event registrations..." : "No registrations matched the selected filters."}</td>
                   </tr>
                 )}
               </tbody>
@@ -588,29 +607,6 @@ export default function PublicEventRegistrationsPage({ portalLabel = "Coordinato
           </div>
         ) : null}
 
-        {amountEditor ? (
-          <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-[#063F32]/45 px-4 py-10 backdrop-blur-sm">
-            <div className="w-full max-w-md overflow-hidden rounded-[2rem] border border-[#2D8A6A]/15 bg-[#FAF7F0] shadow-[0_24px_80px_-36px_rgba(13,59,46,0.24)]">
-              <div className="flex items-start justify-between gap-4 border-b border-[#F1EADC] px-6 py-4">
-                <div>
-                  <p className="text-sm font-semibold uppercase tracking-[0.24em] text-[#C9A227]">Edit amount</p>
-                  <h2 className="mt-2 text-2xl font-semibold text-[#063F32]">{amountEditor.registration_no}</h2>
-                </div>
-                <button type="button" onClick={() => { setAmountEditor(null); setAmountDraft(""); }} className="rounded-xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-3 py-2 text-sm font-semibold text-[#063F32] transition hover:bg-[#F1EADC]">Close</button>
-              </div>
-              <div className="space-y-4 p-6 text-sm text-[#245C4F]">
-                <label className="block">
-                  <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]">Amount</span>
-                  <input type="number" min="0" step="0.01" value={amountDraft} onChange={(event) => setAmountDraft(event.target.value)} className="w-full rounded-2xl border border-[#2D8A6A]/20 bg-white px-4 py-3 text-sm text-[#063F32] outline-none focus:border-[#2D8A6A]" />
-                </label>
-                <div className="flex items-center justify-end gap-3">
-                  <button type="button" onClick={() => { setAmountEditor(null); setAmountDraft(""); }} className="rounded-full border border-[#2D8A6A]/20 bg-white px-4 py-2 text-sm font-semibold text-[#063F32] transition hover:bg-[#F1EADC]">Cancel</button>
-                  <button type="button" onClick={saveAmountEdit} disabled={actionLoadingId === amountEditor.id} className="rounded-full bg-[#0D5C48] px-4 py-2 text-sm font-semibold text-[#FAF7F0] transition hover:bg-[#063F32] disabled:opacity-70">{actionLoadingId === amountEditor.id ? "Saving..." : "Save amount"}</button>
-                </div>
-              </div>
-            </div>
-          </div>
-        ) : null}
         {selected ? (
           <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-[#063F32]/45 px-4 py-10 backdrop-blur-sm">
             <div className="w-full max-w-4xl overflow-hidden rounded-[2rem] border border-[#2D8A6A]/15 bg-[#FAF7F0] shadow-[0_24px_80px_-36px_rgba(13,59,46,0.24)]">

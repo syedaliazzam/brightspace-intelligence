@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { requireRole, roleGuardResponse } from "@/lib/roleGuard";
 import prisma from "@/lib/prisma";
-import { computeFeeHistoryAmounts, feeHistoryTableExists, normalizeMoney } from "@/lib/feeHistory";
+import { createSignedPaymentProofUrl } from "@/lib/supabaseStorage";
+import { applyCarryForwardHistoryRows, computeFeeHistoryAmounts, feeHistoryTableExists, normalizeMoney } from "@/lib/feeHistory";
 
 function json(message, status = 200, extra = {}) {
   return NextResponse.json({ message, ...extra }, { status });
@@ -55,10 +56,20 @@ async function loadStudentSummaries() {
       FROM (
         SELECT
           COALESCE(fhr.month_label, '') AS month_label,
-          COALESCE(fhr.this_month_paid::float8, 0) AS this_month_paid,
+          CASE
+            WHEN COALESCE(fhr.this_month_paid::float8, 0) > 0 THEN fhr.this_month_paid::float8
+            ELSE COALESCE(latest_submission.paid_amount::float8, 0)
+          END AS this_month_paid,
           COALESCE(fhr.remaining_due::float8, 0) AS remaining_due,
           COALESCE(fhr.due_date::timestamp, fhr.created_at) AS sort_date
         FROM fee_history_records fhr
+        LEFT JOIN LATERAL (
+          SELECT fs.paid_amount
+          FROM fee_submissions fs
+          WHERE fs.voucher_id = fhr.voucher_id
+          ORDER BY fs.created_at DESC NULLS LAST, fs.id DESC
+          LIMIT 1
+        ) latest_submission ON TRUE
         WHERE fhr.student_id = sp.id
 
         UNION ALL
@@ -157,21 +168,26 @@ async function loadStudentHistory(studentId) {
         COALESCE(fhr.discount_amount::float8, COALESCE(fv.discount_amount::float8, 0)) AS discount_amount,
         COALESCE(fhr.current_month_fee::float8, COALESCE(fv.total_amount::float8, fv.amount::float8, 0)) AS current_month_fee,
         COALESCE(fhr.total_amount::float8, COALESCE(fv.total_amount::float8, fv.amount::float8, 0)) AS total_amount,
-        COALESCE(fhr.this_month_paid::float8, COALESCE(fs.paid_amount::float8, 0)) AS this_month_paid,
+        CASE
+          WHEN COALESCE(fhr.this_month_paid::float8, 0) > 0 THEN fhr.this_month_paid::float8
+          ELSE COALESCE(fs.paid_amount::float8, 0)
+        END AS this_month_paid,
         COALESCE(fhr.remaining_due::float8, (COALESCE(fv.total_amount::float8, fv.amount::float8, 0) - COALESCE(fs.paid_amount::float8, 0))) AS remaining_due,
         COALESCE(fv.voucher_no, '') AS voucher_no,
         LOWER(COALESCE(fs.status::text, fv.status::text, 'not_submitted')) AS payment_status,
         fs.paid_at,
+        fs.proof_file_path,
         COALESCE(fv.discount_percent::float8, 0) AS discount_percent,
         COALESCE(fv.admission_fee_amount::float8, 0) AS admission_fee_amount,
         COALESCE(fv.regular_fee_amount::float8, 0) AS regular_fee_amount,
+        COALESCE(fv.scholarship_amount::float8, 0) AS scholarship_amount,
         fhr.created_at,
         fhr.updated_at,
         COALESCE(fhr.due_date::timestamp, fhr.created_at) AS sort_date
       FROM fee_history_records fhr
       LEFT JOIN fee_vouchers fv ON fv.id = fhr.voucher_id
       LEFT JOIN LATERAL (
-        SELECT status, paid_at, paid_amount
+        SELECT status, paid_at, paid_amount, proof_file_path
         FROM fee_submissions fs
         WHERE fs.voucher_id = fhr.voucher_id
         ORDER BY fs.created_at DESC NULLS LAST, fs.id DESC
@@ -229,9 +245,11 @@ async function loadStudentHistory(studentId) {
         COALESCE(fv.voucher_no, '') AS voucher_no,
         LOWER(COALESCE(fs.status::text, fv.status::text, 'not_submitted')) AS payment_status,
         fs.paid_at,
+        fs.proof_file_path,
         COALESCE(fv.discount_percent::float8, 0) AS discount_percent,
         COALESCE(fv.admission_fee_amount::float8, 0) AS admission_fee_amount,
         COALESCE(fv.regular_fee_amount::float8, COALESCE(item.base_amount::float8, 0)) AS regular_fee_amount,
+        COALESCE(fv.scholarship_amount::float8, 0) AS scholarship_amount,
         COALESCE(item.created_at, fv.created_at) AS created_at,
         COALESCE(item.updated_at, fv.updated_at) AS updated_at,
         COALESCE(item.due_date::timestamp, fv.due_date::timestamp, COALESCE(item.created_at, fv.created_at)) AS sort_date
@@ -239,7 +257,7 @@ async function loadStudentHistory(studentId) {
       INNER JOIN fee_vouchers fv ON fv.id = item.voucher_id
       LEFT JOIN regular_monthly_fee_batches batch ON batch.id = item.batch_id
       LEFT JOIN LATERAL (
-        SELECT status, paid_at, paid_amount
+        SELECT status, paid_at, paid_amount, proof_file_path
         FROM fee_submissions fs
         WHERE fs.voucher_id = fv.id
         ORDER BY fs.created_at DESC NULLS LAST, fs.id DESC
@@ -299,15 +317,17 @@ async function loadStudentHistory(studentId) {
         COALESCE(fv.voucher_no, '') AS voucher_no,
         LOWER(COALESCE(fs.status::text, fv.status::text, 'not_submitted')) AS payment_status,
         fs.paid_at,
+        fs.proof_file_path,
         COALESCE(fv.discount_percent::float8, 0) AS discount_percent,
         COALESCE(fv.admission_fee_amount::float8, 0) AS admission_fee_amount,
         COALESCE(fv.regular_fee_amount::float8, 0) AS regular_fee_amount,
+        COALESCE(fv.scholarship_amount::float8, 0) AS scholarship_amount,
         fv.created_at,
         fv.updated_at,
         COALESCE(fv.due_date::timestamp, fv.created_at) AS sort_date
       FROM fee_vouchers fv
       LEFT JOIN LATERAL (
-        SELECT status, paid_at, paid_amount
+        SELECT status, paid_at, paid_amount, proof_file_path
         FROM fee_submissions fs
         WHERE fs.voucher_id = fv.id
         ORDER BY fs.created_at DESC NULLS LAST, fs.id DESC
@@ -359,12 +379,10 @@ async function propagateHistory(tx, rowId) {
     throw new Error("Fee history row not found in sequence.");
   }
 
-  let carryForward = null;
-  for (let index = targetIndex; index < rows.length; index += 1) {
+  let carryForward = 0;
+  for (let index = 0; index < rows.length; index += 1) {
     const item = rows[index];
-    const previousMonthDue = index === targetIndex
-      ? normalizeMoney(item.previous_month_due)
-      : normalizeMoney(carryForward);
+    const previousMonthDue = normalizeMoney(carryForward);
     const computed = computeFeeHistoryAmounts({
       previousMonthDue,
       currentMonthFee: item.current_month_fee,
@@ -399,12 +417,35 @@ export async function GET(request) {
     const studentId = normalizeText(searchParams.get("studentId"));
 
     if (studentId) {
-      const items = await loadStudentHistory(studentId);
-      return json("Fee history loaded.", 200, { items });
+      const items = applyCarryForwardHistoryRows(await loadStudentHistory(studentId));
+      const itemsWithProofUrls = await Promise.all(
+        items.map(async (item) => ({
+          ...item,
+          proof_file_url: item?.proof_file_path
+            ? await createSignedPaymentProofUrl(item.proof_file_path).catch(() => "")
+            : "",
+        }))
+      );
+      return json("Fee history loaded.", 200, { items: itemsWithProofUrls });
     }
 
     const items = await loadStudentSummaries();
-    return json("Fee history students loaded.", 200, { items });
+    const itemsWithDerivedDues = await Promise.all(items.map(async (item) => {
+      const studentHistory = applyCarryForwardHistoryRows(await loadStudentHistory(item.student_id));
+      const latestRow = studentHistory[0] || null;
+      const currentPendingDues = Number(latestRow?.computedRemainingDue ?? latestRow?.remaining_due ?? item.current_pending_dues ?? 0);
+      const latestThisMonthPaid = Number(latestRow?.this_month_paid ?? item.latest_this_month_paid ?? 0);
+      const latestMonthLabel = String(latestRow?.month_label || item.latest_month_label || "").trim();
+
+      return {
+        ...item,
+        latest_month_label: latestMonthLabel,
+        latest_this_month_paid: latestThisMonthPaid,
+        current_pending_dues: currentPendingDues,
+      };
+    }));
+
+    return json("Fee history students loaded.", 200, { items: itemsWithDerivedDues });
   } catch (error) {
     const guard = roleGuardResponse(error);
     return guard || json(error instanceof Error ? error.message : "Unable to load fee history.", 500);
@@ -509,8 +550,16 @@ export async function PATCH(request) {
         return propagateHistory(tx, effectiveRowId);
       });
 
-      const items = await loadStudentHistory(result.studentId);
-      return json("Fee history updated.", 200, { studentId: result.studentId, items });
+      const items = applyCarryForwardHistoryRows(await loadStudentHistory(result.studentId));
+      const itemsWithProofUrls = await Promise.all(
+        items.map(async (item) => ({
+          ...item,
+          proof_file_url: item?.proof_file_path
+            ? await createSignedPaymentProofUrl(item.proof_file_path).catch(() => "")
+            : "",
+        }))
+      );
+      return json("Fee history updated.", 200, { studentId: result.studentId, items: itemsWithProofUrls });
     }
 
     const result = await prisma.$transaction(async (tx) => {
@@ -532,8 +581,16 @@ export async function PATCH(request) {
       return propagateHistory(tx, rowId);
     });
 
-    const items = await loadStudentHistory(result.studentId);
-    return json("Fee history updated.", 200, { studentId: result.studentId, items });
+    const items = applyCarryForwardHistoryRows(await loadStudentHistory(result.studentId));
+    const itemsWithProofUrls = await Promise.all(
+      items.map(async (item) => ({
+        ...item,
+        proof_file_url: item?.proof_file_path
+          ? await createSignedPaymentProofUrl(item.proof_file_path).catch(() => "")
+          : "",
+      }))
+    );
+    return json("Fee history updated.", 200, { studentId: result.studentId, items: itemsWithProofUrls });
   } catch (error) {
     const guard = roleGuardResponse(error);
     return guard || json(error instanceof Error ? error.message : "Unable to update fee history.", 500);

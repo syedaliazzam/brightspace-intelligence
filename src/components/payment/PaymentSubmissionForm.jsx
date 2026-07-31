@@ -95,9 +95,16 @@ export default function PaymentSubmissionForm({ voucher }) {
   const regularFee = Number(voucher.regular_fee_amount || voucher.amount || 0);
   const admissionFee = Number(voucher.admission_fee_amount || 0);
   const discountAmount = Number(voucher.discount_amount || 0);
-  const totalAmount = Number(voucher.total_amount || voucher.subtotal_amount || voucher.amount || 0);
+  const scholarshipAmount = Number(voucher.scholarship_amount || 0);
   const hasDiscount = regularFee > 0 && discountAmount > 0;
+  const hasScholarship = scholarshipAmount > 0;
   const discountPercent = hasDiscount ? Math.round((discountAmount / regularFee) * 100) : 0;
+  const derivedTotalAmount = Math.max(regularFee + admissionFee - discountAmount - scholarshipAmount, 0);
+  const totalAmount = Number(
+    (regularFee > 0 || admissionFee > 0 || discountAmount > 0 || scholarshipAmount > 0)
+      ? derivedTotalAmount
+      : voucher.total_amount || voucher.subtotal_amount || voucher.amount || 0
+  );
   const nextMonthlyFee = Math.max(regularFee - discountAmount, 0);
 
   useEffect(() => {
@@ -241,7 +248,7 @@ export default function PaymentSubmissionForm({ voucher }) {
                   <CalendarDays className="h-5 w-5" />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm font-bold text-[#063F32] sm:text-base">Monthly Fee</p>
+                  <p className="text-sm font-bold text-[#063F32] sm:text-base">Regular Monthly Fee</p>
                 </div>
                 <p className="shrink-0 text-right text-sm font-bold text-[#063F32] sm:text-base">
                   PKR {regularFee.toLocaleString("en-PK")}
@@ -259,6 +266,21 @@ export default function PaymentSubmissionForm({ voucher }) {
                   </div>
                   <p className="shrink-0 text-right text-sm font-bold text-[#063F32] sm:text-base">
                     - PKR {discountAmount.toLocaleString("en-PK")}
+                  </p>
+                </div>
+              ) : null}
+
+              {hasScholarship ? (
+                <div className="flex items-center gap-3 py-4">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#F1EADC] text-[#0D5C48]">
+                    <BadgePercent className="h-5 w-5" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-bold text-[#063F32] sm:text-base">Need-based Scholarship</p>
+                    <p className="mt-1 text-xs text-[#245C4F]">Applied scholarship amount</p>
+                  </div>
+                  <p className="shrink-0 text-right text-sm font-bold text-[#063F32] sm:text-base">
+                    - PKR {scholarshipAmount.toLocaleString("en-PK")}
                   </p>
                 </div>
               ) : null}
@@ -292,56 +314,25 @@ export default function PaymentSubmissionForm({ voucher }) {
                     </p>
                   </div>
                 </div>
-                <div
-                  className={`hidden items-start gap-1 text-center text-[#063F32] xl:grid ${
-                    hasDiscount
-                      ? "grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)_auto_minmax(0,1fr)_auto_minmax(0,1fr)]"
-                      : "grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)_auto_minmax(0,1fr)]"
-                  }`}
-                >
-                  <FormulaBox value={regularFee} label="Monthly Fee" />
-                  {hasDiscount ? <FormulaOperator value="-" /> : <FormulaOperator value="+" />}
+                <div className="flex flex-wrap items-center justify-center gap-2 text-[#063F32]">
+                  <FormulaBox value={regularFee} label="Regular Monthly Fee" />
+                  {(hasDiscount || hasScholarship) ? <FormulaOperator value="-" /> : <FormulaOperator value="+" />}
                   {hasDiscount ? (
                     <FormulaBox value={discountAmount} label={`Discount (${discountPercent}%)`} />
+                  ) : null}
+                  {hasScholarship ? <FormulaOperator value="-" /> : null}
+                  {hasScholarship ? <FormulaBox value={scholarshipAmount} label="Scholarship" /> : null}
+                  {(hasDiscount || hasScholarship) ? <FormulaOperator value="+" /> : null}
+                  {(hasDiscount || hasScholarship) ? (
+                    <FormulaBox value={admissionFee} label="Admission Fee" />
                   ) : (
                     <FormulaBox value={admissionFee} label="Admission Fee" />
                   )}
-                  {hasDiscount ? <FormulaOperator value="+" /> : <FormulaOperator value="=" />}
-                  {hasDiscount ? (
-                    <FormulaBox value={admissionFee} label="Admission Fee" />
-                  ) : (
-                    <FormulaTotal value={totalAmount} />
-                  )}
-                  {hasDiscount ? <FormulaOperator value="=" /> : null}
-                  {hasDiscount ? <FormulaTotal value={totalAmount} /> : null}
-                </div>
-
-                <div className="grid gap-2 xl:hidden">
-                  <FormulaBoxSmall value={regularFee} label="Monthly Fee" />
-                  {hasDiscount ? <FormulaOperator value="-" /> : <FormulaOperator value="+" />}
-                  {hasDiscount ? (
-                    <FormulaBoxSmall value={discountAmount} label={`Discount (${discountPercent}%)`} />
-                  ) : (
-                    <FormulaBoxSmall value={admissionFee} label="Admission Fee" />
-                  )}
-                  {hasDiscount ? <FormulaOperator value="+" /> : <FormulaOperator value="=" />}
-                  {hasDiscount ? (
-                    <FormulaBoxSmall value={admissionFee} label="Admission Fee" />
-                  ) : (
-                    <FormulaTotalSmall value={totalAmount} />
-                  )}
-                  {hasDiscount ? <FormulaOperator value="=" /> : null}
-                  {hasDiscount ? <FormulaTotalSmall value={totalAmount} /> : null}
+                  {(hasDiscount || hasScholarship) ? <FormulaOperator value="=" /> : null}
+                  <FormulaTotal value={totalAmount} />
                 </div>
               </div>
             </div>
-
-            {hasDiscount ? (
-              <div className="mt-3 flex items-start gap-3 rounded-[1rem] border border-[#E4D9BE] bg-[#FFF5D6]/65 px-4 py-3 text-sm text-[#063F32]">
-                <Info className="mt-0.5 h-5 w-5 shrink-0 text-[#0D5C48]" />
-                <p>From next month onward, the monthly fee will be PKR {nextMonthlyFee.toLocaleString("en-PK")}/month.</p>
-              </div>
-            ) : null}
           </div>
         </section>
         

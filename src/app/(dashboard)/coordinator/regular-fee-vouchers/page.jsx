@@ -116,8 +116,8 @@ export default function RegularFeeVouchersPage() {
             <p className="inline-flex rounded-full border border-[#E4C766]/30 bg-[#FFF5D6]/12 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.28em] text-[#FFF5D6]">
               Coordinator portal
             </p>
-            <h1 className="mt-4 font-display text-3xl font-bold tracking-tight text-[#FAF7F0] sm:text-4xl">Regular fee vouchers</h1>
-            <p className="mt-3 text-sm leading-7 text-[#EAF6EF] sm:text-base">Generate monthly vouchers for one class and keep batch history in one place.</p>
+            <h1 className="mt-4 font-display text-3xl font-bold tracking-tight text-[#FAF7F0] sm:text-4xl">Regular monthly fee vouchers</h1>
+            <p className="mt-3 text-sm leading-7 text-[#EAF6EF] sm:text-base">Generate regular monthly fee vouchers for one class and keep batch history in one place.</p>
           </div>
         </section>
 
@@ -161,7 +161,7 @@ export default function RegularFeeVouchersPage() {
               <input value={form.monthLabel} onChange={(e) => setForm((c) => ({ ...c, monthLabel: e.target.value }))} placeholder="June 2026" className="w-full rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 text-sm text-[#063F32] outline-none transition focus:border-[#2D8A6A] focus:bg-white focus:ring-4 focus:ring-[#FFF5D6]" />
             </label>
             <label className="block">
-              <span className="mb-2 block text-sm font-medium text-[#245C4F]">Monthly fee</span>
+              <span className="mb-2 block text-sm font-medium text-[#245C4F]">Regular monthly fee</span>
               <input type="number" min="1" value={form.baseAmount} readOnly className="w-full rounded-2xl border border-[#2D8A6A]/20 bg-[#F1EADC] px-4 py-3 text-sm text-[#063F32]" required />
             </label>
             <div className="md:col-span-2">

@@ -6,7 +6,7 @@ export default function SuperAdminPublicEventRegistrationsPage() {
       portalLabel="Super Admin portal"
       title="Event registrations"
       description="Review public event registrations and their verification progress from the super admin portal."
-      canManage={false}
+      canManage
     />
   );
 }

@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { sendEmail, themedEmailShell } from "@/lib/email";
 import { sendWhatsAppText } from "@/lib/whatsapp";
 import prisma from "@/lib/prisma";
+import { computeFeeHistoryAmounts } from "@/lib/feeHistory";
 import { uploadPaymentProof } from "@/lib/supabaseStorage";
 
 const SUBMITTABLE_VOUCHER_STATUSES = new Set(["unpaid", "rejected"]);
@@ -152,6 +153,32 @@ export async function POST(request) {
         UPDATE fee_vouchers
         SET status = ${"submitted"}::voucher_status
         WHERE id = ${voucher.id}::uuid
+      `;
+
+      const [historyRow] = await tx.$queryRaw`
+        SELECT
+          previous_month_due::float8 AS previous_month_due,
+          current_month_fee::float8 AS current_month_fee
+        FROM fee_history_records
+        WHERE voucher_id = ${voucher.id}::uuid
+        ORDER BY due_date ASC NULLS LAST, created_at ASC NULLS LAST, id ASC
+        LIMIT 1
+      `;
+
+      const computed = computeFeeHistoryAmounts({
+        previousMonthDue: historyRow?.previous_month_due || 0,
+        currentMonthFee: historyRow?.current_month_fee || 0,
+        thisMonthPaid: paidAmount,
+      });
+
+      await tx.$executeRaw`
+        UPDATE fee_history_records
+        SET
+          this_month_paid = ${computed.thisMonthPaid},
+          total_amount = ${computed.totalAmount},
+          remaining_due = ${computed.remainingDue},
+          updated_at = NOW()
+        WHERE voucher_id = ${voucher.id}::uuid
       `;
 
       if (voucher.registration_lead_id) {
