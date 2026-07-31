@@ -12,6 +12,11 @@ function normalizeText(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 
+function normalizeLettersOnly(value) {
+  if (typeof value !== "string") return "";
+  return value.replace(/[^A-Za-z]/g, "");
+}
+
 function normalizeMoney(value) {
   const amount = Number(value);
   return Number.isFinite(amount) && amount >= 0 ? amount : null;
@@ -73,6 +78,8 @@ export async function GET() {
         ${columns.title ? Prisma.sql`of.title,` : Prisma.sql`NULL AS title,`}
         ${columns.fee_type ? Prisma.sql`of.fee_type,` : Prisma.sql`NULL AS fee_type,`}
         ${columns.class_level ? Prisma.sql`of.class_level,` : Prisma.sql`NULL AS class_level,`}
+        ${columns.discount_reference ? Prisma.sql`of.discount_reference AS discount_reference,` : Prisma.sql`NULL AS discount_reference,`}
+        ${columns.discount_reference ? Prisma.sql`of.discount_reference AS reference,` : Prisma.sql`NULL AS reference,`}
         ${columns.amount ? Prisma.sql`of.amount::float8 AS amount,` : Prisma.sql`0::float8 AS amount,`}
         ${columns.discount_id ? Prisma.sql`of.discount_id::text AS discount_id,` : Prisma.sql`NULL AS discount_id,`}
         ${columns.discount_percent ? Prisma.sql`of.discount_percent::float8 AS discount_percent,` : Prisma.sql`NULL AS discount_percent,`}
@@ -100,6 +107,7 @@ export async function POST(request) {
     const name = normalizeText(body?.name || body?.title);
     const feeType = normalizeText(body?.fee_type || body?.feeType);
     const classLevel = normalizeText(body?.class_level || body?.classLevel);
+    const discountReference = normalizeLettersOnly(body?.discount_reference || body?.discountReference || body?.reference);
     const description = normalizeText(body?.description);
     const amount = normalizeMoney(body?.amount);
     const discountId = normalizeText(body?.discount_id || body?.discountId);
@@ -127,6 +135,9 @@ export async function POST(request) {
     push("title", name);
     push("fee_type", feeType);
     push("class_level", classLevel || null);
+    if (columns.discount_reference) {
+      push("discount_reference", discountReference || null);
+    }
     push("amount", amount);
     push("discount_id", discountId || null);
     push("discount_percent", discountPercent ?? null);
@@ -158,6 +169,7 @@ export async function PATCH(request) {
     const name = normalizeText(body?.name || body?.title);
     const feeType = normalizeText(body?.fee_type || body?.feeType);
     const classLevel = normalizeText(body?.class_level || body?.classLevel);
+    const discountReference = normalizeLettersOnly(body?.discount_reference || body?.discountReference || body?.reference);
     const description = normalizeText(body?.description);
     const amount = normalizeMoney(body?.amount);
     const discountId = normalizeText(body?.discount_id || body?.discountId);
@@ -180,28 +192,30 @@ export async function PATCH(request) {
       Prisma.sql`title = ${name}`,
       Prisma.sql`fee_type = ${feeType}`,
       Prisma.sql`class_level = ${classLevel || null}`,
+    ];
+
+    if (columns.discount_reference) {
+      updates.push(Prisma.sql`discount_reference = ${discountReference || null}`);
+    }
+    if (columns.discount_id) {
+      updates.push(Prisma.sql`discount_id = ${discountId || null}::uuid`);
+    }
+    if (columns.discount_percent) {
+      updates.push(Prisma.sql`discount_percent = ${discountPercent ?? null}`);
+    }
+    if (columns.discount_amount) {
+      updates.push(Prisma.sql`discount_amount = ${discountAmount ?? null}`);
+    }
+    if (columns.net_amount) {
+      updates.push(Prisma.sql`net_amount = ${netAmount ?? null}`);
+    }
+
+    updates.push(
       Prisma.sql`amount = ${amount}`,
       Prisma.sql`description = ${description || null}`,
       Prisma.sql`status = ${status}`,
-      Prisma.sql`updated_at = NOW()`,
-    ];
-
-    if (columns.discount_id) {
-      updates.splice(5, 0, Prisma.sql`discount_id = ${discountId || null}::uuid`);
-    }
-    if (columns.discount_percent) {
-      updates.splice(columns.discount_id ? 6 : 5, 0, Prisma.sql`discount_percent = ${discountPercent ?? null}`);
-    }
-    if (columns.discount_amount) {
-      updates.splice(columns.discount_id ? 7 : columns.discount_percent ? 6 : 5, 0, Prisma.sql`discount_amount = ${discountAmount ?? null}`);
-    }
-    if (columns.net_amount) {
-      updates.splice(
-        columns.discount_id ? 8 : columns.discount_percent ? 7 : columns.discount_amount ? 6 : 5,
-        0,
-        Prisma.sql`net_amount = ${netAmount ?? null}`
-      );
-    }
+      Prisma.sql`updated_at = NOW()`
+    );
 
     await prisma.$executeRaw`
       UPDATE other_fee

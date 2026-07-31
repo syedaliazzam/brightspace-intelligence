@@ -19,6 +19,7 @@ const EMPTY_FORM = {
     name: "",
     fee_type: "admission_fee",
     class_level: "",
+    discount_reference: "",
     amount: "",
     description: "",
     status: "active",
@@ -72,7 +73,7 @@ const panelClass =
   "rounded-[2rem] border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(250,247,240,0.98)_100%)] shadow-[0_20px_70px_-36px_rgba(13,59,46,0.18)] backdrop-blur-xl";
 
 const tablePanelClass =
-  "hidden overflow-hidden rounded-[1.75rem] border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(250,247,240,0.98)_100%)] shadow-[0_20px_70px_-36px_rgba(13,59,46,0.18)] backdrop-blur-xl lg:block";
+  "block overflow-hidden rounded-[1.75rem] border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(250,247,240,0.98)_100%)] shadow-[0_20px_70px_-36px_rgba(13,59,46,0.18)] backdrop-blur-xl";
 
 const tableHeadClass =
   "bg-[linear-gradient(180deg,#FAF7F0_0%,#F1EADC_100%)]";
@@ -241,7 +242,7 @@ export default function AdminFeeSettingsPage() {
     setForms((current) => ({
       ...current,
       [section]: {
-        ...current[section],
+        ...(current[section] || EMPTY_FORM[section]),
         [name]: value,
       },
     }));
@@ -252,6 +253,7 @@ export default function AdminFeeSettingsPage() {
       setForms((current) => ({
         ...current,
         regular: {
+          ...EMPTY_FORM.regular,
           class_level: item.class_level || "",
           name: item.name || item.title || "",
           amount: item.amount ?? "",
@@ -264,9 +266,11 @@ export default function AdminFeeSettingsPage() {
       setForms((current) => ({
         ...current,
         other: {
+          ...EMPTY_FORM.other,
           name: item.name || item.title || "",
           fee_type: item.fee_type || "admission_fee",
           class_level: item.class_level || "",
+          discount_reference: item.discount_reference || item.reference || "",
           amount: item.amount ?? "",
           description: item.description || "",
           status: item.status || "active",
@@ -280,6 +284,7 @@ export default function AdminFeeSettingsPage() {
       setForms((current) => ({
         ...current,
         payment: {
+          ...EMPTY_FORM.payment,
           name: item.name || "",
           method_key: item.method_key || "",
           account_title: item.account_title || "",
@@ -328,6 +333,7 @@ export default function AdminFeeSettingsPage() {
         payload.name = String(payload.name || payload.title || "").trim();
         payload.fee_type = String(payload.fee_type || payload.feeType || "admission_fee").trim();
         payload.class_level = String(payload.class_level || payload.classLevel || "").trim();
+        payload.discount_reference = String(payload.discount_reference || payload.discountReference || payload.reference || "").replace(/[^A-Za-z]/g, "");
         payload.amount = Number(payload.amount || 0);
         payload.description = String(payload.description || "").trim();
         payload.status = String(payload.status || "active").trim().toLowerCase() || "active";
@@ -594,6 +600,13 @@ export default function AdminFeeSettingsPage() {
                 updateForm("other", "amount", nextAmount);
               }}
             />
+            <input
+              className={fieldClass}
+              placeholder="Reference"
+              value={forms.other.discount_reference}
+              onChange={(event) => updateForm("other", "discount_reference", event.target.value.replace(/[^A-Za-z]/g, ""))}
+              maxLength={50}
+            />
             <div className="relative md:col-span-2">
               <select
                 className={selectClass}
@@ -675,6 +688,7 @@ export default function AdminFeeSettingsPage() {
                 <th className="px-6 py-4">Type</th>
                 <th className="px-6 py-4">Class</th>
                 <th className="px-6 py-4">Amount</th>
+                <th className="px-6 py-4">Reference</th>
                 <th className="px-6 py-4">Status</th>
                 <th className="px-6 py-4">Actions</th>
               </tr>
@@ -686,6 +700,7 @@ export default function AdminFeeSettingsPage() {
                   <td className="px-4 py-3 text-sm">{item.fee_type || "—"}</td>
                   <td className="px-4 py-3 text-sm">{item.class_level || "—"}</td>
                   <td className="px-4 py-3 text-sm">PKR {money(item.amount)}</td>
+                  <td className="px-4 py-3 text-sm">{item.discount_reference || item.reference || "—"}</td>
                   <td className="px-4 py-3 text-sm">{item.status || "active"}</td>
                   <td className="px-6 py-5 align-top text-sm text-[#245C4F]">
                     <div className="flex flex-wrap items-center gap-2">

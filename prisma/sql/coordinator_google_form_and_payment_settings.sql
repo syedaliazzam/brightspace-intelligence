@@ -79,6 +79,7 @@ CREATE TABLE IF NOT EXISTS other_fee (
   title TEXT NOT NULL,
   fee_type TEXT NOT NULL,
   class_level TEXT,
+  discount_reference TEXT,
   amount NUMERIC(12,2) NOT NULL DEFAULT 0,
   discount_id UUID,
   discount_percent NUMERIC(5,2),
