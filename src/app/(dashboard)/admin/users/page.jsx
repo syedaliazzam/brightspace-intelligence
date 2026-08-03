@@ -28,6 +28,85 @@ function formatLabel(value) {
     : "-";
 }
 
+function normalizeRoleValue(value) {
+  if (Array.isArray(value)) {
+    return value.flatMap((entry) => {
+      if (entry && typeof entry === "object" && typeof entry?.name === "string") {
+        return [entry.name];
+      }
+
+      return [String(entry || "").trim()];
+    }).filter(Boolean);
+  }
+
+  if (typeof value === "string") {
+    const trimmedValue = value.trim();
+    if (!trimmedValue) {
+      return [];
+    }
+
+    try {
+      const parsed = JSON.parse(trimmedValue);
+      if (Array.isArray(parsed)) {
+        return parsed.flatMap((entry) => {
+          if (entry && typeof entry === "object" && typeof entry?.name === "string") {
+            return [entry.name];
+          }
+
+          return [String(entry || "").trim()];
+        }).filter(Boolean);
+      }
+    } catch {
+      // Fall through to comma splitting below.
+    }
+
+    return trimmedValue
+      .split(",")
+      .map((entry) => entry.trim())
+      .filter(Boolean);
+  }
+
+  return [];
+}
+
+function getRoleValues(row) {
+  const roleSources = [
+    row?.roles,
+    row?.role,
+    row?.role_names,
+    row?.roleNames,
+    row?.role_name,
+    row?.roleName,
+    row?.user_roles,
+    row?.userRoles,
+  ];
+
+  return Array.from(
+    new Set(
+      roleSources
+        .flatMap((source) => normalizeRoleValue(source))
+        .map((role) => String(role || "").trim())
+        .filter(Boolean)
+    )
+  );
+}
+
+function getDisplayRoles(row) {
+  const normalizedRoles = getRoleValues(row);
+
+  if (normalizedRoles.length) {
+    return normalizedRoles.map((role) => formatLabel(role)).join(", ");
+  }
+
+  return "-";
+}
+
+function hasStaffRoleAccess(row) {
+  return getRoleValues(row).some((role) =>
+    ["admin", "coordinator", "teacher"].includes(String(role || "").toLowerCase())
+  );
+}
+
 function DetailBlock({ label, value }) {
   return (
     <div className="rounded-2xl border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(250,247,240,0.98)_100%)] p-4 shadow-[0_14px_40px_-28px_rgba(13,59,46,0.18)]">
@@ -43,11 +122,11 @@ function getCacheKey(filters) {
   if (filters.role) params.set("role", filters.role);
   if (filters.status) params.set("status", filters.status);
   if (filters.classLevel) params.set("class_level", filters.classLevel);
-  return `admin-users:${params.toString()}`;
+  return `admin-users:v3:${params.toString()}`;
 }
 
 function getOverviewCacheKey(view) {
-  return `admin-users:overview:${view}`;
+  return `admin-users:v3:overview:${view}`;
 }
 
 function getStatusOptions(view) {
@@ -107,6 +186,44 @@ function dedupeUsersById(items = []) {
   return Array.from(seen.values());
 }
 
+function expandStaffRowsByRole(items = [], selectedRole = "") {
+  const staffRoles = new Set(["superadmin", "admin", "coordinator", "teacher"]);
+  const normalizedSelectedRole = String(selectedRole || "").trim().toLowerCase();
+
+  return items.flatMap((item) => {
+    const roleValues = getRoleValues(item)
+      .map((role) => String(role || "").trim().toLowerCase())
+      .filter(Boolean)
+      .filter((role) => staffRoles.has(role));
+
+    const filteredRoleValues = normalizedSelectedRole
+      ? roleValues.filter((role) => role === normalizedSelectedRole)
+      : roleValues;
+
+    const baseRowKey = String(item.id || "").trim();
+    if (!filteredRoleValues.length) {
+      const fallbackRole = String(item.role || "").trim().toLowerCase();
+      if (normalizedSelectedRole && fallbackRole && fallbackRole !== normalizedSelectedRole) {
+        return [];
+      }
+
+      return [{
+        ...item,
+        role: fallbackRole,
+        roles: fallbackRole,
+        rowKey: `${baseRowKey}:default`,
+      }];
+    }
+
+    return filteredRoleValues.map((role) => ({
+      ...item,
+      role,
+      roles: role,
+      rowKey: `${baseRowKey}:${role}`,
+    }));
+  });
+}
+
 export default function AdminUsersPage() {
   const router = useRouter();
   const pathname = usePathname() || "";
@@ -164,6 +281,11 @@ export default function AdminUsersPage() {
   const [classOpen, setClassOpen] = useState(false);
   const loadTableRequestRef = useRef(0);
   const loadOverviewRequestRef = useRef(0);
+  const allStaffItemsRef = useRef([]);
+
+  useEffect(() => {
+    allStaffItemsRef.current = state.allStaffItems;
+  }, [state.allStaffItems]);
 
   function closeSelectState(setter) {
     window.setTimeout(() => setter(false), 0);
@@ -223,13 +345,13 @@ export default function AdminUsersPage() {
         const items = dedupeUsersById(payloads.flatMap((payload) => payload.items || []));
         const staffRoles = new Set(["superadmin", "admin", "coordinator", "teacher"]);
         const staffOnlyItems = items.filter((item) =>
-          staffRoles.has(String(item.role || "").toLowerCase())
+          getRoleValues(item).some((role) => staffRoles.has(String(role || "").toLowerCase()))
         );
         const summary = {
           total: staffOnlyItems.length,
-          active: staffOnlyItems.filter((item) => item.status === "active").length,
-          suspended: staffOnlyItems.filter((item) => item.status === "suspended").length,
-          archived: staffOnlyItems.filter((item) => item.status === "archived").length,
+          active: staffOnlyItems.filter((item) => String(item.status || "").toLowerCase() === "active").length,
+          suspended: staffOnlyItems.filter((item) => String(item.status || "").toLowerCase() === "suspended").length,
+          archived: staffOnlyItems.filter((item) => String(item.status || "").toLowerCase() === "archived").length,
         };
 
         const payload = { items: staffOnlyItems, summary };
@@ -286,17 +408,20 @@ export default function AdminUsersPage() {
     const requestId = ++loadTableRequestRef.current;
     const force = options.force === true || view === "parents";
     const cacheKey = getCacheKey(filters);
+    const allStaffItems = allStaffItemsRef.current;
     setState((current) => ({ ...current, loading: true, error: "" }));
 
-    if (isStaffView && !force && Array.isArray(state.allStaffItems) && state.allStaffItems.length) {
+    if (isStaffView && !force && Array.isArray(allStaffItems) && allStaffItems.length) {
       const searchTerm = String(filters.search || "").trim().toLowerCase();
       const selectedRole = String(filters.role || "").toLowerCase();
       const selectedStatus = String(filters.status || "").toLowerCase();
 
-      let items = state.allStaffItems;
+      let items = allStaffItems;
 
       if (selectedRole) {
-        items = items.filter((item) => String(item.role || "").toLowerCase() === selectedRole);
+        items = items.filter((item) =>
+          getRoleValues(item).some((role) => String(role || "").toLowerCase() === selectedRole)
+        );
       }
 
       if (selectedStatus) {
@@ -381,7 +506,7 @@ export default function AdminUsersPage() {
         const tableItems = dedupeUsersById(payloads.flatMap((payload) => payload.items || []));
         const staffRoles = new Set(["superadmin", "admin", "coordinator", "teacher"]);
         const staffOnlyItems = tableItems.filter((item) =>
-          staffRoles.has(String(item.role || "").toLowerCase())
+          getRoleValues(item).some((role) => staffRoles.has(String(role || "").toLowerCase()))
         );
         items = staffOnlyItems;
         data = { items };
@@ -421,7 +546,7 @@ export default function AdminUsersPage() {
         allStaffItems: [],
       }));
     }
-  }, [filters, isStaffView]);
+  }, [filters, isStaffView, view]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -435,48 +560,82 @@ export default function AdminUsersPage() {
   const cards = useMemo(() => {
     if (isStaffView) {
       const items = state.overviewItems || [];
-      const staffItems = items.filter((item) => ["superadmin", "admin", "coordinator", "teacher"].includes(String(item.role || "").toLowerCase()));
+      const staffUsers = dedupeUsersById(items);
+      const staffCounts = {
+        superadmin: 0,
+        admin: 0,
+        coordinator: 0,
+        teacher: 0,
+        suspended_superadmin: 0,
+        suspended_admin: 0,
+        suspended_teacher: 0,
+      };
+
+      for (const item of staffUsers) {
+        const roleValues = getRoleValues(item).map((role) => String(role || "").toLowerCase());
+        const mappedRoles = roleValues.filter((role) => ["superadmin", "admin", "coordinator", "teacher"].includes(role));
+        const status = String(item.status || "").toLowerCase();
+
+        for (const role of mappedRoles) {
+          if (Object.hasOwn(staffCounts, role)) {
+            staffCounts[role] += 1;
+          }
+
+          if (role === "superadmin" && status === "suspended") {
+            staffCounts.suspended_superadmin += 1;
+          }
+
+          if (role === "admin" && status === "suspended") {
+            staffCounts.suspended_admin += 1;
+          }
+
+          if (role === "teacher" && status === "suspended") {
+            staffCounts.suspended_teacher += 1;
+          }
+        }
+      }
+
       return [
         {
           key: "superadmins",
           label: "Super admins",
-          value: staffItems.filter((item) => item.role === "superadmin").length,
+          value: staffCounts.superadmin,
           tone: "bg-[#0D5C48] text-[#FAF7F0]",
         },
         {
           key: "admins",
           label: "Admins",
-          value: staffItems.filter((item) => item.role === "admin").length,
+          value: staffCounts.admin,
           tone: "bg-[#FAF7F0] text-[#063F32]",
         },
         {
           key: "coordinators",
           label: "Coordinators",
-          value: staffItems.filter((item) => item.role === "coordinator").length,
+          value: staffCounts.coordinator,
           tone: "bg-[#EAF6EF] text-[#0D5C48]",
         },
         {
           key: "teachers",
           label: "Teachers",
-          value: staffItems.filter((item) => item.role === "teacher").length,
+          value: staffCounts.teacher,
           tone: "bg-[#FFF5D6] text-[#8A6B00]",
         },
         {
           key: "suspendedSuperadmins",
           label: "Suspended super admins",
-          value: staffItems.filter((item) => item.role === "superadmin" && item.status === "suspended").length,
+          value: staffCounts.suspended_superadmin,
           tone: "bg-rose-50 text-rose-800",
         },
         {
           key: "suspendedAdmins",
           label: "Suspended admins",
-          value: staffItems.filter((item) => item.role === "admin" && item.status === "suspended").length,
+          value: staffCounts.suspended_admin,
           tone: "bg-rose-50 text-rose-800",
         },
         {
           key: "suspendedTeachers",
           label: "Suspended teachers",
-          value: staffItems.filter((item) => item.role === "teacher" && item.status === "suspended").length,
+          value: staffCounts.suspended_teacher,
           tone: "bg-rose-50 text-rose-800",
         },
       ];
@@ -532,7 +691,7 @@ export default function AdminUsersPage() {
     let items = Array.isArray(state.allStaffItems) ? state.allStaffItems : [];
 
     if (selectedRole) {
-      items = items.filter((item) => String(item.role || "").toLowerCase() === selectedRole);
+      items = items.filter((item) => getRoleValues(item).some((role) => String(role || "").toLowerCase() === selectedRole));
     }
 
     if (selectedStatus) {
@@ -554,7 +713,7 @@ export default function AdminUsersPage() {
       });
     }
 
-    return items;
+    return expandStaffRowsByRole(items, selectedRole);
   }, [filters.role, filters.search, filters.status, isStaffView, state.allStaffItems, state.items]);
 
   const classOptions = useMemo(() => {
@@ -714,9 +873,21 @@ export default function AdminUsersPage() {
 
   async function loginAsParent(row) {
     const params = new URLSearchParams();
-    if (row.username) params.set("identifier", row.username);
-    else if (row.email) params.set("identifier", row.email);
+    if (row.username) {
+      params.set("identifier", row.username);
+    }
+    if (row.email) {
+      params.set("email", row.email);
+      if (!params.has("identifier")) {
+        params.set("identifier", row.email);
+      }
+    }
     if (row.temporary_password) params.set("password", row.temporary_password);
+
+    const rowRole = String(row.role || "").trim().toLowerCase();
+    if (rowRole === "parent") {
+      params.set("selectedRole", "parent");
+    }
 
     const loginUrl = `/login${params.toString() ? `?${params.toString()}` : ""}`;
 
@@ -731,9 +902,19 @@ export default function AdminUsersPage() {
 
   async function loginAsStaff(row) {
     const params = new URLSearchParams();
-    if (row.email) params.set("identifier", row.email);
-    else if (row.username) params.set("identifier", row.username);
+    if (row.email) {
+      params.set("identifier", row.email);
+      params.set("email", row.email);
+    }
+    if (row.username && !params.has("identifier")) {
+      params.set("identifier", row.username);
+    }
     if (row.temporary_password) params.set("password", row.temporary_password);
+
+    const rowRole = String(row.role || "").trim().toLowerCase();
+    if (["superadmin", "admin", "coordinator", "teacher"].includes(rowRole)) {
+      params.set("selectedRole", rowRole);
+    }
 
     const loginUrl = `/login${params.toString() ? `?${params.toString()}` : ""}`;
 
@@ -951,6 +1132,7 @@ export default function AdminUsersPage() {
       ) : null}
 
       <AdminDataTable
+        keyField="rowKey"
         columns={[
           {
             key: "name",
@@ -1061,7 +1243,7 @@ export default function AdminUsersPage() {
           {
             key: "role",
             label: "Role",
-            render: (row) => formatLabel(row.role),
+            render: (row) => formatLabel(row.role || getDisplayRoles(row)),
           },
           {
             key: "status",
@@ -1084,7 +1266,7 @@ export default function AdminUsersPage() {
                 Login
               </button>
             ) : null}
-            {!isAdminReadonlyPortal && view === "staff" && ["admin", "coordinator", "teacher"].includes(String(row.role || "").toLowerCase()) ? (
+            {!isAdminReadonlyPortal && view === "staff" && hasStaffRoleAccess(row) ? (
               <button
                 type="button"
                 onClick={() => setModal({ open: true, record: row })}
@@ -1093,7 +1275,7 @@ export default function AdminUsersPage() {
                 Edit
               </button>
             ) : null}
-            {!isAdminReadonlyPortal && view === "staff" && ["admin", "coordinator", "teacher"].includes(String(row.role || "").toLowerCase()) && String(row.id || "") !== currentUserId ? (
+            {!isAdminReadonlyPortal && view === "staff" && hasStaffRoleAccess(row) && String(row.id || "") !== currentUserId ? (
               <button
                 type="button"
                 onClick={() =>
@@ -1110,7 +1292,7 @@ export default function AdminUsersPage() {
                 {row.status === "suspended" ? "Activate" : "Suspend"}
               </button>
             ) : null}
-            {!isAdminReadonlyPortal && view === "staff" && ["admin", "coordinator", "teacher"].includes(String(row.role || "").toLowerCase()) ? (
+            {!isAdminReadonlyPortal && view === "staff" && hasStaffRoleAccess(row) ? (
               <button
                 type="button"
                 onClick={() => resetPassword(row)}
@@ -1225,7 +1407,7 @@ export default function AdminUsersPage() {
                       ["Name", detailModal.record.name || detailModal.record.full_name],
                       ["Email", detailModal.record.email],
                       ["Phone", detailModal.record.phone],
-                      ["Role", formatLabel(detailModal.record.role)],
+                      ["Role", getDisplayRoles(detailModal.record)],
                       ["Status", formatLabel(detailModal.record.status)],
                     ].map(([label, value]) => (
                       <div key={label} className="rounded-2xl border border-[#2D8A6A]/15 bg-white/90 p-4">

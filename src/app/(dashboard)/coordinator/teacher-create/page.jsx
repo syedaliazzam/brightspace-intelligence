@@ -5,6 +5,82 @@ import { Search } from "lucide-react";
 import StaffFormModal from "@/components/admin/StaffFormModal";
 import AdminDataTable from "@/components/admin/AdminDataTable";
 
+function formatLabel(value) {
+  const text = String(value || "");
+  return text ? text.replace(/_/g, " ").replace(/\b\w/g, (char) => char.toUpperCase()) : "-";
+}
+
+function normalizeRoleValue(value) {
+  if (Array.isArray(value)) {
+    return value.flatMap((entry) => {
+      if (entry && typeof entry === "object" && typeof entry?.name === "string") {
+        return [entry.name];
+      }
+
+      return [String(entry || "").trim()];
+    }).filter(Boolean);
+  }
+
+  if (typeof value === "string") {
+    const trimmedValue = value.trim();
+    if (!trimmedValue) {
+      return [];
+    }
+
+    try {
+      const parsed = JSON.parse(trimmedValue);
+      if (Array.isArray(parsed)) {
+        return parsed.flatMap((entry) => {
+          if (entry && typeof entry === "object" && typeof entry?.name === "string") {
+            return [entry.name];
+          }
+
+          return [String(entry || "").trim()];
+        }).filter(Boolean);
+      }
+    } catch {
+      // Fall through to comma splitting below.
+    }
+
+    return trimmedValue
+      .split(",")
+      .map((entry) => entry.trim())
+      .filter(Boolean);
+  }
+
+  return [];
+}
+
+function getRoleValues(row) {
+  const roleSources = [
+    row?.roles,
+    row?.role,
+    row?.role_names,
+    row?.roleNames,
+    row?.role_name,
+    row?.roleName,
+    row?.user_roles,
+    row?.userRoles,
+  ];
+
+  return roleSources
+    .flatMap((source) => normalizeRoleValue(source))
+    .map((role) => String(role || "").trim())
+    .filter(Boolean);
+}
+
+function getDisplayRoles(row) {
+  const normalizedRoles = getRoleValues(row);
+
+  if (normalizedRoles.length) {
+    return Array.from(new Set(normalizedRoles))
+      .map((role) => formatLabel(role))
+      .join(", ");
+  }
+
+  return "-";
+}
+
 export default function CoordinatorTeacherCreatePage() {
   const [open, setOpen] = useState(false);
   const [editingTeacher, setEditingTeacher] = useState(null);
@@ -35,14 +111,19 @@ export default function CoordinatorTeacherCreatePage() {
   }, []);
 
   useEffect(() => {
-    void loadTeachers();
+    const timeoutId = window.setTimeout(() => {
+      void loadTeachers();
+    }, 0);
+
+    return () => window.clearTimeout(timeoutId);
   }, [loadTeachers]);
 
   const filteredItems = useMemo(() => {
     const query = search.trim().toLowerCase();
     if (!query) return items;
+
     return items.filter((item) =>
-      [item.full_name, item.email, item.phone, item.status]
+      [item.full_name, item.email, item.phone, item.status, getDisplayRoles(item)]
         .filter(Boolean)
         .some((value) => String(value).toLowerCase().includes(query))
     );
@@ -114,6 +195,11 @@ export default function CoordinatorTeacherCreatePage() {
               { key: "full_name", label: "Name" },
               { key: "email", label: "Email" },
               { key: "phone", label: "Phone" },
+              {
+                key: "roles",
+                label: "Roles",
+                render: (row) => getDisplayRoles(row),
+              },
               { key: "status", label: "Status" },
             ]}
             rows={filteredItems}

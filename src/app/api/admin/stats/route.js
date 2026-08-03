@@ -119,6 +119,7 @@ export async function GET() {
     const [
       usersTableExists,
       rolesTableExists,
+      userRolesTableExists,
       registrationLeadsExists,
       feeVouchersExists,
       feeSubmissionsExists,
@@ -130,6 +131,7 @@ export async function GET() {
     ] = await Promise.all([
       runOrEmpty(() => tableExists("users"), false),
       runOrEmpty(() => tableExists("roles"), false),
+      runOrEmpty(() => tableExists("user_roles"), false),
       runOrEmpty(() => tableExists("registration_leads"), false),
       runOrEmpty(() => tableExists("fee_vouchers"), false),
       runOrEmpty(() => tableExists("fee_submissions"), false),
@@ -144,16 +146,44 @@ export async function GET() {
       usersTableExists && rolesTableExists
         ? await runOrEmpty(
             () =>
-              prisma.$queryRaw`
-            SELECT
-              LOWER(r.name) AS role,
-              COUNT(*)::int AS total,
-              COUNT(*) FILTER (WHERE LOWER(u.status::text) = 'active')::int AS active_total
-            FROM users u
-            INNER JOIN roles r ON r.id = u.role_id
-            GROUP BY LOWER(r.name)
-            ORDER BY LOWER(r.name)
-          `,
+              userRolesTableExists
+                ? prisma.$queryRaw`
+                    WITH role_assignments AS (
+                      SELECT
+                        u.id::text AS user_id,
+                        LOWER(r.name) AS role,
+                        LOWER(u.status::text) AS status
+                      FROM users u
+                      INNER JOIN roles r ON r.id = u.role_id
+
+                      UNION ALL
+
+                      SELECT
+                        ur.user_id::text AS user_id,
+                        LOWER(r2.name) AS role,
+                        LOWER(u2.status::text) AS status
+                      FROM user_roles ur
+                      INNER JOIN roles r2 ON r2.id = ur.role_id
+                      INNER JOIN users u2 ON u2.id = ur.user_id
+                    )
+                    SELECT
+                      role,
+                      COUNT(DISTINCT user_id)::int AS total,
+                      COUNT(DISTINCT CASE WHEN status = 'active' THEN user_id END)::int AS active_total
+                    FROM role_assignments
+                    GROUP BY role
+                    ORDER BY role
+                  `
+                : prisma.$queryRaw`
+                    SELECT
+                      LOWER(r.name) AS role,
+                      COUNT(*)::int AS total,
+                      COUNT(*) FILTER (WHERE LOWER(u.status::text) = 'active')::int AS active_total
+                    FROM users u
+                    INNER JOIN roles r ON r.id = u.role_id
+                    GROUP BY LOWER(r.name)
+                    ORDER BY LOWER(r.name)
+                  `,
             []
           )
         : [];
@@ -268,9 +298,72 @@ export async function GET() {
       safeCount("fee_settings"),
     ]);
 
+    const roleAssignmentCountsResult = await (userRolesTableExists
+      ? runOrEmpty(
+          () =>
+            prisma.$queryRaw`
+              WITH role_assignments AS (
+                SELECT
+                  u.id::text AS user_id,
+                  LOWER(r.name) AS role_name,
+                  LOWER(u.status::text) AS status
+                FROM users u
+                INNER JOIN roles r ON r.id = u.role_id
+
+                UNION ALL
+
+                SELECT
+                  u2.id::text AS user_id,
+                  LOWER(r2.name) AS role_name,
+                  LOWER(u2.status::text) AS status
+                FROM user_roles ur
+                INNER JOIN roles r2 ON r2.id = ur.role_id
+                INNER JOIN users u2 ON u2.id = ur.user_id
+              ),
+              distinct_assignments AS (
+                SELECT DISTINCT user_id, role_name, status
+                FROM role_assignments
+              )
+              SELECT
+                COUNT(DISTINCT user_id)::int AS total,
+                COUNT(DISTINCT CASE WHEN status = 'active' THEN user_id END)::int AS active_total,
+                COUNT(*)::int AS role_assignments_total,
+                COUNT(*) FILTER (WHERE status = 'active')::int AS role_assignments_active_total
+              FROM distinct_assignments
+            `,
+          { total: 0, active_total: 0, role_assignments_total: 0, role_assignments_active_total: 0 }
+        )
+      : runOrEmpty(
+          () =>
+            prisma.$queryRaw`
+              SELECT
+                COUNT(*)::int AS total,
+                COUNT(*) FILTER (WHERE LOWER(u.status::text) = 'active')::int AS active_total,
+                COUNT(*)::int AS role_assignments_total,
+                COUNT(*) FILTER (WHERE LOWER(u.status::text) = 'active')::int AS role_assignments_active_total
+              FROM users u
+              INNER JOIN roles r ON r.id = u.role_id
+            `,
+          { total: 0, active_total: 0, role_assignments_total: 0, role_assignments_active_total: 0 }
+        ));
+
+    const roleAssignmentCounts = Array.isArray(roleAssignmentCountsResult)
+      ? roleAssignmentCountsResult[0] || { total: 0, active_total: 0, role_assignments_total: 0, role_assignments_active_total: 0 }
+      : roleAssignmentCountsResult;
+
     const overview = {
-      totalUsers,
-      activeUsers,
+      totalUsers: Number(roleAssignmentCounts?.role_assignments_total || 0),
+      activeUsers: Number(roleAssignmentCounts?.role_assignments_active_total || 0),
+      uniqueUsers: Number(roleAssignmentCounts?.total || 0),
+      uniqueActiveUsers: Number(roleAssignmentCounts?.active_total || 0),
+      totalUsersMulti: Math.max(
+        0,
+        Number(roleAssignmentCounts?.role_assignments_total || 0) - Number(roleAssignmentCounts?.total || 0)
+      ),
+      activeUsersMulti: Math.max(
+        0,
+        Number(roleAssignmentCounts?.role_assignments_active_total || 0) - Number(roleAssignmentCounts?.active_total || 0)
+      ),
       suspendedUsers,
       totalStudents:
         Number(

@@ -62,7 +62,7 @@ export default auth((req) => {
     return NextResponse.next();
   }
 
-  if (pathname === "/login" || pathname === "/") {
+  if ((pathname === "/login" || pathname === "/") && sessionRole) {
     return NextResponse.redirect(new URL(dashboard, req.url));
   }
 

@@ -116,7 +116,7 @@ async function getRoleId(roleName, tx = prisma) {
   return row.id;
 }
 
-async function ensureUniqueUser(email, phone) {
+async function findExistingUser(email, phone) {
   let row;
 
   if (email && phone) {
@@ -142,11 +142,150 @@ async function ensureUniqueUser(email, phone) {
       LIMIT 1
     `;
   } else {
+    return null;
+  }
+
+  return row?.id || null;
+}
+
+async function ensureUniqueUser(email, phone, excludeId = "") {
+  const existingUserId = await findExistingUser(email, phone);
+
+  if (!existingUserId) {
     return;
   }
 
-  if (row?.id) {
-    throw new Error("A user with this email or phone number already exists.");
+  if (excludeId && existingUserId === excludeId) {
+    return;
+  }
+
+  throw new Error(
+    "A user with the same email or phone already exists. Please use a different email or phone."
+  );
+}
+
+async function hasUserRolesTable(tx = prisma) {
+  const [tableCheck] = await tx.$queryRaw(
+    Prisma.sql`
+      SELECT EXISTS (
+        SELECT 1
+        FROM information_schema.tables
+        WHERE table_schema = 'public' AND table_name = 'user_roles'
+      ) AS has_user_roles_table
+    `
+  );
+
+  return Boolean(tableCheck?.has_user_roles_table);
+}
+
+async function ensureUserRoleAssignment(userId, roleId, tx = prisma) {
+  const [tableCheck] = await tx.$queryRaw(
+    Prisma.sql`
+      SELECT EXISTS (
+        SELECT 1
+        FROM information_schema.tables
+        WHERE table_schema = 'public' AND table_name = 'user_roles'
+      ) AS has_user_roles_table
+    `
+  );
+
+  if (tableCheck?.has_user_roles_table) {
+    const [existingAssignment] = await tx.$queryRaw(
+      Prisma.sql`
+        SELECT 1
+        FROM user_roles
+        WHERE user_id = ${userId}::uuid
+          AND role_id = ${roleId}::uuid
+        LIMIT 1
+      `
+    );
+
+    if (!existingAssignment) {
+      await tx.$executeRaw(
+        Prisma.sql`
+          INSERT INTO user_roles (id, user_id, role_id, created_at)
+          VALUES (
+            ${crypto.randomUUID()}::uuid,
+            ${userId}::uuid,
+            ${roleId}::uuid,
+            NOW()
+          )
+          ON CONFLICT (user_id, role_id) DO NOTHING
+        `
+      );
+    }
+
+    await tx.$executeRaw(
+      Prisma.sql`
+        UPDATE users
+        SET role_id = COALESCE(role_id, ${roleId}::uuid)
+        WHERE id = ${userId}::uuid
+          AND (role_id IS NULL OR role_id = ${roleId}::uuid)
+      `
+    );
+    return;
+  }
+
+  const [existingUser] = await tx.$queryRaw(
+    Prisma.sql`
+      SELECT role_id::text AS role_id
+      FROM users
+      WHERE id = ${userId}::uuid
+      LIMIT 1
+    `
+  );
+
+  if (!existingUser?.role_id) {
+    await tx.$executeRaw(
+      Prisma.sql`
+        UPDATE users
+        SET role_id = ${roleId}::uuid
+        WHERE id = ${userId}::uuid
+      `
+    );
+  }
+}
+
+async function ensureProfileForRole(userId, role, tx = prisma) {
+  if (role === "coordinator") {
+    const [existing] = await tx.$queryRaw(
+      Prisma.sql`
+        SELECT 1
+        FROM coordinator_profiles
+        WHERE user_id = ${userId}::uuid
+        LIMIT 1
+      `
+    );
+
+    if (!existing) {
+      await tx.$executeRaw(
+        Prisma.sql`
+          INSERT INTO coordinator_profiles (id, user_id, status)
+          VALUES (${crypto.randomUUID()}::uuid, ${userId}::uuid, ${"active"}::user_status)
+        `
+      );
+    }
+    return;
+  }
+
+  if (role === "teacher") {
+    const [existing] = await tx.$queryRaw(
+      Prisma.sql`
+        SELECT 1
+        FROM teacher_profiles
+        WHERE user_id = ${userId}::uuid
+        LIMIT 1
+      `
+    );
+
+    if (!existing) {
+      await tx.$executeRaw(
+        Prisma.sql`
+          INSERT INTO teacher_profiles (id, user_id, status)
+          VALUES (${crypto.randomUUID()}::uuid, ${userId}::uuid, ${"active"}::user_status)
+        `
+      );
+    }
   }
 }
 
@@ -217,6 +356,7 @@ async function syncProfile(tableName, payload, tx) {
     await tx.$executeRaw`
       INSERT INTO coordinator_profiles (id, user_id, status)
       VALUES (${profileId}::uuid, ${payload.userId}::uuid, ${payload.status || "active"}::user_status)
+      ON CONFLICT (user_id) DO NOTHING
     `;
     return;
   }
@@ -225,6 +365,7 @@ async function syncProfile(tableName, payload, tx) {
     await tx.$executeRaw`
       INSERT INTO teacher_profiles (id, user_id, status)
       VALUES (${profileId}::uuid, ${payload.userId}::uuid, ${payload.status || "active"}::user_status)
+      ON CONFLICT (user_id) DO NOTHING
     `;
   }
 }
@@ -259,10 +400,35 @@ export async function GET(request) {
     const search = normalizeText(searchParams.get("search"));
     const role = normalizeText(searchParams.get("role")).toLowerCase();
     const status = normalizeText(searchParams.get("status")).toLowerCase();
+    const [tableCheck] = await prisma.$queryRaw(
+      Prisma.sql`
+        SELECT EXISTS (
+          SELECT 1
+          FROM information_schema.tables
+          WHERE table_schema = 'public' AND table_name = 'user_roles'
+        ) AS has_user_roles_table
+      `
+    );
+    const hasUserRolesTable = Boolean(tableCheck?.has_user_roles_table);
     const conditions = [];
 
     if (role) {
-      conditions.push(Prisma.sql`LOWER(r.name) = ${role}`);
+      if (hasUserRolesTable) {
+        conditions.push(Prisma.sql`
+          (
+            EXISTS (
+              SELECT 1
+              FROM user_roles ur
+              INNER JOIN roles ur_role ON ur_role.id = ur.role_id
+              WHERE ur.user_id = u.id
+                AND LOWER(ur_role.name) = ${role}
+            )
+            OR LOWER(r.name) = ${role}
+          )
+        `);
+      } else {
+        conditions.push(Prisma.sql`LOWER(r.name) = ${role}`);
+      }
     }
 
     if (status) {
@@ -302,7 +468,24 @@ export async function GET(request) {
         u.email,
         u.phone,
         LOWER(u.status::text) AS status,
-        LOWER(r.name) AS role
+        COALESCE(
+          (
+            SELECT MIN(LOWER(ur_role.name))
+            FROM user_roles ur
+            INNER JOIN roles ur_role ON ur_role.id = ur.role_id
+            WHERE ur.user_id = u.id
+          ),
+          LOWER(r.name)
+        ) AS role,
+        COALESCE(
+          (
+            SELECT STRING_AGG(DISTINCT LOWER(ur_role.name), ',')
+            FROM user_roles ur
+            INNER JOIN roles ur_role ON ur_role.id = ur.role_id
+            WHERE ur.user_id = u.id
+          ),
+          LOWER(r.name)
+        ) AS roles
       FROM users u
       INNER JOIN roles r ON r.id = u.role_id
       ${whereClause}
@@ -310,12 +493,30 @@ export async function GET(request) {
     `;
 
     const summaryRows = await prisma.$queryRaw`
+      WITH role_assignments AS (
+        SELECT
+          u.id::text AS user_id,
+          LOWER(r.name) AS role,
+          LOWER(u.status::text) AS status
+        FROM users u
+        INNER JOIN roles r ON r.id = u.role_id
+
+        UNION ALL
+
+        SELECT
+          ur.user_id::text AS user_id,
+          LOWER(r2.name) AS role,
+          LOWER(u2.status::text) AS status
+        FROM user_roles ur
+        INNER JOIN roles r2 ON r2.id = ur.role_id
+        INNER JOIN users u2 ON u2.id = ur.user_id
+      )
       SELECT
-        LOWER(r.name) AS role,
-        COUNT(*)::int AS total
-      FROM users u
-      INNER JOIN roles r ON r.id = u.role_id
-      GROUP BY LOWER(r.name)
+        role,
+        COUNT(DISTINCT user_id)::int AS total
+      FROM role_assignments
+      GROUP BY role
+      ORDER BY role
     `;
 
     return json("Staff records fetched.", 200, {
@@ -375,34 +576,64 @@ export async function POST(request) {
       return json("Password must be at least 8 characters.", 400);
     }
 
-    await ensureUniqueUser(email, phone);
-
     const roleId = await getRoleId(role);
-    const hashedPassword = await password;
-    const userId = crypto.randomUUID();
-    await prisma.$transaction(async (tx) => {
-      await tx.$executeRaw`
-        INSERT INTO users (
-          id,
-          role_id,
-          full_name,
-          email,
-          phone,
-          password_hash,
-          status,
-          must_change_password
-        )
-        VALUES (
-          ${userId}::uuid,
-          ${roleId}::uuid,
-          ${fullName},
-          ${email || null},
-          ${phone || null},
-          ${hashedPassword},
-          ${"active"}::user_status,
-          ${true}
-        )
+    const existingUserId = await findExistingUser(email, phone);
+    const roleTableExists = await hasUserRolesTable(prisma);
+    const isExistingUser = Boolean(existingUserId);
+
+    if (isExistingUser && !roleTableExists) {
+      return json(
+        "Multi-role support requires the user_roles table.",
+        500
+      );
+    }
+
+    if (isExistingUser && roleTableExists) {
+      const [existingAssignment] = await prisma.$queryRaw`
+        SELECT 1
+        FROM user_roles
+        WHERE user_id = ${existingUserId}::uuid
+          AND role_id = ${roleId}::uuid
+        LIMIT 1
       `;
+
+      if (existingAssignment) {
+        return json("This user already has the selected role.", 400);
+      }
+    }
+
+    const userId = isExistingUser ? existingUserId : crypto.randomUUID();
+    const hashedPassword = await password;
+
+    await prisma.$transaction(async (tx) => {
+      if (!isExistingUser) {
+        await tx.$executeRaw`
+          INSERT INTO users (
+            id,
+            role_id,
+            full_name,
+            email,
+            phone,
+            password_hash,
+            status,
+            must_change_password
+          )
+          VALUES (
+            ${userId}::uuid,
+            ${roleId}::uuid,
+            ${fullName},
+            ${email || null},
+            ${phone || null},
+            ${hashedPassword},
+            ${"active"}::user_status,
+            ${true}
+          )
+        `;
+      }
+
+      if (isExistingUser) {
+        await ensureUserRoleAssignment(userId, roleId, tx);
+      }
 
       if (role === "coordinator" || role === "teacher") {
         await syncProfile(

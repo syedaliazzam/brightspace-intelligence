@@ -28,6 +28,41 @@ function normalizeText(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 
+function getRoleList(value) {
+  return String(value || "")
+    .split(",")
+    .map((entry) => normalizeText(entry).toLowerCase())
+    .filter(Boolean);
+}
+
+function getTemporaryPasswordValue(user) {
+  const storedPassword = String(user.password_hash || "").trim();
+  if (storedPassword) {
+    return storedPassword;
+  }
+
+  const roleList = getRoleList(user.role);
+  const hasStudentRole = roleList.includes("student");
+  const hasParentRole = roleList.includes("parent");
+  const hasStaffRole = roleList.some((role) =>
+    ["superadmin", "admin", "coordinator", "teacher"].includes(role)
+  );
+
+  if (hasStudentRole) {
+    return extractStudentTemporaryPassword(user.latest_credentials_body_text);
+  }
+
+  if (hasParentRole) {
+    return extractParentTemporaryPassword(user.latest_credentials_body_text);
+  }
+
+  if (hasStaffRole) {
+    return extractStaffTemporaryPassword(user.latest_credentials_body_text);
+  }
+
+  return extractTemporaryPassword(user.latest_credentials_body_text);
+}
+
 async function requireAdminSession() {
   const session = await auth();
   const role = String(session?.user?.role || "").toLowerCase();
@@ -180,10 +215,35 @@ function extractStaffTemporaryPassword(bodyText) {
 async function getUsers(search, role, status, classLevel = "") {
   const userColumns = await getTableColumns("users");
   const displayNameSql = getDisplayNameSql(userColumns);
+  const [tableCheck] = await prisma.$queryRaw(
+    Prisma.sql`
+      SELECT EXISTS (
+        SELECT 1
+        FROM information_schema.tables
+        WHERE table_schema = 'public' AND table_name = 'user_roles'
+      ) AS has_user_roles_table
+    `
+  );
+  const hasUserRolesTable = Boolean(tableCheck?.has_user_roles_table);
   const conditions = [];
 
   if (role && ALLOWED_FILTER_ROLES.has(role)) {
-    conditions.push(Prisma.sql`LOWER(r.name) = ${role}`);
+    if (hasUserRolesTable) {
+      conditions.push(Prisma.sql`
+        (
+          EXISTS (
+            SELECT 1
+            FROM user_roles ur
+            INNER JOIN roles ur_role ON ur_role.id = ur.role_id
+            WHERE ur.user_id = u.id
+              AND LOWER(ur_role.name) = ${role}
+          )
+          OR LOWER(r.name) = ${role}
+        )
+      `);
+    } else {
+      conditions.push(Prisma.sql`LOWER(r.name) = ${role}`);
+    }
   }
 
   if (status && ALLOWED_FILTER_STATUSES.has(status)) {
@@ -261,7 +321,42 @@ async function getUsers(search, role, status, classLevel = "") {
       END AS relation,
       COALESCE(STRING_AGG(DISTINCT su.full_name, ', ' ORDER BY su.full_name) FILTER (WHERE su.full_name IS NOT NULL), '') AS student_names,
       LOWER(u.status::text) AS status,
-      LOWER(r.name) AS role
+      COALESCE(
+        (
+          SELECT STRING_AGG(DISTINCT role_name, ',' ORDER BY role_name)
+          FROM (
+            SELECT LOWER(r2.name) AS role_name
+            FROM roles r2
+            WHERE r2.id = u.role_id
+
+            UNION
+
+            SELECT LOWER(ur_role.name) AS role_name
+            FROM user_roles ur
+            INNER JOIN roles ur_role ON ur_role.id = ur.role_id
+            WHERE ur.user_id = u.id
+          ) all_roles
+        ),
+        LOWER(r.name)
+      ) AS role,
+      COALESCE(
+        (
+          SELECT STRING_AGG(DISTINCT role_name, ',' ORDER BY role_name)
+          FROM (
+            SELECT LOWER(r2.name) AS role_name
+            FROM roles r2
+            WHERE r2.id = u.role_id
+
+            UNION
+
+            SELECT LOWER(ur_role.name) AS role_name
+            FROM user_roles ur
+            INNER JOIN roles ur_role ON ur_role.id = ur.role_id
+            WHERE ur.user_id = u.id
+          ) all_roles
+        ),
+        LOWER(r.name)
+      ) AS roles
     FROM users u
     INNER JOIN roles r ON r.id = u.role_id
     LEFT JOIN student_profiles sp ON sp.user_id = u.id
@@ -343,7 +438,7 @@ async function getRoleId(roleName) {
   return row?.id || "";
 }
 
-async function ensureUniqueUser(email, phone) {
+async function findExistingUser(email, phone) {
   const conditions = [];
 
   if (email) {
@@ -355,7 +450,7 @@ async function ensureUniqueUser(email, phone) {
   }
 
   if (!conditions.length) {
-    return;
+    return null;
   }
 
   const [existing] = await prisma.$queryRaw(
@@ -367,8 +462,117 @@ async function ensureUniqueUser(email, phone) {
     `
   );
 
-  if (existing?.id) {
-    throw new Error("A user with this email or phone already exists.");
+  return existing?.id || null;
+}
+
+async function ensureUserRoleAssignment(userId, roleId, tx = prisma) {
+  const [tableCheck] = await tx.$queryRaw(
+    Prisma.sql`
+      SELECT EXISTS (
+        SELECT 1
+        FROM information_schema.tables
+        WHERE table_schema = 'public' AND table_name = 'user_roles'
+      ) AS has_user_roles_table
+    `
+  );
+
+  if (tableCheck?.has_user_roles_table) {
+    const [existingAssignment] = await tx.$queryRaw(
+      Prisma.sql`
+        SELECT 1
+        FROM user_roles
+        WHERE user_id = ${userId}::uuid
+          AND role_id = ${roleId}::uuid
+        LIMIT 1
+      `
+    );
+
+    if (!existingAssignment) {
+      await tx.$executeRaw(
+        Prisma.sql`
+          INSERT INTO user_roles (id, user_id, role_id, created_at)
+          VALUES (
+            ${crypto.randomUUID()}::uuid,
+            ${userId}::uuid,
+            ${roleId}::uuid,
+            NOW()
+          )
+          ON CONFLICT (user_id, role_id) DO NOTHING
+        `
+      );
+    }
+
+    await tx.$executeRaw(
+      Prisma.sql`
+        UPDATE users
+        SET role_id = COALESCE(role_id, ${roleId}::uuid)
+        WHERE id = ${userId}::uuid
+          AND (role_id IS NULL OR role_id = ${roleId}::uuid)
+      `
+    );
+    return;
+  }
+
+  const [existingUser] = await tx.$queryRaw(
+    Prisma.sql`
+      SELECT role_id::text AS role_id
+      FROM users
+      WHERE id = ${userId}::uuid
+      LIMIT 1
+    `
+  );
+
+  if (!existingUser?.role_id) {
+    await tx.$executeRaw(
+      Prisma.sql`
+        UPDATE users
+        SET role_id = ${roleId}::uuid
+        WHERE id = ${userId}::uuid
+      `
+    );
+  }
+}
+
+async function ensureProfileForRole(userId, role, tx = prisma) {
+  if (role === "coordinator") {
+    const [existing] = await tx.$queryRaw(
+      Prisma.sql`
+        SELECT 1
+        FROM coordinator_profiles
+        WHERE user_id = ${userId}::uuid
+        LIMIT 1
+      `
+    );
+
+    if (!existing) {
+      await tx.$executeRaw(
+        Prisma.sql`
+          INSERT INTO coordinator_profiles (id, user_id, status)
+          VALUES (${crypto.randomUUID()}::uuid, ${userId}::uuid, ${"active"}::user_status)
+        `
+      );
+    }
+    return;
+  }
+
+  if (role === "teacher") {
+    const [existing] = await tx.$queryRaw(
+      Prisma.sql`
+        SELECT 1
+        FROM teacher_profiles
+        WHERE user_id = ${userId}::uuid
+        LIMIT 1
+      `
+    );
+
+    if (!existing) {
+      await tx.$executeRaw(
+        Prisma.sql`
+          INSERT INTO teacher_profiles (id, user_id, status)
+          VALUES (${crypto.randomUUID()}::uuid, ${userId}::uuid, ${"active"}::user_status)
+        `
+      );
+    }
   }
 }
 
@@ -402,24 +606,14 @@ export async function GET(request) {
     const users = await getUsers(search, role, status, classLevel);
     const normalizedUsers = users.map((user) => ({
       ...user,
-      temporary_password:
-        String(user.role || "").toLowerCase() === "student"
-          ? String(user.password_hash || "") || extractStudentTemporaryPassword(user.latest_credentials_body_text)
-          : String(user.role || "").toLowerCase() === "parent"
-            ? String(user.password_hash || "") || extractParentTemporaryPassword(user.latest_credentials_body_text)
-          : String(user.role || "").toLowerCase() === "superadmin" ||
-              String(user.role || "").toLowerCase() === "admin" ||
-              String(user.role || "").toLowerCase() === "coordinator" ||
-              String(user.role || "").toLowerCase() === "teacher"
-            ? extractStaffTemporaryPassword(user.latest_credentials_body_text) || String(user.password_hash || "")
-            : extractTemporaryPassword(user.latest_credentials_body_text),
+      temporary_password: getTemporaryPasswordValue(user),
     }));
     return json("Users fetched.", 200, {
       items: normalizedUsers,
       summary: {
         total: normalizedUsers.length,
-        students: normalizedUsers.filter((item) => item.role === "student").length,
-        parents: normalizedUsers.filter((item) => item.role === "parent").length,
+        students: normalizedUsers.filter((item) => getRoleList(item.role).includes("student")).length,
+        parents: normalizedUsers.filter((item) => getRoleList(item.role).includes("parent")).length,
         active: normalizedUsers.filter((item) => item.status === "active").length,
         suspended: normalizedUsers.filter((item) => item.status === "suspended").length,
         archived: normalizedUsers.filter((item) => item.status === "archived").length,
@@ -460,67 +654,73 @@ export async function POST(request) {
       return json("Email is required.", 400);
     }
 
-    if (!password.trim() || password.trim().length < 8) {
-      return json("Password must be at least 8 characters.", 400);
-    }
-
     const roleId = await getRoleId(role);
 
     if (!roleId) {
       return json("Target role was not found in roles table.", 400);
     }
 
-    await ensureUniqueUser(email, phone);
+    const existingUserId = await findExistingUser(email, phone);
+    const isExistingUser = Boolean(existingUserId);
 
-    const userId = crypto.randomUUID();
-    const hashedPassword = await password;
+    if (!isExistingUser && (!password.trim() || password.trim().length < 8)) {
+      return json("Password must be at least 8 characters.", 400);
+    }
+
+    const userId = existingUserId || crypto.randomUUID();
+    const hashedPassword = password.trim() || "";
 
     await prisma.$transaction(async (tx) => {
-      await tx.$executeRaw`
-        INSERT INTO users (
-          id,
-          role_id,
-          full_name,
-          email,
-          phone,
-          password_hash,
-          status,
-          must_change_password
-        )
-        VALUES (
-          ${userId}::uuid,
-          ${roleId}::uuid,
-          ${fullName},
-          ${email || null},
-          ${phone || null},
-          ${hashedPassword},
-          ${"active"}::user_status,
-          ${true}
-        )
-      `;
-
-      if (role === "coordinator") {
+      if (!isExistingUser) {
         await tx.$executeRaw`
-          INSERT INTO coordinator_profiles (id, user_id, status)
-          VALUES (${crypto.randomUUID()}::uuid, ${userId}::uuid, ${"active"}::user_status)
+          INSERT INTO users (
+            id,
+            role_id,
+            full_name,
+            email,
+            phone,
+            password_hash,
+            status,
+            must_change_password
+          )
+          VALUES (
+            ${userId}::uuid,
+            ${roleId}::uuid,
+            ${fullName},
+            ${email || null},
+            ${phone || null},
+            ${hashedPassword},
+            ${"active"}::user_status,
+            ${true}
+          )
         `;
       } else {
         await tx.$executeRaw`
-          INSERT INTO teacher_profiles (id, user_id, status)
-          VALUES (${crypto.randomUUID()}::uuid, ${userId}::uuid, ${"active"}::user_status)
+          UPDATE users
+          SET full_name = ${fullName},
+              email = ${email || null},
+              phone = ${phone || null},
+              status = ${"active"}::user_status,
+              must_change_password = ${true}
+          WHERE id = ${userId}::uuid
         `;
       }
+
+      await ensureUserRoleAssignment(userId, roleId, tx);
+      await ensureProfileForRole(userId, role, tx);
     });
 
     await insertAuditLog(
       authState.session.user.id,
       userId,
-      "user_created",
-      `${role} account created by admin.`,
-      { role }
+      isExistingUser ? "user_role_assigned" : "user_created",
+      isExistingUser
+        ? `${role} role assigned to existing user by admin.`
+        : `${role} account created by admin.`,
+      { role, existingUser: isExistingUser }
     );
 
-    return json("Staff user created.", 201, {
+    return json(isExistingUser ? "Role assigned to existing user." : "Staff user created.", 201, {
       item: {
         id: userId,
         name: fullName,
@@ -528,6 +728,7 @@ export async function POST(request) {
         phone,
         role,
         status: "active",
+        existingUser: isExistingUser,
       },
     });
   } catch (error) {

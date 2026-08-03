@@ -6,7 +6,7 @@ import AdminDashboardCards from "@/components/admin/AdminDashboardCards";
 import AdminDataTable from "@/components/admin/AdminDataTable";
 import { OpenBookLoader } from "@/components/shared/AshShajrahLoaders";
 
-const CACHE_KEY = "admin-dashboard-stats";
+const CACHE_KEY = "admin-dashboard-stats:v4";
 const CACHE_TTL = 60 * 1000;
 
 function formatLabel(value) {
@@ -142,7 +142,7 @@ export default function AdminDashboardPage() {
       key: "activeUsers",
       label: "Active users",
       value: Number(overview.activeUsers || 0),
-      tone: "bg-emerald-50 text-emerald-800",
+      tone: "bg-emerald-50 text-[#0D5C48]",
     },
     {
       key: "classes",
@@ -223,8 +223,8 @@ export default function AdminDashboardPage() {
                     </span>
                   ),
                 },
-                { key: "total", label: "Total users" },
-                { key: "activeTotal", label: "Active users" },
+                { key: "total", label: "Users in role" },
+                { key: "activeTotal", label: "Active in role" },
               ]}
               rows={state.loading ? [] : state.data?.roles || []}
               emptyMessage="Role insights will appear here as account activity grows."

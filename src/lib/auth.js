@@ -16,6 +16,10 @@ function clean(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 
+function normalizeRoleName(value) {
+  return clean(value).toLowerCase();
+}
+
 function normalizeIdentifier(value) {
   const trimmed = clean(value);
   if (trimmed.includes("@")) {
@@ -29,6 +33,62 @@ function toAuthError(code) {
   const error = new Error(code);
   error.code = code;
   return error;
+}
+
+async function getUserRoleNames(userId) {
+  const normalizedUserId = clean(userId);
+  if (!normalizedUserId) {
+    return [];
+  }
+
+  const roleNames = new Set();
+  const tableCheck = await prisma.$queryRaw(
+    Prisma.sql`
+      SELECT EXISTS (
+        SELECT 1
+        FROM information_schema.tables
+        WHERE table_schema = 'public' AND table_name = 'user_roles'
+      ) AS has_user_roles_table
+    `
+  );
+
+  const hasUserRolesTable = Boolean(tableCheck?.[0]?.has_user_roles_table);
+
+  if (hasUserRolesTable) {
+    const mappedRoles = await prisma.$queryRaw(
+      Prisma.sql`
+        SELECT DISTINCT LOWER(TRIM(r.name)) AS role_name
+        FROM user_roles ur
+        INNER JOIN roles r ON r.id = ur.role_id
+        WHERE ur.user_id = ${normalizedUserId}::uuid
+      `
+    );
+
+    mappedRoles.forEach((role) => {
+      const normalizedRole = String(role.role_name || "").trim().toLowerCase();
+      if (normalizedRole) {
+        roleNames.add(normalizedRole);
+      }
+    });
+  }
+
+  const fallbackRoles = await prisma.$queryRaw(
+    Prisma.sql`
+      SELECT DISTINCT LOWER(TRIM(r.name)) AS role_name
+      FROM users u
+      INNER JOIN roles r ON r.id = u.role_id
+      WHERE u.id = ${normalizedUserId}::uuid
+    `
+  );
+
+  fallbackRoles.forEach((role) => {
+    const normalizedRole = String(role.role_name || "").trim().toLowerCase();
+    if (normalizedRole) {
+      roleNames.add(normalizedRole);
+    }
+  });
+
+  return Array.from(roleNames);
 }
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
@@ -64,42 +124,39 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
         if (isEmail) {
           whereCondition = Prisma.sql`
-       LOWER(TRIM(COALESCE(u.email, ''))) = LOWER(TRIM(${rawIdentifier}))
-       `;
+            LOWER(TRIM(COALESCE(u.email, ''))) = LOWER(TRIM(${rawIdentifier}))
+          `;
         } else if (phoneIdentifier.length >= 7) {
           whereCondition = Prisma.sql`
-    (
-      REGEXP_REPLACE(COALESCE(u.phone, ''), '\\D', '', 'g') = ${phoneIdentifier}
-      OR LOWER(TRIM(COALESCE(u.username, ''))) = LOWER(TRIM(${normalizedUsername}))
-    )
-    `;
+            (
+              REGEXP_REPLACE(COALESCE(u.phone, ''), '\\D', '', 'g') = ${phoneIdentifier}
+              OR LOWER(TRIM(COALESCE(u.username, ''))) = LOWER(TRIM(${normalizedUsername}))
+            )
+          `;
         } else if (normalizedUsername) {
           whereCondition = Prisma.sql`
-    LOWER(TRIM(COALESCE(u.username, ''))) = LOWER(TRIM(${normalizedUsername}))
-  `;
+            LOWER(TRIM(COALESCE(u.username, ''))) = LOWER(TRIM(${normalizedUsername}))
+          `;
         } else {
           return null;
         }
 
         const users = await prisma.$queryRaw(
           Prisma.sql`
-      SELECT
-        u.id::text AS id,
-        u.full_name,
-        u.username,
-        u.email,
-        u.phone,
-        u.password_hash,
-        u.status::text AS status,
-        r.name AS role_name
-      FROM users u
-      INNER JOIN roles r ON r.id = u.role_id
-      WHERE ${whereCondition}
-    `
+            SELECT
+              u.id::text AS id,
+              u.full_name,
+              u.username,
+              u.email,
+              u.phone,
+              u.password_hash,
+              u.status::text AS status
+            FROM users u
+            WHERE ${whereCondition}
+          `
         );
 
         const user = users?.[0];
-
         if (!user) {
           return null;
         }
@@ -112,17 +169,34 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           return null;
         }
 
-const storedPassword = String(user.password_hash || "");
+        const storedPassword = String(user.password_hash || "");
+        const passwordMatches = password === storedPassword;
+        if (!passwordMatches) {
+          return null;
+        }
 
-const passwordMatches = password === storedPassword;
+        const availableRoles = await getUserRoleNames(user.id);
+        const requestedRole = normalizeRoleName(credentials?.selectedRole);
+        const hasRequestedRole = Boolean(requestedRole && availableRoles.includes(requestedRole));
 
-if (!passwordMatches) {
-  return null;
-}
+        if (availableRoles.length > 1 && !hasRequestedRole) {
+          return {
+            id: user.id,
+            full_name: user.full_name || "",
+            name: user.full_name || "",
+            username: user.username || "",
+            email: user.email || "",
+            phone: user.phone || "",
+            role: "",
+            roles: availableRoles,
+            selectedRole: "",
+            status: user.status,
+            requiresRoleSelection: true,
+          };
+        }
 
-        const role = String(user.role_name || "").trim().toLowerCase();
-
-        if (!roleToDashboard[role]) {
+        const resolvedRole = hasRequestedRole ? requestedRole : availableRoles[0] || "";
+        if (!resolvedRole || !roleToDashboard[resolvedRole]) {
           return null;
         }
 
@@ -133,8 +207,11 @@ if (!passwordMatches) {
           username: user.username || "",
           email: user.email || "",
           phone: user.phone || "",
-          role,
+          role: resolvedRole,
+          roles: availableRoles,
+          selectedRole: resolvedRole,
           status: user.status,
+          requiresRoleSelection: false,
         };
       },
     }),
@@ -147,9 +224,12 @@ if (!passwordMatches) {
         token.name = user.full_name || "";
         token.username = user.username || "";
         token.email = user.email || "";
-        token.role = user.role;
+        token.role = user.selectedRole || user.role || "";
+        token.selectedRole = user.selectedRole || user.role || "";
+        token.roles = Array.isArray(user.roles) ? user.roles : [];
         token.status = user.status;
         token.phone = user.phone || "";
+        token.requiresRoleSelection = Boolean(user.requiresRoleSelection);
       }
 
       return token;
@@ -161,9 +241,12 @@ if (!passwordMatches) {
         session.user.name = token.name || token.full_name || "";
         session.user.username = token.username || "";
         session.user.email = token.email;
-        session.user.role = token.role;
+        session.user.role = token.selectedRole || token.role || "";
+        session.user.selectedRole = token.selectedRole || token.role || "";
+        session.user.roles = Array.isArray(token.roles) ? token.roles : [];
         session.user.status = token.status;
         session.user.phone = token.phone;
+        session.user.requiresRoleSelection = Boolean(token.requiresRoleSelection);
       }
 
       return session;

@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
 import { signIn } from "next-auth/react";
 import { Eye, EyeOff } from "lucide-react";
+import { roleToDashboard } from "@/lib/auth";
 
 const initialErrors = {
   identifier: "",
@@ -28,25 +29,91 @@ const item = {
 
 export default function LoginPage() {
   const router = useRouter();
-  const [identifier, setIdentifier] = useState("");
-  const [password, setPassword] = useState("");
+  const searchParams = useSearchParams();
+  const queryIdentifier =
+    searchParams?.get("identifier") || searchParams?.get("email") || "";
+  const queryPassword = searchParams?.get("password") || "";
+  const querySelectedRole =
+    searchParams?.get("selectedRole") || searchParams?.get("role") || "";
+
+  const [identifier, setIdentifier] = useState(queryIdentifier);
+  const [password, setPassword] = useState(queryPassword);
   const [showPassword, setShowPassword] = useState(false);
   const [errors, setErrors] = useState(initialErrors);
   const [pending, setPending] = useState(false);
+  const [showRolePicker, setShowRolePicker] = useState(false);
+  const [availableRoles, setAvailableRoles] = useState([]);
+  const [preselectedRole, setPreselectedRole] = useState(querySelectedRole);
 
-  useEffect(() => {
-    const searchParams = new URLSearchParams(window.location.search);
-    const prefillIdentifier = searchParams.get("identifier") || searchParams.get("email") || "";
-    const prefillPassword = searchParams.get("password") || "";
+  function getDashboardPath(role) {
+    const normalizedRole = String(role || "").trim().toLowerCase();
+    return roleToDashboard[normalizedRole] || "/student/dashboard";
+  }
 
-    if (prefillIdentifier) {
-      setIdentifier(prefillIdentifier);
+  const effectiveIdentifier = identifier || queryIdentifier;
+  const effectivePassword = password || queryPassword;
+  const effectiveSelectedRole = preselectedRole || querySelectedRole;
+
+  async function completeLogin(selectedRole = effectiveSelectedRole) {
+    const normalizedSelectedRole = String(selectedRole || "").trim().toLowerCase();
+
+    try {
+      const result = await signIn("credentials", {
+        identifier,
+        password,
+        selectedRole: normalizedSelectedRole,
+        redirect: false,
+      });
+
+      if (!result || result.error) {
+        throw new Error("Invalid credentials.");
+      }
+
+      if (result?.ok === false) {
+        throw new Error("Invalid credentials.");
+      }
+
+      const sessionResponse = await fetch("/api/auth/session", { cache: "no-store" });
+      const session = await sessionResponse.json();
+      const sessionRoles = Array.isArray(session?.user?.roles)
+        ? session.user.roles.filter(Boolean).map((role) => String(role).trim().toLowerCase())
+        : [];
+      const sessionRole = String(session?.user?.role || "").trim().toLowerCase();
+      const roleSelectionRequired = Boolean(session?.user?.requiresRoleSelection || result?.requiresRoleSelection);
+      const roleSelectionRoles = sessionRoles.length > 0 ? sessionRoles : [];
+
+      if ((roleSelectionRequired || (roleSelectionRoles.length > 1 && !normalizedSelectedRole)) && !normalizedSelectedRole) {
+        setAvailableRoles(roleSelectionRoles);
+        setShowRolePicker(true);
+        setPending(false);
+        return;
+      }
+
+      const resolvedRole = String(normalizedSelectedRole || sessionRole || result?.role || "").trim().toLowerCase();
+      if (!resolvedRole) {
+        const fallbackRole = sessionRole || "";
+        if (!fallbackRole) {
+          setErrors((current) => ({
+            ...current,
+            form: "Your account role could not be resolved. Please try again.",
+          }));
+          return;
+        }
+
+        router.replace(getDashboardPath(fallbackRole));
+        return;
+      }
+
+      router.replace(getDashboardPath(resolvedRole));
+    } catch {
+      setErrors((current) => ({
+        ...current,
+        form: "Sign in failed. Please try again.",
+      }));
+    } finally {
+      setPending(false);
     }
-
-    if (prefillPassword) {
-      setPassword(prefillPassword);
-    }
-  }, []);
+  }
 
   async function handleSubmit(event) {
     event.preventDefault();
@@ -66,43 +133,18 @@ export default function LoginPage() {
 
     setPending(true);
     setErrors(initialErrors);
+    setShowRolePicker(false);
+    setAvailableRoles([]);
 
-    try {
-      const result = await signIn("credentials", {
-        identifier,
-        password,
-        redirect: false,
-      });
+    await completeLogin();
+  }
 
-      if (!result || result.error) {
-        throw new Error("Invalid credentials.");
-      }
-
-      const sessionResponse = await fetch("/api/auth/session", { cache: "no-store" });
-      const session = await sessionResponse.json();
-      const role = String(session?.user?.role || "").toLowerCase();
-      const target =
-        role === "superadmin"
-          ? "/superadmin/dashboard"
-          : role === "admin"
-            ? "/admin/dashboard"
-          : role === "coordinator"
-            ? "/coordinator/dashboard"
-            : role === "teacher"
-              ? "/teacher/dashboard"
-              : role === "parent"
-                ? "/parent/dashboard"
-                : "/student/dashboard";
-
-      router.replace(target);
-    } catch {
-      setErrors((current) => ({
-        ...current,
-        form: "Sign in failed. Please try again.",
-      }));
-    } finally {
-      setPending(false);
-    }
+  async function handleRoleSelection(role) {
+    setPending(true);
+    setErrors(initialErrors);
+    setShowRolePicker(false);
+    setPreselectedRole(role);
+    await completeLogin(role);
   }
 
   return (
@@ -112,6 +154,40 @@ export default function LoginPage() {
       <div className="absolute bottom-[-5rem] right-[-4rem] h-80 w-80 rounded-full bg-[#C9A227]/10 blur-3xl" />
 
       <div className="relative mx-auto flex min-h-screen max-w-7xl items-center justify-center px-4 py-10 sm:px-6 lg:px-8">
+        {showRolePicker ? (
+          <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-[radial-gradient(circle_at_center,_rgba(101,184,145,0.18),_rgba(255,255,255,0.1))] backdrop-blur-xl px-4 py-4">
+            <div className="w-full max-w-lg rounded-[2rem] border border-[#2D8A6A]/20 bg-white/95 p-6 shadow-[0_24px_60px_rgba(13,59,46,0.24)] max-h-[calc(100vh-4rem)] overflow-y-auto">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowRolePicker(false);
+                  setPending(false);
+                }}
+                className="absolute right-4 top-4 inline-flex h-10 w-10 items-center justify-center rounded-full border border-[#2D8A6A]/20 bg-[#FAF7F0] text-[#0D5C48] transition hover:bg-[#F1EADC]"
+              >
+                <span className="text-lg leading-none">×</span>
+                <span className="sr-only">Close role selection</span>
+              </button>
+              <div className="relative">
+                <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-[#0D5C48]">Select your role</p>
+                <h3 className="mt-3 text-xl font-semibold text-[#063F32]">This account has multiple portals</h3>
+                <p className="mt-2 text-sm leading-6 text-[#245C4F]">Choose the role you want to continue.</p>
+                <div className="mt-6 flex flex-col gap-3">
+                  {availableRoles.map((role) => (
+                    <button
+                      key={role}
+                      type="button"
+                      onClick={() => void handleRoleSelection(role)}
+                      className="rounded-2xl border border-[#2D8A6A]/20 bg-white px-4 py-3 text-sm font-semibold capitalize text-[#063F32] transition hover:border-[#A3D08A]/60 hover:bg-[#E8F5E8]"
+                    >
+                      {role}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : null}
         <motion.section
           variants={container}
           initial="hidden"
@@ -183,6 +259,7 @@ export default function LoginPage() {
                   {errors.form}
                 </div>
               ) : null}
+
 
               <form className="space-y-5" onSubmit={handleSubmit}>
                 <div>
