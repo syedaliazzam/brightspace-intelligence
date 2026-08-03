@@ -1,10 +1,8 @@
 export const dashboardNavigation = {
   superadmin: [
     { label: "Dashboard", href: "/superadmin/dashboard" },
-    { label: "Class Schedulers", href: "/superadmin/lectures" },
-    { label: "Public Events", href: "/superadmin/public-events" },
+    { label: "All Events Calendar", href: "/superadmin/class-schedulers" },
     { label: "Event Registrations", href: "/superadmin/public-event-registrations" },
-    { label: "Internal Events", href: "/superadmin/internal-events" },
     { label: "Interested Students", href: "/superadmin/interested-students" },
     { label: "Parent Interview Forms", href: "/superadmin/parent-interview-forms" },
     { label: "Admission Records", href: "/superadmin/registration-leads" },
@@ -29,10 +27,8 @@ export const dashboardNavigation = {
   ],
   admin: [
     { label: "Dashboard", href: "/admin/dashboard" },
-    { label: "Class Schedulers", href: "/admin/lectures" },
-    { label: "Public Events", href: "/admin/public-events" },
+    { label: "All Events Calendar", href: "/admin/class-schedulers" },
     { label: "Event Registrations", href: "/admin/public-event-registrations" },
-    { label: "Internal Events", href: "/admin/internal-events" },
     { label: "Interested Students", href: "/admin/interested-students" },
     { label: "Parent Interview Forms", href: "/admin/parent-interview-forms" },
     { label: "Admission Records", href: "/admin/registration-leads" },
@@ -56,10 +52,10 @@ export const dashboardNavigation = {
   ],
   coordinator: [
     { label: "Dashboard", href: "/coordinator/dashboard" },
-    { label: "Class Schedulars", href: "/coordinator/class-schedulers" },
+    { label: "All Events Calendar", href: "/coordinator/class-schedulers" },
     { label: "Public Events", href: "/coordinator/public-events" },
-    { label: "Event Registrations", href: "/coordinator/public-event-registrations" },
     { label: "Internal Events", href: "/coordinator/internal-events" },
+    { label: "Event Registrations", href: "/coordinator/public-event-registrations" },
     { label: "Interested Students", href: "/coordinator/interested-students" },
     { label: "Parent Interview Forms", href: "/coordinator/parent-interview-forms" },
     { label: "Admission Records", href: "/coordinator/registration-leads" },
@@ -79,9 +75,8 @@ export const dashboardNavigation = {
   ],
   teacher: [
     { label: "Dashboard", href: "/teacher/dashboard" },
+    { label: "All Events Calendar", href: "/teacher/class-schedulers" },
     { label: "Lectures", href: "/teacher/lectures" },
-    { label: "Public Events", href: "/teacher/public-events" },
-    { label: "Internal Events", href: "/teacher/internal-events" },
     { label: "Attendance", href: "/teacher/attendance" },
     { label: "Students", href: "/teacher/students" },
     { label: "Homework", href: "/teacher/homework" },
@@ -91,7 +86,7 @@ export const dashboardNavigation = {
   ],
   parent: [
     { label: "Dashboard", href: "/parent/dashboard" },
-    { label: "Public Events", href: "/parent/public-events" },
+    { label: "Events Calendar", href: "/parent/class-schedulers" },
     { label: "Lectures", href: "/parent/lectures" },
     { label: "Homework", href: "/parent/homework" },
     { label: "Attendance", href: "/parent/attendance" },

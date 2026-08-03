@@ -11,7 +11,6 @@ const FILTER_OPTIONS = [
   { id: "all", label: "All Events" },
   { id: "public-events", label: "Public Events" },
   { id: "internal-events", label: "Internal Events" },
-  { id: "class-schedulers", label: "Class Schedulers" },
 ];
 
 function parseDateTime(value) {
@@ -34,33 +33,6 @@ function toCalendarDate(date) {
   const minutes = String(dateValue.getMinutes()).padStart(2, "0");
   const seconds = String(dateValue.getSeconds()).padStart(2, "0");
   return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}`;
-}
-
-function mapClassSchedulerEvents(items = []) {
-  return (items || []).map((item) => {
-    const start = parseDateTime(item?.rescheduled_start || item?.scheduled_start || item?.rescheduledStartTime || item?.scheduledStart);
-    const end = parseDateTime(item?.rescheduled_end || item?.scheduled_end || item?.rescheduledEndTime || item?.scheduledEnd);
-    const title = item?.title || item?.subject_name || "Class scheduler";
-
-    return {
-      id: `class-${item.id}`,
-      title,
-      start: start ? toCalendarDate(start) : "",
-      end: end ? toCalendarDate(end) : "",
-      backgroundColor: "#10B981",
-      borderColor: "#059669",
-      textColor: "#FFFFFF",
-      extendedProps: {
-        type: "class-schedulers",
-        typeLabel: "Class",
-        subtitle: item?.subject_name || item?.class_level || item?.course_title || "Class schedule",
-        meetLink: item?.google_meet_link || "",
-        recordingLink: item?.event_detail_link?.href || "",
-        recordingKind: item?.event_detail_link?.kind || "",
-        recordingLabel: item?.event_detail_link?.label || "",
-      },
-    };
-  });
 }
 
 function mapPublicEvents(items = []) {
@@ -91,8 +63,8 @@ function mapPublicEvents(items = []) {
 
 function mapInternalEvents(items = []) {
   return (items || []).map((item) => {
-    const start = parseDateTime(item?.scheduled_start || item?.scheduledStart);
-    const end = parseDateTime(item?.scheduled_end || item?.scheduledEnd);
+    const start = parseDateTime(item?.scheduled_start);
+    const end = parseDateTime(item?.scheduled_end);
 
     return {
       id: `internal-${item.id}`,
@@ -105,27 +77,23 @@ function mapInternalEvents(items = []) {
       extendedProps: {
         type: "internal-events",
         typeLabel: "Internal",
-        subtitle: item?.host_name || item?.attendee_name || "Internal event",
+        subtitle: item?.host_name || "Internal event",
         meetLink: item?.google_meet_link || item?.meeting_link || "",
         recordingLink: item?.recording_link || item?.event_detail_link?.href || "",
         recordingKind: item?.event_detail_link?.kind || "",
         recordingLabel: item?.event_detail_link?.label || "",
-        eventId: item?.id,
       },
     };
   });
 }
 
-export default function CoordinatorUnifiedCalendarPage() {
+export default function ParentEventsCalendarPage() {
   const [activeFilter, setActiveFilter] = useState("all");
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [copiedLink, setCopiedLink] = useState("");
-  const [syncingRecording, setSyncingRecording] = useState(null);
-  const [recordingLinks, setRecordingLinks] = useState({});
   const [state, setState] = useState({
     loading: true,
     error: "",
-    classEvents: [],
     publicEvents: [],
     internalEvents: [],
   });
@@ -137,28 +105,19 @@ export default function CoordinatorUnifiedCalendarPage() {
       setState((current) => ({ ...current, loading: true, error: "" }));
 
       try {
-        const [lectureResult, publicResult, internalResult] = await Promise.allSettled([
-          fetch("/api/coordinator/lecture-schedules?range=all", { cache: "no-store" }),
-          fetch("/api/coordinator/public-events", { cache: "no-store" }),
+        const [publicResult, internalResult] = await Promise.allSettled([
+          fetch("/api/public-events", { cache: "no-store" }),
           fetch("/api/internal-events", { cache: "no-store" }),
         ]);
 
-        const lectureData = lectureResult.status === "fulfilled" ? await lectureResult.value.json().catch(() => ({ items: [] })) : { items: [] };
         const publicData = publicResult.status === "fulfilled" ? await publicResult.value.json().catch(() => ({ items: [] })) : { items: [] };
         const internalData = internalResult.status === "fulfilled" ? await internalResult.value.json().catch(() => ({ items: [] })) : { items: [] };
 
         if (!active) return;
 
-        const errors = [
-          lectureResult.status === "rejected" ? "Unable to load class schedulers." : null,
-          publicResult.status === "rejected" ? "Unable to load public events." : null,
-          internalResult.status === "rejected" ? "Unable to load internal events." : null,
-        ].filter(Boolean);
-
         setState({
           loading: false,
-          error: errors[0] || "",
-          classEvents: Array.isArray(lectureData?.items) ? mapClassSchedulerEvents(lectureData.items) : [],
+          error: "",
           publicEvents: Array.isArray(publicData?.items) ? mapPublicEvents(publicData.items) : [],
           internalEvents: Array.isArray(internalData?.items) ? mapInternalEvents(internalData.items) : [],
         });
@@ -166,8 +125,7 @@ export default function CoordinatorUnifiedCalendarPage() {
         if (!active) return;
         setState({
           loading: false,
-          error: error instanceof Error ? error.message : "Unable to load event calendar.",
-          classEvents: [],
+          error: error instanceof Error ? error.message : "Unable to load events.",
           publicEvents: [],
           internalEvents: [],
         });
@@ -180,48 +138,6 @@ export default function CoordinatorUnifiedCalendarPage() {
     };
   }, []);
 
-  const handleSyncRecording = async (eventId) => {
-    setSyncingRecording(eventId);
-    try {
-      const response = await fetch(`/api/internal-events/${eventId}/recording-sync`, {
-        method: "POST",
-        cache: "no-store",
-      });
-
-      const data = await response.json();
-
-      if (data?.recording_drive_url) {
-        setRecordingLinks((prev) => ({
-          ...prev,
-          [eventId]: { link: data.recording_drive_url, kind: "recording", label: "View Recording" },
-        }));
-        if (selectedEvent?.extendedProps?.eventId === eventId) {
-          setSelectedEvent((prev) => ({
-            ...prev,
-            extendedProps: {
-              ...prev.extendedProps,
-              recordingLink: data.recording_drive_url,
-              recordingKind: "recording",
-              recordingLabel: "View Recording",
-            },
-          }));
-        }
-      }
-    } catch (error) {
-      console.error("Sync recording error:", error);
-    } finally {
-      setSyncingRecording(null);
-    }
-  };
-
-  const calendarEvents = useMemo(() => {
-    const classEvents = activeFilter === "all" || activeFilter === "class-schedulers" ? state.classEvents : [];
-    const publicEvents = activeFilter === "all" || activeFilter === "public-events" ? state.publicEvents : [];
-    const internalEvents = activeFilter === "all" || activeFilter === "internal-events" ? state.internalEvents : [];
-
-    return [...classEvents, ...publicEvents, ...internalEvents];
-  }, [activeFilter, state.classEvents, state.internalEvents, state.publicEvents]);
-
   return (
     <div className="min-h-screen bg-[#FAF7F0] text-[#063F32]">
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(201,162,39,0.14),transparent_32%),radial-gradient(circle_at_top_right,rgba(45,138,106,0.14),transparent_28%),linear-gradient(180deg,#FAF7F0_0%,#F7F1E3_100%)]" />
@@ -231,17 +147,17 @@ export default function CoordinatorUnifiedCalendarPage() {
           <div className="relative flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
             <div className="max-w-5xl">
               <p className="inline-flex rounded-full border border-[#FFF5D6]/30 bg-[#FFF5D6]/10 px-3 py-1 text-[0.65rem] font-semibold uppercase tracking-[0.24em] text-[#FFF5D6]">
-                Coordinator portal
+                Parent portal
               </p>
               <h1 className="mt-4 font-display text-3xl font-bold text-white-deep sm:text-4xl">
-                All Events Calendar
+                Events Calendar
               </h1>
               <p className="mt-3 text-sm leading-7 text-[#EAF6EF] sm:text-base">
-                View class schedulers, public events, and internal events in a single calendar with the filter options you need.
+                View public and internal events from your school calendar.
               </p>
             </div>
             <div className="rounded-2xl border border-[#E4C766]/30 bg-[#FAF7F0]/10 px-4 py-3 text-sm text-[#FAF7F0]">
-              {calendarEvents.length} events shown
+              {(activeFilter === "all" ? state.publicEvents.length + state.internalEvents.length : activeFilter === "public-events" ? state.publicEvents.length : state.internalEvents.length)} events shown
             </div>
           </div>
         </section>
@@ -268,10 +184,6 @@ export default function CoordinatorUnifiedCalendarPage() {
           </div>
           <div className="flex flex-wrap gap-4 pt-3">
             <div className="flex items-center gap-2">
-              <div className="h-3 w-3 rounded" style={{ backgroundColor: "#10B981" }}></div>
-              <span className="text-xs font-medium text-[#063F32]">Class</span>
-            </div>
-            <div className="flex items-center gap-2">
               <div className="h-3 w-3 rounded" style={{ backgroundColor: "#2563EB" }}></div>
               <span className="text-xs font-medium text-[#063F32]">Public</span>
             </div>
@@ -293,7 +205,11 @@ export default function CoordinatorUnifiedCalendarPage() {
             plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
             initialView="timeGridWeek"
             headerToolbar={{ left: "prev,next today", center: "title", right: "dayGridMonth,timeGridWeek" }}
-            events={calendarEvents}
+            events={useMemo(() => {
+              const publicEvents = activeFilter === "all" || activeFilter === "public-events" ? state.publicEvents : [];
+              const internalEvents = activeFilter === "all" || activeFilter === "internal-events" ? state.internalEvents : [];
+              return [...publicEvents, ...internalEvents];
+            }, [activeFilter, state.publicEvents, state.internalEvents])}
             eventDisplay="block"
             height="auto"
             expandRows
@@ -324,9 +240,15 @@ export default function CoordinatorUnifiedCalendarPage() {
               </div>
             )}
           />
-          {state.loading ? <p className="mt-3 text-sm text-[#245C4F]">Loading event calendar...</p> : null}
-          {!state.loading && calendarEvents.length === 0 ? (
-            <p className="mt-3 text-sm text-[#245C4F]">No events match this filter right now.</p>
+          <style jsx global>{`
+            .fc .fc-event {
+              border: none !important;
+              box-shadow: 0 10px 22px -16px rgba(13, 59, 46, 0.45);
+            }
+          `}</style>
+          {state.loading ? <p className="mt-3 text-sm text-[#245C4F]">Loading events...</p> : null}
+          {!state.loading && state.publicEvents.length === 0 && state.internalEvents.length === 0 ? (
+            <p className="mt-3 text-sm text-[#245C4F]">No events found.</p>
           ) : null}
         </div>
 
@@ -352,7 +274,7 @@ export default function CoordinatorUnifiedCalendarPage() {
                   <div className="rounded-2xl border border-[#2D8A6A]/15 bg-[#FAF7F0] p-4">
                     <div className="flex flex-col gap-3">
                       <div>
-                        <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#C9A227]">Class Joining Link</p>
+                        <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#C9A227]">Event Link</p>
                         <p className="mt-2 break-all text-sm text-[#245C4F]">{selectedEvent.extendedProps.meetLink}</p>
                       </div>
                       <div className="flex flex-wrap gap-2">
@@ -373,31 +295,22 @@ export default function CoordinatorUnifiedCalendarPage() {
                           rel="noreferrer"
                           className="inline-flex rounded-full bg-[linear-gradient(135deg,#0D3B2E,#0D5C48)] px-4 py-2 text-sm font-semibold text-[#FFF5D6]"
                         >
-                          Join Class
+                          Open Event
                         </a>
                       </div>
                     </div>
                   </div>
                 )}
-                {(selectedEvent.extendedProps?.recordingLink && selectedEvent.extendedProps.recordingLink !== selectedEvent.extendedProps.meetLink) || recordingLinks[selectedEvent.extendedProps.eventId] ? (
+                {selectedEvent.extendedProps?.recordingLink && selectedEvent.extendedProps.recordingLink !== selectedEvent.extendedProps.meetLink && (
                   <a
-                    href={recordingLinks[selectedEvent.extendedProps.eventId]?.link || selectedEvent.extendedProps.recordingLink}
+                    href={selectedEvent.extendedProps.recordingLink}
                     target="_blank"
                     rel="noreferrer"
-                    className="inline-flex rounded-full bg-[#FAF7F0] text-[#0D5C48] ring-1 ring-[#2D8A6A]/20 px-4 py-2 text-sm font-semibold"
+                    className={`inline-flex rounded-full px-4 py-2 text-sm font-semibold ${selectedEvent.extendedProps.recordingKind === "recording" ? "bg-[#FAF7F0] text-[#0D5C48] ring-1 ring-[#2D8A6A]/20" : "bg-[linear-gradient(135deg,#0D3B2E,#0D5C48)] text-[#FFF5D6]"}`}
                   >
-                    {recordingLinks[selectedEvent.extendedProps.eventId]?.label || selectedEvent.extendedProps.recordingLabel || "View Recording"}
+                    {selectedEvent.extendedProps.recordingLabel || "View Recording"}
                   </a>
-                ) : selectedEvent.extendedProps?.typeLabel === "Internal" ? (
-                  <button
-                    type="button"
-                    onClick={() => handleSyncRecording(selectedEvent.extendedProps.eventId)}
-                    disabled={syncingRecording === selectedEvent.extendedProps.eventId}
-                    className="inline-flex rounded-full bg-[linear-gradient(135deg,#0D3B2E,#0D5C48)] px-4 py-2 text-sm font-semibold text-[#FFF5D6] hover:shadow-lg disabled:opacity-50"
-                  >
-                    {syncingRecording === selectedEvent.extendedProps.eventId ? "Syncing..." : "Sync Recording"}
-                  </button>
-                ) : null}
+                )}
               </div>
             </div>
           </div>

@@ -1,10 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import FullCalendar from "@fullcalendar/react";
-import dayGridPlugin from "@fullcalendar/daygrid";
-import timeGridPlugin from "@fullcalendar/timegrid";
-import interactionPlugin from "@fullcalendar/interaction";
 import { Check, ChevronDown, ClipboardCopy, Eye, FileVideo, ImagePlus, RefreshCw, RotateCcw, Search } from "lucide-react";
 import {
   cleanText,
@@ -127,7 +123,6 @@ export default function PublicEventsManagementPage({
   showRecordingSync = false,
 }) {
   const pageSize = 7;
-  const calendarRef = useRef(null);
   const formRef = useRef(null);
   const fileInputRef = useRef(null);
   const [items, setItems] = useState([]);
@@ -222,28 +217,6 @@ export default function PublicEventsManagementPage({
     return { total, published, current, upcoming };
   }, [items]);
 
-  const calendarEvents = useMemo(
-    () =>
-      items.map((item) => {
-        const lifecycle = formatEventLifecycleStatus(item.start_at, item.end_at);
-        const colors =
-          lifecycle === "current"
-            ? { background: "#2563EB", border: "#1D4ED8" }
-            : { background: "#6B7280", border: "#4B5563" };
-        return {
-          id: item.id,
-          title: item.title,
-          start: item.start_at,
-          end: item.end_at,
-          backgroundColor: colors.background,
-          borderColor: colors.border,
-          textColor: "#FFFFFF",
-          extendedProps: item,
-        };
-      }),
-    [items]
-  );
-
   const filteredTableItems = useMemo(() => {
     return items.filter((item) => {
       const lifecycle = formatEventLifecycleStatus(item.start_at, item.end_at);
@@ -257,21 +230,16 @@ export default function PublicEventsManagementPage({
   }, [items, tableFilters]);
 
   const totalRecordPages = Math.max(1, Math.ceil(filteredTableItems.length / pageSize));
-  const safeRecordsPage = Math.min(recordsPage, totalRecordPages);
+  const safeRecordsPage = Math.min(Math.max(1, recordsPage), totalRecordPages);
   const paginatedTableItems = useMemo(() => {
     const startIndex = (safeRecordsPage - 1) * pageSize;
     return filteredTableItems.slice(startIndex, startIndex + pageSize);
   }, [filteredTableItems, safeRecordsPage, pageSize]);
 
-  useEffect(() => {
+  function updateTableFilters(nextState) {
     setRecordsPage(1);
-  }, [tableFilters]);
-
-  useEffect(() => {
-    if (recordsPage > totalRecordPages) {
-      setRecordsPage(totalRecordPages);
-    }
-  }, [recordsPage, totalRecordPages]);
+    setTableFilters(nextState);
+  }
 
   function resetTableFilters() {
     setRecordsPage(1);
@@ -457,184 +425,119 @@ export default function PublicEventsManagementPage({
           </div>
         </section>
 
-        <section className="relative rounded-[2rem] border border-[#2D8A6A]/15 bg-white p-3 shadow-[0_20px_70px_-36px_rgba(13,59,46,0.18)]">
-          <style jsx global>{`
-            .public-events-calendar .fc-timegrid-slot-lane.fc-slot-half-hour,
-            .public-events-calendar .fc-timegrid-slot-label.fc-slot-half-hour {
-              border-top-color: transparent !important;
-              box-shadow: none !important;
-              background-image: none !important;
-            }
-
-            .public-events-calendar .fc-timegrid-slot.fc-slot-half-hour {
-              border-top-color: transparent !important;
-              box-shadow: none !important;
-              background-image: none !important;
-            }
-          `}</style>
-          <div className="public-events-calendar">
-          <FullCalendar
-            ref={calendarRef}
-            plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
-            initialView="timeGridWeek"
-            headerToolbar={{ left: "prev,next today", center: "title", right: "timeGridWeek,dayGridMonth" }}
-            events={calendarEvents}
-            eventClick={(info) => setSelected(info.event.extendedProps)}
-            slotLaneClassNames={(arg) => (arg.date.getMinutes() === 30 ? ["fc-slot-half-hour"] : [])}
-            slotLabelClassNames={(arg) => (arg.date.getMinutes() === 30 ? ["fc-slot-half-hour"] : [])}
-            slotLaneDidMount={(arg) => {
-              if (arg.date.getMinutes() !== 30) return;
-              arg.el.style.borderTopColor = "transparent";
-              arg.el.style.backgroundImage = "none";
-              arg.el.style.boxShadow = "none";
-            }}
-            slotLabelDidMount={(arg) => {
-              if (arg.date.getMinutes() !== 30) return;
-              arg.el.style.borderTopColor = "transparent";
-              arg.el.style.backgroundImage = "none";
-              arg.el.style.boxShadow = "none";
-            }}
-            eventContent={(arg) => (
-              <div className="cursor-pointer overflow-hidden rounded-md px-1.5 py-1 text-white">
-                <div className="flex items-center gap-1.5 text-[10px] font-semibold leading-none">
-                  <span className="shrink-0 opacity-95">
-                    {arg.timeText || formatTimeOnly(arg.event.start)}
-                  </span>
-                  <span className="truncate font-medium opacity-100">
-                    {arg.event.title}
-                  </span>
+        {selected ? (
+          <div className="absolute inset-0 z-20 flex items-center justify-center rounded-[2rem] bg-[#063F32]/35 px-4 py-6 backdrop-blur-sm">
+            <div className="w-full max-w-3xl overflow-hidden rounded-[2rem] border border-[#2D8A6A]/15 bg-[#FAF7F0] shadow-[0_24px_80px_-36px_rgba(13,59,46,0.24)]">
+              <div className="flex items-start justify-between gap-4 border-b border-[#F1EADC] px-6 py-4">
+                <div>
+                  <p className="text-sm font-semibold uppercase tracking-[0.24em] text-[#C9A227]">Public event details</p>
+                  <h2 className="mt-2 text-2xl font-semibold text-[#063F32]">{selected.title}</h2>
                 </div>
+                <button type="button" onClick={() => setSelected(null)} className="rounded-xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-3 py-2 text-sm font-semibold text-[#063F32] transition hover:bg-[#F1EADC]">Close</button>
               </div>
-            )}
-            height="auto"
-            editable={false}
-            selectable={false}
-            weekends
-            eventDisplay="block"
-            eventTimeFormat={{ hour: "numeric", minute: "2-digit", hour12: true }}
-            slotDuration="00:30:00"
-            slotLabelInterval="01:00:00"
-            slotMinTime="08:00:00"
-            slotMaxTime="18:00:00"
-            scrollTime="08:00:00"
-            allDaySlot={false}
-          />
-          </div>
-          {loading ? <p className="mt-3 px-2 text-sm text-[#245C4F]">Loading public events...</p> : null}
-          {selected ? (
-            <div className="absolute inset-0 z-20 flex items-center justify-center rounded-[2rem] bg-[#063F32]/35 px-4 py-6 backdrop-blur-sm">
-              <div className="w-full max-w-3xl overflow-hidden rounded-[2rem] border border-[#2D8A6A]/15 bg-[#FAF7F0] shadow-[0_24px_80px_-36px_rgba(13,59,46,0.24)]">
-                <div className="flex items-start justify-between gap-4 border-b border-[#F1EADC] px-6 py-4">
-                  <div>
-                    <p className="text-sm font-semibold uppercase tracking-[0.24em] text-[#C9A227]">Public event details</p>
-                    <h2 className="mt-2 text-2xl font-semibold text-[#063F32]">{selected.title}</h2>
+              <div className="max-h-[58vh] space-y-4 overflow-y-auto p-5 text-sm text-[#245C4F] sm:p-6">
+                {selected.image_url ? (
+                  <div className="overflow-hidden rounded-[1.5rem] border border-[#2D8A6A]/10 bg-white">
+                    <img src={selected.image_url} alt={selected.title} className="h-32 w-full object-cover sm:h-36" />
                   </div>
-                  <button type="button" onClick={() => setSelected(null)} className="rounded-xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-3 py-2 text-sm font-semibold text-[#063F32] transition hover:bg-[#F1EADC]">Close</button>
-                </div>
-                <div className="max-h-[58vh] space-y-4 overflow-y-auto p-5 text-sm text-[#245C4F] sm:p-6">
-                  {selected.image_url ? (
-                    <div className="overflow-hidden rounded-[1.5rem] border border-[#2D8A6A]/10 bg-white">
-                      <img src={selected.image_url} alt={selected.title} className="h-32 w-full object-cover sm:h-36" />
-                    </div>
-                  ) : null}
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="rounded-2xl border border-[#2D8A6A]/12 bg-white px-4 py-3">
-                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]">Start</p>
-                      <p className="mt-1">{formatEventDateTime(selected.start_at)}</p>
-                    </div>
-                    <div className="rounded-2xl border border-[#2D8A6A]/12 bg-white px-4 py-3">
-                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]">End</p>
-                      <p className="mt-1">{formatEventDateTime(selected.end_at)}</p>
-                    </div>
-                    <div className="rounded-2xl border border-[#2D8A6A]/12 bg-white px-4 py-3">
-                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]">Registration deadline</p>
-                      <p className="mt-1">{formatEventDateTime(selected.registration_deadline)}</p>
-                    </div>
-                    <div className="rounded-2xl border border-[#2D8A6A]/12 bg-white px-4 py-3">
-                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]">Event fee</p>
-                      <p className="mt-1">{formatMoney(selected.event_fee_amount)}</p>
-                    </div>
-                    <div className="rounded-2xl border border-[#2D8A6A]/12 bg-white px-4 py-3">
-                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]">Lifecycle</p>
-                      <p className="mt-1">{formatEventLifecycleLabel(formatEventLifecycleStatus(selected.start_at, selected.end_at))}</p>
-                    </div>
-                    <div className="rounded-2xl border border-[#2D8A6A]/12 bg-white px-4 py-3">
-                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]">Publication</p>
-                      <p className="mt-1">{String(selected.publication_status || "draft").toLowerCase() === "published" ? "Published" : "Draft"}</p>
-                    </div>
-                  <div className="rounded-2xl border border-[#2D8A6A]/12 bg-white px-4 py-4">
+                ) : null}
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="rounded-2xl border border-[#2D8A6A]/12 bg-white px-4 py-3">
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]">Start</p>
+                    <p className="mt-1">{formatEventDateTime(selected.start_at)}</p>
+                  </div>
+                  <div className="rounded-2xl border border-[#2D8A6A]/12 bg-white px-4 py-3">
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]">End</p>
+                    <p className="mt-1">{formatEventDateTime(selected.end_at)}</p>
+                  </div>
+                  <div className="rounded-2xl border border-[#2D8A6A]/12 bg-white px-4 py-3">
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]">Registration deadline</p>
+                    <p className="mt-1">{formatEventDateTime(selected.registration_deadline)}</p>
+                  </div>
+                  <div className="rounded-2xl border border-[#2D8A6A]/12 bg-white px-4 py-3">
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]">Event fee</p>
+                    <p className="mt-1">{formatMoney(selected.event_fee_amount)}</p>
+                  </div>
+                  <div className="rounded-2xl border border-[#2D8A6A]/12 bg-white px-4 py-3">
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]">Lifecycle</p>
+                    <p className="mt-1">{formatEventLifecycleLabel(formatEventLifecycleStatus(selected.start_at, selected.end_at))}</p>
+                  </div>
+                  <div className="rounded-2xl border border-[#2D8A6A]/12 bg-white px-4 py-3">
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]">Publication</p>
+                    <p className="mt-1">{String(selected.publication_status || "draft").toLowerCase() === "published" ? "Published" : "Draft"}</p>
+                  </div>
+                  <div className="col-span-2 rounded-2xl border border-[#2D8A6A]/12 bg-white px-4 py-4">
                     <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]">Description</p>
                     <p className="mt-2 whitespace-pre-line">{selected.description || "-"}</p>
                   </div>
-                    <div className="col-span-2 rounded-2xl border border-[#2D8A6A]/12 bg-white px-4 py-3">
-                      <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]">Meet link</p>
-                      <p className="mt-2 break-all text-sm text-[#245C4F]">{selected.meet_link || "Not provided"}</p>
-                      {selected.meet_link ? (
-                        <div className="mt-3 flex flex-wrap gap-2">
-                          <a
-                            href={selected.meet_link}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="inline-flex items-center gap-2 rounded-full bg-[linear-gradient(135deg,#0D3B2E,#0D5C48)] px-4 py-2 text-xs font-semibold text-[#FFF5D6]"
-                          >
-                            Open link
-                          </a>
-                          <button
-                            type="button"
-                            onClick={() => copyMeetLink(selected.meet_link)}
-                            className="inline-flex items-center gap-2 rounded-full border border-[#2D8A6A]/20 bg-white px-4 py-2 text-xs font-semibold text-[#0D5C48]"
-                          >
-                            {copiedMeetLink === selected.meet_link ? <Check className="h-3.5 w-3.5" /> : <ClipboardCopy className="h-3.5 w-3.5" />}
-                            {copiedMeetLink === selected.meet_link ? "Copied" : "Copy"}
-                          </button>
-                        </div>
-                      ) : null}
-                    </div>
-                  </div>
-                  {selected.google_calendar_last_error ? (
-                    <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-amber-800">
-                      {selected.google_calendar_last_error}
-                    </div>
-                  ) : null}
-                  {canShowPublicEventRecordingSection(selected) ? (
-                    <div className="rounded-2xl border border-[#2D8A6A]/15 bg-white p-4">
-                      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                        <div>
-                          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#C9A227]">Recording</p>
-                          <p className="mt-1 text-[#245C4F]">
-                            {selected.recording_drive_url ? "Recording is available." : "Recording appears after Google finishes processing it."}
-                          </p>
-                        </div>
-                        {showRecordingSync ? (
-                          <button
-                            type="button"
-                            onClick={handleSyncRecording}
-                            disabled={syncingRecordingId === selected.id}
-                            className="inline-flex items-center justify-center gap-2 rounded-full border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-2 text-sm font-semibold text-[#0D5C48] disabled:opacity-70"
-                          >
-                            <RefreshCw className={`h-4 w-4 ${syncingRecordingId === selected.id ? "animate-spin" : ""}`} />
-                            Sync Recording
-                          </button>
-                        ) : null}
-                      </div>
-                      {selected.recording_drive_url ? (
+                  <div className="col-span-2 rounded-2xl border border-[#2D8A6A]/12 bg-white px-4 py-3">
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]">Meet link</p>
+                    <p className="mt-2 break-all text-sm text-[#245C4F]">{selected.meet_link || "Not provided"}</p>
+                    {selected.meet_link ? (
+                      <div className="mt-3 flex flex-wrap gap-2">
                         <a
-                          href={selected.recording_drive_url}
+                          href={selected.meet_link}
                           target="_blank"
                           rel="noreferrer"
-                          className="mt-4 inline-flex items-center gap-2 rounded-full bg-[linear-gradient(135deg,#0D3B2E,#0D5C48)] px-4 py-2 text-sm font-semibold text-[#FFF5D6]"
+                          className="inline-flex items-center gap-2 rounded-full bg-[linear-gradient(135deg,#0D3B2E,#0D5C48)] px-4 py-2 text-xs font-semibold text-[#FFF5D6]"
                         >
-                          <FileVideo className="h-4 w-4" />
-                          Open Recording
+                          Open link
                         </a>
+                        <button
+                          type="button"
+                          onClick={() => copyMeetLink(selected.meet_link)}
+                          className="inline-flex items-center gap-2 rounded-full border border-[#2D8A6A]/20 bg-white px-4 py-2 text-xs font-semibold text-[#0D5C48]"
+                        >
+                          {copiedMeetLink === selected.meet_link ? <Check className="h-3.5 w-3.5" /> : <ClipboardCopy className="h-3.5 w-3.5" />}
+                          {copiedMeetLink === selected.meet_link ? "Copied" : "Copy"}
+                        </button>
+                      </div>
+                    ) : null}
+                  </div>
+                </div>
+                {selected.google_calendar_last_error ? (
+                  <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-amber-800">
+                    {selected.google_calendar_last_error}
+                  </div>
+                ) : null}
+                {canShowPublicEventRecordingSection(selected) ? (
+                  <div className="rounded-2xl border border-[#2D8A6A]/15 bg-white p-4">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                      <div>
+                        <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#C9A227]">Recording</p>
+                        <p className="mt-1 text-[#245C4F]">
+                          {selected.recording_drive_url ? "Recording is available." : "Recording appears after Google finishes processing it."}
+                        </p>
+                      </div>
+                      {showRecordingSync ? (
+                        <button
+                          type="button"
+                          onClick={handleSyncRecording}
+                          disabled={syncingRecordingId === selected.id}
+                          className="inline-flex items-center justify-center gap-2 rounded-full border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-2 text-sm font-semibold text-[#0D5C48] disabled:opacity-70"
+                        >
+                          <RefreshCw className={`h-4 w-4 ${syncingRecordingId === selected.id ? "animate-spin" : ""}`} />
+                          Sync Recording
+                        </button>
                       ) : null}
                     </div>
-                  ) : null}
-                </div>
+                    {selected.recording_drive_url ? (
+                      <a
+                        href={selected.recording_drive_url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="mt-4 inline-flex items-center gap-2 rounded-full bg-[linear-gradient(135deg,#0D3B2E,#0D5C48)] px-4 py-2 text-sm font-semibold text-[#FFF5D6]"
+                      >
+                        <FileVideo className="h-4 w-4" />
+                        Open Recording
+                      </a>
+                    ) : null}
+                  </div>
+                ) : null}
               </div>
             </div>
-          ) : null}
-        </section>
+          </div>
+        ) : null}
 
         {showRecords ? (
           <section className="relative overflow-hidden rounded-[2rem] border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(250,247,240,0.98))] shadow-[0_20px_70px_-36px_rgba(13,59,46,0.18)]">
@@ -651,7 +554,7 @@ export default function PublicEventsManagementPage({
                     onBlur={() => setOpenFilterSelect("")}
                     onChange={(event) => {
                       setOpenFilterSelect("");
-                      setTableFilters((current) => ({ ...current, lifecycle: event.target.value }));
+                      updateTableFilters({ ...tableFilters, lifecycle: event.target.value });
                     }}
                     className="w-full appearance-none rounded-2xl border border-[#2D8A6A]/20 bg-white px-4 py-3 pr-11 text-sm text-[#063F32] outline-none focus:border-[#2D8A6A]"
                   >
@@ -672,7 +575,7 @@ export default function PublicEventsManagementPage({
                     onBlur={() => setOpenFilterSelect("")}
                     onChange={(event) => {
                       setOpenFilterSelect("");
-                      setTableFilters((current) => ({ ...current, publication: event.target.value }));
+                      updateTableFilters({ ...tableFilters, publication: event.target.value });
                     }}
                     className="w-full appearance-none rounded-2xl border border-[#2D8A6A]/20 bg-white px-4 py-3 pr-11 text-sm text-[#063F32] outline-none focus:border-[#2D8A6A]"
                   >
@@ -692,7 +595,7 @@ export default function PublicEventsManagementPage({
                     onBlur={() => setOpenFilterSelect("")}
                     onChange={(event) => {
                       setOpenFilterSelect("");
-                      setTableFilters((current) => ({ ...current, column: event.target.value }));
+                      updateTableFilters({ ...tableFilters, column: event.target.value });
                     }}
                     className="w-full appearance-none rounded-2xl border border-[#2D8A6A]/20 bg-white px-4 py-3 pr-11 text-sm text-[#063F32] outline-none focus:border-[#2D8A6A]"
                   >
@@ -709,7 +612,7 @@ export default function PublicEventsManagementPage({
                   <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#2D8A6A]" />
                   <input
                     value={tableFilters.search}
-                    onChange={(event) => setTableFilters((current) => ({ ...current, search: event.target.value }))}
+                    onChange={(event) => updateTableFilters({ ...tableFilters, search: event.target.value })}
                     placeholder="Search in selected column"
                     className="w-full rounded-2xl border border-[#2D8A6A]/20 bg-white py-3 pl-11 pr-4 text-sm text-[#063F32] outline-none focus:border-[#2D8A6A]"
                   />

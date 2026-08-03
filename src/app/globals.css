@@ -132,3 +132,104 @@ textarea,
     transform: translateX(250%);
   }
 }
+
+/* FullCalendar Styles */
+.fc {
+  --fc-border-color: rgba(13, 92, 72, 0.12);
+  --fc-page-bg-color: #ffffff;
+  --fc-neutral-bg-color: #faf7f0;
+  --fc-today-bg-color: rgba(201, 162, 39, 0.08);
+  --fc-now-indicator-color: #c94f4f;
+}
+
+.fc .fc-toolbar.fc-header-toolbar {
+  margin-bottom: 1rem;
+}
+
+.fc .fc-toolbar-title {
+  color: #063f32;
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.fc .fc-button {
+  border-radius: 999px;
+  border: 1px solid rgba(45, 138, 106, 0.16);
+  background: #ffffff;
+  color: #245c4f;
+  box-shadow: none;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+
+.fc .fc-button:hover,
+.fc .fc-button:focus {
+  background: #f1eadc;
+  color: #063f32;
+  box-shadow: none;
+}
+
+.fc .fc-button-primary:not(:disabled).fc-button-active,
+.fc .fc-button-primary:not(:disabled):active {
+  border-color: rgba(201, 162, 39, 0.45);
+  background: linear-gradient(135deg, #c9a227, #e4c766);
+  color: #063f32;
+  box-shadow: 0 10px 24px -14px rgba(201, 162, 39, 0.5);
+}
+
+.fc .fc-scrollgrid,
+.fc .fc-timegrid-slot,
+.fc .fc-timegrid-axis,
+.fc .fc-col-header-cell,
+.fc .fc-daygrid-day,
+.fc .fc-daygrid-day-frame {
+  border-color: rgba(13, 92, 72, 0.12) !important;
+}
+
+.fc .fc-col-header-cell {
+  background: #faf7f0;
+}
+
+.fc .fc-col-header-cell-cushion {
+  padding: 0.9rem 0.35rem;
+  color: #063f32;
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.fc .fc-timegrid-axis-cushion,
+.fc .fc-timegrid-slot-label-cushion {
+  color: #245c4f;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.fc .fc-timegrid-slot {
+  height: 4.2rem;
+  background-image: linear-gradient(to bottom, rgba(13, 92, 72, 0.03), rgba(13, 92, 72, 0.03));
+  background-size: 100% 1px;
+  background-repeat: no-repeat;
+  background-position: bottom;
+}
+
+.fc .fc-timegrid-col-frame {
+  min-height: 100%;
+}
+
+.fc .fc-timegrid-now-indicator-line {
+  border-color: #c94f4f;
+  border-width: 2px;
+}
+
+.fc .fc-timegrid-now-indicator-arrow {
+  border-left-color: #c94f4f;
+  border-right-color: #c94f4f;
+}
+
+.fc .fc-event {
+  border: none !important;
+  box-shadow: 0 10px 22px -16px rgba(13, 59, 46, 0.45);
+}

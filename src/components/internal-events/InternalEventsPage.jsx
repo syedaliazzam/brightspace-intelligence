@@ -1,13 +1,24 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import FullCalendar from "@fullcalendar/react";
-import dayGridPlugin from "@fullcalendar/daygrid";
-import timeGridPlugin from "@fullcalendar/timegrid";
-import interactionPlugin from "@fullcalendar/interaction";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { ChevronDown, Copy, FileVideo, Link as LinkIcon, Plus, RefreshCw } from "lucide-react";
 
 const APP_TIMEZONE = "Asia/Karachi";
+
+const VISIBILITY_ROLE_OPTIONS = [
+  { value: "admin", label: "Admin" },
+  { value: "teacher", label: "Teacher" },
+  { value: "parent", label: "Parents" },
+  { value: "superadmin", label: "Super Admin" },
+];
+
+function toggleRoleSelection(currentRoles = [], role) {
+  if (!role) return currentRoles;
+  const nextRoles = currentRoles.includes(role)
+    ? currentRoles.filter((item) => item !== role)
+    : [...currentRoles, role];
+  return Array.from(new Set(nextRoles));
+}
 
 function toPakistanDateTimeInput(value) {
   if (!value) return "";
@@ -42,34 +53,55 @@ function roleLabel(value) {
 }
 
 function eventStatus(item) {
-  const status = String(item?.status || "scheduled").toLowerCase();
+  const status = String(item?.status || "").toLowerCase();
+  const start = item?.scheduled_start ? new Date(item.scheduled_start) : null;
+  const end = item?.scheduled_end ? new Date(item.scheduled_end) : null;
+  const now = new Date();
+
   if (status === "cancelled") return "Cancelled";
-  const now = Date.now();
-  const startTime = new Date(item?.scheduled_start || 0).getTime();
-  const endTime = new Date(item?.scheduled_end || 0).getTime();
-  if (Number.isFinite(startTime) && now < startTime) return "Upcoming";
-  if (Number.isFinite(endTime) && now <= endTime) return "Live";
-  return "Ended";
+  if (status === "live") return "Live";
+  if (status === "completed" || status === "completed_by_teacher" || status === "verified_by_coordinator") return "Completed";
+  if (status === "missed" || status === "rescheduled" || status === "disputed") return "Follow-up";
+  if (status === "ended") return "Ended";
+
+  if (start && end) {
+    if (now > end) return "Ended";
+    if (now >= start && now <= end) return "Live";
+    return "Upcoming";
+  }
+
+  if (status === "upcoming" || status === "scheduled") return "Upcoming";
+
+  return "Upcoming";
 }
 
-function getEventPalette(item) {
-  const status = eventStatus(item).toLowerCase();
-  if (status === "live") return { background: "#2563EB", border: "#1D4ED8", text: "#FFFFFF" };
-  if (status === "upcoming") return { background: "#75797D", border: "#666A6E", text: "#FFFFFF" };
-  if (status === "cancelled") return { background: "#B91C1C", border: "#991B1B", text: "#FFFFFF" };
-  return { background: "#75797D", border: "#666A6E", text: "#FFFFFF" };
-}
+function statusTone(item) {
+  const status = String(item?.status || "").toLowerCase();
+  const start = item?.scheduled_start ? new Date(item.scheduled_start) : null;
+  const end = item?.scheduled_end ? new Date(item.scheduled_end) : null;
+  const now = new Date();
 
-function canShowRecordingSection(item) {
-  const status = eventStatus(item).toLowerCase();
-  return status === "live" || status === "ended";
+  if (status === "cancelled") return "bg-[#FDECEC] text-[#B91C1C]";
+  if (status === "live") return "bg-[#EAF6EF] text-[#0D5C48]";
+  if (status === "completed" || status === "completed_by_teacher" || status === "verified_by_coordinator") return "bg-[#EAF6EF] text-[#0D5C48]";
+  if (status === "missed" || status === "rescheduled" || status === "disputed") return "bg-[#FFF7ED] text-[#C2410C]";
+  if (status === "ended") return "bg-[#F1EADC] text-[#7A5E2B]";
+
+  if (start && end) {
+    if (now > end) return "bg-[#F1EADC] text-[#7A5E2B]";
+    if (now >= start && now <= end) return "bg-[#EAF6EF] text-[#0D5C48]";
+    return "bg-[#EEF4FF] text-[#1D4ED8]";
+  }
+
+  if (status === "upcoming" || status === "scheduled") return "bg-[#EEF4FF] text-[#1D4ED8]";
+
+  return "bg-[#EEF4FF] text-[#1D4ED8]";
 }
 
 export default function InternalEventsPage({
   portalLabel = "Coordinator portal",
   canCreate = true,
 } = {}) {
-  const calendarRef = useRef(null);
   const [items, setItems] = useState([]);
   const [attendees, setAttendees] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -77,10 +109,9 @@ export default function InternalEventsPage({
   const [syncingId, setSyncingId] = useState("");
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
-  const [copiedMeetLink, setCopiedMeetLink] = useState("");
-  const [selected, setSelected] = useState(null);
   const [attendeeOpen, setAttendeeOpen] = useState(false);
   const [search, setSearch] = useState("");
+  const [visibleToRoles, setVisibleToRoles] = useState([]);
   const [form, setForm] = useState({
     title: "",
     description: "",
@@ -133,25 +164,6 @@ export default function InternalEventsPage({
     return () => window.clearTimeout(timer);
   }, [message]);
 
-  const calendarEvents = useMemo(
-    () =>
-      items.map((item) => {
-        const palette = getEventPalette(item);
-        return {
-          id: item.id,
-          title: item.title,
-          start: toPakistanDateTimeInput(item.scheduled_start),
-          end: toPakistanDateTimeInput(item.scheduled_end),
-          allDay: false,
-          backgroundColor: palette.background,
-          borderColor: palette.border,
-          textColor: palette.text,
-          extendedProps: item,
-        };
-      }),
-    [items]
-  );
-
   const summary = useMemo(
     () => ({
       total: items.length,
@@ -165,12 +177,11 @@ export default function InternalEventsPage({
     event.preventDefault();
     setCreating(true);
     setError("");
-    const createdEventDate = form.scheduledStart;
     try {
       const response = await fetch("/api/internal-events", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
+        body: JSON.stringify({ ...form, visibleToRoles }),
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data?.message || "Unable to create event.");
@@ -182,44 +193,12 @@ export default function InternalEventsPage({
         scheduledStart: "",
         scheduledEnd: "",
       });
+      setVisibleToRoles([]);
       await load();
-      calendarRef.current?.getApi?.().gotoDate?.(new Date(createdEventDate));
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : "Unable to create event.");
     } finally {
       setCreating(false);
-    }
-  }
-
-  async function handleCopy(value, label = "Link copied.") {
-    if (!value) return;
-    try {
-      await navigator.clipboard.writeText(value);
-      setCopiedMeetLink(value);
-      setMessage(label);
-      window.setTimeout(() => setCopiedMeetLink(""), 2200);
-    } catch {
-      setMessage("Unable to copy link.");
-    }
-  }
-
-  async function handleSyncRecording() {
-    if (!selected?.id) return;
-    setSyncingId(selected.id);
-    try {
-      const response = await fetch(`/api/internal-events/${selected.id}/recording-sync`, {
-        method: "POST",
-      });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data?.message || "Unable to sync recording.");
-      const recordingUrl = data.recording_drive_url || "";
-      setMessage(data?.message || "Recording sync checked.");
-      setSelected((current) => current ? { ...current, recording_drive_url: recordingUrl || current.recording_drive_url } : current);
-      await load();
-    } catch (syncError) {
-      setMessage(syncError instanceof Error ? syncError.message : "Unable to sync recording.");
-    } finally {
-      setSyncingId("");
     }
   }
 
@@ -321,6 +300,45 @@ export default function InternalEventsPage({
                   className="w-full rounded-2xl border border-[#2D8A6A]/20 bg-white px-4 py-3 text-sm outline-none focus:border-[#2D8A6A] focus:ring-2 focus:ring-[#2D8A6A]/20"
                 />
               </label>
+              <fieldset className="block lg:col-span-2">
+                <legend className="mb-2 block text-sm font-semibold text-[#245C4F]">Visible to portals</legend>
+
+                <div className="rounded-2xl border border-[#2D8A6A]/20 bg-white p-3">
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+                    {VISIBILITY_ROLE_OPTIONS.map((option) => {
+                      const checked = visibleToRoles.includes(option.value);
+                      const inputId = `visibility-role-${option.value}`;
+
+                      return (
+                        <label
+                          key={option.value}
+                          htmlFor={inputId}
+                          className={`flex cursor-pointer items-center gap-3 rounded-xl border px-3 py-2 text-sm transition ${
+                            checked
+                              ? "border-[#2D8A6A] bg-[#EAF6EF]"
+                              : "border-[#2D8A6A]/10 bg-[#FAF7F0]"
+                          }`}
+                        >
+                          <input
+                            id={inputId}
+                            type="checkbox"
+                            value={option.value}
+                            checked={checked}
+                            onChange={() => {
+                              setVisibleToRoles((currentRoles) => toggleRoleSelection(currentRoles, option.value));
+                            }}
+                            className="h-4 w-4 rounded border-[#2D8A6A] text-[#0D5C48] focus:ring-[#2D8A6A]"
+                          />
+
+                          <span className="font-medium text-[#245C4F]">{option.label}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <p className="mt-2 text-xs text-[#2D8A6A]">Select one or more roles. Leave empty to show the event to all portals.</p>
+              </fieldset>
               <div className="lg:col-span-2">
                 <button
                   type="submit"
@@ -348,130 +366,56 @@ export default function InternalEventsPage({
 
         {error ? <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">{error}</div> : null}
 
-        <div className="relative rounded-[1.75rem] bg-[#FAF7F0] p-0 shadow-[0_20px_70px_-36px_rgba(13,59,46,0.18)]">
-          <div className="overflow-hidden rounded-[1.5rem] border border-[#2D8A6A]/15 bg-white p-3">
-            <FullCalendar
-              ref={calendarRef}
-              plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
-              initialView="timeGridWeek"
-              headerToolbar={{ left: "prev,next today", center: "title", right: "dayGridMonth,timeGridWeek" }}
-              events={calendarEvents}
-              eventClick={(info) => setSelected(info.event.extendedProps)}
-              height="auto"
-              nowIndicator
-              editable={false}
-              selectable={false}
-              weekends
-              allDaySlot={false}
-              timeZone="local"
-              eventDisplay="block"
-              eventTimeFormat={{ hour: "numeric", minute: "2-digit", hour12: true }}
-              slotMinTime="08:00:00"
-              slotMaxTime="18:00:00"
-              scrollTime="08:00:00"
-              slotDuration="01:00:00"
-              expandRows
-              eventClassNames={() => ["cursor-pointer"]}
-              eventContent={(arg) => (
-                <div className="overflow-hidden px-1 text-[11px] leading-tight text-white">
-                  <div className="truncate font-semibold">{arg.event.title}</div>
-                  {arg.event.extendedProps?.attendee_name ? (
-                    <div className="truncate text-[10px] text-white/90">{arg.event.extendedProps.attendee_name}</div>
-                  ) : null}
-                </div>
-              )}
-            />
-            {loading ? <p className="mt-3 text-sm text-[#245C4F]">Loading events...</p> : null}
+        <section className="rounded-[1.75rem] border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(250,247,240,0.98)_100%)] shadow-[0_20px_70px_-36px_rgba(13,59,46,0.18)]">
+          <div className="flex items-center justify-between border-b border-[#2D8A6A]/10 px-5 py-5">
+            <h2 className="text-lg font-semibold text-[#063F32]">Event records</h2>
+            <span className="rounded-full bg-[#EAF6EF] px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]">
+              {items.length} items
+            </span>
           </div>
 
-          {selected ? (
-            <div className="absolute inset-0 z-[9999] flex items-center justify-center rounded-[1.75rem] px-4 py-8 sm:px-6">
-              <div className="absolute inset-0 rounded-[1.75rem] bg-[#063F32]/45 backdrop-blur-sm" />
-              <div className="relative max-h-[calc(100%-4rem)] w-full max-w-4xl overflow-y-auto rounded-[2rem] border border-[#2D8A6A]/15 bg-[#FAF7F0] shadow-[0_24px_80px_-36px_rgba(13,59,46,0.24)]">
-                <div className="flex items-start justify-between gap-4 border-b border-[#F1EADC] px-6 py-4">
-                  <div>
-                    <p className="text-sm font-semibold uppercase tracking-[0.24em] text-[#C9A227]">Event details</p>
-                    <h2 className="mt-2 text-2xl font-semibold text-[#063F32]">{selected.title}</h2>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setSelected(null)}
-                    className="rounded-xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-3 py-2 text-sm font-semibold text-[#063F32] transition hover:bg-[#F1EADC]"
-                  >
-                    Close
-                  </button>
-                </div>
-                <div className="space-y-4 p-6 text-sm text-[#245C4F]">
-                  <div className="grid gap-3 md:grid-cols-3">
-                    {[
-                      ["Host", `${selected.host_name || "Coordinator"}${selected.host_meet_role ? ` - ${roleLabel(selected.host_meet_role)}` : ""}`],
-                      ["Attendee", `${selected.attendee_name || "-"}${selected.attendee_meet_role ? ` - ${roleLabel(selected.attendee_meet_role)}` : selected.attendee_role ? ` - ${roleLabel(selected.attendee_role)}` : ""}`],
-                      ["Start", formatDateTime(selected.scheduled_start)],
-                      ["End", formatDateTime(selected.scheduled_end)],
-                      ["Description", selected.description || "Not available"],
-                    ].map(([label, value]) => (
-                      <div key={label} className="rounded-2xl border border-[#2D8A6A]/12 bg-white px-4 py-3">
-                        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]">{label}</p>
-                        <p className="mt-1 whitespace-pre-line text-[#245C4F]">{value}</p>
-                      </div>
-                    ))}
-                  </div>
-
-                  {selected.google_last_error ? (
-                    <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-amber-800">
-                      {selected.google_last_error}
-                    </div>
-                  ) : null}
-
-                  {selected.google_meet_link ? (
-                    <div className="rounded-2xl border border-[#2D8A6A]/15 bg-[#FAF7F0] p-4">
-                      <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#C9A227]">Meet link</p>
-                      <p className="mt-2 break-all text-sm text-[#245C4F]">{selected.google_meet_link}</p>
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        <a href={selected.google_meet_link} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 rounded-full bg-[linear-gradient(135deg,#0D3B2E,#0D5C48)] px-4 py-2 text-sm font-semibold text-[#FFF5D6]">
-                          <LinkIcon className="h-4 w-4" />
-                          Join Event
-                        </a>
-                        <button type="button" onClick={() => handleCopy(selected.google_meet_link, "Meet link copied.")} className="inline-flex items-center gap-2 rounded-full border border-[#2D8A6A]/20 bg-white px-4 py-2 text-sm font-semibold text-[#0D5C48]">
-                          <Copy className="h-4 w-4" />
-                          {copiedMeetLink && copiedMeetLink === selected.google_meet_link ? "Copied" : "Copy"}
-                        </button>
-                      </div>
-                    </div>
-                  ) : null}
-
-                  {canShowRecordingSection(selected) ? (
-                    <div className="rounded-2xl border border-[#2D8A6A]/15 bg-white p-4">
-                      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                        <div>
-                          <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#C9A227]">Recording</p>
-                          <p className="mt-1 text-[#245C4F]">
-                            {selected.recording_drive_url ? "Recording is available." : "Recording appears after Google finishes processing it."}
-                          </p>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={handleSyncRecording}
-                          disabled={syncingId === selected.id}
-                          className="inline-flex items-center justify-center gap-2 rounded-full border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-2 text-sm font-semibold text-[#0D5C48] disabled:opacity-70"
-                        >
-                          <RefreshCw className={`h-4 w-4 ${syncingId === selected.id ? "animate-spin" : ""}`} />
-                          Sync Recording
-                        </button>
-                      </div>
-                      {selected.recording_drive_url ? (
-                        <a href={selected.recording_drive_url} target="_blank" rel="noreferrer" className="mt-4 inline-flex items-center gap-2 rounded-full bg-[linear-gradient(135deg,#0D3B2E,#0D5C48)] px-4 py-2 text-sm font-semibold text-[#FFF5D6]">
-                          <FileVideo className="h-4 w-4" />
-                          Open Recording
-                        </a>
-                      ) : null}
-                    </div>
-                  ) : null}
-                </div>
-              </div>
-            </div>
-          ) : null}
-        </div>
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-left text-sm text-[#245C4F]">
+              <thead className="bg-[#FAF7F0] text-xs uppercase tracking-[0.18em] text-[#0D5C48]">
+                <tr>
+                  <th className="px-5 py-3 font-semibold">Title</th>
+                  <th className="px-5 py-3 font-semibold">Host</th>
+                  <th className="px-5 py-3 font-semibold">Attendee</th>
+                  <th className="px-5 py-3 font-semibold">Start</th>
+                  <th className="px-5 py-3 font-semibold">End</th>
+                  <th className="px-5 py-3 font-semibold">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {items.length ? (
+                  items.map((item) => (
+                    <tr
+                      key={item.id}
+                      className="border-t border-[#2D8A6A]/10 transition"
+                    >
+                      <td className="px-5 py-4 font-medium text-[#063F32]">{item.title}</td>
+                      <td className="px-5 py-4">{item.host_name || "Coordinator"}</td>
+                      <td className="px-5 py-4">{item.attendee_name || "-"}</td>
+                      <td className="px-5 py-4">{formatDateTime(item.scheduled_start)}</td>
+                      <td className="px-5 py-4">{formatDateTime(item.scheduled_end)}</td>
+                      <td className="px-5 py-4">
+                        <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${statusTone(item)}`}>
+                          {eventStatus(item)}
+                        </span>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={6} className="px-5 py-8 text-center text-[#245C4F]">
+                      {loading ? "Loading events..." : "No internal events available."}
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </section>
 
         {message ? (
           <div className="fixed right-4 top-4 z-[10000] rounded-2xl border border-[#2D8A6A]/20 bg-[linear-gradient(135deg,#0D3B2E,#0D5C48)] px-4 py-3 text-sm font-semibold text-[#FFF5D6] shadow-[0_18px_40px_-24px_rgba(13,59,46,0.55)]">
@@ -481,44 +425,6 @@ export default function InternalEventsPage({
 
       </div>
 
-      <style jsx global>{`
-        .fc {
-          --fc-border-color: rgba(13, 92, 72, 0.12);
-          --fc-page-bg-color: #ffffff;
-          --fc-neutral-bg-color: #faf7f0;
-          --fc-today-bg-color: rgba(201, 162, 39, 0.08);
-          --fc-now-indicator-color: #c94f4f;
-        }
-        .fc .fc-toolbar.fc-header-toolbar { margin-bottom: 1rem; }
-        .fc .fc-toolbar-title { color: #063f32; font-size: 1.05rem; font-weight: 700; }
-        .fc .fc-button {
-          border-radius: 999px;
-          border: 1px solid rgba(45, 138, 106, 0.16);
-          background: #ffffff;
-          color: #245c4f;
-          box-shadow: none;
-          font-weight: 600;
-          text-transform: capitalize;
-        }
-        .fc .fc-button:hover,
-        .fc .fc-button:focus { background: #f1eadc; color: #063f32; box-shadow: none; }
-        .fc .fc-button-primary:not(:disabled).fc-button-active,
-        .fc .fc-button-primary:not(:disabled):active {
-          border-color: rgba(201, 162, 39, 0.45);
-          background: linear-gradient(135deg, #c9a227, #e4c766);
-          color: #063f32;
-          box-shadow: 0 10px 24px -14px rgba(201, 162, 39, 0.5);
-        }
-        .fc .fc-scrollgrid,
-        .fc .fc-timegrid-slot,
-        .fc .fc-timegrid-axis,
-        .fc .fc-col-header-cell,
-        .fc .fc-daygrid-day,
-        .fc .fc-daygrid-day-frame { border-color: rgba(13, 92, 72, 0.12) !important; }
-        .fc .fc-col-header-cell { background: #faf7f0; }
-        .fc .fc-timegrid-slot { height: 4.2rem; }
-        .fc .fc-event { border-radius: 0.9rem; padding: 0.15rem; }
-      `}</style>
     </div>
   );
 }

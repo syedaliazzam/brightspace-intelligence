@@ -3,8 +3,9 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { createCalendarLectureEvent, extractMeetCodeFromLink } from "@/lib/googleCalendar";
 import prisma from "@/lib/prisma";
+import { isEventVisibleToRole, normalizeVisibleRoles } from "@/lib/internalEventsVisibility";
 
-const READ_ROLES = new Set(["admin", "coordinator", "superadmin", "teacher"]);
+const READ_ROLES = new Set(["admin", "coordinator", "superadmin", "teacher", "parent"]);
 const WRITE_ROLES = new Set(["admin", "coordinator", "superadmin"]);
 
 function json(message, status = 200, extra = {}) {
@@ -162,6 +163,7 @@ export async function GET(request) {
         ie.recording_drive_url,
         ie.recording_synced_at,
         ie.google_last_error,
+        ie.visible_to_roles,
         host.id::text AS host_user_id,
         host.full_name AS host_name,
         host.email AS host_email,
@@ -181,7 +183,18 @@ export async function GET(request) {
       ...values
     );
 
-    return json("Internal events fetched.", 200, { items });
+    const visibleItems = items.filter((item) => isEventVisibleToRole(item?.visible_to_roles, role));
+    const searchableItems = search
+      ? visibleItems.filter((item) => {
+          const haystack = [item?.title, item?.description, item?.attendee_name, item?.host_name]
+            .filter(Boolean)
+            .join(" ")
+            .toLowerCase();
+          return haystack.includes(search.toLowerCase());
+        })
+      : visibleItems;
+
+    return json("Internal events fetched.", 200, { items: searchableItems });
   } catch (error) {
     return json(error instanceof Error ? error.message : "Unable to load internal events.", 500);
   }
@@ -201,6 +214,10 @@ export async function POST(request) {
     const attendeeUserId = clean(body?.attendeeUserId);
     const scheduledStart = parseDateTime(body?.scheduledStart);
     const scheduledEnd = parseDateTime(body?.scheduledEnd);
+    const visibleToRoles = normalizeVisibleRoles(body?.visibleToRoles ?? body?.visible_to_roles ?? []);
+    if (role === "coordinator" && !visibleToRoles.includes("coordinator")) {
+      visibleToRoles.push("coordinator");
+    }
 
     if (!title) return json("Event title is required.", 400);
     if (!attendeeUserId) return json("Attendee is required.", 400);
@@ -210,6 +227,9 @@ export async function POST(request) {
 
     const eventId = crypto.randomUUID();
     const attendee = await getAttendee(attendeeUserId);
+    const visibleToRolesSql = visibleToRoles.length
+      ? `ARRAY[${visibleToRoles.map((role) => `'${String(role).replace(/'/g, "''")}'`).join(", ")}]::text[]`
+      : "NULL";
     if (!attendee?.id) throw new Error("Selected attendee is not available.");
 
     const coordinator = await getFirstCoordinator();
@@ -245,6 +265,12 @@ export async function POST(request) {
       )
       RETURNING id::text AS id
     `;
+
+    await prisma.$executeRawUnsafe(`
+      UPDATE internal_events
+      SET visible_to_roles = ${visibleToRolesSql}
+      WHERE id = '${created.id}'::uuid
+    `);
 
     let calendarError = "";
     try {

@@ -38,8 +38,8 @@ function toCalendarDate(date) {
 
 function mapClassSchedulerEvents(items = []) {
   return (items || []).map((item) => {
-    const start = parseDateTime(item?.rescheduled_start || item?.scheduled_start || item?.rescheduledStartTime || item?.scheduledStart);
-    const end = parseDateTime(item?.rescheduled_end || item?.scheduled_end || item?.rescheduledEndTime || item?.scheduledEnd);
+    const start = parseDateTime(item?.rescheduled_start || item?.scheduled_start);
+    const end = parseDateTime(item?.rescheduled_end || item?.scheduled_end);
     const title = item?.title || item?.subject_name || "Class scheduler";
 
     return {
@@ -53,7 +53,7 @@ function mapClassSchedulerEvents(items = []) {
       extendedProps: {
         type: "class-schedulers",
         typeLabel: "Class",
-        subtitle: item?.subject_name || item?.class_level || item?.course_title || "Class schedule",
+        subtitle: item?.subject_name || item?.class_level || "Class schedule",
         meetLink: item?.google_meet_link || "",
         recordingLink: item?.event_detail_link?.href || "",
         recordingKind: item?.event_detail_link?.kind || "",
@@ -91,8 +91,8 @@ function mapPublicEvents(items = []) {
 
 function mapInternalEvents(items = []) {
   return (items || []).map((item) => {
-    const start = parseDateTime(item?.scheduled_start || item?.scheduledStart);
-    const end = parseDateTime(item?.scheduled_end || item?.scheduledEnd);
+    const start = parseDateTime(item?.scheduled_start);
+    const end = parseDateTime(item?.scheduled_end);
 
     return {
       id: `internal-${item.id}`,
@@ -105,23 +105,20 @@ function mapInternalEvents(items = []) {
       extendedProps: {
         type: "internal-events",
         typeLabel: "Internal",
-        subtitle: item?.host_name || item?.attendee_name || "Internal event",
+        subtitle: item?.host_name || "Internal event",
         meetLink: item?.google_meet_link || item?.meeting_link || "",
         recordingLink: item?.recording_link || item?.event_detail_link?.href || "",
         recordingKind: item?.event_detail_link?.kind || "",
         recordingLabel: item?.event_detail_link?.label || "",
-        eventId: item?.id,
       },
     };
   });
 }
 
-export default function CoordinatorUnifiedCalendarPage() {
+export default function SuperAdminUnifiedCalendarPage() {
   const [activeFilter, setActiveFilter] = useState("all");
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [copiedLink, setCopiedLink] = useState("");
-  const [syncingRecording, setSyncingRecording] = useState(null);
-  const [recordingLinks, setRecordingLinks] = useState({});
   const [state, setState] = useState({
     loading: true,
     error: "",
@@ -149,15 +146,9 @@ export default function CoordinatorUnifiedCalendarPage() {
 
         if (!active) return;
 
-        const errors = [
-          lectureResult.status === "rejected" ? "Unable to load class schedulers." : null,
-          publicResult.status === "rejected" ? "Unable to load public events." : null,
-          internalResult.status === "rejected" ? "Unable to load internal events." : null,
-        ].filter(Boolean);
-
         setState({
           loading: false,
-          error: errors[0] || "",
+          error: "",
           classEvents: Array.isArray(lectureData?.items) ? mapClassSchedulerEvents(lectureData.items) : [],
           publicEvents: Array.isArray(publicData?.items) ? mapPublicEvents(publicData.items) : [],
           internalEvents: Array.isArray(internalData?.items) ? mapInternalEvents(internalData.items) : [],
@@ -180,40 +171,6 @@ export default function CoordinatorUnifiedCalendarPage() {
     };
   }, []);
 
-  const handleSyncRecording = async (eventId) => {
-    setSyncingRecording(eventId);
-    try {
-      const response = await fetch(`/api/internal-events/${eventId}/recording-sync`, {
-        method: "POST",
-        cache: "no-store",
-      });
-
-      const data = await response.json();
-
-      if (data?.recording_drive_url) {
-        setRecordingLinks((prev) => ({
-          ...prev,
-          [eventId]: { link: data.recording_drive_url, kind: "recording", label: "View Recording" },
-        }));
-        if (selectedEvent?.extendedProps?.eventId === eventId) {
-          setSelectedEvent((prev) => ({
-            ...prev,
-            extendedProps: {
-              ...prev.extendedProps,
-              recordingLink: data.recording_drive_url,
-              recordingKind: "recording",
-              recordingLabel: "View Recording",
-            },
-          }));
-        }
-      }
-    } catch (error) {
-      console.error("Sync recording error:", error);
-    } finally {
-      setSyncingRecording(null);
-    }
-  };
-
   const calendarEvents = useMemo(() => {
     const classEvents = activeFilter === "all" || activeFilter === "class-schedulers" ? state.classEvents : [];
     const publicEvents = activeFilter === "all" || activeFilter === "public-events" ? state.publicEvents : [];
@@ -231,13 +188,13 @@ export default function CoordinatorUnifiedCalendarPage() {
           <div className="relative flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
             <div className="max-w-5xl">
               <p className="inline-flex rounded-full border border-[#FFF5D6]/30 bg-[#FFF5D6]/10 px-3 py-1 text-[0.65rem] font-semibold uppercase tracking-[0.24em] text-[#FFF5D6]">
-                Coordinator portal
+                Super Admin portal
               </p>
               <h1 className="mt-4 font-display text-3xl font-bold text-white-deep sm:text-4xl">
                 All Events Calendar
               </h1>
               <p className="mt-3 text-sm leading-7 text-[#EAF6EF] sm:text-base">
-                View class schedulers, public events, and internal events in a single calendar with the filter options you need.
+                View class schedulers, public events, and internal events in a single calendar.
               </p>
             </div>
             <div className="rounded-2xl border border-[#E4C766]/30 bg-[#FAF7F0]/10 px-4 py-3 text-sm text-[#FAF7F0]">
@@ -379,25 +336,16 @@ export default function CoordinatorUnifiedCalendarPage() {
                     </div>
                   </div>
                 )}
-                {(selectedEvent.extendedProps?.recordingLink && selectedEvent.extendedProps.recordingLink !== selectedEvent.extendedProps.meetLink) || recordingLinks[selectedEvent.extendedProps.eventId] ? (
+                {selectedEvent.extendedProps?.recordingLink && selectedEvent.extendedProps.recordingLink !== selectedEvent.extendedProps.meetLink && (
                   <a
-                    href={recordingLinks[selectedEvent.extendedProps.eventId]?.link || selectedEvent.extendedProps.recordingLink}
+                    href={selectedEvent.extendedProps.recordingLink}
                     target="_blank"
                     rel="noreferrer"
-                    className="inline-flex rounded-full bg-[#FAF7F0] text-[#0D5C48] ring-1 ring-[#2D8A6A]/20 px-4 py-2 text-sm font-semibold"
+                    className={`inline-flex rounded-full px-4 py-2 text-sm font-semibold ${selectedEvent.extendedProps.recordingKind === "recording" ? "bg-[#FAF7F0] text-[#0D5C48] ring-1 ring-[#2D8A6A]/20" : "bg-[linear-gradient(135deg,#0D3B2E,#0D5C48)] text-[#FFF5D6]"}`}
                   >
-                    {recordingLinks[selectedEvent.extendedProps.eventId]?.label || selectedEvent.extendedProps.recordingLabel || "View Recording"}
+                    {selectedEvent.extendedProps.recordingLabel || "View Recording"}
                   </a>
-                ) : selectedEvent.extendedProps?.typeLabel === "Internal" ? (
-                  <button
-                    type="button"
-                    onClick={() => handleSyncRecording(selectedEvent.extendedProps.eventId)}
-                    disabled={syncingRecording === selectedEvent.extendedProps.eventId}
-                    className="inline-flex rounded-full bg-[linear-gradient(135deg,#0D3B2E,#0D5C48)] px-4 py-2 text-sm font-semibold text-[#FFF5D6] hover:shadow-lg disabled:opacity-50"
-                  >
-                    {syncingRecording === selectedEvent.extendedProps.eventId ? "Syncing..." : "Sync Recording"}
-                  </button>
-                ) : null}
+                )}
               </div>
             </div>
           </div>

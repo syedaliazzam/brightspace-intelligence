@@ -1,3 +1,5 @@
+"use client";
+
 import InternalEventsPage from "@/components/internal-events/InternalEventsPage";
 
 export default function CoordinatorInternalEventsPage() {
