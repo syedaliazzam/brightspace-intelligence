@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
 import { signIn } from "next-auth/react";
@@ -27,7 +27,7 @@ const item = {
   show: { opacity: 1, y: 0 },
 };
 
-export default function LoginPage() {
+function LoginPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const queryIdentifier =
@@ -339,5 +339,13 @@ export default function LoginPage() {
         </motion.section>
       </div>
     </main>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="flex min-h-screen items-center justify-center bg-[#FAF7F0] text-[#063F32]">Loading...</div>}>
+      <LoginPageContent />
+    </Suspense>
   );
 }
