@@ -27,6 +27,7 @@ export default function LectureScheduleForm({ options, onSuccess }) {
   const [teachersLoading, setTeachersLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [toast, setToast] = useState("");
+  const [toastIsError, setToastIsError] = useState(false);
   const assignmentLookupRef = useRef(0);
   const [classOpen, setClassOpen] = useState(false);
   const [subjectOpen, setSubjectOpen] = useState(false);
@@ -178,10 +179,13 @@ export default function LectureScheduleForm({ options, onSuccess }) {
     setTeacherOpen(false);
   }
 
-  function showToast(message) {
+  function showToast(message, isError = false) {
     setToast(message);
+    setToastIsError(isError);
     window.clearTimeout(window.__lectureScheduleToastTimer);
-    window.__lectureScheduleToastTimer = window.setTimeout(() => setToast(""), 2800);
+    // Show errors longer (8 seconds) than success messages (2.8 seconds)
+    const duration = isError ? 8000 : 2800;
+    window.__lectureScheduleToastTimer = window.setTimeout(() => setToast(""), duration);
   }
 
   function toggleStudent(studentId) {
@@ -257,7 +261,9 @@ export default function LectureScheduleForm({ options, onSuccess }) {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data?.message || "Unable to schedule lecture.");
+        const errorMsg = data?.message || data?.error || "Unable to schedule lecture.";
+        console.error("Lecture scheduling error:", { status: response.status, data, errorMsg });
+        throw new Error(errorMsg);
       }
 
       setForm({
@@ -280,7 +286,8 @@ export default function LectureScheduleForm({ options, onSuccess }) {
       setTeacherNotice("");
       onSuccess?.();
     } catch (error) {
-      showToast(error instanceof Error ? error.message : "Unable to schedule lecture.");
+      const errorMsg = error instanceof Error ? error.message : "Unable to schedule lecture.";
+      showToast(errorMsg, true);
     } finally {
       setSubmitting(false);
     }
@@ -289,7 +296,11 @@ export default function LectureScheduleForm({ options, onSuccess }) {
   return (
     <>
       {toast ? (
-        <div className="fixed right-6 top-6 z-[90] rounded-2xl border border-[#2D8A6A]/20 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(250,247,240,0.98)_100%)] px-4 py-3 text-sm font-semibold text-[#063F32] shadow-[0_18px_60px_-36px_rgba(13,59,46,0.22)] backdrop-blur-xl">
+        <div className={`fixed right-6 top-6 z-[90] rounded-2xl border px-4 py-3 text-sm font-semibold shadow-[0_18px_60px_-36px_rgba(13,59,46,0.22)] backdrop-blur-xl ${
+          toastIsError
+            ? "border-red-300 bg-red-50 text-red-800"
+            : "border-[#2D8A6A]/20 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(250,247,240,0.98)_100%)] text-[#063F32]"
+        }`}>
           {toast}
         </div>
       ) : null}

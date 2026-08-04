@@ -553,6 +553,10 @@ export async function POST(request) {
       return json("No lecture days fall within the selected date range.", 400);
     }
 
+    if (occurrenceDates.length > 200) {
+      return json("Cannot create more than 200 lectures at once. Please reduce the date range or select fewer days.", 400);
+    }
+
     function formatScheduleDate(date, hours, minutes) {
       const scheduled = new Date(date);
       scheduled.setHours(hours, minutes, 0, 0);
@@ -776,15 +780,18 @@ export async function POST(request) {
 
         return { ids: createdRows.map((row) => row.id) };
       },
-      { timeout: 15000 }
+      { timeout: 600000 }
     );
 
-    await sendLectureLinkEmails({
+    // Send emails asynchronously without blocking response
+    sendLectureLinkEmails({
       teacher,
       enrollmentRows,
       title,
       scheduledStart: firstOccurrenceStart,
       meetLink: firstResolvedMeetLink || manualMeetLink,
+    }).catch((error) => {
+      console.warn("[lecture-schedules] Email batch failed:", error instanceof Error ? error.message : String(error));
     });
 
     await createAuditLog({

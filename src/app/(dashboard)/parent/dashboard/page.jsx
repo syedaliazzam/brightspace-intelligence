@@ -5,6 +5,7 @@ import ChildSwitcher from "@/components/parent/ChildSwitcher";
 import ParentStatsCards from "@/components/parent/ParentStatsCards";
 import ActiveHeadlinesBanner from "@/components/shared/ActiveHeadlinesBanner";
 import UpcomingPublicEventsTicker from "@/components/layout/UpcomingPublicEventsTicker";
+import MonthlyPlanSlider from "@/components/layout/MonthlyPlanSlider";
 
 export default function ParentDashboardPage() {
   const [showAllMonthlyChildren, setShowAllMonthlyChildren] = useState(false);
@@ -99,6 +100,7 @@ export default function ParentDashboardPage() {
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(201,162,39,0.12),transparent_35%),radial-gradient(circle_at_top_right,rgba(45,138,106,0.12),transparent_32%),linear-gradient(180deg,#FAF7F0_0%,#F7F1E3_100%)]" />
       <div className="relative mx-auto max-w-7xl space-y-6 overflow-hidden rounded-[2rem] px-4 py-4 sm:px-6 lg:px-8">
         <UpcomingPublicEventsTicker />
+        <MonthlyPlanSlider />
         {state.monthlyFee && hasUnpaidMonthlyChildren ? (
           <section
             className={`w-full rounded-[2rem] border px-5 py-4 text-sm shadow-[0_20px_70px_-36px_rgba(13,59,46,0.18)] backdrop-blur-xl ${

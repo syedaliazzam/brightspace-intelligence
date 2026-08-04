@@ -1,6 +1,7 @@
 export const dashboardNavigation = {
   superadmin: [
     { label: "Dashboard", href: "/superadmin/dashboard" },
+    { label: "Plan for Month", href: "/superadmin/plan-for-month" },
     { label: "All Events Calendar", href: "/superadmin/class-schedulers" },
     { label: "Event Registrations", href: "/superadmin/public-event-registrations" },
     { label: "Interested Students", href: "/superadmin/interested-students" },
@@ -27,6 +28,7 @@ export const dashboardNavigation = {
   ],
   admin: [
     { label: "Dashboard", href: "/admin/dashboard" },
+    { label: "Plan for Month", href: "/admin/plan-for-month" },
     { label: "All Events Calendar", href: "/admin/class-schedulers" },
     { label: "Event Registrations", href: "/admin/public-event-registrations" },
     { label: "Interested Students", href: "/admin/interested-students" },
@@ -52,6 +54,7 @@ export const dashboardNavigation = {
   ],
   coordinator: [
     { label: "Dashboard", href: "/coordinator/dashboard" },
+    { label: "Plan for Month", href: "/coordinator/plan-for-month" },
     { label: "All Events Calendar", href: "/coordinator/class-schedulers" },
     { label: "Public Events", href: "/coordinator/public-events" },
     { label: "Internal Events", href: "/coordinator/internal-events" },

@@ -64,6 +64,8 @@ function getIconForLabel(label) {
   if (key.includes("internal events")) return CalendarRange;
   if (key.includes("lecture schedule")) return CalendarDays;
   if (key.includes("lecture verification")) return ClipboardCheck;
+  if ((key.includes("plan") || key.includes("planning")) && key.includes("month")) return ClipboardCheck;
+  if (key.includes("plan for month") || key.includes("plan for")) return ClipboardCheck;
   if (key.includes("reports")) return FileText;
   if (key.includes("sent emails") || key.includes("email logs") || key.includes("emails")) return MessageSquareText;
   if (key.includes("lectures")) return BookOpen;
