@@ -381,8 +381,8 @@ export default function InternalEventsPage({
                   <th className="px-5 py-3 font-semibold">Title</th>
                   <th className="px-5 py-3 font-semibold">Host</th>
                   <th className="px-5 py-3 font-semibold">Attendee</th>
-                  <th className="px-5 py-3 font-semibold">Start</th>
-                  <th className="px-5 py-3 font-semibold">End</th>
+                  <th className="px-5 py-3 font-semibold">Start time</th>
+                  <th className="px-5 py-3 font-semibold">End time</th>
                   <th className="px-5 py-3 font-semibold">Status</th>
                 </tr>
               </thead>

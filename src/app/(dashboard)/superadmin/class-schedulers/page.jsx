@@ -55,9 +55,11 @@ function mapClassSchedulerEvents(items = []) {
         typeLabel: "Class",
         subtitle: item?.subject_name || item?.class_level || "Class schedule",
         meetLink: item?.google_meet_link || "",
-        recordingLink: item?.event_detail_link?.href || "",
-        recordingKind: item?.event_detail_link?.kind || "",
-        recordingLabel: item?.event_detail_link?.label || "",
+        recordingLink: item?.recording_drive_url || item?.event_detail_link?.href || "",
+        recordingKind: item?.recording_drive_url ? "recording" : item?.event_detail_link?.kind || "",
+        recordingLabel: item?.recording_drive_url ? "View Recording" : item?.event_detail_link?.label || "",
+        eventId: item?.id,
+        eventType: "class-schedulers",
       },
     };
   });
@@ -81,9 +83,11 @@ function mapPublicEvents(items = []) {
         typeLabel: "Public",
         subtitle: item?.publication_status || "Public event",
         meetLink: item?.meet_link || item?.google_meet_link || item?.meeting_link || "",
-        recordingLink: item?.recording_link || item?.event_detail_link?.href || "",
-        recordingKind: item?.event_detail_link?.kind || "",
-        recordingLabel: item?.event_detail_link?.label || "",
+        recordingLink: item?.recording_drive_url || item?.recording_link || item?.event_detail_link?.href || "",
+        recordingKind: item?.recording_drive_url ? "recording" : item?.event_detail_link?.kind || "",
+        recordingLabel: item?.recording_drive_url ? "View Recording" : item?.event_detail_link?.label || "",
+        eventId: item?.id,
+        eventType: "public-events",
       },
     };
   });
@@ -107,9 +111,11 @@ function mapInternalEvents(items = []) {
         typeLabel: "Internal",
         subtitle: item?.host_name || "Internal event",
         meetLink: item?.google_meet_link || item?.meeting_link || "",
-        recordingLink: item?.recording_link || item?.event_detail_link?.href || "",
-        recordingKind: item?.event_detail_link?.kind || "",
-        recordingLabel: item?.event_detail_link?.label || "",
+        recordingLink: item?.recording_drive_url || item?.recording_link || item?.event_detail_link?.href || "",
+        recordingKind: item?.recording_drive_url ? "recording" : item?.event_detail_link?.kind || "",
+        recordingLabel: item?.recording_drive_url ? "View Recording" : item?.event_detail_link?.label || "",
+        eventId: item?.id,
+        eventType: "internal-events",
       },
     };
   });
@@ -178,6 +184,13 @@ export default function SuperAdminUnifiedCalendarPage() {
 
     return [...classEvents, ...publicEvents, ...internalEvents];
   }, [activeFilter, state.classEvents, state.internalEvents, state.publicEvents]);
+
+  const resolvedRecordingLink = selectedEvent?.extendedProps?.recordingLink || "";
+  const resolvedRecordingLabel = selectedEvent?.extendedProps?.recordingLabel || "View Recording";
+  const resolvedRecordingKind = selectedEvent?.extendedProps?.recordingKind || "";
+  const showRecordingActionLink = Boolean(
+    resolvedRecordingLink && resolvedRecordingLink !== selectedEvent?.extendedProps?.meetLink
+  );
 
   return (
     <div className="min-h-screen bg-[#FAF7F0] text-[#063F32]">
@@ -336,16 +349,16 @@ export default function SuperAdminUnifiedCalendarPage() {
                     </div>
                   </div>
                 )}
-                {selectedEvent.extendedProps?.recordingLink && selectedEvent.extendedProps.recordingLink !== selectedEvent.extendedProps.meetLink && (
+                {showRecordingActionLink ? (
                   <a
-                    href={selectedEvent.extendedProps.recordingLink}
+                    href={resolvedRecordingLink}
                     target="_blank"
                     rel="noreferrer"
-                    className={`inline-flex rounded-full px-4 py-2 text-sm font-semibold ${selectedEvent.extendedProps.recordingKind === "recording" ? "bg-[#FAF7F0] text-[#0D5C48] ring-1 ring-[#2D8A6A]/20" : "bg-[linear-gradient(135deg,#0D3B2E,#0D5C48)] text-[#FFF5D6]"}`}
+                    className={`inline-flex rounded-full px-4 py-2 text-sm font-semibold ${resolvedRecordingKind === "recording" ? "bg-[#FAF7F0] text-[#0D5C48] ring-1 ring-[#2D8A6A]/20" : "bg-[linear-gradient(135deg,#0D3B2E,#0D5C48)] text-[#FFF5D6]"}`}
                   >
-                    {selectedEvent.extendedProps.recordingLabel || "View Recording"}
+                    {resolvedRecordingLabel}
                   </a>
-                )}
+                ) : null}
               </div>
             </div>
           </div>

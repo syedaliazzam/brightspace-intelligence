@@ -55,9 +55,12 @@ function mapClassSchedulerEvents(items = []) {
         typeLabel: "Class",
         subtitle: item?.subject_name || item?.class_level || item?.course_title || "Class schedule",
         meetLink: item?.google_meet_link || "",
-        recordingLink: item?.event_detail_link?.href || "",
-        recordingKind: item?.event_detail_link?.kind || "",
-        recordingLabel: item?.event_detail_link?.label || "",
+        recordingLink: item?.recording_drive_url || item?.event_detail_link?.href || "",
+        recordingKind: item?.recording_drive_url ? "recording" : item?.event_detail_link?.kind || "",
+        recordingLabel: item?.recording_drive_url ? "View Recording" : item?.event_detail_link?.label || "",
+        eventId: item?.id,
+        eventType: "class-schedulers",
+        syncEndpoint: `/api/coordinator/lecture-schedules/${item.id}/meet-attendance-sync`,
       },
     };
   });
@@ -81,9 +84,12 @@ function mapPublicEvents(items = []) {
         typeLabel: "Public",
         subtitle: item?.publication_status || "Public event",
         meetLink: item?.meet_link || item?.google_meet_link || item?.meeting_link || "",
-        recordingLink: item?.recording_link || item?.event_detail_link?.href || "",
-        recordingKind: item?.event_detail_link?.kind || "",
-        recordingLabel: item?.event_detail_link?.label || "",
+        recordingLink: item?.recording_drive_url || item?.recording_link || item?.event_detail_link?.href || "",
+        recordingKind: item?.recording_drive_url ? "recording" : item?.event_detail_link?.kind || "",
+        recordingLabel: item?.recording_drive_url ? "View Recording" : item?.event_detail_link?.label || "",
+        eventId: item?.id,
+        eventType: "public-events",
+        syncEndpoint: `/api/coordinator/public-events/${item.id}/recording-sync`,
       },
     };
   });
@@ -107,10 +113,12 @@ function mapInternalEvents(items = []) {
         typeLabel: "Internal",
         subtitle: item?.host_name || item?.attendee_name || "Internal event",
         meetLink: item?.google_meet_link || item?.meeting_link || "",
-        recordingLink: item?.recording_link || item?.event_detail_link?.href || "",
-        recordingKind: item?.event_detail_link?.kind || "",
-        recordingLabel: item?.event_detail_link?.label || "",
+        recordingLink: item?.recording_drive_url || item?.recording_link || item?.event_detail_link?.href || "",
+        recordingKind: item?.recording_drive_url ? "recording" : item?.event_detail_link?.kind || "",
+        recordingLabel: item?.recording_drive_url ? "View Recording" : item?.event_detail_link?.label || "",
         eventId: item?.id,
+        eventType: "internal-events",
+        syncEndpoint: `/api/internal-events/${item.id}/recording-sync`,
       },
     };
   });
@@ -181,26 +189,41 @@ export default function CoordinatorUnifiedCalendarPage() {
   }, []);
 
   const handleSyncRecording = async (eventId) => {
+    if (!eventId) return;
+
+    const eventType = selectedEvent?.extendedProps?.eventType || selectedEvent?.extendedProps?.type;
+    const syncEndpoint = selectedEvent?.extendedProps?.syncEndpoint ||
+      (eventType === "class-schedulers"
+        ? `/api/coordinator/lecture-schedules/${eventId}/meet-attendance-sync`
+        : eventType === "public-events"
+          ? `/api/coordinator/public-events/${eventId}/recording-sync`
+          : eventType === "internal-events"
+            ? `/api/internal-events/${eventId}/recording-sync`
+            : null);
+
+    if (!syncEndpoint) return;
+
     setSyncingRecording(eventId);
     try {
-      const response = await fetch(`/api/internal-events/${eventId}/recording-sync`, {
+      const response = await fetch(syncEndpoint, {
         method: "POST",
         cache: "no-store",
       });
 
       const data = await response.json();
+      const nextRecordingLink = data?.recording_drive_url || "";
 
-      if (data?.recording_drive_url) {
+      if (nextRecordingLink) {
         setRecordingLinks((prev) => ({
           ...prev,
-          [eventId]: { link: data.recording_drive_url, kind: "recording", label: "View Recording" },
+          [eventId]: { link: nextRecordingLink, kind: "recording", label: "View Recording" },
         }));
         if (selectedEvent?.extendedProps?.eventId === eventId) {
           setSelectedEvent((prev) => ({
             ...prev,
             extendedProps: {
               ...prev.extendedProps,
-              recordingLink: data.recording_drive_url,
+              recordingLink: nextRecordingLink,
               recordingKind: "recording",
               recordingLabel: "View Recording",
             },
@@ -221,6 +244,22 @@ export default function CoordinatorUnifiedCalendarPage() {
 
     return [...classEvents, ...publicEvents, ...internalEvents];
   }, [activeFilter, state.classEvents, state.internalEvents, state.publicEvents]);
+
+  const selectedEventId = selectedEvent?.extendedProps?.eventId;
+  const selectedEventType = selectedEvent?.extendedProps?.eventType || selectedEvent?.extendedProps?.type;
+  const resolvedRecordingLink =
+    selectedEvent?.extendedProps?.recordingLink || recordingLinks[selectedEventId]?.link || "";
+  const resolvedRecordingLabel =
+    recordingLinks[selectedEventId]?.label || selectedEvent?.extendedProps?.recordingLabel || "View Recording";
+  const resolvedRecordingKind =
+    recordingLinks[selectedEventId]?.kind || selectedEvent?.extendedProps?.recordingKind || "";
+  const showRecordingActionLink = Boolean(
+    resolvedRecordingLink && resolvedRecordingLink !== selectedEvent?.extendedProps?.meetLink
+  );
+  const showSyncRecordingButton =
+    Boolean(selectedEventId) &&
+    ["class-schedulers", "public-events", "internal-events"].includes(selectedEventType) &&
+    !showRecordingActionLink;
 
   return (
     <div className="min-h-screen bg-[#FAF7F0] text-[#063F32]">
@@ -247,7 +286,7 @@ export default function CoordinatorUnifiedCalendarPage() {
         </section>
 
         <section className="rounded-[1.75rem] border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(250,247,240,0.98)_100%)] p-4 shadow-[0_20px_70px_-36px_rgba(13,59,46,0.18)] backdrop-blur-xl">
-          <div className="flex flex-wrap gap-2 pb-4 border-b border-[#2D8A6A]/10">
+          <div className="flex flex-wrap gap-2">
             {FILTER_OPTIONS.map((option) => {
               const isActive = activeFilter === option.id;
               return (
@@ -266,7 +305,7 @@ export default function CoordinatorUnifiedCalendarPage() {
               );
             })}
           </div>
-          <div className="flex flex-wrap gap-4 pt-3">
+          <div className="mt-4 flex flex-wrap gap-4 border-t border-[#2D8A6A]/10 pt-4">
             <div className="flex items-center gap-2">
               <div className="h-3 w-3 rounded" style={{ backgroundColor: "#10B981" }}></div>
               <span className="text-xs font-medium text-[#063F32]">Class</span>
@@ -379,23 +418,24 @@ export default function CoordinatorUnifiedCalendarPage() {
                     </div>
                   </div>
                 )}
-                {(selectedEvent.extendedProps?.recordingLink && selectedEvent.extendedProps.recordingLink !== selectedEvent.extendedProps.meetLink) || recordingLinks[selectedEvent.extendedProps.eventId] ? (
+                {showRecordingActionLink ? (
                   <a
-                    href={recordingLinks[selectedEvent.extendedProps.eventId]?.link || selectedEvent.extendedProps.recordingLink}
+                    href={resolvedRecordingLink}
                     target="_blank"
                     rel="noreferrer"
-                    className="inline-flex rounded-full bg-[#FAF7F0] text-[#0D5C48] ring-1 ring-[#2D8A6A]/20 px-4 py-2 text-sm font-semibold"
+                    className={`inline-flex rounded-full px-4 py-2 text-sm font-semibold ${resolvedRecordingKind === "recording" ? "bg-[#FAF7F0] text-[#0D5C48] ring-1 ring-[#2D8A6A]/20" : "bg-[linear-gradient(135deg,#0D3B2E,#0D5C48)] text-[#FFF5D6]"}`}
                   >
-                    {recordingLinks[selectedEvent.extendedProps.eventId]?.label || selectedEvent.extendedProps.recordingLabel || "View Recording"}
+                    {resolvedRecordingLabel}
                   </a>
-                ) : selectedEvent.extendedProps?.typeLabel === "Internal" ? (
+                ) : null}
+                {showSyncRecordingButton ? (
                   <button
                     type="button"
-                    onClick={() => handleSyncRecording(selectedEvent.extendedProps.eventId)}
-                    disabled={syncingRecording === selectedEvent.extendedProps.eventId}
+                    onClick={() => handleSyncRecording(selectedEventId)}
+                    disabled={syncingRecording === selectedEventId}
                     className="inline-flex rounded-full bg-[linear-gradient(135deg,#0D3B2E,#0D5C48)] px-4 py-2 text-sm font-semibold text-[#FFF5D6] hover:shadow-lg disabled:opacity-50"
                   >
-                    {syncingRecording === selectedEvent.extendedProps.eventId ? "Syncing..." : "Sync Recording"}
+                    {syncingRecording === selectedEventId ? "Syncing..." : "Sync Recording"}
                   </button>
                 ) : null}
               </div>
