@@ -90,7 +90,9 @@ export default function LMSCalendar({ apiUrl, filters = {}, extraParams = {}, on
   }, [activeDate, extraParams, filters.classLevel, filters.subjectId, filters.status]);
 
   useEffect(() => {
-    calendarRef.current?.getApi?.().gotoDate?.(activeDate);
+    if (activeDate) {
+      calendarRef.current?.getApi?.().gotoDate?.(activeDate);
+    }
   }, [activeDate, view]);
 
   useEffect(() => {

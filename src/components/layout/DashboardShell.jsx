@@ -13,9 +13,14 @@ export default function DashboardShell({ session, children }) {
   const [collapsed, setCollapsed] = useState(false);
   const role = String(session?.user?.role || "").toLowerCase();
   const isStudent = role === "student";
+  const isDashboardPage = typeof pathname === "string" && pathname.split("/").pop() === "dashboard";
 
   useEffect(() => {
-    setMobileOpen(false);
+    const frame = window.requestAnimationFrame(() => {
+      setMobileOpen(false);
+    });
+
+    return () => window.cancelAnimationFrame(frame);
   }, [pathname]);
 
   useEffect(() => {
@@ -53,6 +58,7 @@ export default function DashboardShell({ session, children }) {
         ) : null}
 
         <main className={`transition-[padding] duration-200 ${isStudent ? "pt-0" : `pt-20 ${collapsed ? "lg:pl-20" : "lg:pl-72"}`}`}>
+          {!isStudent ? <div className="pt-0" /> : null}
           <div className="px-0 pb-0 sm:px-0 lg:px-0">
             {isStudent ? children : (
               <motion.section

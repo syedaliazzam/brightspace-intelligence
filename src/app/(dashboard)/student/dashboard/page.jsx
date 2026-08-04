@@ -10,33 +10,22 @@ import NoteThreadsBoard from "@/components/shared/NoteThreadsBoard";
 import LMSCalendar from "@/components/calendar/LMSCalendar";
 import ActiveHeadlinesBanner from "@/components/shared/ActiveHeadlinesBanner";
 import { OpenBookLoader } from "@/components/shared/AshShajrahLoaders";
+import StudentPortalTickerWrapper from "@/components/layout/StudentPortalTickerWrapper";
 
-function todayDate() {
-  const date = new Date();
-  date.setMinutes(date.getMinutes() - date.getTimezoneOffset());
-  return date.toISOString().slice(0, 10);
+function getTodayDate() {
+  return "";
 }
 
 function formatAgeValue(age, dateOfBirth) {
   const explicitAge = String(age || "").trim();
   if (explicitAge) return explicitAge;
   if (!dateOfBirth) return "";
-  const dob = new Date(dateOfBirth);
-  if (Number.isNaN(dob.getTime())) return "";
-  const now = new Date();
-  let years = now.getFullYear() - dob.getFullYear();
-  const monthDelta = now.getMonth() - dob.getMonth();
-  if (monthDelta < 0 || (monthDelta === 0 && now.getDate() < dob.getDate())) {
-    years -= 1;
-  }
-  return years > 0 ? `${years} year${years === 1 ? "" : "s"}` : "";
+  return "";
 }
 
 function formatDateValue(value) {
   if (!value) return "";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return String(value);
-  return new Intl.DateTimeFormat("en-US", { dateStyle: "medium" }).format(date);
+  return String(value);
 }
 
 export default function StudentDashboardPage() {
@@ -52,7 +41,7 @@ export default function StudentDashboardPage() {
     loading: true,
     error: "",
     monthlyFee: null,
-    filters: { date: todayDate(), range: "today", subjectId: "", status: "" },
+    filters: { date: "", range: "today", subjectId: "", status: "" },
   });
 
   async function loadDashboard() {
@@ -91,7 +80,7 @@ export default function StudentDashboardPage() {
   }
 
   async function loadLectures(filters = state.filters) {
-    const safe = { ...filters, date: filters.date || todayDate() };
+    const safe = { ...filters, date: filters.date || getTodayDate() };
     const params = new URLSearchParams(safe);
     setState((current) => ({ ...current, loading: true }));
     const response = await fetch(`/api/student/calendar-lectures?${params.toString()}`, { cache: "no-store" });
@@ -112,7 +101,13 @@ export default function StudentDashboardPage() {
       try { await loadAttendance(); } catch (error) { setState((current) => ({ ...current, error: error instanceof Error ? error.message : String(error) })); }
       try { await loadProfile(); } catch (error) { setState((current) => ({ ...current, error: error instanceof Error ? error.message : String(error) })); }
       try { await loadMonthlyFee(); } catch (error) { setState((current) => ({ ...current, error: error instanceof Error ? error.message : String(error) })); }
-      try { await loadLectures({ date: todayDate(), range: "today", subjectId: "", status: "" }); } catch (error) { setState((current) => ({ ...current, loading: false, error: error instanceof Error ? error.message : String(error) })); }
+      try {
+        const initialDate = getTodayDate();
+        setState((current) => ({ ...current, filters: { ...current.filters, date: initialDate } }));
+        await loadLectures({ date: initialDate, range: "today", subjectId: "", status: "" });
+      } catch (error) {
+        setState((current) => ({ ...current, loading: false, error: error instanceof Error ? error.message : String(error) }));
+      }
     }
     initialize();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -125,6 +120,7 @@ export default function StudentDashboardPage() {
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(201,162,39,0.12),transparent_35%),radial-gradient(circle_at_top_right,rgba(45,138,106,0.12),transparent_32%),linear-gradient(180deg,#FAF7F0_0%,#F7F1E3_100%)]" />
         <div className="rounded-[2rem] relative mx-auto max-w-7xl space-y-6 px-4 py-4 sm:px-6 lg:px-8">
           <StudentPortalNavbar profile={profile} />
+          <StudentPortalTickerWrapper />
 
           {state.monthlyFee && !state.monthlyFee.is_paid ? (
             <section className={`w-full rounded-[2rem] border px-5 py-4 text-sm shadow-[0_20px_70px_-36px_rgba(13,59,46,0.18)] backdrop-blur-xl ${state.monthlyFee.overdue ? "border-rose-200 bg-rose-50 text-rose-700" : state.monthlyFee.due_soon ? "border-[#E4C766]/70 bg-[#FFF5D6] text-[#8A6B00]" : "border-[#2D8A6A]/20 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(250,247,240,0.98)_100%)] text-[#0D5C48]"}`}>

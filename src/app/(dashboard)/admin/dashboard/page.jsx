@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import AdminDashboardCards from "@/components/admin/AdminDashboardCards";
 import AdminDataTable from "@/components/admin/AdminDataTable";
 import { OpenBookLoader } from "@/components/shared/AshShajrahLoaders";
+import UpcomingPublicEventsTicker from "@/components/layout/UpcomingPublicEventsTicker";
 
 const CACHE_KEY = "admin-dashboard-stats:v4";
 const CACHE_TTL = 60 * 1000;
@@ -163,6 +164,7 @@ export default function AdminDashboardPage() {
     <div className="min-h-screen border-0 text-[#063F32]">
       <div className="min-h-screen border-0 text-[#063F32] pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(201,162,39,0.14),transparent_32%),radial-gradient(circle_at_top_right,rgba(45,138,106,0.14),transparent_28%),linear-gradient(180deg,#FAF7F0_0%,#F7F1E3_100%)]" />
       <div className="relative mx-auto max-w-7xl space-y-6 px-4 py-5 sm:px-6 lg:px-8">
+        <UpcomingPublicEventsTicker />
         <section className="relative overflow-hidden rounded-[2rem] border border-[#2D8A6A]/15 bg-[linear-gradient(135deg,rgba(13,59,46,0.98),rgba(13,92,72,0.94))] p-6 text-[#FAF7F0] shadow-[0_24px_80px_-36px_rgba(13,59,46,0.32)] sm:p-8">
           <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(228,198,102,0.12),transparent_28%),radial-gradient(circle_at_bottom_left,rgba(101,184,145,0.14),transparent_30%)]" />
           <div className="relative max-w-6xl">
