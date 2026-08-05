@@ -30,7 +30,17 @@ function normalizeText(value) {
 }
 
 function parseScheduleDate(value) {
-  const date = new Date(value);
+  const text = normalizeText(value);
+  if (!text) return null;
+
+  const parts = text.split("-").map(Number);
+  if (parts.length === 3 && parts.every((part) => Number.isInteger(part))) {
+    const [year, month, day] = parts;
+    const date = new Date(year, month - 1, day);
+    return Number.isNaN(date.getTime()) ? null : date;
+  }
+
+  const date = new Date(text);
   return Number.isNaN(date.getTime()) ? null : date;
 }
 

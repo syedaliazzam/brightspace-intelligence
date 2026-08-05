@@ -33,14 +33,6 @@ export async function GET(request) {
         INNER JOIN subjects s ON s.id = cs.subject_id
         WHERE cs.course_id = ${courseId}::uuid
           AND COALESCE(s.status, 'active'::user_status) = 'active'::user_status
-          AND NOT EXISTS (
-            SELECT 1
-            FROM teacher_assignments ta
-            WHERE ta.course_id = cs.course_id
-              AND ta.subject_id = cs.subject_id
-              AND ta.student_id IS NULL
-              AND ta.status = 'active'::user_status
-          )
         ORDER BY s.name ASC
       `;
 
