@@ -36,34 +36,98 @@ function toCalendarDate(date) {
   return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}`;
 }
 
-function mapClassSchedulerEvents(items = []) {
-  return (items || []).map((item) => {
-    const start = parseDateTime(item?.rescheduled_start || item?.scheduled_start || item?.rescheduledStartTime || item?.scheduledStart);
-    const end = parseDateTime(item?.rescheduled_end || item?.scheduled_end || item?.rescheduledEndTime || item?.scheduledEnd);
-    const title = item?.title || item?.subject_name || "Class scheduler";
+function parseDateOnly(value) {
+  const text = String(value || "").trim();
+  if (!text) return null;
+  const [year, month, day] = text.split("-").map(Number);
+  if (![year, month, day].every((part) => Number.isInteger(part))) return null;
+  return new Date(year, month - 1, day);
+}
 
-    return {
-      id: `class-${item.id}`,
-      title,
-      start: start ? toCalendarDate(start) : "",
-      end: end ? toCalendarDate(end) : "",
-      backgroundColor: "#10B981",
-      borderColor: "#059669",
-      textColor: "#FFFFFF",
-      extendedProps: {
-        type: "class-schedulers",
-        typeLabel: "Class",
-        subtitle: item?.subject_name || item?.class_level || item?.course_title || "Class schedule",
-        meetLink: item?.google_meet_link || "",
-        recordingLink: item?.recording_drive_url || item?.event_detail_link?.href || "",
-        recordingKind: item?.recording_drive_url ? "recording" : item?.event_detail_link?.kind || "",
-        recordingLabel: item?.recording_drive_url ? "View Recording" : item?.event_detail_link?.label || "",
-        eventId: item?.id,
-        eventType: "class-schedulers",
-        syncEndpoint: `/api/coordinator/lecture-schedules/${item.id}/meet-attendance-sync`,
-      },
-    };
-  });
+function formatLocalCalendarDate(date, hours, minutes) {
+  const next = new Date(date);
+  next.setHours(hours, minutes, 0, 0);
+  return toCalendarDate(next);
+}
+
+function getWeekdaySet(daysActive = "") {
+  const parts = String(daysActive)
+    .split(",")
+    .map((part) => part.trim().slice(0, 3).toLowerCase())
+    .filter(Boolean);
+  return new Set(parts);
+}
+
+function expandClassSchedulerEvent(item) {
+  const startDate = parseDateOnly(item?.start_date);
+  const endDate = parseDateOnly(item?.end_date);
+  const startTimeParts = String(item?.start_time || "00:00").split(":").map(Number);
+  const endTimeParts = String(item?.end_time || "00:00").split(":").map(Number);
+  const weekdaySet = getWeekdaySet(item?.days_active);
+
+  if (!startDate || !endDate || !weekdaySet.size) return [];
+
+  const events = [];
+  const cursor = new Date(startDate);
+  while (cursor <= endDate) {
+    const weekday = cursor.toLocaleDateString("en-US", { weekday: "short" }).toLowerCase();
+    if (weekdaySet.has(weekday)) {
+      const occurrenceStart = formatLocalCalendarDate(cursor, startTimeParts[0] || 0, startTimeParts[1] || 0);
+      const occurrenceEnd = formatLocalCalendarDate(cursor, endTimeParts[0] || 0, endTimeParts[1] || 0);
+      events.push({
+        id: `class-${item.id}-${cursor.toISOString().slice(0, 10)}`,
+        title: item?.title || item?.subject_name || "Class scheduler",
+        start: occurrenceStart,
+        end: occurrenceEnd,
+        backgroundColor: "#10B981",
+        borderColor: "#059669",
+        textColor: "#FFFFFF",
+        extendedProps: {
+          type: "class-schedulers",
+          typeLabel: "Class",
+          subtitle: item?.subject_name || item?.class_level || item?.course_title || "Class schedule",
+          meetLink: item?.google_meet_link || "",
+          recordingLink: item?.recording_drive_url || item?.event_detail_link?.href || "",
+          recordingKind: item?.recording_drive_url ? "recording" : item?.event_detail_link?.kind || "",
+          recordingLabel: item?.recording_drive_url ? "View Recording" : item?.event_detail_link?.label || "",
+          eventId: item?.id,
+          eventType: "class-schedulers",
+        },
+      });
+    }
+    cursor.setDate(cursor.getDate() + 1);
+  }
+
+  return events.length ? events : [{
+    id: `class-${item.id}`,
+    title: item?.title || item?.subject_name || "Class scheduler",
+    start: item?.scheduled_start ? toCalendarDate(new Date(item.scheduled_start)) : "",
+    end: item?.scheduled_end ? toCalendarDate(new Date(item.scheduled_end)) : "",
+    backgroundColor: "#10B981",
+    borderColor: "#059669",
+    textColor: "#FFFFFF",
+    extendedProps: {
+      type: "class-schedulers",
+      typeLabel: "Class",
+      subtitle: item?.subject_name || item?.class_level || item?.course_title || "Class schedule",
+      meetLink: item?.google_meet_link || "",
+      recordingLink: item?.recording_drive_url || item?.event_detail_link?.href || "",
+      recordingKind: item?.recording_drive_url ? "recording" : item?.event_detail_link?.kind || "",
+      recordingLabel: item?.recording_drive_url ? "View Recording" : item?.event_detail_link?.label || "",
+      eventId: item?.id,
+      eventType: "class-schedulers",
+    },
+  }];
+}
+
+function mapClassSchedulerEvents(items = []) {
+  return (items || []).flatMap((item) => expandClassSchedulerEvent(item).map((event) => ({
+    ...event,
+    extendedProps: {
+      ...event.extendedProps,
+      syncEndpoint: `/api/coordinator/lecture-schedules/${item.id}/meet-attendance-sync`,
+    },
+  })));
 }
 
 function mapPublicEvents(items = []) {
