@@ -98,13 +98,10 @@ export default function PaymentSubmissionForm({ voucher }) {
   const scholarshipAmount = Number(voucher.scholarship_amount || 0);
   const hasDiscount = regularFee > 0 && discountAmount > 0;
   const hasScholarship = scholarshipAmount > 0;
-  const discountPercent = hasDiscount ? Math.round((discountAmount / regularFee) * 100) : 0;
-  const derivedTotalAmount = Math.max(regularFee + admissionFee - discountAmount - scholarshipAmount, 0);
-  const totalAmount = Number(
-    (regularFee > 0 || admissionFee > 0 || discountAmount > 0 || scholarshipAmount > 0)
-      ? derivedTotalAmount
-      : voucher.total_amount || voucher.subtotal_amount || voucher.amount || 0
-  );
+  const discountPercent = hasDiscount
+    ? Number(voucher.discount_percent || (discountAmount / regularFee) * 100 || 0)
+    : 0;
+  const totalAmount = Number(voucher.total_amount || voucher.amount || 0);
   const nextMonthlyFee = Math.max(regularFee - discountAmount, 0);
 
   useEffect(() => {

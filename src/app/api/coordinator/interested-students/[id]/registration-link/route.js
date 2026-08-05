@@ -75,10 +75,12 @@ export async function POST(request, { params }) {
       request.nextUrl.origin;
     const baseRegistrationLink = `${appUrl.replace(/\/+$/, "")}/admission-form?leadToken=${encodeURIComponent(token)}`;
     const registrationUrl = new URL(baseRegistrationLink);
-    if (paymentPayload?.admissionFeeId) registrationUrl.searchParams.set("admissionFeeId", String(paymentPayload.admissionFeeId));
-    if (paymentPayload?.admissionFeeAmount) registrationUrl.searchParams.set("admissionFeeAmount", String(paymentPayload.admissionFeeAmount));
-    if (paymentPayload?.discountId) registrationUrl.searchParams.set("discountId", String(paymentPayload.discountId));
-    if (paymentPayload?.discountPercent) registrationUrl.searchParams.set("discountPercent", String(paymentPayload.discountPercent));
+    if (paymentPayload?.admissionFeeId !== undefined && paymentPayload?.admissionFeeId !== null && String(paymentPayload.admissionFeeId) !== "") registrationUrl.searchParams.set("admissionFeeId", String(paymentPayload.admissionFeeId));
+    if (paymentPayload?.admissionFeeAmount !== undefined && paymentPayload?.admissionFeeAmount !== null) registrationUrl.searchParams.set("admissionFeeAmount", String(paymentPayload.admissionFeeAmount));
+    if (paymentPayload?.discountId !== undefined && paymentPayload?.discountId !== null && String(paymentPayload.discountId) !== "") registrationUrl.searchParams.set("discountId", String(paymentPayload.discountId));
+    if (paymentPayload?.discountPercent !== undefined && paymentPayload?.discountPercent !== null) registrationUrl.searchParams.set("discountPercent", String(paymentPayload.discountPercent));
+    if (paymentPayload?.discountAmount !== undefined && paymentPayload?.discountAmount !== null) registrationUrl.searchParams.set("discountAmount", String(paymentPayload.discountAmount));
+    if (paymentPayload?.totalAmount !== undefined && paymentPayload?.totalAmount !== null) registrationUrl.searchParams.set("totalAmount", String(paymentPayload.totalAmount));
     if (paymentPayload?.paymentMethodId) registrationUrl.searchParams.set("paymentMethodId", String(paymentPayload.paymentMethodId));
     if (paymentPayload?.paymentMethodName) registrationUrl.searchParams.set("paymentMethodName", String(paymentPayload.paymentMethodName));
     if (paymentPayload?.paymentInstructions) registrationUrl.searchParams.set("paymentInstructions", String(paymentPayload.paymentInstructions));

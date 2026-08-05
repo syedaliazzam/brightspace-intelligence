@@ -902,6 +902,11 @@ export async function POST(request) {
     const scholarshipFormId = normalizeText(body?.scholarship_form_id ?? body?.scholarshipFormId);
     const discountId = normalizeText(body?.discount_id ?? body?.discountId);
     const discountPercentInput = Number((body?.discount_percent ?? body?.discountPercent) || 0);
+    const discountAmountInput = toMoney(body?.discount_amount ?? body?.discountAmount);
+    const totalAmountInput = toMoney(body?.total_amount ?? body?.totalAmount);
+    const hasAdmissionFeeInput = body?.admission_fee_amount !== undefined || body?.admissionFeeAmount !== undefined;
+    const hasDiscountAmountInput = body?.discount_amount !== undefined || body?.discountAmount !== undefined;
+    const hasTotalAmountInput = body?.total_amount !== undefined || body?.totalAmount !== undefined;
     const dueDate = normalizeDueDate(body?.dueDate);
     const paymentMethod = normalizeText(body?.paymentMethod);
     const paymentMethodId = normalizeText(body?.paymentMethodId || body?.payment_method_id);
@@ -959,7 +964,17 @@ export async function POST(request) {
     `;
 
     if (existingVoucher?.id) {
-      if (scholarshipFormId || scholarshipAmountInput > 0) {
+      const hasAnyEditableVoucherChange =
+        scholarshipFormId ||
+        scholarshipAmountInput > 0 ||
+        hasAdmissionFeeInput ||
+        hasDiscountAmountInput ||
+        hasTotalAmountInput ||
+        Boolean(dueDate) ||
+        Boolean(paymentMethodId || paymentMethod) ||
+        Boolean(paymentInstructions);
+
+      if (hasAnyEditableVoucherChange) {
         const updatedExistingVoucherResult = await prisma.$transaction(async (tx) => {
           const selectedPaymentMethod = await getPaymentMethodById(paymentMethodId, tx);
           const resolvedPaymentMethod = selectedPaymentMethod
@@ -970,14 +985,18 @@ export async function POST(request) {
             throw new Error("Invalid payment method.");
           }
 
-          const existingSubtotalAmount = Number(
-            existingVoucher.subtotal_amount ||
-              (Number(existingVoucher.regular_fee_amount || 0) + Number(existingVoucher.admission_fee_amount || 0))
-          );
-          const existingDiscountAmount = Number(existingVoucher.discount_amount || 0);
-          const recalculatedTotalAmount = Number(
-            (existingSubtotalAmount - existingDiscountAmount - scholarshipAmountInput).toFixed(2)
-          );
+          const existingRegularFeeAmount = Number(existingVoucher.regular_fee_amount || 0);
+          const existingAdmissionFeeAmount = Number(existingVoucher.admission_fee_amount || 0);
+          const admissionFeeAmount = hasAdmissionFeeInput
+            ? Number(admissionFeeAmountInput.toFixed(2))
+            : existingAdmissionFeeAmount;
+          const discountAmount = hasDiscountAmountInput
+            ? Number(discountAmountInput.toFixed(2))
+            : Number(existingVoucher.discount_amount || 0);
+          const subtotalAmount = Number((existingRegularFeeAmount + admissionFeeAmount).toFixed(2));
+          const recalculatedTotalAmount = hasTotalAmountInput
+            ? Number(totalAmountInput.toFixed(2))
+            : Number((subtotalAmount - discountAmount - scholarshipAmountInput).toFixed(2));
 
           if (recalculatedTotalAmount <= 0) {
             throw new Error("Voucher total must be greater than zero.");
@@ -993,6 +1012,12 @@ export async function POST(request) {
 
           if (voucherColumns.scholarship_amount) {
             pushUpdate(`scholarship_amount = $__INDEX__`, scholarshipAmountInput);
+          }
+          if (voucherColumns.admission_fee_amount && hasAdmissionFeeInput) {
+            pushUpdate(`admission_fee_amount = $__INDEX__`, admissionFeeAmount);
+          }
+          if (voucherColumns.discount_amount && hasDiscountAmountInput) {
+            pushUpdate(`discount_amount = $__INDEX__`, discountAmount);
           }
           if (voucherColumns.amount) {
             pushUpdate(`amount = $__INDEX__`, recalculatedTotalAmount);
@@ -1342,10 +1367,16 @@ export async function POST(request) {
       const regularFeeAmount = regularFeeApplied
         ? Number(regularFeeRecord?.amount || 0)
         : 0;
-      const admissionFeeAmount = selectedOtherFee
-        ? Number(selectedOtherFee.amount || 0)
-        : admissionFeeAmountInput;
-      const discountPercent = discount ? Number(discount.percent || 0) : Number(discountPercentInput || 0);
+      const admissionFeeAmount = hasAdmissionFeeInput
+        ? Number(admissionFeeAmountInput.toFixed(2))
+        : selectedOtherFee
+          ? Number(selectedOtherFee.amount || 0)
+          : 0;
+      const discountPercent = discount
+        ? Number(discount.percent || 0)
+        : discountAmountInput > 0 && regularFeeAmount > 0
+          ? Number(((discountAmountInput / regularFeeAmount) * 100).toFixed(2))
+          : Number(discountPercentInput || 0);
 
       if (role !== "admin" && discountPercent > maxDiscountPercent) {
         throw new Error(`Coordinator can only apply up to ${maxDiscountPercent}% discount.`);
@@ -1356,8 +1387,11 @@ export async function POST(request) {
       }
 
       const subtotalAmount = Number((regularFeeAmount + admissionFeeAmount).toFixed(2));
-      const discountAmount = Number((regularFeeAmount * discountPercent / 100).toFixed(2));
-      const totalAmount = Number((subtotalAmount - discountAmount - scholarshipAmountInput).toFixed(2));
+      const discountAmount = hasDiscountAmountInput
+        ? Number(discountAmountInput.toFixed(2))
+        : Number((regularFeeAmount * discountPercent / 100).toFixed(2));
+      const computedTotalAmount = Number((subtotalAmount - discountAmount - scholarshipAmountInput).toFixed(2));
+      const totalAmount = totalAmountInput > 0 ? Number(totalAmountInput.toFixed(2)) : computedTotalAmount;
       if (totalAmount <= 0) {
         throw new Error("Voucher total must be greater than zero.");
       }

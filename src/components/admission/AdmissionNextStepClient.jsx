@@ -135,6 +135,7 @@ export default function AdmissionNextStepClient({
       regularFee: Number(voucher.regular_fee_amount || 0),
       admissionFee: Number(voucher.admission_fee_amount || 0),
       discountAmount: Number(voucher.discount_amount || 0),
+      discountPercent: Number(voucher.discount_percent || 0),
       totalAmount: Number(voucher.total_amount || voucher.amount || 0),
     };
   }, [voucher]);
@@ -145,11 +146,10 @@ export default function AdmissionNextStepClient({
     const discountAmount = scholarshipMode ? 0 : feeSummary.discountAmount;
     const totalAmount = scholarshipMode
       ? Math.max(monthlyFee + admissionFee, 0)
-      : Math.max(monthlyFee - discountAmount + admissionFee, 0);
-    const discountPercent =
-      !scholarshipMode && monthlyFee > 0 && discountAmount > 0
-        ? Math.round((discountAmount / monthlyFee) * 100)
-        : 0;
+      : feeSummary.totalAmount;
+    const discountPercent = !scholarshipMode
+      ? Number(feeSummary.discountPercent || 0)
+      : 0;
     const hasDiscount = discountPercent > 0 && discountAmount > 0;
     const nextMonthlyFee = Math.max(monthlyFee - discountAmount, 0);
 

@@ -162,7 +162,9 @@ async function insertFeeVoucherForAdmission({
   paymentMethodId,
   paymentMethodName,
   admissionFeeAmount,
+  discountAmount,
   discountPercent,
+  totalAmount,
   paymentInstructions,
   dueDate,
   tx,
@@ -174,9 +176,13 @@ async function insertFeeVoucherForAdmission({
   const supportedColumns = new Set();
   const voucherId = crypto.randomUUID();
   const regularFeeAmount = await getRegularFeeAmount(classLevel, tx);
-  const discountAmount = Number(((regularFeeAmount * Number(discountPercent || 0)) / 100).toFixed(2));
+  const resolvedDiscountAmount = Number.isFinite(Number(discountAmount)) && Number(discountAmount) > 0
+    ? Number(Number(discountAmount).toFixed(2))
+    : Number(((regularFeeAmount * Number(discountPercent || 0)) / 100).toFixed(2));
   const subtotalAmount = Number((regularFeeAmount + Number(admissionFeeAmount || 0)).toFixed(2));
-  const totalAmount = Number((subtotalAmount - discountAmount).toFixed(2));
+  const resolvedTotalAmount = Number.isFinite(Number(totalAmount)) && Number(totalAmount) > 0
+    ? Number(Number(totalAmount).toFixed(2))
+    : Number((subtotalAmount - resolvedDiscountAmount).toFixed(2));
   const paymentMethod = paymentMethodId ? await getPaymentMethodById(paymentMethodId, tx) : null;
 
   if (columns.id) {
@@ -192,7 +198,7 @@ async function insertFeeVoucherForAdmission({
     supportedColumns.add("voucher_no");
   }
   if (columns.amount) {
-    addColumn(insertColumns, insertValues, "amount", totalAmount);
+    addColumn(insertColumns, insertValues, "amount", resolvedTotalAmount);
     supportedColumns.add("amount");
   }
   if (columns.regular_fee_applied) {
@@ -216,11 +222,11 @@ async function insertFeeVoucherForAdmission({
     supportedColumns.add("subtotal_amount");
   }
   if (columns.discount_amount) {
-    addColumn(insertColumns, insertValues, "discount_amount", discountAmount);
+    addColumn(insertColumns, insertValues, "discount_amount", resolvedDiscountAmount);
     supportedColumns.add("discount_amount");
   }
   if (columns.total_amount) {
-    addColumn(insertColumns, insertValues, "total_amount", totalAmount);
+    addColumn(insertColumns, insertValues, "total_amount", resolvedTotalAmount);
     supportedColumns.add("total_amount");
   }
   if (columns.due_date && dueDate) {
@@ -282,9 +288,9 @@ async function insertFeeVoucherForAdmission({
     voucherId,
     voucherNo,
     regularFeeAmount,
-    discountAmount,
+    discountAmount: resolvedDiscountAmount,
     subtotalAmount,
-    totalAmount,
+    totalAmount: resolvedTotalAmount,
     paymentMethod,
   };
 }
@@ -560,6 +566,8 @@ export async function POST(request) {
     const paymentMethodId = normalizeText(formData.get("paymentMethodId") || formData.get("payment_method_id"));
     const admissionFeeAmount = normalizeText(formData.get("admission_fee"));
     const discountPercent = normalizeText(formData.get("discount_percent"));
+    const discountAmount = normalizeText(formData.get("discount_amount"));
+    const totalAmount = normalizeText(formData.get("total_amount"));
     const paymentInstructions = normalizeText(formData.get("payment_instructions"));
     const payerName = normalizeText(formData.get("payer_name"));
     const payerEmail = normalizeText(formData.get("payer_email"));
@@ -822,7 +830,9 @@ export async function POST(request) {
         paymentMethodId,
         paymentMethodName: paymentMethod || "",
         admissionFeeAmount: toMoney(admissionFeeAmount),
+        discountAmount: toMoney(discountAmount),
         discountPercent: Number(String(discountPercent || "0").replace("%", "")) || 0,
+        totalAmount: toMoney(totalAmount),
         paymentInstructions,
         dueDate: paymentDueDate,
         tx,
@@ -845,7 +855,7 @@ export async function POST(request) {
     }
 
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL || request.nextUrl.origin;
-    const nextStepUrl = `${String(appUrl || "").replace(/\/+$/, "")}/admission-next-step/${createdLead.id}?voucherNo=${encodeURIComponent(voucher?.voucherNo || "")}&leadToken=${encodeURIComponent(leadToken || "")}&submitted=1`;
+    const nextStepUrl = `${String(appUrl || "").replace(/\/+$/, "")}/admission-next-step/${createdLead.id}?voucherNo=${encodeURIComponent(voucher?.voucherNo || "")}&leadToken=${encodeURIComponent(leadToken || "")}&submitted=1&admissionFeeAmount=${encodeURIComponent(String(toMoney(admissionFeeAmount) || 0))}&discountPercent=${encodeURIComponent(String(Number(String(discountPercent || "0").replace("%", "")) || 0))}&discountAmount=${encodeURIComponent(String(toMoney(discountAmount) || 0))}&totalAmount=${encodeURIComponent(String(toMoney(totalAmount) || 0))}&paymentInstructions=${encodeURIComponent(String(paymentInstructions || ""))}&paymentMethodId=${encodeURIComponent(String(paymentMethodId || ""))}&paymentMethodName=${encodeURIComponent(String(paymentMethod || ""))}`;
 
     const parentEmail = parentSummary.parentEmail || linkedLead?.email || "";
     if (parentEmail) {

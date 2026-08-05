@@ -63,10 +63,12 @@ export default function FeeVoucherForm({
     scholarshipFormId: "",
     discountId: "",
     discountPercent: "",
+    discountAmount: "",
     dueDate: "",
     paymentMethodId: "",
     paymentMethod: "",
     paymentInstructions: "",
+    totalAmount: "",
   });
 
   useEffect(() => {
@@ -114,10 +116,16 @@ export default function FeeVoucherForm({
 
   const selectedRegularFee = Number(selectedRegularFeeRecord?.amount || 0);
   const admissionFeeAmount = Number(selectedAdmissionFee?.amount || 0);
+  const admissionFeeAmountInput = Number(form.admissionFeeAmount || selectedAdmissionFee?.amount || 0);
   const scholarshipAmountInput = Number(form.scholarshipAmount || 0);
-  const discountPercent = Number(form.discountPercent || 0);
-  const discountAmount = selectedRegularFee * (discountPercent / 100);
-  const totalAmount = selectedRegularFee + admissionFeeAmount - discountAmount - scholarshipAmountInput;
+  const discountAmountInput = Number(
+    form.discountAmount ||
+      (selectedDiscount?.percent ? ((selectedRegularFee * Number(selectedDiscount.percent || 0)) / 100).toFixed(2) : 0)
+  );
+  const discountPercent = selectedRegularFee > 0 ? Number(((discountAmountInput / selectedRegularFee) * 100).toFixed(2)) : 0;
+  const derivedTotalAmount = selectedRegularFee + admissionFeeAmountInput - discountAmountInput - scholarshipAmountInput;
+  const totalAmountInput = Number(form.totalAmount || derivedTotalAmount);
+  const totalAmount = totalAmountInput > 0 ? totalAmountInput : derivedTotalAmount;
   const eligibleLeads = useMemo(
     () =>
       leads.filter(
@@ -185,23 +193,12 @@ export default function FeeVoucherForm({
   }, [open, options.paymentMethods, form.paymentMethodId]);
 
   useEffect(() => {
-    if (!open || !selectedLead) return;
-    if (selectedAdmissionFee?.id && form.otherFeeId !== selectedAdmissionFee.id) {
-      setForm((current) => ({
-        ...current,
-        otherFeeId: selectedAdmissionFee.id,
-        admissionFeeAmount: String(selectedAdmissionFee.amount || ""),
-      }));
-    }
-  }, [open, selectedAdmissionFee, selectedLead, form.otherFeeId]);
-
-  useEffect(() => {
     if (!open) return;
     setForm((current) => ({
       ...current,
-      scholarshipAmount: scholarshipAmount ? String(scholarshipAmount) : "",
-      scholarshipFormId: scholarshipFormId || "",
-    }));
+        scholarshipAmount: scholarshipAmount ? String(scholarshipAmount) : "",
+        scholarshipFormId: scholarshipFormId || "",
+      }));
   }, [open, scholarshipAmount, scholarshipFormId]);
 
   function updateField(name, value) {
@@ -223,9 +220,11 @@ export default function FeeVoucherForm({
         regularFeeId: selectedRegularFeeRecord?.id || "",
         regularFeeAmount: selectedRegularFee,
         otherFeeId: selectedAdmissionFee?.id || form.otherFeeId || "",
-        admissionFeeAmount: admissionFeeAmount,
+        admissionFeeAmount: admissionFeeAmountInput,
         scholarshipAmount: scholarshipAmountInput,
         scholarshipFormId: form.scholarshipFormId || "",
+        discountAmount: discountAmountInput,
+        totalAmount: totalAmountInput > 0 ? totalAmountInput : derivedTotalAmount,
       };
 
       const response = await fetch("/api/coordinator/fee-vouchers", {
@@ -251,10 +250,12 @@ export default function FeeVoucherForm({
         scholarshipFormId: "",
         discountId: "",
         discountPercent: "",
+        discountAmount: "",
         dueDate: "",
         paymentMethodId: "",
         paymentMethod: "",
         paymentInstructions: "",
+        totalAmount: "",
       });
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : "Unable to create voucher.");
@@ -348,13 +349,27 @@ export default function FeeVoucherForm({
                 <div className="grid gap-4 md:col-span-2 md:grid-cols-2">
                   <div className="rounded-2xl border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(250,247,240,0.98)_100%)] px-4 py-4">
                     <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#245C4F]">Regular fee</p>
-                    <p className="mt-3 text-sm text-[#245C4F]">PKR {selectedRegularFee.toFixed(2)}</p>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={selectedRegularFee}
+                      readOnly
+                      className="mt-3 w-full rounded-2xl border border-[#2D8A6A]/20 bg-[#F3EFE6] px-4 py-3 text-sm text-[#063F32] outline-none"
+                    />
                   </div>
 
-                  <div className="rounded-2xl border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(250,247,240,0.98)_100%)] px-4 py-4">
+                  <label className="rounded-2xl border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(250,247,240,0.98)_100%)] px-4 py-4">
                     <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#245C4F]">Admission fee</p>
-                    <p className="mt-3 text-sm text-[#245C4F]">PKR {admissionFeeAmount.toFixed(2)}</p>
-                  </div>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={form.admissionFeeAmount || selectedAdmissionFee?.amount || ""}
+                      onChange={(event) => updateField("admissionFeeAmount", event.target.value)}
+                      className="mt-3 w-full rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 text-sm text-[#063F32] outline-none transition focus:border-[#2D8A6A] focus:bg-white focus:ring-4 focus:ring-[#FFF5D6]"
+                    />
+                  </label>
                 </div>
 
                 <label className="block rounded-2xl border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(250,247,240,0.98)_100%)] px-4 py-4 md:col-span-2">
@@ -388,6 +403,10 @@ export default function FeeVoucherForm({
                           const nextDiscount = options.discounts.find((item) => item.id === event.target.value);
                           updateField("discountId", event.target.value);
                           updateField("discountPercent", nextDiscount?.percent || "");
+                          updateField(
+                            "discountAmount",
+                            nextDiscount?.percent ? String(((selectedRegularFee * Number(nextDiscount.percent || 0)) / 100).toFixed(2)) : ""
+                          );
                         }}
                         className="w-full appearance-none rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 pr-11 text-sm text-[#063F32] outline-none transition focus:border-[#2D8A6A] focus:bg-white focus:ring-4 focus:ring-[#FFF5D6]"
                       >
@@ -398,7 +417,7 @@ export default function FeeVoucherForm({
                             <option key={discount.id} value={discount.id}>
                               {discount.label}
                             </option>
-                          ))}
+                        ))}
                       </select>
                       <ChevronDown
                         className={`pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#0D5C48] transition-transform duration-200 ${
@@ -406,6 +425,21 @@ export default function FeeVoucherForm({
                         }`}
                       />
                     </div>
+                    <label className="mt-4 block">
+                      <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.16em] text-[#245C4F]">
+                        Discount amount
+                      </span>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={form.discountAmount || (selectedDiscount?.percent ? ((selectedRegularFee * Number(selectedDiscount.percent || 0)) / 100).toFixed(2) : "")}
+                        onChange={(event) => updateField("discountAmount", event.target.value)}
+                        className="w-full rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 text-sm text-[#063F32] outline-none transition focus:border-[#2D8A6A] focus:bg-white focus:ring-4 focus:ring-[#FFF5D6]"
+                        placeholder="Edit discount amount"
+                      />
+                    </label>
+                    <p className="mt-2 text-xs text-[#245C4F]">{discountPercent.toFixed(2)}% of the regular fee</p>
                   </label>
 
                   <label className="block rounded-2xl border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(250,247,240,0.98)_100%)] px-4 py-4">
@@ -451,17 +485,26 @@ export default function FeeVoucherForm({
                     Regular Fee: <span className="font-semibold text-[#063F32]">PKR {selectedRegularFee.toFixed(2)}</span>
                   </p>
                   <p>
-                    Admission Fee: <span className="font-semibold text-[#063F32]">PKR {admissionFeeAmount.toFixed(2)}</span>
+                    Admission Fee: <span className="font-semibold text-[#063F32]">PKR {admissionFeeAmountInput.toFixed(2)}</span>
                   </p>
                   <p>
-                    Discount on Regular Fee: <span className="font-semibold text-[#063F32]">PKR {discountAmount.toFixed(2)}</span>
+                    Discount on Regular Fee: <span className="font-semibold text-[#063F32]">PKR {discountAmountInput.toFixed(2)}</span>
                   </p>
                   <p>
                     Scholarship Amount: <span className="font-semibold text-[#063F32]">PKR {scholarshipAmountInput.toFixed(2)}</span>
                   </p>
-                  <p className="sm:col-span-3">
-                    Total Payable: <span className="font-semibold text-[#063F32]">PKR {totalAmount.toFixed(2)}</span>
-                  </p>
+                  <label className="sm:col-span-3">
+                    <span className="mb-2 block text-sm font-medium text-[#245C4F]">Total payable</span>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={form.totalAmount || derivedTotalAmount.toFixed(2)}
+                      onChange={(event) => updateField("totalAmount", event.target.value)}
+                      className="w-full rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 text-sm text-[#063F32] outline-none transition focus:border-[#2D8A6A] focus:bg-white focus:ring-4 focus:ring-[#FFF5D6]"
+                      placeholder={`Calculated total: PKR ${derivedTotalAmount.toFixed(2)}`}
+                    />
+                  </label>
                 </div>
 
                 {error ? (

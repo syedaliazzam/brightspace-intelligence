@@ -57,6 +57,8 @@ const initialForm = {
   paymentMethod: "",
   admissionFee: "",
   discountPercent: "",
+  discountAmount: "",
+  totalAmount: "",
   paymentInstructions: "",
   payerName: "",
   payerEmail: "",
@@ -820,6 +822,8 @@ function AdmissionFormContent() {
   const liveSelectedAdmissionFeeAmountParam = useMemo(() => searchParams?.get("admissionFeeAmount") || "", [searchParams]);
   const liveSelectedDiscountId = useMemo(() => searchParams?.get("discountId") || "", [searchParams]);
   const liveSelectedDiscountPercentParam = useMemo(() => searchParams?.get("discountPercent") || "", [searchParams]);
+  const liveSelectedDiscountAmountParam = useMemo(() => searchParams?.get("discountAmount") || "", [searchParams]);
+  const liveSelectedTotalAmountParam = useMemo(() => searchParams?.get("totalAmount") || "", [searchParams]);
   const liveSelectedPaymentMethodId = useMemo(() => searchParams?.get("paymentMethodId") || "", [searchParams]);
   const liveSelectedPaymentMethodNameParam = useMemo(() => searchParams?.get("paymentMethodName") || "", [searchParams]);
   const livePaymentInstructionsFromLink = useMemo(() => searchParams?.get("paymentInstructions") || "", [searchParams]);
@@ -844,13 +848,19 @@ function AdmissionFormContent() {
       null,
     [liveSelectedPaymentMethodId, liveSelectedPaymentMethodNameParam, paymentOptions.paymentMethods]
   );
-  const liveAdmissionFeeAmount = Number(liveSelectedAdmissionFee?.amount || liveSelectedAdmissionFeeAmountParam || 0);
+  const liveAdmissionFeeAmount = Number(liveSelectedAdmissionFeeAmountParam || liveSelectedAdmissionFee?.amount || 0);
   const liveDiscountPercent = Number(liveSelectedDiscount?.percent || 0);
-  const livePaymentInstructions = String(livePaymentInstructionsFromLink || liveSelectedPaymentMethod?.instructions || "").trim();
-
   const previewDiscountPercent = useMemo(() => {
     return Number(String(form.discountPercent || "0").replace("%", "")) || 0;
   }, [form.discountPercent]);
+
+  const previewRegularFeeAmount = Number(previewRegularFee?.amount || 0);
+  const previewDiscountAmount = Math.round((previewRegularFeeAmount * previewDiscountPercent) / 100);
+  const previewAdmissionFeeAmount = Number(previewAdmissionFee?.amount || 0);
+  const previewTotalAmount = Math.max(previewRegularFeeAmount - previewDiscountAmount + previewAdmissionFeeAmount, 0);
+  const liveDiscountAmount = Number(liveSelectedDiscountAmountParam || Math.round((previewRegularFeeAmount * liveDiscountPercent) / 100) || 0);
+  const liveTotalAmount = Number(liveSelectedTotalAmountParam || Math.max(previewRegularFeeAmount - liveDiscountAmount + liveAdmissionFeeAmount, 0));
+  const livePaymentInstructions = String(livePaymentInstructionsFromLink || liveSelectedPaymentMethod?.instructions || "").trim();
 
   const previewPaymentInstructions = useMemo(() => {
     return String(form.paymentInstructions || "").trim();
@@ -876,13 +886,6 @@ function AdmissionFormContent() {
 
     return undefined;
   }, [isPreviewMode, leadToken, isPreviewPaymentReady]);
-
-  const previewRegularFeeAmount = Number(previewRegularFee?.amount || 0);
-  const previewDiscountAmount = Math.round((previewRegularFeeAmount * previewDiscountPercent) / 100);
-  const previewAdmissionFeeAmount = Number(previewAdmissionFee?.amount || 0);
-  const previewTotalAmount = Math.max(previewRegularFeeAmount - previewDiscountAmount + previewAdmissionFeeAmount, 0);
-  const liveDiscountAmount = Math.round(previewRegularFeeAmount * (liveDiscountPercent / 100));
-  const liveTotalAmount = Math.max(previewRegularFeeAmount - liveDiscountAmount + liveAdmissionFeeAmount, 0);
 
   function updateField(name, value) {
     const nextValue = (name === "fatherCnic" || name === "motherCnic")
@@ -1123,6 +1126,8 @@ function AdmissionFormContent() {
         payment_method: isPreviewMode ? form.paymentMethod : (liveSelectedPaymentMethod?.name || liveSelectedPaymentMethod?.method_key || ""),
         admission_fee: isPreviewMode ? form.admissionFee : String(liveAdmissionFeeAmount || ""),
         discount_percent: isPreviewMode ? form.discountPercent : String(liveDiscountPercent || ""),
+        discount_amount: isPreviewMode ? form.discountAmount : String(liveDiscountAmount),
+        total_amount: isPreviewMode ? form.totalAmount : String(liveTotalAmount),
         payment_instructions: isPreviewMode ? form.paymentInstructions : livePaymentInstructions,
         payer_name: "",
         payer_email: "",

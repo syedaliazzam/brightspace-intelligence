@@ -120,9 +120,12 @@ export default function InterestedStudentsPanel({
   const [deletingId, setDeletingId] = useState("");
   const [hiddenRowIds, setHiddenRowIds] = useState([]);
   const [previewAdmissionFeeId, setPreviewAdmissionFeeId] = useState("");
+  const [previewAdmissionFeeAmount, setPreviewAdmissionFeeAmount] = useState("");
   const [previewDiscountId, setPreviewDiscountId] = useState("");
+  const [previewDiscountAmount, setPreviewDiscountAmount] = useState("");
   const [previewPaymentMethodId, setPreviewPaymentMethodId] = useState("");
   const [previewPaymentInstructions, setPreviewPaymentInstructions] = useState("");
+  const [previewTotalAmount, setPreviewTotalAmount] = useState("");
   const [manualPaymentFile, setManualPaymentFile] = useState(null);
   const [manualPaymentPreviewUrl, setManualPaymentPreviewUrl] = useState("");
   const [manualPaymentSubmitting, setManualPaymentSubmitting] = useState(false);
@@ -212,10 +215,12 @@ export default function InterestedStudentsPanel({
     paymentOptions.paymentMethods.find((item) => item.id === previewPaymentMethodId) || null;
 
   const regularFeeAmount = Number(regularFee?.amount || 0);
-  const admissionFeeAmount = Number(selectedPreviewAdmissionFee?.amount || 0);
+  const admissionFeeAmount = Number(previewAdmissionFeeAmount || selectedPreviewAdmissionFee?.amount || 0);
   const discountPercent = Number(discount?.percent || 0);
-  const discountAmount = Math.round(regularFeeAmount * (discountPercent / 100));
-  const totalAmount = Math.max(regularFeeAmount - discountAmount + admissionFeeAmount, 0);
+  const computedDiscountAmount = Math.round(regularFeeAmount * (discountPercent / 100));
+  const discountAmount = Number(previewDiscountAmount || computedDiscountAmount || 0);
+  const computedTotalAmount = Math.max(regularFeeAmount - discountAmount + admissionFeeAmount, 0);
+  const totalAmount = Number(previewTotalAmount || computedTotalAmount || 0);
   const totalPages = Math.max(1, Math.ceil(localItems.length / PAGE_SIZE));
   const classFilterOptions = useMemo(() => {
     const classes = paymentOptions.classLevels
@@ -514,9 +519,11 @@ export default function InterestedStudentsPanel({
     try {
       const payload = {
         admissionFeeId: previewAdmissionFeeId,
-        admissionFeeAmount: selectedPreviewAdmissionFee?.amount || "",
+        admissionFeeAmount: admissionFeeAmount,
         discountPercent: discount?.percent || "",
         discountId: previewDiscountId,
+        discountAmount,
+        totalAmount,
         paymentMethodId: previewPaymentMethodId,
         paymentMethodName: selectedPreviewPaymentMethod?.name || "",
         paymentInstructions: previewPaymentInstructions,
@@ -1360,7 +1367,11 @@ export default function InterestedStudentsPanel({
                           <div className="mt-3 relative">
                             <select
                               value={previewAdmissionFeeId}
-                              onChange={(event) => setPreviewAdmissionFeeId(event.target.value)}
+                              onChange={(event) => {
+                                const nextAdmissionFee = paymentOptions.admissionFees.find((item) => item.id === event.target.value);
+                                setPreviewAdmissionFeeId(event.target.value);
+                                setPreviewAdmissionFeeAmount(nextAdmissionFee ? String(nextAdmissionFee.amount || "") : "");
+                              }}
                               className="w-full appearance-none rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 pr-11 text-sm text-[#063F32] outline-none transition focus:border-[#2D8A6A] focus:bg-white focus:ring-4 focus:ring-[#FFF5D6]"
                             >
                               <option value="">No admission fee selected</option>
@@ -1370,8 +1381,22 @@ export default function InterestedStudentsPanel({
                                   {Number(item.amount || 0).toLocaleString("en-PK")}
                                 </option>
                               ))}
-                            </select>
+                          </select>
                           </div>
+                          <label className="mt-4 block">
+                            <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.16em] text-[#245C4F]">
+                              Admission fee amount
+                            </span>
+                            <input
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              value={previewAdmissionFeeAmount}
+                              onChange={(event) => setPreviewAdmissionFeeAmount(event.target.value)}
+                              className="w-full rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 text-sm text-[#063F32] outline-none transition focus:border-[#2D8A6A] focus:bg-white focus:ring-4 focus:ring-[#FFF5D6]"
+                              placeholder={selectedPreviewAdmissionFee ? String(selectedPreviewAdmissionFee.amount || "") : "Enter admission fee amount"}
+                            />
+                          </label>
                           <p className="mt-2 text-sm text-[#245C4F]">
                             {selectedPreviewAdmissionFee?.title ||
                               selectedPreviewAdmissionFee?.name ||
@@ -1384,7 +1409,16 @@ export default function InterestedStudentsPanel({
                           <div className="mt-3 relative">
                             <select
                               value={previewDiscountId}
-                              onChange={(event) => setPreviewDiscountId(event.target.value)}
+                              onChange={(event) => {
+                                const nextDiscount = paymentOptions.discounts.find((item) => item.id === event.target.value);
+                                const nextDiscountPercent = Number(nextDiscount?.percent || 0);
+                                setPreviewDiscountId(event.target.value);
+                                setPreviewDiscountAmount(
+                                  nextDiscountPercent > 0
+                                    ? String(Math.round(regularFeeAmount * (nextDiscountPercent / 100)))
+                                    : ""
+                                );
+                              }}
                               className="w-full appearance-none rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 pr-11 text-sm text-[#063F32] outline-none transition focus:border-[#2D8A6A] focus:bg-white focus:ring-4 focus:ring-[#FFF5D6]"
                             >
                               <option value="">No discount selected</option>
@@ -1401,6 +1435,20 @@ export default function InterestedStudentsPanel({
                                 ))}
                             </select>
                           </div>
+                          <label className="mt-4 block">
+                            <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.16em] text-[#245C4F]">
+                              Discount amount
+                            </span>
+                            <input
+                              type="number"
+                              min="0"
+                              step="0.01"
+                              value={previewDiscountAmount}
+                              onChange={(event) => setPreviewDiscountAmount(event.target.value)}
+                              className="w-full rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 text-sm text-[#063F32] outline-none transition focus:border-[#2D8A6A] focus:bg-white focus:ring-4 focus:ring-[#FFF5D6]"
+                              placeholder={discountPercent ? String(computedDiscountAmount) : "Enter discount amount"}
+                            />
+                          </label>
                           <p className="mt-2 text-sm text-[#245C4F]">
                             Allowed discounts are limited to coordinator-approved values up to {Number(paymentOptions.coordinatorMaxDiscountPercent || 20)}%.
                           </p>
@@ -1492,7 +1540,15 @@ export default function InterestedStudentsPanel({
                           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]">
                             Total after discount
                           </p>
-                          <p className="mt-2 text-lg font-bold text-[#063F32]">PKR {totalAmount.toLocaleString("en-PK")}</p>
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={previewTotalAmount}
+                            onChange={(event) => setPreviewTotalAmount(event.target.value)}
+                            className="mt-2 w-full rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 text-lg font-bold text-[#063F32] outline-none transition focus:border-[#2D8A6A] focus:bg-white focus:ring-4 focus:ring-[#FFF5D6]"
+                            placeholder={String(computedTotalAmount)}
+                          />
                           <p className="mt-1">Regular fee minus discount plus admission fee.</p>
                         </div>
                       </div>
