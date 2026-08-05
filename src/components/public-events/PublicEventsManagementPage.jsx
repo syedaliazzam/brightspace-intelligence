@@ -11,7 +11,15 @@ import {
   formatMoney,
 } from "@/lib/publicEvents";
 
+const EVENT_CATEGORIES = [
+  { id: "alh-students", label: "Ashshajrah Students" },
+  { id: "alh-parents", label: "Ashshajrah Parents" },
+  { id: "general-students", label: "General Students" },
+  { id: "general-parents", label: "General Parents" },
+];
+
 const EMPTY_FORM = {
+  eventCategory: "",
   title: "",
   description: "",
   startDate: "",
@@ -45,6 +53,7 @@ function formatTimeOnly(value) {
 const PUBLIC_EVENT_TABLE_COLUMNS = [
   { value: "all", label: "All columns" },
   { value: "title", label: "Event" },
+  { value: "event_category", label: "Category" },
   { value: "start_date", label: "Start date" },
   { value: "start_time", label: "Start time" },
   { value: "end_date", label: "End date" },
@@ -62,10 +71,13 @@ const PUBLIC_EVENT_TABLE_COLUMNS = [
 function getPublicEventColumnValue(item, column) {
   const lifecycle = formatEventLifecycleLabel(formatEventLifecycleStatus(item.start_at, item.end_at));
   const publication = String(item.publication_status || "draft").toLowerCase() === "published" ? "Published" : "Draft";
+  const categoryLabel = EVENT_CATEGORIES.find((c) => c.id === item.event_category)?.label || item.event_category || "";
 
   switch (column) {
     case "title":
       return item.title;
+    case "event_category":
+      return categoryLabel;
     case "start_date":
       return formatEventDate(item.start_at);
     case "start_time":
@@ -147,6 +159,7 @@ export default function PublicEventsManagementPage({
     column: "all",
     search: "",
   });
+  const [categoryOpen, setCategoryOpen] = useState(false);
 
   async function load() {
     setLoading(true);
@@ -258,6 +271,7 @@ export default function PublicEventsManagementPage({
 
     try {
       const payload = new FormData();
+      payload.set("eventCategory", form.eventCategory);
       payload.set("title", form.title);
       payload.set("description", form.description);
       payload.set("startDate", form.startDate);
@@ -465,6 +479,10 @@ export default function PublicEventsManagementPage({
                   <div className="rounded-2xl border border-[#2D8A6A]/12 bg-white px-4 py-3">
                     <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]">Publication</p>
                     <p className="mt-1">{String(selected.publication_status || "draft").toLowerCase() === "published" ? "Published" : "Draft"}</p>
+                  </div>
+                  <div className="rounded-2xl border border-[#2D8A6A]/12 bg-white px-4 py-3">
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]">Category</p>
+                    <p className="mt-1">{EVENT_CATEGORIES.find((c) => c.id === selected.event_category)?.label || selected.event_category || "-"}</p>
                   </div>
                   <div className="col-span-2 rounded-2xl border border-[#2D8A6A]/12 bg-white px-4 py-4">
                     <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]">Description</p>
@@ -788,6 +806,29 @@ export default function PublicEventsManagementPage({
               </div>
               <div className="max-h-[80vh] overflow-y-auto p-6">
                 <form key={formResetKey} ref={formRef} className="grid gap-4 md:grid-cols-2" onSubmit={handleSubmit}>
+                  <label className="block md:col-span-2">
+                    <span className="mb-2 block text-sm font-semibold text-[#245C4F]">Select Event Category</span>
+                    <div className="relative">
+                      <select
+                        value={form.eventCategory}
+                        onChange={(event) => setForm((current) => ({ ...current, eventCategory: event.target.value }))}
+                        onFocus={() => setCategoryOpen(true)}
+                        onBlur={() => setCategoryOpen(false)}
+                        className="w-full appearance-none rounded-2xl border border-[#2D8A6A]/20 bg-white px-4 py-3 pr-10 text-sm outline-none focus:border-[#2D8A6A] focus:ring-2 focus:ring-[#FFF5D6]"
+                        required
+                      >
+                        <option value="">Select a category</option>
+                        {EVENT_CATEGORIES.map((cat) => (
+                          <option key={cat.id} value={cat.id}>{cat.label}</option>
+                        ))}
+                      </select>
+                      <ChevronDown
+                        className={`pointer-events-none absolute right-3 top-1/2 h-5 w-5 -translate-y-1/2 text-[#245C4F] transition-transform ${
+                          categoryOpen ? "rotate-180" : ""
+                        }`}
+                      />
+                    </div>
+                  </label>
                   <label className="block">
                     <span className="mb-2 block text-sm font-semibold text-[#245C4F]">Event name</span>
                     <input value={form.title} onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))} className="w-full rounded-2xl border border-[#2D8A6A]/20 bg-white px-4 py-3 text-sm outline-none focus:border-[#2D8A6A] focus:ring-2 focus:ring-[#FFF5D6]" required />

@@ -415,6 +415,10 @@ export default function PublicEventRegistrationsPage({ portalLabel = "Coordinato
                   <th className="whitespace-nowrap px-6 py-4">Event</th>
                   <th className="whitespace-nowrap px-6 py-4">Event Date</th>
                   <th className="whitespace-nowrap px-6 py-4">Participant</th>
+                  <th className="whitespace-nowrap px-6 py-4">Student Name</th>
+                  <th className="whitespace-nowrap px-6 py-4">Parent Name</th>
+                  <th className="whitespace-nowrap px-6 py-4">School Name</th>
+                  <th className="whitespace-nowrap px-6 py-4">Class Name</th>
                   <th className="whitespace-nowrap px-6 py-4">Email</th>
                   <th className="whitespace-nowrap px-6 py-4">WhatsApp</th>
                   {showReceivedAmountColumn ? <th className="whitespace-nowrap px-6 py-4">Received Amount</th> : null}
@@ -430,6 +434,14 @@ export default function PublicEventRegistrationsPage({ portalLabel = "Coordinato
                     <td className="px-6 py-4 font-medium text-[#063F32]">{item.event_name}</td>
                     <td className="px-6 py-4 text-[#245C4F]">{formatEventDate(item.event_start_at)}</td>
                     <td className="px-6 py-4 text-[#245C4F]">{item.participant_name || "-"}</td>
+                    <td className="px-6 py-4 text-[#245C4F]">
+                      {Array.isArray(item.student_names) && item.student_names.length > 0
+                        ? item.student_names.join(", ")
+                        : item.student_name || "-"}
+                    </td>
+                    <td className="px-6 py-4 text-[#245C4F]">{item.parent_name || "-"}</td>
+                    <td className="px-6 py-4 text-[#245C4F]">{item.school_name || "-"}</td>
+                    <td className="px-6 py-4 text-[#245C4F]">{item.class_input || "-"}</td>
                     <td className="px-6 py-4 text-[#245C4F]">{item.email || "-"}</td>
                     <td className="px-6 py-4 text-[#245C4F]">{item.whatsapp || "-"}</td>
                     {showReceivedAmountColumn ? (
@@ -628,6 +640,10 @@ export default function PublicEventRegistrationsPage({ portalLabel = "Coordinato
                     <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]">Participant information</p>
                     <div className="mt-3 space-y-2">
                       <p><span className="font-semibold text-[#063F32]">Participant:</span> {selected.participant_name || "-"}</p>
+                      <p><span className="font-semibold text-[#063F32]">Student Name:</span> {Array.isArray(selected.student_names) && selected.student_names.length > 0 ? selected.student_names.join(", ") : selected.student_name || "-"}</p>
+                      <p><span className="font-semibold text-[#063F32]">Parent Name:</span> {selected.parent_name || "-"}</p>
+                      <p><span className="font-semibold text-[#063F32]">School Name:</span> {selected.school_name || "-"}</p>
+                      <p><span className="font-semibold text-[#063F32]">Class:</span> {selected.class_input || "-"}</p>
                       <p><span className="font-semibold text-[#063F32]">Email:</span> {selected.email || "-"}</p>
                       <p><span className="font-semibold text-[#063F32]">WhatsApp:</span> {selected.whatsapp || "-"}</p>
                     </div>

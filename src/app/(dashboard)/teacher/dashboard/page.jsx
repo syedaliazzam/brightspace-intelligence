@@ -7,6 +7,7 @@ import ClassActionModal from "@/components/teacher/ClassActionModal";
 import LMSCalendar from "@/components/calendar/LMSCalendar";
 import ActiveHeadlinesBanner from "@/components/shared/ActiveHeadlinesBanner";
 import UpcomingPublicEventsTicker from "@/components/layout/UpcomingPublicEventsTicker";
+import MonthlyPlanSlider from "@/components/layout/MonthlyPlanSlider";
 
 function todayDate() {
   const date = new Date();
@@ -126,6 +127,7 @@ export default function TeacherDashboardPage() {
       <div className="pointer-events-none border-0 rounded-[2rem] absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(201,162,39,0.12),transparent_35%),radial-gradient(circle_at_top_right,rgba(45,138,106,0.12),transparent_32%),linear-gradient(180deg,#FAF7F0_0%,#F7F1E3_100%)]" />
       <div className="relative border-0 rounded-[2rem] mx-auto max-w-7xl space-y-6 px-4 py-4 sm:px-6 lg:px-8">
         <UpcomingPublicEventsTicker />
+        <MonthlyPlanSlider />
         <ActiveHeadlinesBanner items={state.headlines} />
         <section className="relative overflow-hidden rounded-[2rem] border border-[#2D8A6A]/15 bg-[linear-gradient(135deg,rgba(13,59,46,0.98),rgba(13,92,72,0.94))] p-6 text-[#FAF7F0] shadow-[0_24px_80px_-36px_rgba(13,59,46,0.32)] sm:p-8">
           <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(228,198,102,0.12),transparent_28%),radial-gradient(circle_at_bottom_left,rgba(101,184,145,0.14),transparent_30%)]" />

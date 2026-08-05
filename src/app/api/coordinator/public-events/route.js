@@ -105,6 +105,7 @@ export async function GET() {
         pe.id::text AS id,
         pe.title,
         pe.description,
+        pe.event_category,
         pe.meet_link,
         pe.start_at,
         pe.end_at,
@@ -157,6 +158,7 @@ export async function POST(request) {
 
   try {
     const formData = await request.formData();
+    const eventCategory = cleanText(formData.get("eventCategory"));
     const title = cleanText(formData.get("title"));
     const description = cleanText(formData.get("description"));
     const startDate = cleanText(formData.get("startDate"));
@@ -168,6 +170,7 @@ export async function POST(request) {
     const registrationDeadlineTime = cleanText(formData.get("registrationDeadlineTime"));
     const file = formData.get("image");
 
+    if (!eventCategory) return json("Event category is required.", 400);
     if (!title) return json("Event name is required.", 400);
     if (!description) return json("Event description is required.", 400);
     if (!(file instanceof File) || file.size <= 0) return json("Event image is required.", 400);
@@ -204,6 +207,7 @@ export async function POST(request) {
         id,
         title,
         description,
+        event_category,
         meet_link,
         start_at,
         end_at,
@@ -227,6 +231,7 @@ export async function POST(request) {
         ${eventId}::uuid,
         ${title},
         ${description},
+        ${eventCategory},
         NULL,
         ${startAt},
         ${endAt},
