@@ -176,10 +176,6 @@ export async function PATCH(request, context) {
         };
       }
 
-      if (!resolvedMeetLink || !isValidGoogleMeetLink(resolvedMeetLink)) {
-        return json("Unable to create a valid Google Meet link. Provide a fallback Google Meet link or complete Google Workspace organizer setup.", 400);
-      }
-
       await prisma.$transaction(async (tx) => {
         await tx.$executeRaw`
           UPDATE lecture_schedules
@@ -247,13 +243,7 @@ export async function PATCH(request, context) {
         resolvedMeetSource = "google_workspace";
       }
     } catch (error) {
-      if (!manualMeetLink) {
-        throw error;
-      }
-    }
-
-    if (!resolvedMeetLink || !isValidGoogleMeetLink(resolvedMeetLink)) {
-      return json("Unable to create a valid Google Meet link. Provide a fallback Google Meet link or complete Google Workspace organizer setup.", 400);
+      console.warn("[lecture-schedules] Google Meet creation failed during reschedule:", error instanceof Error ? error.message : String(error));
     }
 
     const [newLecture] = await prisma.$transaction(async (tx) => {

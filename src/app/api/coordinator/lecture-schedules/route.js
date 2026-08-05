@@ -679,49 +679,43 @@ export async function POST(request) {
     const firstOccurrenceEnd = isOvernight
       ? formatScheduleDateWithOffset(occurrenceDates[0], endHours, endMinutes, 1)
       : formatScheduleDate(occurrenceDates[0], endHours, endMinutes);
-    let firstResolvedMeetLink = manualMeetLink;
+    let sharedCalendarData = {
+      eventId: "",
+      meetSpaceId: extractMeetCodeFromLink(manualMeetLink),
+      meetLink: manualMeetLink,
+    };
+    let sharedResolvedMeetLink = manualMeetLink;
+    let sharedResolvedMeetSource = manualMeetLink ? "manual" : "google_workspace";
+
+    try {
+      sharedCalendarData = await createCalendarLectureEvent({
+        organizerEmail: session.user.email || "",
+        title,
+        description,
+        start: firstOccurrenceStart,
+        end: firstOccurrenceEnd,
+        attendees: meetingAttendees,
+      });
+
+      if (sharedCalendarData.meetLink) {
+        sharedResolvedMeetLink = sharedCalendarData.meetLink;
+        sharedResolvedMeetSource = "google_workspace";
+      }
+    } catch (error) {
+      console.warn("[lecture-schedules] Google Meet creation failed:", error instanceof Error ? error.message : String(error));
+    }
+
+    const lectureCalendarEventId = sharedCalendarData.eventId || null;
+    const lectureMeetLink = sharedResolvedMeetLink || null;
+    const lectureMeetSource = sharedResolvedMeetSource;
+    const lectureMeetSpaceId = sharedCalendarData.meetSpaceId || null;
+    let firstResolvedMeetLink = lectureMeetLink || manualMeetLink;
 
     for (const date of occurrenceDates) {
       const scheduledStart = formatScheduleDate(date, startHours, startMinutes);
       const scheduledEnd = isOvernight
         ? formatScheduleDateWithOffset(date, endHours, endMinutes, 1)
         : formatScheduleDate(date, endHours, endMinutes);
-
-      let calendarData = {
-        eventId: "",
-        meetSpaceId: extractMeetCodeFromLink(manualMeetLink),
-        meetLink: manualMeetLink,
-      };
-      let resolvedMeetLink = manualMeetLink;
-      let resolvedMeetSource = manualMeetLink ? "manual" : "google_workspace";
-
-      try {
-        calendarData = await createCalendarLectureEvent({
-          organizerEmail: session.user.email || "",
-          title,
-          description,
-          start: scheduledStart,
-          end: scheduledEnd,
-          attendees: meetingAttendees,
-        });
-
-        if (calendarData.meetLink) {
-          resolvedMeetLink = calendarData.meetLink;
-          resolvedMeetSource = "google_workspace";
-        }
-      } catch (error) {
-        if (!manualMeetLink) {
-          return json(error instanceof Error ? error.message : "Unable to create the Google Meet event.", 400);
-        }
-      }
-
-      if (!resolvedMeetLink || !isValidGoogleMeetLink(resolvedMeetLink)) {
-        return json("Unable to create a valid Google Meet link. Provide a fallback Google Meet link or complete Google Workspace organizer setup.", 400);
-      }
-
-      if (!firstResolvedMeetLink && resolvedMeetLink) {
-        firstResolvedMeetLink = resolvedMeetLink;
-      }
 
       lectureInsertRows.push(
         Prisma.sql`
@@ -736,10 +730,10 @@ export async function POST(request) {
             ${description || null},
             ${scheduledStart}::timestamp,
             ${scheduledEnd}::timestamp,
-            ${calendarData.eventId || null},
-            ${resolvedMeetLink || null},
-            ${resolvedMeetSource},
-            ${calendarData.meetSpaceId || null},
+            ${lectureCalendarEventId},
+            ${lectureMeetLink},
+            ${lectureMeetSource},
+            ${lectureMeetSpaceId},
             'scheduled'::lecture_status,
             NOW(),
             NOW()
