@@ -630,7 +630,9 @@ export async function POST(request, { params }) {
         `;
         await tx.$executeRaw`
           UPDATE fee_vouchers
-          SET status = 'verified'::voucher_status
+          SET status = 'verified'::voucher_status,
+              amount = COALESCE(${Number(submission.paid_amount || 0)}, amount),
+              total_amount = COALESCE(${Number(submission.paid_amount || 0)}, total_amount)
           WHERE id = ${submission.fee_voucher_id || submission.voucher_id}::uuid;
         `;
         await insertFeeVerification({
@@ -721,7 +723,9 @@ export async function POST(request, { params }) {
       `;
       await tx.$executeRaw`
         UPDATE fee_vouchers
-        SET status = 'verified'::voucher_status
+        SET status = 'verified'::voucher_status,
+            amount = COALESCE(${Number(submission.paid_amount || 0)}, amount),
+            total_amount = COALESCE(${Number(submission.paid_amount || 0)}, total_amount)
         WHERE id = ${submission.fee_voucher_id || submission.voucher_id}::uuid;
       `;
 

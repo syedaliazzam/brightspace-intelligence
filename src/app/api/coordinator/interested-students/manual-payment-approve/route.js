@@ -25,6 +25,7 @@ export async function POST(request) {
     const formData = await request.formData();
     const interestedStudentId = normalizeText(formData.get("interestedStudentId"));
     const proofFile = formData.get("proofFile");
+    const paidAmountInput = Number(formData.get("paidAmount") || 0);
 
     if (!interestedStudentId) return json("Interested student id is required.", 400);
     if (!(proofFile instanceof File) || !proofFile.size) {
@@ -79,6 +80,9 @@ export async function POST(request) {
     if (row?.payment_submission_id) {
       return json("Payment has already been submitted for this voucher, so Submit Payment is no longer available here.", 400);
     }
+    const submissionPaidAmount = Number.isFinite(paidAmountInput) && paidAmountInput > 0
+      ? paidAmountInput
+      : Number(row.voucher_amount || 0);
 
     const upload = await uploadPaymentProof({
       voucherNo: row.voucher_no,
@@ -106,7 +110,7 @@ export async function POST(request) {
           ${row.voucher_id}::uuid,
           ${row.payer_name},
           ${transactionId},
-          ${Number(row.voucher_amount || 0)},
+          ${submissionPaidAmount},
           ${paidAt}::timestamp,
           ${upload.storedPath},
           'pending'::fee_submission_status
@@ -115,7 +119,9 @@ export async function POST(request) {
 
       await tx.$executeRaw`
         UPDATE fee_vouchers
-        SET status = 'submitted'::voucher_status
+        SET status = 'submitted'::voucher_status,
+            amount = ${submissionPaidAmount},
+            total_amount = ${submissionPaidAmount}
         WHERE id = ${row.voucher_id}::uuid
       `;
 

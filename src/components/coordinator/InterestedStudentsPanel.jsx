@@ -127,6 +127,7 @@ export default function InterestedStudentsPanel({
   const [previewPaymentInstructions, setPreviewPaymentInstructions] = useState("");
   const [previewTotalAmount, setPreviewTotalAmount] = useState("");
   const [manualPaymentFile, setManualPaymentFile] = useState(null);
+  const [manualPaymentAmount, setManualPaymentAmount] = useState("");
   const [manualPaymentPreviewUrl, setManualPaymentPreviewUrl] = useState("");
   const [manualPaymentSubmitting, setManualPaymentSubmitting] = useState(false);
   const [credentialsEmail, setCredentialsEmail] = useState(null);
@@ -182,6 +183,17 @@ export default function InterestedStudentsPanel({
       active = false;
     };
   }, [paymentOptions.discounts.length, selectedLead?.id, selectedLeadViewMode]);
+
+  useEffect(() => {
+    if (selectedLeadViewMode === "manual_payment" && selectedLead?.id) {
+      setManualPaymentAmount(String(selectedLead.voucher_amount || ""));
+    }
+    if (!selectedLead?.id) {
+      setManualPaymentAmount("");
+      setManualPaymentFile(null);
+      setManualPaymentPreviewUrl("");
+    }
+  }, [selectedLead?.id, selectedLead?.voucher_amount, selectedLeadViewMode]);
 
   const selectedClassLevel = String(selectedLead?.class_level || "").trim();
   const regularFee = useMemo(() => {
@@ -476,6 +488,7 @@ export default function InterestedStudentsPanel({
   }
   async function approveManualPayment(item) {
     if (!item?.id || !manualPaymentFile) return;
+    const editedPaidAmount = Number(manualPaymentAmount || item.voucher_amount || 0);
 
     setManualPaymentSubmitting(true);
     setMessage("");
@@ -484,6 +497,7 @@ export default function InterestedStudentsPanel({
       const formData = new FormData();
       formData.append("interestedStudentId", item.id);
       formData.append("proofFile", manualPaymentFile);
+      formData.append("paidAmount", String(editedPaidAmount));
 
       const response = await fetch("/api/coordinator/interested-students/manual-payment-approve", {
         method: "POST",
@@ -1279,6 +1293,20 @@ export default function InterestedStudentsPanel({
                           <InfoCell label="Student" value={selectedLead.student_name} />
                           <InfoCell label="Parent" value={selectedLead.parent_name} />
                         </dl>
+                        <label className="mt-4 block">
+                          <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.16em] text-[#245C4F]">
+                            Paid amount
+                          </span>
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.01"
+                            value={manualPaymentAmount}
+                            onChange={(event) => setManualPaymentAmount(event.target.value)}
+                            className="w-full rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 text-sm text-[#063F32] outline-none transition focus:border-[#2D8A6A] focus:bg-white focus:ring-4 focus:ring-[#FFF5D6]"
+                            placeholder={selectedLead.voucher_amount ? String(selectedLead.voucher_amount) : "Enter amount"}
+                          />
+                        </label>
                       </div>
 
                       <div className="rounded-[1rem] border border-[#2D8A6A]/15 bg-white p-4">

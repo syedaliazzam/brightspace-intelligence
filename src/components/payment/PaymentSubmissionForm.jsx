@@ -101,6 +101,7 @@ export default function PaymentSubmissionForm({ voucher }) {
   const discountPercent = hasDiscount
     ? Number(voucher.discount_percent || (discountAmount / regularFee) * 100 || 0)
     : 0;
+  const formattedDiscountPercent = Number(discountPercent || 0).toFixed(2);
   const totalAmount = Number(voucher.total_amount || voucher.amount || 0);
   const nextMonthlyFee = Math.max(regularFee - discountAmount, 0);
 
@@ -259,7 +260,7 @@ export default function PaymentSubmissionForm({ voucher }) {
                   </div>
                   <div className="min-w-0 flex-1">
                     <p className="text-sm font-bold text-[#063F32] sm:text-base">Discount</p>
-                    <p className="mt-1 text-xs text-[#245C4F]">{discountPercent}% monthly fee discount</p>
+                    <p className="mt-1 text-xs text-[#245C4F]">{formattedDiscountPercent}% monthly fee discount</p>
                   </div>
                   <p className="shrink-0 text-right text-sm font-bold text-[#063F32] sm:text-base">
                     - PKR {discountAmount.toLocaleString("en-PK")}
@@ -315,7 +316,7 @@ export default function PaymentSubmissionForm({ voucher }) {
                   <FormulaBox value={regularFee} label="Regular Monthly Fee" />
                   {(hasDiscount || hasScholarship) ? <FormulaOperator value="-" /> : <FormulaOperator value="+" />}
                   {hasDiscount ? (
-                    <FormulaBox value={discountAmount} label={`Discount (${discountPercent}%)`} />
+                    <FormulaBox value={discountAmount} label={`Discount (${formattedDiscountPercent}%)`} />
                   ) : null}
                   {hasScholarship ? <FormulaOperator value="-" /> : null}
                   {hasScholarship ? <FormulaBox value={scholarshipAmount} label="Scholarship" /> : null}
