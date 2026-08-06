@@ -70,10 +70,10 @@ async function createNotifications(tx, userIds, title, message, type = "class") 
 
 async function sendLectureLinkEmails({ teacher, enrollmentRows, title, scheduledStart, meetLink }) {
   const baseUrl = getAppUrl();
-  const recipients = [];
+  const recipientList = [];
 
   if (teacher.email) {
-    recipients.push({
+    recipientList.push({
       email: teacher.email,
       name: teacher.full_name,
       portalUrl: `${baseUrl}/teacher/dashboard`,
@@ -82,20 +82,22 @@ async function sendLectureLinkEmails({ teacher, enrollmentRows, title, scheduled
     });
   }
 
-  for (const enrollment of enrollmentRows) {
-    const email = enrollment.student_email || enrollment.parent_email;
-    if (!email) continue;
-
-    recipients.push({
+  const parentRecipients = new Map();
+  for (const row of enrollmentRows || []) {
+    const email = String(row?.parent_email || "").trim();
+    if (!email || parentRecipients.has(email)) continue;
+    parentRecipients.set(email, {
       email,
-      name: enrollment.student_email ? enrollment.student_name : enrollment.parent_name,
-      portalUrl: `${baseUrl}${enrollment.student_email ? "/student/dashboard" : "/parent/lectures"}`,
-      studentName: enrollment.student_name,
-      subjectName: enrollment.subject_name,
+      name: row?.parent_name,
+      portalUrl: `${baseUrl}/parent/lectures`,
+      studentName: row?.student_name,
+      subjectName: row?.subject_name,
     });
   }
 
-  for (const recipient of recipients) {
+  recipientList.push(...parentRecipients.values());
+
+  for (const recipient of recipientList) {
     try {
       await sendEmail({
         to: recipient.email,
@@ -681,6 +683,20 @@ export async function POST(request) {
     }
 
     const representativeEnrollment = enrollmentRows[0];
+    const [existingClassMeet] = await prisma.$queryRaw`
+      SELECT
+        ls.google_meet_link AS google_meet_link,
+        ls.google_meet_space_id AS google_meet_space_id,
+        ls.meet_link_source AS meet_link_source
+      FROM lecture_schedules ls
+      INNER JOIN enrollments e ON e.id = ls.enrollment_id
+      WHERE e.course_id = ${courseId}::uuid
+        AND ls.google_meet_link IS NOT NULL
+        AND TRIM(ls.google_meet_link) <> ''
+      ORDER BY ls.created_at ASC
+      LIMIT 1
+    `;
+
     const lectureInsertRows = [];
     const meetingAttendees = [
       teacher.email ? { email: teacher.email, name: teacher.full_name } : null,
@@ -689,36 +705,47 @@ export async function POST(request) {
     const firstOccurrenceEnd = isOvernight
       ? formatScheduleDateWithOffset(occurrenceDates[0], endHours, endMinutes, 1)
       : formatScheduleDate(occurrenceDates[0], endHours, endMinutes);
+    const classMeetLink = manualMeetLink || existingClassMeet?.google_meet_link || "";
+    const classMeetSource =
+      manualMeetLink
+        ? "manual"
+        : existingClassMeet?.meet_link_source || "";
+    const classMeetSpaceId =
+      extractMeetCodeFromLink(classMeetLink) ||
+      existingClassMeet?.google_meet_space_id ||
+      null;
     let sharedCalendarData = {
       eventId: "",
-      meetSpaceId: extractMeetCodeFromLink(manualMeetLink),
-      meetLink: manualMeetLink,
+      meetSpaceId: classMeetSpaceId,
+      meetLink: classMeetLink,
     };
-    let sharedResolvedMeetLink = manualMeetLink;
-    let sharedResolvedMeetSource = manualMeetLink ? "manual" : "google_workspace";
+    let sharedResolvedMeetLink = classMeetLink;
+    let sharedResolvedMeetSource = classMeetSource || "google_workspace";
 
-    try {
-      sharedCalendarData = await createCalendarLectureEvent({
-        organizerEmail: session.user.email || "",
-        title,
-        description,
-        start: firstOccurrenceStart,
-        end: firstOccurrenceEnd,
-        attendees: meetingAttendees,
-      });
+    if (!sharedResolvedMeetLink) {
+      try {
+        sharedCalendarData = await createCalendarLectureEvent({
+          organizerEmail: session.user.email || "",
+          title,
+          description,
+          start: firstOccurrenceStart,
+          end: firstOccurrenceEnd,
+          attendees: meetingAttendees,
+        });
 
-      if (sharedCalendarData.meetLink) {
-        sharedResolvedMeetLink = sharedCalendarData.meetLink;
-        sharedResolvedMeetSource = "google_workspace";
+        if (sharedCalendarData.meetLink) {
+          sharedResolvedMeetLink = sharedCalendarData.meetLink;
+          sharedResolvedMeetSource = "google_workspace";
+        }
+      } catch (error) {
+        console.warn("[lecture-schedules] Google Meet creation failed:", error instanceof Error ? error.message : String(error));
       }
-    } catch (error) {
-      console.warn("[lecture-schedules] Google Meet creation failed:", error instanceof Error ? error.message : String(error));
     }
 
     const lectureCalendarEventId = sharedCalendarData.eventId || null;
     const lectureMeetLink = sharedResolvedMeetLink || null;
     const lectureMeetSource = sharedResolvedMeetSource;
-    const lectureMeetSpaceId = sharedCalendarData.meetSpaceId || null;
+    const lectureMeetSpaceId = sharedCalendarData.meetSpaceId || classMeetSpaceId || null;
     let firstResolvedMeetLink = lectureMeetLink || manualMeetLink;
 
     for (const date of occurrenceDates) {
@@ -787,7 +814,7 @@ export async function POST(request) {
       { timeout: 600000 }
     );
 
-    // Send emails asynchronously without blocking response
+    // Send only the first upcoming lecture email at creation time.
     sendLectureLinkEmails({
       teacher,
       enrollmentRows,
@@ -795,7 +822,7 @@ export async function POST(request) {
       scheduledStart: firstOccurrenceStart,
       meetLink: firstResolvedMeetLink || manualMeetLink,
     }).catch((error) => {
-      console.warn("[lecture-schedules] Email batch failed:", error instanceof Error ? error.message : String(error));
+      console.warn("[lecture-schedules] First lecture email failed:", error instanceof Error ? error.message : String(error));
     });
 
     await createAuditLog({

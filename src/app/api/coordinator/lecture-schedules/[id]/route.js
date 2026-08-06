@@ -142,6 +142,25 @@ export async function PATCH(request, context) {
       return json("Scheduled start and end are required.", 400);
     }
 
+    const [existingClassMeet] = await prisma.$queryRaw`
+      SELECT
+        ls.google_meet_link AS google_meet_link,
+        ls.google_meet_space_id AS google_meet_space_id,
+        ls.meet_link_source AS meet_link_source
+      FROM lecture_schedules ls
+      INNER JOIN enrollments e ON e.id = ls.enrollment_id
+      WHERE e.course_id = (
+        SELECT course_id
+        FROM enrollments
+        WHERE id = ${lecture.enrollment_id}::uuid
+        LIMIT 1
+      )
+        AND ls.google_meet_link IS NOT NULL
+        AND TRIM(ls.google_meet_link) <> ''
+      ORDER BY ls.created_at ASC
+      LIMIT 1
+    `;
+
     if (action === "update") {
       let calendarData = {
         eventId: lecture.google_calendar_event_id || "",
@@ -219,31 +238,39 @@ export async function PATCH(request, context) {
 
     let calendarData = {
       eventId: lecture.google_calendar_event_id || "",
-      meetLink: manualMeetLink,
-      meetSpaceId: extractMeetCodeFromLink(manualMeetLink),
+      meetLink: manualMeetLink || existingClassMeet?.google_meet_link || "",
+      meetSpaceId:
+        extractMeetCodeFromLink(manualMeetLink || existingClassMeet?.google_meet_link || "") ||
+        existingClassMeet?.google_meet_space_id ||
+        null,
     };
-    let resolvedMeetLink = manualMeetLink;
-    let resolvedMeetSource = manualMeetLink ? "manual" : "google_workspace";
+    let resolvedMeetLink = manualMeetLink || existingClassMeet?.google_meet_link || "";
+    let resolvedMeetSource =
+      manualMeetLink
+        ? "manual"
+        : existingClassMeet?.meet_link_source || "google_workspace";
 
-    try {
-      calendarData = await createCalendarLectureEvent({
-        organizerEmail: session.user.email || lecture.coordinator_email || "",
-        title: title || lecture.title,
-        description: description || lecture.description,
-        start: scheduledStart,
-        end: scheduledEnd,
-        attendees: [
-          lecture.teacher_email ? { email: lecture.teacher_email, name: lecture.teacher_name } : null,
-          lecture.student_email ? { email: lecture.student_email, name: lecture.student_name } : null,
-          lecture.parent_email ? { email: lecture.parent_email, name: lecture.parent_name } : null,
-        ].filter(Boolean),
-      });
-      if (calendarData.meetLink) {
-        resolvedMeetLink = calendarData.meetLink;
-        resolvedMeetSource = "google_workspace";
+    if (!resolvedMeetLink) {
+      try {
+        calendarData = await createCalendarLectureEvent({
+          organizerEmail: session.user.email || lecture.coordinator_email || "",
+          title: title || lecture.title,
+          description: description || lecture.description,
+          start: scheduledStart,
+          end: scheduledEnd,
+          attendees: [
+            lecture.teacher_email ? { email: lecture.teacher_email, name: lecture.teacher_name } : null,
+            lecture.student_email ? { email: lecture.student_email, name: lecture.student_name } : null,
+            lecture.parent_email ? { email: lecture.parent_email, name: lecture.parent_name } : null,
+          ].filter(Boolean),
+        });
+        if (calendarData.meetLink) {
+          resolvedMeetLink = calendarData.meetLink;
+          resolvedMeetSource = "google_workspace";
+        }
+      } catch (error) {
+        console.warn("[lecture-schedules] Google Meet creation failed during reschedule:", error instanceof Error ? error.message : String(error));
       }
-    } catch (error) {
-      console.warn("[lecture-schedules] Google Meet creation failed during reschedule:", error instanceof Error ? error.message : String(error));
     }
 
     const [newLecture] = await prisma.$transaction(async (tx) => {
