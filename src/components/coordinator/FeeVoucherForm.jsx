@@ -373,7 +373,7 @@ export default function FeeVoucherForm({
                 </div>
 
                 <label className="block rounded-2xl border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(250,247,240,0.98)_100%)] px-4 py-4 md:col-span-2">
-                  <span className="mb-2 block text-sm font-medium text-[#245C4F]">Need-based scholarship amount</span>
+                  <span className="mb-2 block text-sm font-medium text-[#245C4F]">Scholarship amount</span>
                   <input
                     type="number"
                     min="0"

@@ -6,7 +6,7 @@ export default function AdminNeedBasedScholarshipsPage() {
   return (
     <NeedBasedScholarshipsPage
       portalLabel="Admin portal"
-      title="Need based scholarship records"
+      title="Scholarship records"
       description="Review Step 6 scholarship applications from the admin portal in a read-only view."
       allowCreateVoucher={false}
     />

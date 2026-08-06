@@ -62,7 +62,7 @@ export async function POST(request) {
     `;
 
     if (["submitted", "verified"].includes(String(voucher?.status || "").toLowerCase())) {
-      return json("Need based scholarship is no longer available because payment has already been submitted.", 400);
+      return json("Scholarship is no longer available because payment has already been submitted.", 400);
     }
 
     const [interestedStudent] = await prisma.$queryRaw`
@@ -127,10 +127,10 @@ export async function POST(request) {
       `;
     }
 
-    return json("Need based scholarship submitted successfully.", 200);
+    return json("Scholarship submitted successfully.", 200);
   } catch (error) {
     return json(
-      error instanceof Error ? error.message : "Unable to submit need based scholarship form.",
+      error instanceof Error ? error.message : "Unable to submit scholarship form.",
       500
     );
   }

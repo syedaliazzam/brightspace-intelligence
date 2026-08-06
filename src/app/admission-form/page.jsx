@@ -1511,9 +1511,9 @@ function AdmissionFormContent() {
             className="mt-1 h-4 w-4 rounded border-[#2D8A6A]/30 text-[#0D5C48] focus:ring-[#C9A227]"
           />
           <span>
-            <span className="block font-semibold">Do you want to avail need based scholarship?</span>
+            <span className="block font-semibold">Do you want to avail scholarship?</span>
             <span className="mt-1 block text-[#245C4F]">
-              Need base scholarship is for Zakat, Khairat and Atiyah.
+              Scholarship is for Zakat, Khairat and Atiyah.
             </span>
           </span>
         </label>
@@ -1679,9 +1679,9 @@ function AdmissionFormContent() {
                 className="mt-1 h-4 w-4 rounded border-[#2D8A6A]/30 text-[#0D5C48] focus:ring-[#C9A227]"
               />
               <span>
-                <span className="block font-semibold">Do you want to avail need based scholarship?</span>
+                <span className="block font-semibold">Do you want to avail scholarship?</span>
                 <span className="mt-1 block text-[#245C4F]">
-                  Need base scholarship is for Zakat, Khairat and Atiyah.
+                  Scholarship is for Zakat, Khairat and Atiyah.
                 </span>
               </span>
             </label>
@@ -1770,9 +1770,9 @@ function AdmissionFormContent() {
                 className="mt-1 h-4 w-4 rounded border-[#2D8A6A]/30 text-[#0D5C48] focus:ring-[#C9A227]"
               />
               <span>
-                <span className="block font-semibold">Do you want to avail need based scholarship?</span>
+                <span className="block font-semibold">Do you want to avail scholarship?</span>
                 <span className="mt-1 block text-[#245C4F]">
-                  Need base scholarship is for Zakat, Khairat and Atiyah.
+                  Scholarship is for Zakat, Khairat and Atiyah.
                 </span>
               </span>
             </label>
@@ -1992,9 +1992,9 @@ function AdmissionFormContent() {
                 className="mt-1 h-4 w-4 rounded border-[#2D8A6A]/30 text-[#0D5C48] focus:ring-[#C9A227]"
               />
               <span>
-                <span className="block font-semibold">Do you want to avail need based scholarship?</span>
+                <span className="block font-semibold">Do you want to avail scholarship?</span>
                 <span className="mt-1 block text-[#245C4F]">
-                  Need base scholarship is for Zakat, Khairat and Atiyah.
+                  Scholarship is for Zakat, Khairat and Atiyah.
                 </span>
               </span>
             </label>

@@ -36,7 +36,7 @@ function formatScholarshipStatus(item) {
 
 export function NeedBasedScholarshipsPage({
   portalLabel = "Coordinator portal",
-  title = "Need based scholarship records",
+  title = "Scholarship records",
   description = "Review scholarship applications, inspect the financial details, and create the follow-up voucher from one place.",
   allowCreateVoucher = true,
 } = {}) {
@@ -264,7 +264,7 @@ export function NeedBasedScholarshipsPage({
             <div className="relative max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded-[2rem] border border-[#2D8A6A]/15 bg-[#FAF7F0] p-6 shadow-[0_24px_80px_-36px_rgba(13,59,46,0.24)] sm:p-8">
               <div className="flex items-start justify-between gap-4">
                 <div>
-                  <p className="text-sm font-semibold uppercase tracking-[0.24em] text-[#C9A227]">Need based scholarship</p>
+                  <p className="text-sm font-semibold uppercase tracking-[0.24em] text-[#C9A227]">Scholarship</p>
                   <h2 className="mt-2 text-2xl font-semibold text-[#063F32]">{selectedItem.student_name}</h2>
                 </div>
                 <button type="button" onClick={() => setSelectedItem(null)} className="rounded-xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-3 py-2 text-sm font-semibold text-[#063F32] transition hover:bg-[#F1EADC]">Close</button>

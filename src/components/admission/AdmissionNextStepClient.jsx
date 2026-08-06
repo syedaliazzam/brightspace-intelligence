@@ -90,10 +90,10 @@ export default function AdmissionNextStepClient({
   const paymentAlreadySubmitted = paymentLockedStatuses.has(String(voucher?.status || "").toLowerCase());
   const paymentLockedByScholarship = scholarshipSubmitted;
   const scholarshipLockMessage = scholarshipSubmitted
-    ? "Need based scholarship has already been submitted."
-    : "Need based scholarship is locked because the payment has already been submitted.";
+    ? "Scholarship has already been submitted."
+    : "Scholarship is locked because the payment has already been submitted.";
   const paymentLockMessage = paymentLockedByScholarship
-    ? "Payment form is no longer available because the need based scholarship form has already been submitted."
+    ? "Payment form is no longer available because the scholarship form has already been submitted."
     : "";
 
   useEffect(() => {
@@ -309,17 +309,17 @@ export default function AdmissionNextStepClient({
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data?.message || "Unable to submit need based scholarship form.");
+        throw new Error(data?.message || "Unable to submit scholarship form.");
       }
 
       setTone("success");
-      setMessage("Need based scholarship form submitted successfully.");
+      setMessage("Scholarship form submitted successfully.");
       window.setTimeout(() => {
         router.refresh();
       }, 800);
     } catch (error) {
       setTone("error");
-      setMessage(error instanceof Error ? error.message : "Unable to submit need based scholarship form.");
+      setMessage(error instanceof Error ? error.message : "Unable to submit scholarship form.");
     } finally {
       setPending(false);
     }
@@ -347,7 +347,7 @@ export default function AdmissionNextStepClient({
               Admission submitted
             </p>
             <h2 className="mb-3 mt-4 font-display text-3xl font-bold tracking-tight text-white sm:text-4xl">
-              Continue with payment or need based scholarship
+              Continue with payment or scholarship
             </h2>
             <p className="text-sm leading-7 text-[#EAF6EF] sm:text-base">
               Your admission form has been received. Please continue with the next step from this page.
@@ -370,9 +370,9 @@ export default function AdmissionNextStepClient({
             className="mt-1 h-4 w-4 rounded border-[#2D8A6A]/30 text-[#0D5C48] focus:ring-[#C9A227]"
           />
           <span>
-            <span className="block font-semibold">Do you want to avail need based scholarship?</span>
+            <span className="block font-semibold">Do you want to avail scholarship?</span>
             <span className="mt-1 block text-[#245C4F]">
-              Need base scholarship is for Zakat, Khairat and Atiyah.
+              Scholarship is for Zakat, Khairat and Atiyah.
             </span>
             {paymentAlreadySubmitted || scholarshipSubmitted ? (
               <span className="mt-2 block text-xs font-medium text-[#8A6B00]">
@@ -402,7 +402,7 @@ export default function AdmissionNextStepClient({
 
             <section className="rounded-[2rem] border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.96),rgba(250,247,240,0.98))] p-6 shadow-[0_24px_80px_-36px_rgba(13,59,46,0.18)] sm:p-8">
               <p className="text-sm font-semibold uppercase tracking-[0.24em] text-[#C9A227]">
-                Need based scholarship
+                Scholarship
               </p>
               <h2 className="mt-2 text-2xl font-semibold tracking-tight text-[#063F32]">
                 Scholarship request form
@@ -410,7 +410,7 @@ export default function AdmissionNextStepClient({
 
               {scholarshipSubmitted ? (
                 <div className="mt-6 rounded-2xl border border-[#2D8A6A]/20 bg-[#EAF6EF] px-4 py-3 text-sm text-[#0D5C48]">
-                  Need based scholarship form is already submitted for this admission.
+                  Scholarship form is already submitted for this admission.
                 </div>
               ) : (
                 <form className="mt-6 grid gap-4" onSubmit={handleScholarshipSubmit}>

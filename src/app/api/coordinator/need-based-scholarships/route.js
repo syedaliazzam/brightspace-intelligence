@@ -63,7 +63,7 @@ export async function GET() {
       ORDER BY nbsf.created_at DESC NULLS LAST, nbsf.id DESC
     `;
 
-    return json("Need-based scholarship records fetched.", 200, { items });
+    return json("Scholarship records fetched.", 200, { items });
   } catch (error) {
     return json(error instanceof Error ? error.message : "Unable to fetch scholarship records.", 500);
   }

@@ -460,7 +460,7 @@ function buildVoucherEmailContent({
       ["Other Fee", otherFeeAmount > 0 ? otherFeeAmount.toFixed(2) : "0.00"],
       ["Subtotal", Number(regularFeeAmount + otherFeeAmount).toFixed(2)],
       ["Discount on Regular Fee", `${discountPercent}% (${discountAmount.toFixed(2)})`],
-      ["Need-based Scholarship", scholarshipAmount > 0 ? Number(scholarshipAmount).toFixed(2) : "0.00"],
+      ["Scholarship", scholarshipAmount > 0 ? Number(scholarshipAmount).toFixed(2) : "0.00"],
       ["Total Payable", totalAmount.toFixed(2)],
       ["Due Date", formattedDueDate],
       ["Payment Method", paymentMethod?.name || paymentMethodName || "-"],
@@ -515,7 +515,7 @@ Regular Fee: ${regularFeeAmount > 0 ? regularFeeAmount.toFixed(2) : "0.00"}
 Other Fee: ${otherFeeAmount > 0 ? otherFeeAmount.toFixed(2) : "0.00"}
 Subtotal: ${Number(regularFeeAmount + otherFeeAmount).toFixed(2)}
 Discount on Regular Fee: ${discountPercent}% (${discountAmount.toFixed(2)})
-Need-based Scholarship: ${scholarshipAmount > 0 ? Number(scholarshipAmount).toFixed(2) : "0.00"}
+Scholarship: ${scholarshipAmount > 0 ? Number(scholarshipAmount).toFixed(2) : "0.00"}
 Total Payable: ${totalAmount.toFixed(2)}
 Due Date: ${formattedDueDate}
 
@@ -1066,7 +1066,7 @@ export async function POST(request) {
           `;
 
           if (!Array.isArray(updatedScholarshipRows) || !updatedScholarshipRows.length) {
-            throw new Error("Need-based scholarship record was not updated with the existing voucher.");
+            throw new Error("Scholarship record was not updated with the existing voucher.");
           }
 
           await tx.$executeRaw`
@@ -1226,8 +1226,8 @@ export async function POST(request) {
 
         return json(
           existingVoucherEmailStatus === "sent"
-            ? "Existing voucher linked with need based scholarship and email sent successfully."
-            : "Existing voucher linked with need based scholarship, but email sending failed.",
+            ? "Existing voucher linked with scholarship and email sent successfully."
+            : "Existing voucher linked with scholarship, but email sending failed.",
           200,
           {
             item: {
@@ -1479,7 +1479,7 @@ export async function POST(request) {
         `;
 
         if (!Array.isArray(updatedScholarshipRows) || !updatedScholarshipRows.length) {
-          throw new Error("Need-based scholarship record was not updated with the created voucher.");
+          throw new Error("Scholarship record was not updated with the created voucher.");
         }
       }
 
