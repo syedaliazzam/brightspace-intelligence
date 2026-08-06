@@ -10,6 +10,8 @@ export default function MonthlyPlanSlider() {
   const [loading, setLoading] = useState(true);
   const [previewImage, setPreviewImage] = useState(null);
   const timerRef = useRef(null);
+  const scrollerRef = useRef(null);
+  const isAutoScrollingRef = useRef(false);
 
   useEffect(() => {
     async function loadPlan() {
@@ -52,12 +54,17 @@ export default function MonthlyPlanSlider() {
     if (timerRef.current) clearInterval(timerRef.current);
 
     timerRef.current = setInterval(() => {
-      setCurrentIdx((prev) => {
-        if (!plan?.image_urls?.length) return prev;
-        return (prev + 1) % plan.image_urls.length;
-      });
-    }, 4000);
-  }, [plan]);
+      if (isAutoScrollingRef.current) return;
+      isAutoScrollingRef.current = true;
+      if (!plan?.image_urls?.length) return;
+
+      const nextIndex = (currentIdx + 1) % plan.image_urls.length;
+      scrollToIndex(nextIndex);
+      window.setTimeout(() => {
+        isAutoScrollingRef.current = false;
+      }, 900);
+    }, 6500);
+  }, [plan, currentIdx]);
 
   useEffect(() => {
     if (!plan?.image_urls?.length || loading) return;
@@ -67,23 +74,101 @@ export default function MonthlyPlanSlider() {
     };
   }, [plan, loading, startAutoSlide]);
 
-  if (loading || !plan?.image_urls?.length) return null;
+  const images = plan?.image_urls || [];
+  const monthName = plan?.start_date
+    ? new Date(plan.start_date).toLocaleDateString("en-US", { month: "long", year: "numeric" })
+    : "";
 
-  const images = plan.image_urls;
-  const monthName = new Date(plan.start_date).toLocaleDateString("en-US", { month: "long", year: "numeric" });
+  useEffect(() => {
+    const scroller = scrollerRef.current;
+    if (!scroller) return;
+
+    let rafId = 0;
+    let scrollEndTimer = 0;
+
+    const syncCurrentIndex = () => {
+      const cards = scroller.querySelectorAll("[data-plan-card]");
+      if (!cards.length) return;
+
+      const maxScrollLeft = scroller.scrollWidth - scroller.clientWidth;
+      if (scroller.scrollLeft <= 24) {
+        setCurrentIdx(0);
+        return;
+      }
+
+      if (scroller.scrollLeft >= maxScrollLeft - 24) {
+        setCurrentIdx(cards.length - 1);
+        return;
+      }
+
+      const scrollerRect = scroller.getBoundingClientRect();
+      let closestIndex = 0;
+      let closestDistance = Number.POSITIVE_INFINITY;
+
+      cards.forEach((card, index) => {
+        const rect = card.getBoundingClientRect();
+        const cardLeftDistance = Math.abs(rect.left - scrollerRect.left);
+        const cardRightDistance = Math.abs(rect.right - scrollerRect.right);
+        const distance = Math.min(cardLeftDistance, cardRightDistance);
+
+        if (distance < closestDistance) {
+          closestDistance = distance;
+          closestIndex = index;
+        }
+      });
+
+      setCurrentIdx(closestIndex);
+    };
+
+    const onScroll = () => {
+      if (rafId) cancelAnimationFrame(rafId);
+      if (scrollEndTimer) window.clearTimeout(scrollEndTimer);
+      rafId = requestAnimationFrame(syncCurrentIndex);
+      scrollEndTimer = window.setTimeout(syncCurrentIndex, 120);
+    };
+
+    scroller.addEventListener("scroll", onScroll, { passive: true });
+    syncCurrentIndex();
+
+    return () => {
+      scroller.removeEventListener("scroll", onScroll);
+      if (rafId) cancelAnimationFrame(rafId);
+      if (scrollEndTimer) window.clearTimeout(scrollEndTimer);
+    };
+  }, [images.length]);
+
+  const scrollToIndex = (index) => {
+    const scroller = scrollerRef.current;
+    if (!scroller) return;
+
+    const card = scroller.querySelectorAll("[data-plan-card]")[index];
+    if (!card) return;
+
+    const targetLeft = card.offsetLeft - scroller.offsetLeft;
+
+    scroller.scrollTo({
+      left: Math.max(targetLeft - 2, 0),
+      behavior: "smooth",
+    });
+    setCurrentIdx(index);
+  };
 
   const handlePrev = () => {
-    setCurrentIdx((prev) => (prev === 0 ? images.length - 1 : prev - 1));
+    const nextIndex = currentIdx === 0 ? images.length - 1 : currentIdx - 1;
+    scrollToIndex(nextIndex);
     startAutoSlide();
   };
 
   const handleNext = () => {
-    setCurrentIdx((prev) => (prev + 1) % images.length);
+    const nextIndex = (currentIdx + 1) % images.length;
+    scrollToIndex(nextIndex);
     startAutoSlide();
   };
 
+  if (loading || !images.length) return null;
+
   return (
-    <section className="rounded-3xl border border-emerald/12 bg-white p-6 sm:p-8 shadow-[0_20px_50px_rgba(13,59,46,0.14)] transition-all duration-500">
+    <section className="rounded-3xl bg-transparent p-6 sm:p-8 transition-all duration-500 bg-[linear-gradient(135deg,rgba(255,255,255,0.98),rgba(250,247,240,0.97))] shadow-[0_12px_40px_-24px_rgba(13,59,46,0.22)]">
       <div className="mb-6">
         <span className="inline-flex rounded-full border border-gold/30 bg-gold/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-wider text-emerald-deep">Monthly Plan</span>
         <h3 className="mt-4 text-2xl sm:text-3xl font-bold text-emerald-deep">Plan for {monthName}</h3>
@@ -91,15 +176,20 @@ export default function MonthlyPlanSlider() {
       </div>
 
       <div className="relative group">
-        <div className="w-full overflow-hidden">
-          <div className="flex gap-4 sm:gap-6 transition-transform duration-700 ease-in-out" style={{
-            transform: `translateX(calc(-${currentIdx} * (calc(100% / 3) + 1.5rem)))`,
-          }}>
+        <div
+          ref={scrollerRef}
+          className="no-scrollbar overflow-x-auto rounded-[2rem] bg-transparent p-0 scroll-smooth pb-0 snap-x snap-mandatory touch-pan-x"
+          style={{ WebkitOverflowScrolling: "touch" }}
+        >
+          <div className="grid grid-flow-col auto-cols-[calc(100vw-2rem)] gap-3 bg-transparent transition-none md:auto-cols-[calc((100%-1.5rem)/2)] md:gap-6">
             {images.map((img, idx) => (
               <button
                 key={`${img}-${idx}`}
-                onClick={() => setPreviewImage(img)}
-                className="group/card flex-shrink-0 w-full md:w-1/3 overflow-hidden rounded-3xl border border-emerald/12 bg-white shadow-[0_20px_50px_rgba(13,59,46,0.14)] transition-all duration-500 hover:border-gold/35 hover:shadow-[0_28px_60px_rgba(13,59,46,0.18)] cursor-pointer"
+                data-plan-card
+                onClick={() => {
+                  setPreviewImage(img);
+                }}
+                className="group/card block w-full snap-start snap-always overflow-hidden rounded-3xl border border-emerald/10 bg-transparent shadow-[0_20px_50px_rgba(13,59,46,0.10)] transition-all duration-500 hover:border-gold/30 hover:shadow-[0_28px_60px_rgba(13,59,46,0.14)] cursor-pointer"
               >
                 <div className="relative h-56 w-full overflow-hidden bg-gradient-to-br from-emerald-50 to-gold/5">
                   <img
@@ -118,14 +208,14 @@ export default function MonthlyPlanSlider() {
           <>
             <button
               onClick={handlePrev}
-              className="absolute -left-4 top-1/2 -translate-y-1/2 rounded-full border border-emerald/20 bg-emerald p-3 text-cream shadow-[0_12px_30px_rgba(13,59,46,0.2)] transition-all duration-300 hover:border-gold/40 hover:bg-emerald-light hover:shadow-[0_16px_40px_rgba(13,59,46,0.25)] z-20 md:opacity-0 group-hover:opacity-100"
+              className="absolute -left-4 top-1/2 -translate-y-1/2 rounded-full border border-emerald/15 bg-white/85 p-3 text-emerald-deep shadow-[0_12px_30px_rgba(13,59,46,0.14)] backdrop-blur-md transition-all duration-300 hover:border-gold/40 hover:bg-white hover:shadow-[0_16px_40px_rgba(13,59,46,0.18)] z-20 md:opacity-0 group-hover:opacity-100"
               aria-label="Previous"
             >
               <ChevronLeft size={24} strokeWidth={2.5} />
             </button>
             <button
               onClick={handleNext}
-              className="absolute -right-4 top-1/2 -translate-y-1/2 rounded-full border border-emerald/20 bg-emerald p-3 text-cream shadow-[0_12px_30px_rgba(13,59,46,0.2)] transition-all duration-300 hover:border-gold/40 hover:bg-emerald-light hover:shadow-[0_16px_40px_rgba(13,59,46,0.25)] z-20 md:opacity-0 group-hover:opacity-100"
+              className="absolute -right-4 top-1/2 -translate-y-1/2 rounded-full border border-emerald/15 bg-white/85 p-3 text-emerald-deep shadow-[0_12px_30px_rgba(13,59,46,0.14)] backdrop-blur-md transition-all duration-300 hover:border-gold/40 hover:bg-white hover:shadow-[0_16px_40px_rgba(13,59,46,0.18)] z-20 md:opacity-0 group-hover:opacity-100"
               aria-label="Next"
             >
               <ChevronRight size={24} strokeWidth={2.5} />
@@ -133,23 +223,6 @@ export default function MonthlyPlanSlider() {
           </>
         )}
       </div>
-
-      {images.length > 1 && (
-        <div className="mt-8 flex justify-center gap-2">
-          {images.map((_, idx) => (
-            <button
-              key={idx}
-              onClick={() => setCurrentIdx(idx)}
-              className={`rounded-full transition-all duration-300 ${
-                idx === currentIdx
-                  ? "h-3 w-8 bg-emerald shadow-[0_4px_12px_rgba(13,59,46,0.2)]"
-                  : "h-2.5 w-2.5 bg-emerald/25 hover:bg-emerald/50"
-              }`}
-              aria-label={`Go to image ${idx + 1}`}
-            />
-          ))}
-        </div>
-      )}
 
       {previewImage && (
         <ClientPortal>
@@ -178,6 +251,17 @@ export default function MonthlyPlanSlider() {
           </div>
         </ClientPortal>
       )}
+
+      <style jsx global>{`
+        .no-scrollbar {
+          -ms-overflow-style: none;
+          scrollbar-width: none;
+        }
+
+        .no-scrollbar::-webkit-scrollbar {
+          display: none;
+        }
+      `}</style>
     </section>
   );
 }
