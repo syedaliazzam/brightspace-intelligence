@@ -55,6 +55,7 @@ export const dashboardNavigation = {
   coordinator: [
     { label: "Dashboard", href: "/coordinator/dashboard" },
     { label: "Plan for Month", href: "/coordinator/plan-for-month" },
+    { label: "Educational Documents", href: "/coordinator/educational-documents" },
     { label: "All Events Calendar", href: "/coordinator/class-schedulers" },
     { label: "Public Events", href: "/coordinator/public-events" },
     { label: "Internal Events", href: "/coordinator/internal-events" },

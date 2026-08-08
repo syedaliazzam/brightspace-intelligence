@@ -117,7 +117,7 @@ function SelectField({ value, onChange, onFocus, onBlur, className = "", childre
   );
 }
 
-export default function NoteThreadsBoard({ mode = "viewer", lectures = [], portalTargetId, allowReply = true }) {
+export default function NoteThreadsBoard({ mode = "viewer", lectures = [], portalTargetId, allowReply = true, enabled = true }) {
   const canReply = allowReply && (mode === "teacher" || mode === "admin" || mode === "parent" || mode === "student");
   const [threads, setThreads] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -260,11 +260,12 @@ export default function NoteThreadsBoard({ mode = "viewer", lectures = [], porta
   }
 
   useEffect(() => {
+    if (!enabled) return;
     const timer = window.setTimeout(() => {
       loadThreads().catch((err) => setError(err.message));
     }, 0);
     return () => window.clearTimeout(timer);
-  }, []);
+  }, [enabled]);
 
   const panel = "rounded-[2rem] border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(250,247,240,0.98)_100%)] shadow-[0_20px_70px_-36px_rgba(13,59,46,0.18)] backdrop-blur-xl";
   const buttonBase = "rounded-xl border px-3 py-2 text-xs font-semibold transition";

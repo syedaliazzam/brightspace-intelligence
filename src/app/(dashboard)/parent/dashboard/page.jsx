@@ -6,6 +6,7 @@ import ParentStatsCards from "@/components/parent/ParentStatsCards";
 import ActiveHeadlinesBanner from "@/components/shared/ActiveHeadlinesBanner";
 import UpcomingPublicEventsTicker from "@/components/layout/UpcomingPublicEventsTicker";
 import MonthlyPlanSlider from "@/components/layout/MonthlyPlanSlider";
+import EducationalDocumentsSection from "@/components/parent/EducationalDocumentsSection";
 
 export default function ParentDashboardPage() {
   const [showAllMonthlyChildren, setShowAllMonthlyChildren] = useState(false);
@@ -219,14 +220,17 @@ export default function ParentDashboardPage() {
             Please select a child first.
           </div>
         ) : (
-          <ParentStatsCards
-            items={[
-              { key: "attended", label: "Attended lectures", value: state.stats.present_lectures || 0 },
-              { key: "homework", label: "Pending homework", value: state.stats.pending_homework || 0 },
-              { key: "attendance", label: "Attendance", value: `${state.stats.attendance_percentage || 0}%` },
-              { key: "fees", label: "Fee status", value: state.stats.fee_status || "not_available" },
-            ]}
-          />
+          <>
+            <ParentStatsCards
+              items={[
+                { key: "attended", label: "Attended lectures", value: state.stats.present_lectures || 0 },
+                { key: "homework", label: "Pending homework", value: state.stats.pending_homework || 0 },
+                { key: "attendance", label: "Attendance", value: `${state.stats.attendance_percentage || 0}%` },
+                { key: "fees", label: "Fee status", value: state.stats.fee_status || "not_available" },
+              ]}
+            />
+            <EducationalDocumentsSection studentClassLevel={state.children.find((c) => c.id === state.selectedChildId)?.grade_level} />
+          </>
         )}
       </div>
     </div>

@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useSession } from "next-auth/react";
 import TeacherNotesPanel from "@/components/teacher/TeacherNotesPanel";
 
 export default function TeacherNotesPage() {
   const [state, setState] = useState({ classes: [], notes: [], error: "" });
+  const { status } = useSession();
 
   async function load() {
     const [classesResponse, notesResponse] = await Promise.all([
@@ -18,8 +20,9 @@ export default function TeacherNotesPage() {
   }
 
   useEffect(() => {
+    if (status !== "authenticated") return;
     load().catch((error) => setState((current) => ({ ...current, error: error.message })));
-  }, []);
+  }, [status]);
 
   return (
     <div id="teacher-page-portal-root" className="min-h-screen border-0 space-y-6 bg-[#FAF7F0]">
@@ -36,7 +39,7 @@ export default function TeacherNotesPage() {
           </div>
         </section>
         {state.error ? <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">{state.error}</div> : null}
-        <TeacherNotesPanel lectures={state.classes} items={state.notes} portalTargetId="teacher-page-portal-root" onSaved={() => load()} />
+        <TeacherNotesPanel lectures={state.classes} items={state.notes} portalTargetId="teacher-page-portal-root" onSaved={() => load()} enabled={status === "authenticated"} />
       </div>
     </div>
   );
