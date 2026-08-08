@@ -664,12 +664,20 @@ export default function CoordinatorFeeHistoryPage() {
                               ? parts.regularFee || currentMonthFeeValue
                               : currentMonthFeeValue || parts.regularFee,
                         };
-                        const previousMonthDueValue = Number(row.computedPreviousMonthDue ?? row.previous_month_due ?? draft.previous_month_due ?? 0);
+                        const previousMonthDueValue = Number(
+                          isAdmissionRow
+                            ? 0
+                            : (row.computedPreviousMonthDue ?? row.previous_month_due ?? draft.previous_month_due ?? 0)
+                        );
                         const computed = computeAmounts(previousMonthDueValue, currentFeeParts.currentMonthFee, draft.this_month_paid);
-                        const rowRemainingDue = Number(row.remaining_due ?? computed.remaining ?? 0);
+                        const rowRemainingDue = Number(
+                          isAdmissionRow
+                            ? Math.max(0, Number(currentFeeParts.currentMonthFee || 0) - Number(draft.this_month_paid || row.this_month_paid || 0))
+                            : (row.remaining_due ?? computed.remaining ?? 0)
+                        );
                         const displayTotalAmount = Number(
                           isAdmissionRow
-                            ? (row.total_amount || row.current_month_fee || currentFeeParts.currentMonthFee || 0)
+                            ? (row.current_month_fee || currentFeeParts.currentMonthFee || row.total_amount || 0)
                             : (row.total_amount || currentFeeParts.currentMonthFee || 0)
                         );
                         return (
