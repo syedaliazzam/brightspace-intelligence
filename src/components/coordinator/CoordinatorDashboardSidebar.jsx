@@ -24,7 +24,7 @@ import {
 const NAV_ITEMS = [
   { label: "Dashboard / Overview", href: "/coordinator/dashboard", icon: LayoutDashboard, tone: "bg-[#FAF7F0] text-[#245C4F]" },
   { label: "Plan for Month", href: "/coordinator/plan-for-month", icon: ClipboardCheck, tone: "bg-[#EAF6EF] text-[#0D5C48]" },
-  { label: "Educational Documents", href: "/coordinator/educational-documents", icon: BookOpen, tone: "bg-[#EAF6EF] text-[#0D5C48]" },
+  { label: "Educational Documents", href: "/superadmin/educational-documents", icon: BookOpen, tone: "bg-[#EAF6EF] text-[#0D5C48]" },
   { label: "Interested Students", href: "/coordinator/interested-students", icon: Users, tone: "bg-[#EAF6EF] text-[#0D5C48]" },
   { label: "Registration Leads", href: "/coordinator/registration-leads", icon: UserCog, tone: "bg-[#FFF5D6] text-[#8A6B00]" },
   { label: "Payments", href: "/coordinator/payments", icon: CreditCard, tone: "bg-[#FAF7F0] text-[#245C4F]" },

@@ -4,7 +4,7 @@ import prisma from "@/lib/prisma";
 import { uploadAdmissionDocument } from "@/lib/supabaseStorage";
 import crypto from "crypto";
 
-const ALLOWED_ROLES = ["coordinator", "admin"];
+const ALLOWED_ROLES = ["coordinator", "admin", "superadmin"];
 
 function json(message, status = 200, extra = {}) {
   return NextResponse.json({ message, ...extra }, { status });

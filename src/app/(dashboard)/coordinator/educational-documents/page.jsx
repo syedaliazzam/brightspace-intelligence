@@ -26,7 +26,25 @@ function normalizeText(value) {
   return String(value || "").trim().toLowerCase();
 }
 
-export default function EducationalDocumentsPage() {
+function isPdfPath(value) {
+  return String(value || "").toLowerCase().includes(".pdf");
+}
+
+function isImagePath(value) {
+  return /\.(png|jpe?g|webp|gif|bmp|svg)(\?.*)?$/i.test(String(value || ""));
+}
+
+function buildPreviewUrl(value) {
+  return `/api/file-preview?path=${encodeURIComponent(String(value || ""))}`;
+}
+
+export default function EducationalDocumentsPage({
+  allowManage = true,
+  showActionsColumn = true,
+  portalLabel = "Coordinator portal",
+  title = "Educational Documents",
+  description = "Manage timetables, curriculum plans, material lists, and other educational resources for all classes.",
+}) {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -174,25 +192,25 @@ export default function EducationalDocumentsPage() {
           <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
             <div className="max-w-4xl">
               <p className="inline-flex rounded-full border border-[#E4C766]/30 bg-[#FFF5D6]/12 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.28em] text-[#FFF5D6]">
-                Coordinator portal
+                {portalLabel}
               </p>
-              <h1 className="mt-4 font-display text-3xl font-bold tracking-tight text-[#FAF7F0] sm:text-4xl">Educational Documents</h1>
-              <p className="mt-3 text-sm leading-7 text-[#EAF6EF] sm:text-base">
-                Manage timetables, curriculum plans, material lists, and other educational resources for all classes.
-              </p>
+              <h1 className="mt-4 font-display text-3xl font-bold tracking-tight text-[#FAF7F0] sm:text-4xl">{title}</h1>
+              <p className="mt-3 text-sm leading-7 text-[#EAF6EF] sm:text-base">{description}</p>
             </div>
-            <button
-              onClick={() => {
-                setEditingItem(null);
-                setForm({ title: "", documentType: "", classLevel: "" });
-                setSelectedFile(null);
-                setShowAddModal(true);
-              }}
-              className="inline-flex items-center justify-center gap-2 self-start rounded-2xl bg-[#FFF5D6] px-4 py-2 text-sm font-semibold text-[#063F32] transition hover:bg-[#F1EADC] lg:self-auto"
-            >
-              <Plus size={18} />
-              Add Document
-            </button>
+            {allowManage ? (
+              <button
+                onClick={() => {
+                  setEditingItem(null);
+                  setForm({ title: "", documentType: "", classLevel: "" });
+                  setSelectedFile(null);
+                  setShowAddModal(true);
+                }}
+                className="inline-flex items-center justify-center gap-2 self-start rounded-2xl bg-[#FFF5D6] px-4 py-2 text-sm font-semibold text-[#063F32] transition hover:bg-[#F1EADC] lg:self-auto"
+              >
+                <Plus size={18} />
+                Add Document
+              </button>
+            ) : null}
           </div>
         </section>
 
@@ -263,8 +281,9 @@ export default function EducationalDocumentsPage() {
                   <th className="whitespace-nowrap px-6 py-4">Title</th>
                   <th className="whitespace-nowrap px-6 py-4">Type</th>
                   <th className="whitespace-nowrap px-6 py-4">Class Level</th>
+                  <th className="whitespace-nowrap px-6 py-4">View Document</th>
                   <th className="whitespace-nowrap px-6 py-4">Created</th>
-                  <th className="whitespace-nowrap px-6 py-4 text-right">Actions</th>
+                  {showActionsColumn ? <th className="whitespace-nowrap px-6 py-4 text-right">Actions</th> : null}
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#F1EADC]">
@@ -275,40 +294,59 @@ export default function EducationalDocumentsPage() {
                       <td className="px-6 py-4 font-semibold text-[#063F32]">{item.title || "-"}</td>
                       <td className="px-6 py-4 text-[#245C4F]">{getTypeLabel(item.document_type) || "-"}</td>
                       <td className="px-6 py-4 text-[#245C4F]">{item.class_level || "All Classes"}</td>
-                      <td className="px-6 py-4 text-[#245C4F]">{formatDate(item.created_at)}</td>
-                      <td className="px-6 py-4 text-right">
-                        <div className="flex items-center justify-end gap-2">
-                          <button
-                            onClick={() => {
-                              setEditingItem(item);
-                              setForm({
-                                title: item.title || "",
-                                documentType: item.document_type || "",
-                                classLevel: item.class_level || "",
-                              });
-                              setSelectedFile(null);
-                              setShowAddModal(true);
-                            }}
-                            className="rounded-xl border border-[#2D8A6A]/20 bg-[#FAF7F0] p-2 text-[#063F32] transition hover:bg-[#F1EADC]"
-                          >
-                            <Edit2 size={16} />
-                          </button>
-                          <button
-                            onClick={() => {
-                              setDeleteTargetId(item.id);
-                              setShowDeleteModal(true);
-                            }}
-                            className="rounded-xl border border-rose-200 bg-rose-50 p-2 text-rose-600 transition hover:bg-rose-100"
-                          >
-                            <Trash2 size={16} />
-                          </button>
-                        </div>
+                      <td className="px-6 py-4">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (isImagePath(item.file_url)) {
+                              window.open(buildPreviewUrl(item.file_url), "_blank", "noopener,noreferrer");
+                              return;
+                            }
+                            window.open(buildPreviewUrl(item.file_url), "_blank", "noopener,noreferrer");
+                          }}
+                          className="inline-flex items-center justify-center rounded-xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-3 py-2 text-xs font-semibold text-[#063F32] transition hover:bg-[#F1EADC]"
+                        >
+                          View Document
+                        </button>
                       </td>
+                      <td className="px-6 py-4 text-[#245C4F]">{formatDate(item.created_at)}</td>
+                      {showActionsColumn ? (
+                        <td className="px-6 py-4 text-right">
+                          {allowManage ? (
+                            <div className="flex items-center justify-end gap-2">
+                              <button
+                                onClick={() => {
+                                  setEditingItem(item);
+                                  setForm({
+                                    title: item.title || "",
+                                    documentType: item.document_type || "",
+                                    classLevel: item.class_level || "",
+                                  });
+                                  setSelectedFile(null);
+                                  setShowAddModal(true);
+                                }}
+                                className="rounded-xl border border-[#2D8A6A]/20 bg-[#FAF7F0] p-2 text-[#063F32] transition hover:bg-[#F1EADC]"
+                              >
+                                <Edit2 size={16} />
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setDeleteTargetId(item.id);
+                                  setShowDeleteModal(true);
+                                }}
+                                className="rounded-xl border border-rose-200 bg-rose-50 p-2 text-rose-600 transition hover:bg-rose-100"
+                              >
+                                <Trash2 size={16} />
+                              </button>
+                            </div>
+                          ) : null}
+                        </td>
+                      ) : null}
                     </tr>
                   ))
                 ) : (
                   <tr>
-                    <td className="px-6 py-10 text-center text-[#245C4F]" colSpan={6}>
+                    <td className="px-6 py-10 text-center text-[#245C4F]" colSpan={showActionsColumn ? 7 : 6}>
                       {loading ? "Loading documents..." : "No educational documents found."}
                     </td>
                   </tr>
@@ -323,10 +361,10 @@ export default function EducationalDocumentsPage() {
         </section>
       </div>
 
-      {showAddModal ? (
+      {allowManage && showAddModal ? (
         <ClientPortal targetId="coordinator-page-portal-root">
-          <div className="absolute inset-x-0 top-0 z-[9999] isolate min-h-full overflow-visible bg-[#063F32]/45 px-4 py-10">
-            <div className="mx-auto max-w-2xl rounded-[2rem] border border-[#2D8A6A]/15 bg-[#FAF7F0] p-6 shadow-[0_24px_80px_-36px_rgba(13,59,46,0.24)] sm:p-8">
+          <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-[#063F32]/45 px-4 py-8">
+            <div className="w-full max-w-xl max-h-[85vh] overflow-y-auto rounded-[2rem] border border-[#2D8A6A]/15 bg-[#FAF7F0] p-5 shadow-[0_24px_80px_-36px_rgba(13,59,46,0.24)] sm:p-6">
               <div className="mb-6">
                 <h3 className="text-2xl font-semibold text-[#063F32]">{editingItem ? "Edit Document" : "Add Educational Document"}</h3>
                 <p className="mt-1 text-sm text-[#245C4F]">Manage timetables, curricula, and learning materials</p>
@@ -419,10 +457,10 @@ export default function EducationalDocumentsPage() {
         </ClientPortal>
       ) : null}
 
-      {showDeleteModal ? (
+      {allowManage && showDeleteModal ? (
         <ClientPortal targetId="coordinator-page-portal-root">
-          <div className="absolute inset-x-0 top-0 z-[9999] isolate min-h-full overflow-visible bg-[#063F32]/45 px-4 py-10">
-            <div className="mx-auto max-w-sm rounded-[2rem] border border-[#2D8A6A]/15 bg-[#FAF7F0] p-6 shadow-[0_24px_80px_-36px_rgba(13,59,46,0.24)]">
+          <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-[#063F32]/45 px-4 py-8">
+            <div className="w-full max-w-sm max-h-[80vh] overflow-y-auto rounded-[2rem] border border-[#2D8A6A]/15 bg-[#FAF7F0] p-5 shadow-[0_24px_80px_-36px_rgba(13,59,46,0.24)]">
               <h3 className="text-lg font-semibold text-[#063F32]">Remove Document</h3>
               <p className="mt-3 text-sm text-[#245C4F]">Are you sure you want to remove this educational document from all portals? This action cannot be undone.</p>
 
