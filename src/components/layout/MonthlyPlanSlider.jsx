@@ -168,8 +168,8 @@ export default function MonthlyPlanSlider() {
   if (loading || !images.length) return null;
 
   return (
-    <section className="rounded-3xl bg-transparent p-6 sm:p-8 transition-all duration-500 bg-[linear-gradient(135deg,rgba(255,255,255,0.98),rgba(250,247,240,0.97))] shadow-[0_12px_40px_-24px_rgba(13,59,46,0.22)]">
-      <div className="mb-6">
+    <section className="rounded-3xl bg-transparent p-4 sm:p-6 transition-all duration-500 bg-[linear-gradient(135deg,rgba(255,255,255,0.98),rgba(250,247,240,0.97))] shadow-[0_12px_40px_-24px_rgba(13,59,46,0.22)]">
+      <div className="mb-4 sm:mb-5">
         <span className="inline-flex rounded-full border border-gold/30 bg-gold/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-wider text-emerald-deep">Monthly Plan</span>
         <h3 className="mt-4 text-2xl sm:text-3xl font-bold text-emerald-deep">Plan for {monthName}</h3>
         <p className="mt-2 text-sm text-emerald-deep/70">Browse our planned activities and initiatives</p>
@@ -191,11 +191,11 @@ export default function MonthlyPlanSlider() {
                 }}
                 className="group/card block w-full snap-start snap-always overflow-hidden rounded-3xl border border-emerald/10 bg-transparent shadow-[0_20px_50px_rgba(13,59,46,0.10)] transition-all duration-500 hover:border-gold/30 hover:shadow-[0_28px_60px_rgba(13,59,46,0.14)] cursor-pointer"
               >
-                <div className="relative h-56 w-full overflow-hidden bg-gradient-to-br from-emerald-50 to-gold/5">
+                <div className="relative flex h-[300px] w-full items-center justify-center overflow-hidden sm:h-[360px] lg:h-[420px]">
                   <img
                     src={img}
                     alt={`plan-image-${idx}`}
-                    className="h-full w-full object-cover transition-transform duration-500 group-hover/card:scale-[1.05]"
+                    className="max-h-full max-w-full h-auto w-auto object-contain transition-transform duration-500 group-hover/card:scale-[1.02]"
                   />
                   <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-emerald-deep/10 via-transparent to-transparent opacity-0 transition-opacity duration-500 group-hover/card:opacity-100" />
                 </div>
@@ -244,7 +244,7 @@ export default function MonthlyPlanSlider() {
                   <X size={28} />
                 </button>
               </div>
-              <div className="rounded-2xl overflow-hidden bg-gradient-to-br from-emerald-50 to-gold/5">
+              <div className="rounded-2xl overflow-hidden">
                 <img src={previewImage} alt="preview" className="w-full h-auto max-h-[75vh] object-contain" />
               </div>
             </div>

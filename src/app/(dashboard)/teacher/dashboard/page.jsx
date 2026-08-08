@@ -124,7 +124,7 @@ export default function TeacherDashboardPage() {
 
   return (
     <div className="border-0 min-h-screen space-y-6 bg-[#FAF7F0]">
-      <div className="pointer-events-none border-0 rounded-[2rem] absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(201,162,39,0.12),transparent_35%),radial-gradient(circle_at_top_right,rgba(45,138,106,0.12),transparent_32%),linear-gradient(180deg,#FAF7F0_0%,#F7F1E3_100%)]" />
+      <div className="pointer-events-none border-0 absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(201,162,39,0.12),transparent_35%),radial-gradient(circle_at_top_right,rgba(45,138,106,0.12),transparent_32%),linear-gradient(180deg,#FAF7F0_0%,#F7F1E3_100%)]" />
       <div className="relative border-0 rounded-[2rem] mx-auto max-w-7xl space-y-6 px-4 py-4 sm:px-6 lg:px-8">
         <UpcomingPublicEventsTicker />
         <MonthlyPlanSlider />
@@ -135,7 +135,7 @@ export default function TeacherDashboardPage() {
             <p className="inline-flex rounded-full border border-[#FFF5D6]/30 bg-[#FFF5D6]/10 px-3 py-1 text-[0.65rem] font-semibold uppercase tracking-[0.24em] text-[#FFF5D6]">Teacher dashboard</p>
             <h1 className="mb-2 mt-4 text-3xl font-bold text-[#FAF7F0] sm:text-4xl lg:text-4xl font-display">Teaching operations</h1>
             <p className="mt-2 max-w-5xl text-sm leading-7 text-[#EAF6EF] sm:text-base lg:whitespace-nowrap">
-              Manage today's lectures, calendar movement, and performance signals from one place.
+              Manage lectures, calendar movement, and performance signals from one place.
             </p>
           </div>
         </section>
