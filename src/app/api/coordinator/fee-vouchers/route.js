@@ -436,6 +436,7 @@ function buildVoucherEmailContent({
   discountPercent,
   discountAmount,
   totalAmount,
+  currentPendingDue,
   dueDate,
   paymentMethod,
   paymentInstructions,
@@ -462,6 +463,7 @@ function buildVoucherEmailContent({
       ["Discount on Regular Fee", `${discountPercent}% (${discountAmount.toFixed(2)})`],
       ["Scholarship", scholarshipAmount > 0 ? Number(scholarshipAmount).toFixed(2) : "0.00"],
       ["Total Payable", totalAmount.toFixed(2)],
+      ["Current Pending Due", Number(currentPendingDue || 0).toFixed(2)],
       ["Due Date", formattedDueDate],
       ["Payment Method", paymentMethod?.name || paymentMethodName || "-"],
       ["Account Title", paymentMethod?.account_title || "-"],
@@ -517,6 +519,7 @@ Subtotal: ${Number(regularFeeAmount + otherFeeAmount).toFixed(2)}
 Discount on Regular Fee: ${discountPercent}% (${discountAmount.toFixed(2)})
 Scholarship: ${scholarshipAmount > 0 ? Number(scholarshipAmount).toFixed(2) : "0.00"}
 Total Payable: ${totalAmount.toFixed(2)}
+Current Pending Due: ${Number(currentPendingDue || 0).toFixed(2)}
 Due Date: ${formattedDueDate}
 
 Payment Method: ${paymentMethod?.name || paymentMethodName || "-"}
@@ -1103,11 +1106,11 @@ export async function POST(request) {
               LIMIT 1
             `)[0]?.value || "";
 
-          const [updatedVoucher] = await tx.$queryRaw`
-            SELECT
-              fv.id::text AS id,
-              fv.voucher_no,
-              fv.amount,
+      const [updatedVoucher] = await tx.$queryRaw`
+        SELECT
+          fv.id::text AS id,
+          fv.voucher_no,
+          fv.amount,
               fv.due_date,
               fv.payment_method,
               pm.name AS payment_method_name,
@@ -1131,15 +1134,23 @@ export async function POST(request) {
               fv.regular_fee_amount,
               fv.admission_fee_amount,
               fv.discount_percent,
-              fv.discount_amount,
-              fv.subtotal_amount,
-              fv.total_amount
-            FROM fee_vouchers fv
-            INNER JOIN registration_leads rl ON rl.id = fv.registration_id
-            LEFT JOIN payment_methods pm ON pm.id = fv.payment_method_id
-            WHERE fv.id = ${existingVoucher.id}::uuid
-            LIMIT 1
-          `;
+          fv.discount_amount,
+          fv.subtotal_amount,
+          fv.total_amount,
+          COALESCE(latest_history.remaining_due::float8, COALESCE(fv.total_amount::float8, fv.amount::float8, 0)) AS current_pending_due
+        FROM fee_vouchers fv
+        INNER JOIN registration_leads rl ON rl.id = fv.registration_id
+        LEFT JOIN payment_methods pm ON pm.id = fv.payment_method_id
+        LEFT JOIN LATERAL (
+          SELECT fhr.remaining_due
+          FROM fee_history_records fhr
+          WHERE fhr.voucher_id = fv.id
+          ORDER BY fhr.due_date DESC NULLS LAST, fhr.created_at DESC NULLS LAST, fhr.id DESC
+          LIMIT 1
+        ) latest_history ON TRUE
+        WHERE fv.id = ${existingVoucher.id}::uuid
+        LIMIT 1
+      `;
 
           const voucherItem = updatedVoucher || existingVoucher;
           const paymentSubmitUrl = buildPaymentSubmitUrl(voucherItem.voucher_no || existingVoucher.voucher_no);
@@ -1155,6 +1166,7 @@ export async function POST(request) {
             discountPercent: Number(voucherItem.discount_percent || 0),
             discountAmount: Number(voucherItem.discount_amount || 0),
             totalAmount: Number(voucherItem.total_amount || voucherItem.amount || 0),
+            currentPendingDue: Number(voucherItem.current_pending_due || voucherItem.total_amount || voucherItem.amount || 0),
             dueDate: voucherItem.due_date,
             paymentMethod: selectedPaymentMethod || { name: resolvedPaymentMethod },
             paymentInstructions,
@@ -1499,7 +1511,7 @@ export async function POST(request) {
       );
 
       const [created] = await tx.$queryRaw`
-        SELECT
+          SELECT
           fv.id::text AS id,
           fv.voucher_no,
           fv.amount,
@@ -1536,10 +1548,18 @@ export async function POST(request) {
           fv.discount_percent,
           fv.discount_amount,
           fv.subtotal_amount,
-          fv.total_amount
+          fv.total_amount,
+          COALESCE(latest_history.remaining_due::float8, COALESCE(fv.total_amount::float8, fv.amount::float8, 0)) AS current_pending_due
         FROM fee_vouchers fv
         INNER JOIN registration_leads rl ON rl.id = fv.registration_id
         LEFT JOIN payment_methods pm ON pm.id = fv.payment_method_id
+        LEFT JOIN LATERAL (
+          SELECT fhr.remaining_due
+          FROM fee_history_records fhr
+          WHERE fhr.voucher_id = fv.id
+          ORDER BY fhr.due_date DESC NULLS LAST, fhr.created_at DESC NULLS LAST, fhr.id DESC
+          LIMIT 1
+        ) latest_history ON TRUE
         WHERE fv.id = ${voucherId}::uuid
         LIMIT 1
       `;
@@ -1570,6 +1590,7 @@ export async function POST(request) {
         discountPercent,
         discountAmount,
         totalAmount,
+        currentPendingDue: Number(created.current_pending_due || totalAmount || amount || 0),
         dueDate,
         paymentMethod: selectedPaymentMethod || { name: resolvedPaymentMethod },
         paymentInstructions,

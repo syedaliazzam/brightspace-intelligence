@@ -12,7 +12,7 @@ const TRANSACTION_PATTERN = "^[A-Za-z0-9_-]{3,150}$";
 
 function FormulaOperator({ value }) {
   return (
-    <div className="flex items-center justify-center pt-1 text-base font-bold text-[#063F32] sm:text-xl">
+    <div className="-translate-y-1 flex items-center justify-center self-center pt-0 text-sm font-bold leading-none text-[#063F32] sm:text-lg">
       {value}
     </div>
   );
@@ -21,12 +21,12 @@ function FormulaOperator({ value }) {
 function FormulaBox({ value, label }) {
   return (
     <div className="min-w-0">
-      <div className="rounded-2xl border border-[#E4D9BE] bg-[#FFFEFB] px-1 py-2.5 shadow-[0_8px_18px_rgba(13,59,46,0.05)]">
-        <p className="text-center text-[11px] font-bold text-[#063F32] sm:text-xs">
+      <div className="rounded-2xl border border-[#E4D9BE] bg-[#FFFEFB] px-1 py-1.5 shadow-[0_8px_18px_rgba(13,59,46,0.05)]">
+        <p className="text-center text-[10px] font-bold leading-none text-[#063F32] sm:text-[11px]">
           {Number(value || 0).toLocaleString("en-PK")}
         </p>
       </div>
-      <p className="mt-1.5 text-center text-[9px] font-medium leading-3 text-[#245C4F] sm:text-[10px]">
+      <p className="mt-1 whitespace-nowrap text-center text-[8px] font-medium leading-3 text-[#245C4F] sm:text-[9px]">
         {label}
       </p>
     </div>
@@ -36,12 +36,12 @@ function FormulaBox({ value, label }) {
 function FormulaTotal({ value }) {
   return (
     <div className="min-w-0">
-      <div className="rounded-2xl bg-[linear-gradient(135deg,#063F32,#0D5C48)] px-2.5 py-2.5 text-[#FAF7F0] shadow-[0_14px_28px_rgba(13,59,46,0.24)]">
-        <p className="text-center text-[11px] font-bold sm:text-xs">
+      <div className="rounded-2xl bg-[linear-gradient(135deg,#063F32,#0D5C48)] px-2 py-1.5 text-[#FAF7F0] shadow-[0_14px_28px_rgba(13,59,46,0.24)]">
+        <p className="text-center text-[10px] font-bold leading-none sm:text-[11px]">
           {Number(value || 0).toLocaleString("en-PK")}
         </p>
       </div>
-      <p className="mt-1.5 text-center text-[9px] font-medium leading-3 text-[#245C4F] sm:text-[10px]">
+      <p className="mt-1 whitespace-nowrap text-center text-[8px] font-medium leading-3 text-[#245C4F] sm:text-[9px]">
         Total Amount
       </p>
     </div>
@@ -103,6 +103,8 @@ export default function PaymentSubmissionForm({ voucher }) {
     : 0;
   const formattedDiscountPercent = Number(discountPercent || 0).toFixed(2);
   const totalAmount = Number(voucher.total_amount || voucher.amount || 0);
+  const hasAdmissionFee = admissionFee > 0;
+  const currentPendingDue = hasAdmissionFee ? 0 : Number(voucher.current_pending_due || 0);
   const nextMonthlyFee = Math.max(regularFee - discountAmount, 0);
 
   useEffect(() => {
@@ -179,7 +181,7 @@ export default function PaymentSubmissionForm({ voucher }) {
     <div className="grid items-start gap-6 lg:grid-cols-[1.10fr_0.70fr]">
       <section className="grid gap-5 rounded-[1.35rem] border border-[rgba(13,59,46,0.08)] bg-white/95 p-4 shadow-[0_12px_28px_rgba(13,59,46,0.05)] sm:p-6">
         <div className="rounded-[1rem] border border-[#2D8A6A]/10 bg-white p-4">
-          <div className="grid gap-4 sm:grid-cols-2">
+              <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#245C4F]">Student</p>
               <p className="mt-2 text-sm font-semibold text-[#063F32]">{voucher.student_name || "Not provided"}</p>
@@ -283,54 +285,67 @@ export default function PaymentSubmissionForm({ voucher }) {
                 </div>
               ) : null}
 
-              <div className="flex items-center gap-3 py-4">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#F1EADC] text-[#0D5C48]">
-                  <School className="h-5 w-5" />
+              {hasAdmissionFee ? (
+                <div className="flex items-center gap-3 py-4">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#F1EADC] text-[#0D5C48]">
+                    <School className="h-5 w-5" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-bold text-[#063F32] sm:text-base">Admission Fee</p>
+                    <p className="mt-1 text-xs text-[#245C4F]">One-time fee only</p>
+                  </div>
+                  <p className="shrink-0 text-right text-sm font-bold text-[#063F32] sm:text-base">
+                    PKR {admissionFee.toLocaleString("en-PK")}
+                  </p>
                 </div>
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-bold text-[#063F32] sm:text-base">Admission Fee</p>
-                  <p className="mt-1 text-xs text-[#245C4F]">One-time fee only</p>
+              ) : null}
+
+              {!hasAdmissionFee && currentPendingDue > 0 ? (
+                <div className="flex items-center gap-3 py-4">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#F1EADC] text-[#0D5C48]">
+                    <Info className="h-5 w-5" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-bold text-[#063F32] sm:text-base">Current Pending Due</p>
+                    <p className="mt-1 text-xs text-[#245C4F]">Carried forward from the previous fee record</p>
+                  </div>
+                  <p className="shrink-0 text-right text-sm font-bold text-[#063F32] sm:text-base">
+                    PKR {currentPendingDue.toLocaleString("en-PK")}
+                  </p>
                 </div>
-                <p className="shrink-0 text-right text-sm font-bold text-[#063F32] sm:text-base">
-                  PKR {admissionFee.toLocaleString("en-PK")}
-                </p>
-              </div>
+              ) : null}
             </div>
 
             <div className="my-4 border-t border-dashed border-[#D8CBAA]" />
 
-            <div className="rounded-[1.25rem] border border-[#E4D9BE] bg-white p-3.5 sm:p-4">
-              <div className="grid gap-3 md:grid-cols-[minmax(0,0.78fr)_minmax(0,1.22fr)] md:items-center">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[linear-gradient(135deg,#063F32,#0D5C48)] text-[#FAF7F0] shadow-[0_12px_30px_rgba(13,59,46,0.22)]">
+            <div className="rounded-[1.25rem] border border-[#E4D9BE] bg-white p-3 sm:p-4">
+              <div className="flex flex-col gap-4 lg:flex-col lg:items-center">
+                <div className="flex min-w-full items-center gap-3">
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[linear-gradient(135deg,#063F32,#0D5C48)] text-[#FAF7F0] shadow-[0_12px_30px_rgba(13,59,46,0.22)]">
                     <Calculator className="h-5 w-5" />
                   </div>
                   <div>
-                    <p className="text-[9px] font-bold uppercase tracking-[0.18em] text-[#0D5C48] sm:text-[10px]">Total Amount</p>
-                    <p className="mt-1 text-lg font-bold leading-tight text-[#063F32] sm:text-xl">
+                    <p className="text-[8px] font-bold uppercase tracking-[0.16em] text-[#0D5C48] sm:text-[9px]">Total Amount</p>
+                    <p className="mt-1 text-base font-bold leading-tight text-[#063F32] sm:text-lg">
                       PKR {totalAmount.toLocaleString("en-PK")}
                     </p>
                   </div>
                 </div>
-                <div className="flex flex-wrap items-center justify-center gap-2 text-[#063F32]">
-                  <FormulaBox value={regularFee} label="Regular Monthly Fee" />
-                  {(hasDiscount || hasScholarship) ? <FormulaOperator value="-" /> : <FormulaOperator value="+" />}
-                  {hasDiscount ? (
-                    <FormulaBox value={discountAmount} label={`Discount (${formattedDiscountPercent}%)`} />
-                  ) : null}
-                  {hasScholarship ? <FormulaOperator value="-" /> : null}
-                  {hasScholarship ? <FormulaBox value={scholarshipAmount} label="Scholarship" /> : null}
-                  {(hasDiscount || hasScholarship) ? <FormulaOperator value="+" /> : null}
-                  {(hasDiscount || hasScholarship) ? (
-                    <FormulaBox value={admissionFee} label="Admission Fee" />
-                  ) : (
-                    <FormulaBox value={admissionFee} label="Admission Fee" />
-                  )}
-                  {(hasDiscount || hasScholarship) ? <FormulaOperator value="=" /> : null}
+                <div className="grid flex-1 grid-cols-7 items-end gap-2 text-[#063F32]">
+                  <FormulaBox value={regularFee} label="Regular Monthly Fee"/>
+                  {hasDiscount ? <FormulaOperator value="-"/> : null}
+                  {hasDiscount ? <FormulaBox value={discountAmount} label={`Discount (${formattedDiscountPercent}%)`} /> : null}
+                  <FormulaOperator value="+" />
+                  <FormulaBox
+                    value={hasAdmissionFee ? admissionFee : currentPendingDue}
+                    label={hasAdmissionFee ? "Admission Fee" : "Current Pending Due"}
+                  />
+                  <FormulaOperator value="=" />
                   <FormulaTotal value={totalAmount} />
                 </div>
               </div>
             </div>
+
           </div>
         </section>
         

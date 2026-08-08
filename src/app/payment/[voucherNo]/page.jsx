@@ -39,6 +39,12 @@ async function getVoucher(voucherNo) {
         fv.payment_method,
         fv.payment_instructions,
         fv.payment_method_options,
+        COALESCE(
+          NULLIF(latest_history.previous_month_due::float8, 0),
+          previous_history.remaining_due::float8,
+          latest_history.remaining_due::float8,
+          COALESCE(fv.total_amount::float8, fv.amount::float8, 0)
+        ) AS current_pending_due,
         COALESCE(su.full_name, rl.student_name, item.student_name, '') AS student_name,
         COALESCE(rl.parent_name, item.parent_name, '') AS parent_name,
         COALESCE(rl.class_level, c.class_level, c.title, '') AS class_level,
@@ -51,6 +57,40 @@ async function getVoucher(voucherNo) {
     LEFT JOIN users su ON su.id = sp.user_id
     LEFT JOIN regular_monthly_fee_batches b ON b.id = item.batch_id
     LEFT JOIN courses c ON c.id = b.class_id
+    LEFT JOIN LATERAL (
+      SELECT
+        fhr.previous_month_due,
+        fhr.remaining_due,
+        COALESCE(fv_hist.voucher_no, '') AS history_voucher_no,
+        fhr.created_at AS history_created_at,
+        fhr.id AS history_id
+      FROM fee_history_records fhr
+      LEFT JOIN fee_vouchers fv_hist ON fv_hist.id = fhr.voucher_id
+      WHERE fhr.voucher_id = fv.id
+      ORDER BY fv_hist.voucher_no DESC NULLS LAST, fhr.created_at DESC NULLS LAST, fhr.id DESC
+      LIMIT 1
+    ) latest_history ON TRUE
+    LEFT JOIN LATERAL (
+      SELECT fhr_prev.remaining_due
+      FROM fee_history_records fhr_prev
+      LEFT JOIN fee_vouchers fv_prev ON fv_prev.id = fhr_prev.voucher_id
+      WHERE item.student_id IS NOT NULL
+        AND fhr_prev.student_id = item.student_id
+        AND fhr_prev.voucher_id IS DISTINCT FROM fv.id
+        AND (
+          ROW(
+            COALESCE(fv_prev.voucher_no, ''),
+            fhr_prev.created_at,
+            fhr_prev.id
+          ) < ROW(
+            COALESCE(latest_history.history_voucher_no, fv.voucher_no),
+            COALESCE(latest_history.history_created_at, COALESCE(item.created_at, fv.created_at)),
+            COALESCE(latest_history.history_id, fv.id)
+          )
+        )
+      ORDER BY fv_prev.voucher_no DESC NULLS LAST, fhr_prev.created_at DESC NULLS LAST, fhr_prev.id DESC
+      LIMIT 1
+    ) previous_history ON TRUE
     WHERE fv.voucher_no = ${voucherNo}
     LIMIT 1
   `;
@@ -121,6 +161,7 @@ export default async function PaymentVoucherPage({ params }) {
     discount_amount: Number(voucher.discount_amount || 0),
     scholarship_amount: Number(voucher.scholarship_amount || 0),
     total_amount: Number(voucher.total_amount || voucher.amount || 0),
+    current_pending_due: Number(voucher.current_pending_due || 0),
     due_date: voucher.due_date ? new Date(voucher.due_date).toISOString() : null,
     status: String(voucher.status || ""),
     payment_method: voucher.payment_method || "",

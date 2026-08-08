@@ -76,7 +76,7 @@ async function getItems(status) {
       fs."status"::text AS status,
       fv."id"::text AS fee_voucher_id,
       fv."voucher_no",
-      fv."amount" AS voucher_amount,
+      COALESCE(fv."total_amount", fv."amount") AS voucher_amount,
       fv."status"::text AS voucher_status,
       CASE WHEN fv.registration_id IS NULL THEN true ELSE false END AS is_monthly_voucher,
       rl."id"::text AS registration_lead_id,

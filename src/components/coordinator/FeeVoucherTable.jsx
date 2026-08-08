@@ -368,12 +368,18 @@ export default function FeeVoucherTable({ vouchers }) {
                     </td>
                     <td className="px-6 py-5">
                   <p className="font-semibold text-[#063F32]">{voucher.student_name}</p>
+                  <p className="mt-1 text-xs font-medium text-[#245C4F]">
+                    Pending due: {formatMoney(voucher.current_pending_due || voucher.total_amount || voucher.amount || 0)}
+                  </p>
                   <p className="mt-1 text-sm text-[#245C4F]">
                         {voucher.parent_name || "Parent pending"}
                       </p>
                     </td>
                     <td className="px-6 py-5 font-semibold text-[#063F32]">
                       {formatMoney(voucher.amount)}
+                      <p className="mt-1 text-xs font-medium text-[#245C4F]">
+                        Pending due: {formatMoney(voucher.current_pending_due || voucher.total_amount || voucher.amount || 0)}
+                      </p>
                     </td>
                     <td className="px-6 py-5 text-sm text-[#245C4F]">
                       {formatDate(voucher.due_date)}

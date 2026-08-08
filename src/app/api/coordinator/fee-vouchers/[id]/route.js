@@ -38,6 +38,7 @@ export async function GET(_request, { params }) {
         fv.discount_percent::text AS discount_percent,
         fv.discount_amount::text AS discount_amount,
         fv.total_amount::text AS total_amount,
+        COALESCE(latest_history.remaining_due::float8, COALESCE(fv.total_amount::float8, fv.amount::float8, 0)) AS current_pending_due,
         fv.payment_method_id::text AS payment_method_id,
         fv.regular_fee_id::text AS regular_fee_id,
         rl.id::text AS registration_lead_id,
@@ -56,6 +57,13 @@ export async function GET(_request, { params }) {
       FROM fee_vouchers fv
       LEFT JOIN registration_leads rl ON rl.id = COALESCE(fv.registration_id, fv.registration_lead_id)
       LEFT JOIN payment_methods pm ON pm.id = fv.payment_method_id
+      LEFT JOIN LATERAL (
+        SELECT fhr.remaining_due
+        FROM fee_history_records fhr
+        WHERE fhr.voucher_id = fv.id
+        ORDER BY fhr.due_date DESC NULLS LAST, fhr.created_at DESC NULLS LAST, fhr.id DESC
+        LIMIT 1
+      ) latest_history ON TRUE
       WHERE fv.id = ${id}::uuid
       LIMIT 1
     `;

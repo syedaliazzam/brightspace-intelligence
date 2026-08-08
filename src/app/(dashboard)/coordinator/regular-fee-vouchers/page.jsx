@@ -162,7 +162,14 @@ export default function RegularFeeVouchersPage() {
             </label>
             <label className="block">
               <span className="mb-2 block text-sm font-medium text-[#245C4F]">Regular monthly fee</span>
-              <input type="number" min="1" value={form.baseAmount} readOnly className="w-full rounded-2xl border border-[#2D8A6A]/20 bg-[#F1EADC] px-4 py-3 text-sm text-[#063F32]" required />
+              <input
+                type="number"
+                min="1"
+                value={form.baseAmount}
+                onChange={(e) => setForm((current) => ({ ...current, baseAmount: e.target.value }))}
+                className="w-full rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 text-sm text-[#063F32] outline-none transition focus:border-[#2D8A6A] focus:bg-white focus:ring-4 focus:ring-[#FFF5D6]"
+                required
+              />
             </label>
             <div className="md:col-span-2">
               <p className="mb-3 block text-sm font-medium text-[#245C4F]">Bank / Payment Method</p>
@@ -252,9 +259,12 @@ export default function RegularFeeVouchersPage() {
                     <thead className="bg-[linear-gradient(180deg,#FAF7F0_0%,#F1EADC_100%)] text-xs uppercase tracking-[0.18em] text-[#0D5C48]">
                       <tr>
                         <th className="px-4 py-3">Student</th>
+                        <th className="px-4 py-3">Email</th>
                         <th className="px-4 py-3">Voucher No</th>
                         <th className="px-4 py-3">Phone</th>
-                        <th className="px-4 py-3">Amount</th>
+                        <th className="px-4 py-3">Monthly Fee</th>
+                        <th className="px-4 py-3">Current Pending Due</th>
+                        <th className="px-4 py-3">Total Amount</th>
                         <th className="px-4 py-3">Payment Status</th>
                         <th className="px-4 py-3">Voucher Status</th>
                       </tr>
@@ -264,11 +274,15 @@ export default function RegularFeeVouchersPage() {
                         <tr key={row.id}>
                           <td className="px-4 py-4">
                             <p className="font-semibold text-[#063F32]">{row.student_name || "-"}</p>
-                            <p className="text-xs text-[#245C4F]">{row.student_email || row.parent_email || "-"}</p>
+                          </td>
+                          <td className="px-4 py-4 text-[#245C4F]">
+                            {row.student_email || row.parent_email || "-"}
                           </td>
                           <td className="px-4 py-4 text-[#245C4F]">{row.voucher_no || "-"}</td>
                           <td className="px-4 py-4 text-[#245C4F]">{row.student_phone || row.parent_phone || "-"}</td>
                           <td className="px-4 py-4 text-[#245C4F]">{formatMoney(row.base_amount)}</td>
+                          <td className="px-4 py-4 text-[#245C4F]">{formatMoney(row.current_pending_due || 0)}</td>
+                          <td className="px-4 py-4 font-semibold text-[#063F32]">{formatMoney((Number(row.base_amount || 0) + Number(row.current_pending_due || 0)))}</td>
                           <td className="px-4 py-4">
                             <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${STATUS_STYLES[String(row.payment_status || "not_submitted").toLowerCase()] || STATUS_STYLES.not_submitted}`}>
                               {formatStatus(row.payment_status || "not_submitted")}
@@ -282,7 +296,7 @@ export default function RegularFeeVouchersPage() {
                         </tr>
                       )) : (
                         <tr>
-                          <td className="px-4 py-6 text-center text-[#245C4F]" colSpan={6}>No student voucher rows available.</td>
+                          <td className="px-4 py-6 text-center text-[#245C4F]" colSpan={9}>No student voucher rows available.</td>
                         </tr>
                       )}
                     </tbody>

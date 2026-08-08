@@ -94,11 +94,11 @@ async function getHistory() {
           'voucher_id', item.voucher_id::text,
           'student_id', item.student_id::text,
           'student_name', item.student_name,
-          'student_email', item.student_email,
+          'student_email', COALESCE(NULLIF(TRIM(item.student_email), ''), NULLIF(TRIM(su.email), ''), NULLIF(TRIM(rl.email), ''), NULLIF(TRIM(pu.email), '')),
           'student_phone', item.student_phone,
           'parent_name', item.parent_name,
-          'parent_email', item.parent_email,
-          'parent_phone', item.parent_phone,
+          'parent_email', COALESCE(NULLIF(TRIM(item.parent_email), ''), NULLIF(TRIM(pu.email), ''), NULLIF(TRIM(rl.email), '')),
+          'parent_phone', COALESCE(NULLIF(TRIM(item.parent_phone), ''), NULLIF(TRIM(pu.phone), ''), NULLIF(TRIM(rl.phone), '')),
           'base_amount', item.base_amount::float8,
           'late_fee_amount', item.late_fee_amount::float8,
           'due_date', item.due_date,
@@ -108,12 +108,61 @@ async function getHistory() {
           'payment_status', COALESCE(fs.status::text, 'not_submitted'),
           'transaction_id', fs.transaction_id,
           'paid_amount', fs.paid_amount::float8,
-          'paid_at', fs.paid_at
+          'paid_at', fs.paid_at,
+          'current_pending_due', COALESCE(fhr.previous_month_due::float8, previous_history.remaining_due::float8, 0),
+          'total_amount', COALESCE(fhr.total_amount::float8, COALESCE(fv.total_amount::float8, fv.amount::float8, item.base_amount::float8, 0))
         )
         ORDER BY item.created_at ASC
       ) AS items
       FROM regular_monthly_fee_voucher_items item
       INNER JOIN fee_vouchers fv ON fv.id = item.voucher_id
+      LEFT JOIN student_profiles sp ON sp.id = item.student_id
+      LEFT JOIN users su ON su.id = sp.user_id
+      LEFT JOIN registration_leads rl ON rl.id = fv.registration_id
+      LEFT JOIN LATERAL (
+        SELECT spp.parent_id
+        FROM student_parents spp
+        WHERE spp.student_id = item.student_id
+        ORDER BY spp.is_primary DESC, spp.id DESC
+        LIMIT 1
+      ) primary_parent ON TRUE
+      LEFT JOIN parent_profiles pp ON pp.id = primary_parent.parent_id
+      LEFT JOIN users pu ON pu.id = pp.user_id
+      LEFT JOIN LATERAL (
+        SELECT
+          fhr.previous_month_due,
+          fhr.total_amount,
+          fhr.remaining_due,
+          COALESCE(fv_hist.voucher_no, '') AS history_voucher_no,
+          fhr.created_at AS history_created_at,
+          fhr.id AS history_id
+        FROM fee_history_records fhr
+        LEFT JOIN fee_vouchers fv_hist ON fv_hist.id = fhr.voucher_id
+        WHERE fhr.voucher_id = item.voucher_id
+        ORDER BY fv_hist.voucher_no DESC NULLS LAST, fhr.created_at DESC NULLS LAST, fhr.id DESC
+        LIMIT 1
+      ) fhr ON TRUE
+      LEFT JOIN LATERAL (
+        SELECT
+          fhr_prev.remaining_due
+        FROM fee_history_records fhr_prev
+        LEFT JOIN fee_vouchers fv_prev ON fv_prev.id = fhr_prev.voucher_id
+        WHERE fhr_prev.student_id = item.student_id
+          AND fhr_prev.voucher_id IS DISTINCT FROM item.voucher_id
+          AND (
+            ROW(
+              COALESCE(fv_prev.voucher_no, ''),
+              fhr_prev.created_at,
+              fhr_prev.id
+            ) < ROW(
+              COALESCE(fhr.history_voucher_no, fv.voucher_no),
+              COALESCE(fhr.history_created_at, item.created_at),
+              COALESCE(fhr.history_id, item.id::uuid)
+            )
+          )
+        ORDER BY fv_prev.voucher_no DESC NULLS LAST, fhr_prev.created_at DESC NULLS LAST, fhr_prev.id DESC
+        LIMIT 1
+      ) previous_history ON TRUE
       LEFT JOIN LATERAL (
         SELECT
           status,
@@ -203,16 +252,23 @@ export async function POST(request) {
         sp.id::text AS student_id,
         e.registration_id::text AS registration_id,
         u.full_name AS student_name,
-        u.email AS student_email,
+        COALESCE(NULLIF(TRIM(u.email), ''), NULLIF(TRIM(rl.email), '')) AS student_email,
         u.phone AS student_phone,
         COALESCE(pu.full_name, '') AS parent_name,
-        pu.email AS parent_email,
-        pu.phone AS parent_phone
+        COALESCE(NULLIF(TRIM(pu.email), ''), NULLIF(TRIM(rl.email), '')) AS parent_email,
+        COALESCE(NULLIF(TRIM(pu.phone), ''), NULLIF(TRIM(rl.phone), '')) AS parent_phone
       FROM enrollments e
       INNER JOIN student_profiles sp ON sp.id = e.student_id
       INNER JOIN users u ON u.id = sp.user_id
-      LEFT JOIN student_parents spp ON spp.student_id = sp.id AND spp.is_primary = TRUE
-      LEFT JOIN parent_profiles pp ON pp.id = spp.parent_id
+      LEFT JOIN registration_leads rl ON rl.id = e.registration_id
+      LEFT JOIN LATERAL (
+        SELECT spp.parent_id
+        FROM student_parents spp
+        WHERE spp.student_id = sp.id
+        ORDER BY spp.is_primary DESC, spp.id DESC
+        LIMIT 1
+      ) primary_parent ON TRUE
+      LEFT JOIN parent_profiles pp ON pp.id = primary_parent.parent_id
       LEFT JOIN users pu ON pu.id = pp.user_id
       WHERE e.course_id = ${classId}::uuid
         AND LOWER(e.status) = 'active'
@@ -249,18 +305,34 @@ export async function POST(request) {
         INSERT INTO regular_monthly_fee_batches (
           id, batch_no, class_id, month_label, due_date, base_amount, late_fee_amount, student_count, total_amount, status, created_by, created_at, updated_at
         ) VALUES (
-          ${batchId}::uuid, ${batchNo}, ${classId}::uuid, ${monthLabel || null}, ${dueDate}::date, ${baseAmount}, ${lateFeeAmount}, ${students.length}, ${(baseAmount + lateFeeAmount) * students.length}, 'active', ${session.user.id}::uuid, NOW(), NOW()
+          ${batchId}::uuid, ${batchNo}, ${classId}::uuid, ${monthLabel || null}, ${dueDate}::date, ${baseAmount}, ${lateFeeAmount}, ${students.length}, 0, 'active', ${session.user.id}::uuid, NOW(), NOW()
         )
       `;
+
+      let batchTotalPayable = 0;
 
       for (const student of students) {
         const voucherNo = `${getVoucherPrefix(new Date())}-${padSequence(voucherSequence)}`;
         voucherSequence += 1;
+        let computedCurrentPendingDue = 0;
+        let computedTotalPayable = baseAmount;
         const paymentMethodColumnFragment = voucherColumns.has("payment_method_id")
           ? Prisma.sql`, "payment_method_id"`
           : Prisma.empty;
         const paymentMethodValueFragment = voucherColumns.has("payment_method_id")
           ? Prisma.sql`, ${paymentMethodId || null}::uuid`
+          : Prisma.empty;
+        const totalAmountColumnFragment = voucherColumns.has("total_amount")
+          ? Prisma.sql`, "total_amount"`
+          : Prisma.empty;
+        const totalAmountValueFragment = voucherColumns.has("total_amount")
+          ? Prisma.sql`, ${baseAmount}`
+          : Prisma.empty;
+        const regularFeeAmountColumnFragment = voucherColumns.has("regular_fee_amount")
+          ? Prisma.sql`, "regular_fee_amount"`
+          : Prisma.empty;
+        const regularFeeAmountValueFragment = voucherColumns.has("regular_fee_amount")
+          ? Prisma.sql`, ${baseAmount}`
           : Prisma.empty;
         const paymentMethodOptionsColumnFragment = voucherColumns.has("payment_method_options")
           ? Prisma.sql`, "payment_method_options"`
@@ -273,11 +345,15 @@ export async function POST(request) {
           INSERT INTO fee_vouchers (
             "id", "voucher_no", "registration_id", "amount", "due_date", "status"
             ${paymentMethodColumnFragment}
+            ${totalAmountColumnFragment}
+            ${regularFeeAmountColumnFragment}
             ${paymentMethodOptionsColumnFragment},
             "payment_instructions", "created_at", "updated_at"
           ) VALUES (
-            gen_random_uuid(), ${voucherNo}, NULL, ${baseAmount}, ${dueDate}::date, 'unpaid'::voucher_status
+            gen_random_uuid(), ${voucherNo}, ${student.registration_id || null}::uuid, ${baseAmount}, ${dueDate}::date, 'unpaid'::voucher_status
             ${paymentMethodValueFragment}
+            ${totalAmountValueFragment}
+            ${regularFeeAmountValueFragment}
             ${paymentMethodOptionsValueFragment},
             NULL, NOW(), NOW()
           )
@@ -293,8 +369,8 @@ export async function POST(request) {
         `;
 
         if (historyTableReady) {
-          const previousMonthDue = await getLatestFeeHistoryCarryForward(tx, student.student_id);
-          await insertFeeHistoryRow({
+          computedCurrentPendingDue = await getLatestFeeHistoryCarryForward(tx, student.student_id);
+          const computedHistory = await insertFeeHistoryRow({
             tx,
             studentId: student.student_id,
             batchId,
@@ -302,14 +378,33 @@ export async function POST(request) {
             registrationId: student.registration_id || null,
             monthLabel: monthLabel || '',
             dueDate,
-            previousMonthDue,
+            previousMonthDue: computedCurrentPendingDue,
             discountAmount: 0,
             currentMonthFee: baseAmount,
             thisMonthPaid: 0,
           });
+          computedTotalPayable = Number(computedHistory?.totalAmount || (baseAmount + computedCurrentPendingDue));
+          if (voucherColumns.has("total_amount")) {
+            await tx.$executeRaw`
+              UPDATE fee_vouchers
+              SET total_amount = ${computedTotalPayable}
+              WHERE id = ${voucher.id}::uuid
+            `;
+          }
+          createdRows.push({
+            ...student,
+            voucher_no: voucherNo,
+            current_pending_due: computedCurrentPendingDue,
+            total_amount: computedTotalPayable,
+          });
+        } else {
+          createdRows.push({
+            ...student,
+            voucher_no: voucherNo,
+            current_pending_due: computedCurrentPendingDue,
+            total_amount: computedTotalPayable,
+          });
         }
-
-        createdRows.push({ ...student, voucher_no: voucherNo });
         emailJobs.push({
           to: isValidEmail(student.student_email)
             ? normalizeText(student.student_email).toLowerCase()
@@ -318,8 +413,18 @@ export async function POST(request) {
               : "",
           studentName: student.student_name,
           voucherNo,
+          amount: computedTotalPayable,
+          current_pending_due: computedCurrentPendingDue,
         });
+        batchTotalPayable += computedTotalPayable;
       }
+
+      await tx.$executeRaw`
+        UPDATE regular_monthly_fee_batches
+        SET total_amount = ${batchTotalPayable},
+            updated_at = NOW()
+        WHERE id = ${batchId}::uuid
+      `;
     }, { maxWait: 20000, timeout: 120000 });
 
     const portalUrlBase = process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL || "";
@@ -331,7 +436,9 @@ export async function POST(request) {
         html: buildFeeVoucherEmailHtml({
           studentName: job.studentName,
           voucherNo: job.voucherNo,
-          amount: `PKR ${Number(baseAmount).toLocaleString("en-PK")}`,
+          monthlyFee: `PKR ${Number(baseAmount).toLocaleString("en-PK")}`,
+          amount: `PKR ${Number(job.amount || baseAmount).toLocaleString("en-PK")}`,
+          currentPendingDue: `PKR ${Number(job.current_pending_due || baseAmount).toLocaleString("en-PK")}`,
           dueDate,
           portalUrl: `${portalUrlBase}/payment/${encodeURIComponent(job.voucherNo)}`,
         }),

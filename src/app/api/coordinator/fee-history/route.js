@@ -12,6 +12,19 @@ function normalizeText(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 
+function compareVoucherSequence(left, right) {
+  const leftVoucher = String(left?.voucher_no || "");
+  const rightVoucher = String(right?.voucher_no || "");
+  const voucherCompare = rightVoucher.localeCompare(leftVoucher, undefined, { numeric: true, sensitivity: "base" });
+  if (voucherCompare !== 0) return voucherCompare;
+
+  const leftCreatedAt = new Date(left?.created_at || 0).getTime();
+  const rightCreatedAt = new Date(right?.created_at || 0).getTime();
+  if (leftCreatedAt !== rightCreatedAt) return rightCreatedAt - leftCreatedAt;
+
+  return String(right?.id || "").localeCompare(String(left?.id || ""));
+}
+
 async function loadStudentSummaries() {
   return prisma.$queryRaw`
     SELECT
@@ -20,13 +33,15 @@ async function loadStudentSummaries() {
       COALESCE(u.email, '') AS student_email,
       COALESCE(u.phone, '') AS student_phone,
       COALESCE(pu.full_name, '') AS parent_name,
-      COALESCE(pu.email, '') AS parent_email,
+      COALESCE(pu.email, rl.email, '') AS parent_email,
       COALESCE(pu.phone, '') AS parent_phone,
+      COALESCE(rl.email, '') AS lead_email,
       COALESCE(sp.admission_no, '') AS admission_no,
       COALESCE(NULLIF(c.class_level, ''), c.title, '') AS class_level,
       COALESCE(latest.month_label, '') AS latest_month_label,
       COALESCE(latest.this_month_paid::float8, 0) AS latest_this_month_paid,
       COALESCE(latest.remaining_due::float8, 0) AS current_pending_dues,
+      COALESCE(latest.remaining_due::float8, 0) AS remaining_due,
       COALESCE(latest.history_count::int, 0) AS history_count
     FROM student_profiles sp
     INNER JOIN users u ON u.id = sp.user_id
@@ -39,6 +54,7 @@ async function loadStudentSummaries() {
       LIMIT 1
     ) enr ON TRUE
     LEFT JOIN courses c ON c.id = enr.course_id
+    LEFT JOIN registration_leads rl ON rl.id = enr.registration_id
     LEFT JOIN student_parents spp ON spp.student_id = sp.id AND spp.is_primary = TRUE
     LEFT JOIN parent_profiles pp ON pp.id = spp.parent_id
     LEFT JOIN users pu ON pu.id = pp.user_id
@@ -165,14 +181,41 @@ async function loadStudentHistory(studentId) {
         COALESCE(fhr.month_label, '') AS month_label,
         fhr.due_date,
         COALESCE(fhr.previous_month_due::float8, 0) AS previous_month_due,
-        COALESCE(fhr.discount_amount::float8, COALESCE(fv.discount_amount::float8, 0)) AS discount_amount,
-        COALESCE(fhr.current_month_fee::float8, COALESCE(fv.total_amount::float8, fv.amount::float8, 0)) AS current_month_fee,
-        COALESCE(fhr.total_amount::float8, COALESCE(fv.total_amount::float8, fv.amount::float8, 0)) AS total_amount,
+        CASE
+          WHEN COALESCE(fv.admission_fee_amount::float8, 0) > 0 THEN COALESCE(fv.discount_amount::float8, 0)
+          ELSE COALESCE(fhr.discount_amount::float8, fv.discount_amount::float8, 0)
+        END AS discount_amount,
+        CASE
+          WHEN COALESCE(fv.admission_fee_amount::float8, 0) > 0 THEN COALESCE(
+            fv.total_amount::float8,
+            (
+              COALESCE(fv.regular_fee_amount::float8, 0)
+              + COALESCE(fv.admission_fee_amount::float8, 0)
+              - COALESCE(fv.discount_amount::float8, 0)
+            ),
+            fv.amount::float8,
+            0
+          )
+          ELSE COALESCE(fhr.current_month_fee::float8, fv.total_amount::float8, fv.amount::float8, 0)
+        END AS current_month_fee,
+        CASE
+          WHEN COALESCE(fv.admission_fee_amount::float8, 0) > 0 THEN COALESCE(
+            fv.total_amount::float8,
+            (
+              COALESCE(fv.regular_fee_amount::float8, 0)
+              + COALESCE(fv.admission_fee_amount::float8, 0)
+              - COALESCE(fv.discount_amount::float8, 0)
+            ),
+            fv.amount::float8,
+            0
+          )
+          ELSE COALESCE(fhr.total_amount::float8, fv.total_amount::float8, fv.amount::float8, 0)
+        END AS total_amount,
         CASE
           WHEN COALESCE(fhr.this_month_paid::float8, 0) > 0 THEN fhr.this_month_paid::float8
           ELSE COALESCE(fs.paid_amount::float8, 0)
         END AS this_month_paid,
-        COALESCE(fhr.remaining_due::float8, (COALESCE(fv.total_amount::float8, fv.amount::float8, 0) - COALESCE(fs.paid_amount::float8, 0))) AS remaining_due,
+        COALESCE(fhr.remaining_due::float8, (COALESCE(fhr.total_amount::float8, fv.total_amount::float8, fv.amount::float8, 0) - COALESCE(fs.paid_amount::float8, 0))) AS remaining_due,
         COALESCE(fv.voucher_no, '') AS voucher_no,
         LOWER(COALESCE(fs.status::text, fv.status::text, 'not_submitted')) AS payment_status,
         fs.paid_at,
@@ -432,7 +475,7 @@ export async function GET(request) {
     const items = await loadStudentSummaries();
     const itemsWithDerivedDues = await Promise.all(items.map(async (item) => {
       const studentHistory = applyCarryForwardHistoryRows(await loadStudentHistory(item.student_id));
-      const latestRow = studentHistory[0] || null;
+      const latestRow = [...studentHistory].sort(compareVoucherSequence)[0] || null;
       const currentPendingDues = Number(latestRow?.computedRemainingDue ?? latestRow?.remaining_due ?? item.current_pending_dues ?? 0);
       const latestThisMonthPaid = Number(latestRow?.this_month_paid ?? item.latest_this_month_paid ?? 0);
       const latestMonthLabel = String(latestRow?.month_label || item.latest_month_label || "").trim();
@@ -442,6 +485,7 @@ export async function GET(request) {
         latest_month_label: latestMonthLabel,
         latest_this_month_paid: latestThisMonthPaid,
         current_pending_dues: currentPendingDues,
+        remaining_due: currentPendingDues,
       };
     }));
 

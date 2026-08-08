@@ -79,6 +79,14 @@ export default function FeeVoucherPreviewModal({ voucher, onClose }) {
               </div>
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#245C4F]">
+                  Current pending due
+                </p>
+                <p className="mt-2 font-semibold text-[#063F32]">
+                  PKR {Number(voucher.current_pending_due || voucher.total_amount || voucher.amount || 0).toLocaleString("en-PK")}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#245C4F]">
                   Due date
                 </p>
                 <p className="mt-2 font-semibold text-[#063F32]">{formatDate(voucher.due_date)}</p>

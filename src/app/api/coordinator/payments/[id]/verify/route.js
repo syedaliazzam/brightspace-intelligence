@@ -511,7 +511,7 @@ async function getSubmissionRecord(id, tx = prisma) {
       ) AS class_level,
       NULLIF(TRIM(istd.class_level), '') AS interested_class_level,
       rl.age AS student_age,
-      CASE WHEN rl.id IS NULL THEN true ELSE false END AS is_monthly_voucher
+      CASE WHEN item.voucher_id IS NOT NULL THEN true ELSE false END AS is_monthly_voucher
     FROM fee_submissions fs
     INNER JOIN fee_vouchers fv ON fv.id = fs.voucher_id
     LEFT JOIN registration_leads rl ON rl.id = fv.registration_id
@@ -621,7 +621,9 @@ export async function POST(request, { params }) {
     let parentContactPhone =
       submission.phone || submission.parent_phone || submission.parentPhone || "";
 
-    if (submission.is_monthly_voucher) {
+    const isMonthlyVoucher = Boolean(submission.is_monthly_voucher);
+
+    if (isMonthlyVoucher) {
       await prisma.$transaction(async (tx) => {
         await tx.$executeRaw`
           UPDATE fee_submissions
@@ -630,9 +632,7 @@ export async function POST(request, { params }) {
         `;
         await tx.$executeRaw`
           UPDATE fee_vouchers
-          SET status = 'verified'::voucher_status,
-              amount = COALESCE(${Number(submission.paid_amount || 0)}, amount),
-              total_amount = COALESCE(${Number(submission.paid_amount || 0)}, total_amount)
+          SET status = 'verified'::voucher_status
           WHERE id = ${submission.fee_voucher_id || submission.voucher_id}::uuid;
         `;
         await insertFeeVerification({
@@ -688,6 +688,13 @@ export async function POST(request, { params }) {
       });
     }
 
+    if (isMonthlyVoucher) {
+      return json("Monthly payment verified. LMS access restored.", 200, {
+        success: true,
+        credentials_email: null,
+      });
+    }
+
     const resolvedClassLevel =
       normalizeText(submission.class_level) ||
       normalizeText(submission.interested_class_level);
@@ -723,9 +730,7 @@ export async function POST(request, { params }) {
       `;
       await tx.$executeRaw`
         UPDATE fee_vouchers
-        SET status = 'verified'::voucher_status,
-            amount = COALESCE(${Number(submission.paid_amount || 0)}, amount),
-            total_amount = COALESCE(${Number(submission.paid_amount || 0)}, total_amount)
+        SET status = 'verified'::voucher_status
         WHERE id = ${submission.fee_voucher_id || submission.voucher_id}::uuid;
       `;
 

@@ -76,13 +76,17 @@ export function themedEmailShell({ eyebrow, title, intro, rows = [], bodyBlocks 
 export function buildFeeVoucherEmailHtml({
   studentName,
   voucherNo,
+  monthlyFee,
   amount,
+  currentPendingDue,
   dueDate,
   portalUrl,
 }) {
   const safeStudentName = escapeHtml(studentName);
   const safeVoucherNo = escapeHtml(voucherNo);
+  const safeMonthlyFee = escapeHtml(monthlyFee || amount);
   const safeAmount = escapeHtml(amount);
+  const safeCurrentPendingDue = escapeHtml(currentPendingDue || amount);
   const safeDueDate = escapeHtml(formatDate(dueDate));
   const safePortalUrl = escapeHtml(portalUrl);
 
@@ -93,7 +97,9 @@ export function buildFeeVoucherEmailHtml({
     rows: [
       ["Student", safeStudentName],
       ["Voucher No", safeVoucherNo],
-      ["Amount", safeAmount],
+      ["Monthly Fee", safeMonthlyFee],
+      ["Current Pending Due", safeCurrentPendingDue],
+      ["Total Amount", safeAmount],
       ["Due Date", safeDueDate],
     ],
     buttonLabel: "Open Voucher",

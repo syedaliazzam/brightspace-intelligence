@@ -64,11 +64,11 @@ function getCurrentMonthFeeParts(row) {
   const admissionFee = Number(row?.admission_fee_amount || 0);
   const discount = Number(row?.discount_amount || 0);
   const scholarshipAmount = Number(row?.scholarship_amount || 0);
+  const derivedTotal = Math.max(regularFee + admissionFee - discount - scholarshipAmount, 0);
   const hasBreakdown = regularFee > 0 || admissionFee > 0 || discount > 0 || scholarshipAmount > 0;
-  const derivedTotal = regularFee + admissionFee - discount - scholarshipAmount;
   const currentMonthFee = hasBreakdown
     ? derivedTotal
-    : Number(row?.current_month_fee || row?.total_amount || derivedTotal);
+    : Number(row?.current_month_fee || derivedTotal);
 
   return {
     regularFee,
@@ -396,13 +396,26 @@ export default function CoordinatorFeeHistoryPage() {
 
   const filteredHistoryItems = useMemo(() => {
     const query = normalizeText(historySearchTerm);
-    return carryForwardHistoryRows.filter((item) => {
+    const matchedRows = carryForwardHistoryRows.filter((item) => {
       if (historyStatusFilter !== "all" && normalizeText(item.payment_status) !== historyStatusFilter) return false;
       if (!query) return true;
       const fields = historyColumnFilter === "all"
         ? [item.month_label, item.voucher_no, item.payment_status, item.due_date]
         : [item[historyColumnFilter]];
       return fields.some((value) => normalizeText(value).includes(query));
+    });
+
+    return [...matchedRows].sort((left, right) => {
+      const leftVoucher = String(left.voucher_no || "");
+      const rightVoucher = String(right.voucher_no || "");
+      const voucherCompare = rightVoucher.localeCompare(leftVoucher, undefined, { numeric: true, sensitivity: "base" });
+      if (voucherCompare !== 0) return voucherCompare;
+
+      const leftCreatedAt = new Date(left?.created_at || 0).getTime();
+      const rightCreatedAt = new Date(right?.created_at || 0).getTime();
+      if (leftCreatedAt !== rightCreatedAt) return rightCreatedAt - leftCreatedAt;
+
+      return String(left?.id || "").localeCompare(String(right?.id || ""));
     });
   }, [carryForwardHistoryRows, historyColumnFilter, historySearchTerm, historyStatusFilter]);
 
@@ -504,7 +517,7 @@ export default function CoordinatorFeeHistoryPage() {
                     <td className="px-6 py-4 text-[#245C4F]">{item.student_email || item.parent_email || "-"}</td>
                     <td className="px-6 py-4 text-[#245C4F]">{item.class_level || "-"}</td>
                     <td className="px-6 py-4 text-[#245C4F]">{item.admission_no || "-"}</td>
-                    <td className="px-6 py-4 font-semibold text-[#063F32]">{formatMoney(item.current_pending_dues)}</td>
+                    <td className="px-6 py-4 font-semibold text-[#063F32]">{formatMoney(item.remaining_due ?? item.current_pending_dues)}</td>
                     <td className="px-6 py-4 text-[#245C4F]">{item.latest_month_label || "-"}</td>
                     <td className="px-6 py-4 text-[#245C4F]">{formatMoney(item.latest_this_month_paid)}</td>
                     <td className="px-6 py-4 text-right">
@@ -538,9 +551,10 @@ export default function CoordinatorFeeHistoryPage() {
                 <div className="flex flex-wrap items-start justify-between gap-4">
                   <div>
                     <p className="text-sm font-semibold uppercase tracking-[0.24em] text-[#C9A227]">Fee Details</p>
-                    <div className="mt-3 space-y-2 md:space-y-0 text-sm text-[#245C4F] md:flex md:gap-10">
+                    <div className="mt-3 space-y-2 md:space-y-0 text-sm text-[#245C4F] md:flex md:flex-wrap md:gap-10">
                       <p><span className="font-semibold text-[#063F32]">Student Name:</span> {selectedStudent.student_name || "-"}</p>
                       <p><span className="font-semibold text-[#063F32]">Parent Name:</span> {selectedStudent.parent_name || "-"}</p>
+                      <p><span className="font-semibold text-[#063F32]">Parent Email:</span> {selectedStudent.parent_email || selectedStudent.lead_email || "-"}</p>
                       <p><span className="font-semibold text-[#063F32]">Class:</span> {selectedStudent.class_level || "-"}</p>
                     </div>
                   </div>
@@ -622,7 +636,7 @@ export default function CoordinatorFeeHistoryPage() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-[#F1EADC]">
-                      {visibleHistoryItems.length ? visibleHistoryItems.map((row) => {
+                      {visibleHistoryItems.length ? visibleHistoryItems.map((row, rowIndex) => {
                         const isEditableHistoryRow = true;
                         const draft = drafts[row.id] || {
                           previous_month_due: moneyInputValue(row.previous_month_due),
@@ -630,22 +644,34 @@ export default function CoordinatorFeeHistoryPage() {
                           current_month_fee: moneyInputValue(row.current_month_fee),
                           this_month_paid: moneyInputValue(row.this_month_paid),
                         };
-                        const regularFee = Number(row?.regular_fee_amount || 0);
-                        const admissionFee = Number(row?.admission_fee_amount || 0);
-                        const draftDiscount = Number(draft.discount_amount || 0);
-                        const scholarshipAmount = Number(row?.scholarship_amount || 0);
-                        const currentMonthFeeValue = Number(draft.current_month_fee || row.current_month_fee || 0);
-                        const derivedTotal = regularFee + admissionFee - draftDiscount - scholarshipAmount;
-                        const hasBreakdown = regularFee > 0 || admissionFee > 0 || draftDiscount > 0 || scholarshipAmount > 0;
+                        const parts = getCurrentMonthFeeParts(row);
+                        const currentMonthFeeValue = Number(parts.currentMonthFee || draft.current_month_fee || row.current_month_fee || 0);
+                        const discountVisible = parts.discount > 0;
+                        const scholarshipVisible = parts.scholarshipAmount > 0;
+                        const isAdmissionRow = String(row.source_type || "").toLowerCase() === "voucher-direct" || Number(parts.admissionFee || 0) > 0;
+                        const isCarryForwardRow = String(row.source_type || "").toLowerCase() === "history" && Number(row.previous_month_due || row.computedPreviousMonthDue || 0) > 0;
+                        const hasAdmissionBreakdown = isAdmissionRow;
+                        const hasMonthlyBreakdown = !hasAdmissionBreakdown && parts.regularFee > 0;
+                        const hasBreakdown = hasAdmissionBreakdown || hasMonthlyBreakdown;
                         const currentFeeParts = {
-                          regularFee: hasBreakdown ? regularFee : 0,
-                          admissionFee: hasBreakdown ? admissionFee : 0,
-                          discount: hasBreakdown ? draftDiscount : 0,
-                          scholarshipAmount: hasBreakdown ? scholarshipAmount : 0,
-                          currentMonthFee: hasBreakdown ? derivedTotal : currentMonthFeeValue,
+                          regularFee: hasBreakdown ? parts.regularFee : currentMonthFeeValue,
+                          admissionFee: hasAdmissionBreakdown ? parts.admissionFee : 0,
+                          discount: hasAdmissionBreakdown ? parts.discount : 0,
+                          scholarshipAmount: hasAdmissionBreakdown ? parts.scholarshipAmount : 0,
+                          currentMonthFee: isAdmissionRow
+                            ? Number(row.current_month_fee || row.total_amount || Math.max(parts.regularFee + parts.admissionFee - parts.discount - parts.scholarshipAmount, 0))
+                            : isCarryForwardRow
+                              ? parts.regularFee || currentMonthFeeValue
+                              : currentMonthFeeValue || parts.regularFee,
                         };
                         const previousMonthDueValue = Number(row.computedPreviousMonthDue ?? row.previous_month_due ?? draft.previous_month_due ?? 0);
                         const computed = computeAmounts(previousMonthDueValue, currentFeeParts.currentMonthFee, draft.this_month_paid);
+                        const rowRemainingDue = Number(row.remaining_due ?? computed.remaining ?? 0);
+                        const displayTotalAmount = Number(
+                          isAdmissionRow
+                            ? (row.total_amount || row.current_month_fee || currentFeeParts.currentMonthFee || 0)
+                            : (row.total_amount || currentFeeParts.currentMonthFee || 0)
+                        );
                         return (
                           <tr key={row.id}>
                             <td className="px-4 py-4 font-semibold text-[#063F32]">{row.month_label || "-"}</td>
@@ -656,7 +682,7 @@ export default function CoordinatorFeeHistoryPage() {
                             </td>
                             <td className="px-4 py-4 align-top">
                               <div className="min-w-[320px] space-y-2 rounded-2xl border border-[#2D8A6A]/12 bg-white px-0 py-0 shadow-[0_12px_30px_-24px_rgba(13,59,46,0.14)]">
-                                {hasBreakdown ? (
+                                {hasAdmissionBreakdown ? (
                                   <div className="flex flex-nowrap items-center rounded-2xl justify-between gap-1 overflow-x-auto bg-[#FAF7F0] px-2 py-2 text-[10px] text-[#245C4F]">
                                     <div className="min-w-[50px] text-center">
                                       <p className="text-[8px] font-semibold uppercase tracking-[0.1em] text-[#0D5C48]">Monthly</p>
@@ -687,6 +713,16 @@ export default function CoordinatorFeeHistoryPage() {
                                       <p className="mt-0.5 whitespace-nowrap text-xs font-bold leading-none">{formatMoney(currentFeeParts.currentMonthFee)}</p>
                                     </div>
                                   </div>
+                                ) : hasMonthlyBreakdown ? (
+                                  <div className="rounded-xl border border-[#F1EADC] bg-[#FAF7F0] px-3 py-2">
+                                    <p className="text-[8px] font-semibold uppercase tracking-[0.1em] text-[#0D5C48]">Monthly Fee</p>
+                                    <p className="mt-1 font-bold text-[#063F32]">{formatMoney(currentFeeParts.currentMonthFee)}</p>
+                                  </div>
+                                ) : isCarryForwardRow ? (
+                                  <div className="rounded-xl border border-[#F1EADC] bg-[#FAF7F0] px-3 py-2">
+                                    <p className="text-[8px] font-semibold uppercase tracking-[0.1em] text-[#0D5C48]">Monthly Fee</p>
+                                    <p className="mt-1 font-bold text-[#063F32]">{formatMoney(currentFeeParts.currentMonthFee)}</p>
+                                  </div>
                                 ) : (
                                   <div className="rounded-xl border border-[#F1EADC] bg-[#FAF7F0] px-3 py-2">
                                     <p className="text-[8px] font-semibold uppercase tracking-[0.1em] text-[#0D5C48]">Current Month Fee</p>
@@ -695,9 +731,9 @@ export default function CoordinatorFeeHistoryPage() {
                                 )}
                               </div>
                             </td>
-                            <td className="px-4 py-4 font-semibold text-[#063F32]">{formatMoney(computed.total)}</td>
+                            <td className="px-4 py-4 font-semibold text-[#063F32]">{formatMoney(displayTotalAmount)}</td>
                             <td className="px-4 py-4">{isEditableHistoryRow ? <input value={draft.this_month_paid} onChange={(event) => setDrafts((current) => ({ ...current, [row.id]: { ...draft, this_month_paid: event.target.value } }))} type="number" min="0" className="w-28 rounded-xl border border-[#2D8A6A]/20 bg-white px-3 py-2 text-sm text-[#063F32] outline-none focus:border-[#2D8A6A]" /> : <span className="text-[#245C4F]">{formatMoney(draft.this_month_paid)}</span>}</td>
-                            <td className="px-4 py-4 font-semibold text-[#063F32]">{formatMoney(computed.remaining)}</td>
+                            <td className="px-4 py-4 font-semibold text-[#063F32]">{formatMoney(rowRemainingDue)}</td>
                             <td className="px-4 py-4 text-[#245C4F]">{String(row.payment_status || "-").replace(/_/g, " ")}</td>
                             <td className="px-4 py-4 text-[#245C4F]">
                               {row.proof_file_url ? (

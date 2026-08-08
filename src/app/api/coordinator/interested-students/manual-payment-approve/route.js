@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 import { uploadPaymentProof } from "@/lib/supabaseStorage";
+import { computeFeeHistoryAmounts } from "@/lib/feeHistory";
 
 const ALLOWED_ROLES = new Set(["coordinator", "admin", "superadmin"]);
 
@@ -43,6 +44,10 @@ export async function POST(request) {
         fv.id::text AS voucher_id,
         fv.voucher_no,
         fv.amount::float8 AS voucher_amount,
+        fv.regular_fee_amount::float8 AS regular_fee_amount,
+        fv.admission_fee_amount::float8 AS admission_fee_amount,
+        fv.discount_amount::float8 AS discount_amount,
+        fv.total_amount::float8 AS total_amount,
         LOWER(COALESCE(fv.status::text, 'unpaid')) AS voucher_status,
         fs.id::text AS payment_submission_id,
         LOWER(COALESCE(fs.status::text, '')) AS payment_submission_status
@@ -53,6 +58,10 @@ export async function POST(request) {
           fv_inner.id,
           fv_inner.voucher_no,
           fv_inner.amount,
+          fv_inner.regular_fee_amount,
+          fv_inner.admission_fee_amount,
+          fv_inner.discount_amount,
+          fv_inner.total_amount,
           fv_inner.status,
           fv_inner.created_at
         FROM fee_vouchers fv_inner
@@ -83,6 +92,15 @@ export async function POST(request) {
     const submissionPaidAmount = Number.isFinite(paidAmountInput) && paidAmountInput > 0
       ? paidAmountInput
       : Number(row.voucher_amount || 0);
+    const regularFeeAmount = Number(row.regular_fee_amount || 0);
+    const admissionFeeAmount = Number(row.admission_fee_amount || 0);
+    const discountAmount = Number(row.discount_amount || 0);
+    const currentMonthFee = Number(row.total_amount || Math.max(regularFeeAmount + admissionFeeAmount - discountAmount, 0));
+    const computedAmounts = computeFeeHistoryAmounts({
+      previousMonthDue: 0,
+      currentMonthFee,
+      thisMonthPaid: submissionPaidAmount,
+    });
 
     const upload = await uploadPaymentProof({
       voucherNo: row.voucher_no,
@@ -119,9 +137,7 @@ export async function POST(request) {
 
       await tx.$executeRaw`
         UPDATE fee_vouchers
-        SET status = 'submitted'::voucher_status,
-            amount = ${submissionPaidAmount},
-            total_amount = ${submissionPaidAmount}
+        SET status = 'submitted'::voucher_status
         WHERE id = ${row.voucher_id}::uuid
       `;
 
@@ -151,6 +167,62 @@ export async function POST(request) {
         verifyResponse.status || 500,
         { paymentSubmissionId: submissionId }
       );
+    }
+
+    const [studentRow] = await prisma.$queryRaw`
+      SELECT fv.student_id::text AS student_id
+      FROM fee_vouchers fv
+      WHERE fv.id = ${row.voucher_id}::uuid
+      LIMIT 1
+    `;
+
+    if (studentRow?.student_id) {
+      await prisma.$executeRaw`
+        INSERT INTO fee_history_records (
+          id,
+          student_id,
+          batch_id,
+          voucher_id,
+          registration_id,
+          month_label,
+          due_date,
+          previous_month_due,
+          discount_amount,
+          current_month_fee,
+          total_amount,
+          this_month_paid,
+          remaining_due,
+          created_at,
+          updated_at
+        )
+        VALUES (
+          gen_random_uuid(),
+          ${studentRow.student_id}::uuid,
+          NULL,
+          ${row.voucher_id}::uuid,
+          ${row.registration_lead_id}::uuid,
+          TO_CHAR(NOW(), 'Mon YYYY'),
+          NOW()::date,
+          ${computedAmounts.previousMonthDue},
+          ${discountAmount},
+          ${computedAmounts.currentMonthFee},
+          ${computedAmounts.totalAmount},
+          ${computedAmounts.thisMonthPaid},
+          ${computedAmounts.remainingDue},
+          NOW(),
+          NOW()
+        )
+        ON CONFLICT (voucher_id) DO UPDATE
+        SET
+          student_id = EXCLUDED.student_id,
+          previous_month_due = EXCLUDED.previous_month_due,
+          discount_amount = EXCLUDED.discount_amount,
+          current_month_fee = EXCLUDED.current_month_fee,
+          total_amount = EXCLUDED.total_amount,
+          this_month_paid = EXCLUDED.this_month_paid,
+          remaining_due = EXCLUDED.remaining_due,
+          updated_at = NOW()
+      `;
     }
 
     return json(

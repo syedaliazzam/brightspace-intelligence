@@ -98,7 +98,8 @@ export async function POST(request) {
         COALESCE(rl.parent_name, item.parent_name, '') AS parent_name,
         COALESCE(rl.email, item.student_email, item.parent_email, '') AS email,
         COALESCE(rl.phone, item.student_phone, item.parent_phone, '') AS phone,
-        COALESCE(rl.class_level, c.class_level, c.title, '') AS class_level
+        COALESCE(rl.class_level, c.class_level, c.title, '') AS class_level,
+        COALESCE(latest_history.remaining_due::float8, COALESCE(fv.total_amount::float8, fv.amount::float8, 0)) AS current_pending_due
       FROM fee_vouchers fv
       LEFT JOIN registration_leads rl ON rl.id = fv.registration_id
       LEFT JOIN regular_monthly_fee_voucher_items item ON item.voucher_id = fv.id
@@ -106,6 +107,13 @@ export async function POST(request) {
       LEFT JOIN users su ON su.id = sp.user_id
       LEFT JOIN regular_monthly_fee_batches b ON b.id = item.batch_id
       LEFT JOIN courses c ON c.id = b.class_id
+      LEFT JOIN LATERAL (
+        SELECT fhr.remaining_due
+        FROM fee_history_records fhr
+        WHERE fhr.voucher_id = fv.id
+        ORDER BY fhr.due_date DESC NULLS LAST, fhr.created_at DESC NULLS LAST, fhr.id DESC
+        LIMIT 1
+      ) latest_history ON TRUE
       WHERE fv.voucher_no = ${voucherNo}
       LIMIT 1
     `;
@@ -122,6 +130,8 @@ export async function POST(request) {
       voucherNo,
       file: proofFile,
     });
+
+    let latestRemainingDue = 0;
 
     const item = await prisma.$transaction(async (tx) => {
       const submissionId = crypto.randomUUID();
@@ -170,6 +180,7 @@ export async function POST(request) {
         currentMonthFee: historyRow?.current_month_fee || 0,
         thisMonthPaid: paidAmount,
       });
+      latestRemainingDue = computed.remainingDue;
 
       await tx.$executeRaw`
         UPDATE fee_history_records
@@ -254,6 +265,7 @@ Email: ${lead?.email || "-"}
 Phone: ${lead?.phone || "-"}
 Class Level: ${lead?.class_level || "-"}
 Voucher No: ${voucherNo}
+Current Pending Due: ${latestRemainingDue}
 Transaction ID: ${transactionId}
 Paid Amount: ${paidAmount}
 Paid At: ${formattedPaidAt}
@@ -272,6 +284,7 @@ Login: ${portalUrl}`;
         ["Phone", lead?.phone || "-"],
         ["Class Level", lead?.class_level || "-"],
         ["Voucher No", voucherNo],
+        ["Current Pending Due", Number(latestRemainingDue || 0).toFixed(2)],
         ["Transaction ID", transactionId],
         ["Paid Amount", paidAmount],
         ["Paid At", formattedPaidAt],
@@ -290,6 +303,7 @@ Email: ${lead?.email || "-"}
 Phone: ${lead?.phone || "-"}
 Class Level: ${lead?.class_level || "-"}
 Voucher No: ${voucherNo}
+Current Pending Due: ${latestRemainingDue}
 Transaction ID: ${transactionId}
 Paid Amount: ${paidAmount}
 Paid At: ${formattedPaidAt}`;
@@ -304,6 +318,7 @@ Paid At: ${formattedPaidAt}`;
         ["Phone", lead?.phone || "-"],
         ["Class Level", lead?.class_level || "-"],
         ["Voucher No", voucherNo],
+        ["Current Pending Due", Number(latestRemainingDue || 0).toFixed(2)],
         ["Transaction ID", transactionId],
         ["Paid Amount", paidAmount],
         ["Paid At", formattedPaidAt],
