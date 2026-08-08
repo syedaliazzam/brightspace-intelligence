@@ -47,13 +47,8 @@ export async function GET() {
     );
 
     const currentUpcoming = items
-      .filter((item) => item.lifecycle_status === "current" || item.lifecycle_status === "upcoming")
-      .sort((left, right) => {
-        if (left.lifecycle_status !== right.lifecycle_status) {
-          return left.lifecycle_status === "current" ? -1 : 1;
-        }
-        return new Date(left.start_at).getTime() - new Date(right.start_at).getTime();
-      });
+      .filter((item) => item.lifecycle_status === "upcoming")
+      .sort((left, right) => new Date(left.start_at).getTime() - new Date(right.start_at).getTime());
 
     const past = items
       .filter((item) => item.lifecycle_status === "past")

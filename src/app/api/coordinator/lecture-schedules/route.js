@@ -350,6 +350,7 @@ export async function GET(request) {
           TO_CHAR(MAX(ls.scheduled_end), 'YYYY-MM-DD') AS end_date,
           TO_CHAR(MIN(ls.scheduled_start), 'HH24:MI') AS start_time,
           TO_CHAR(MAX(ls.scheduled_end), 'HH24:MI') AS end_time,
+          ARRAY_AGG(DISTINCT TO_CHAR(ls.scheduled_start, 'YYYY-MM-DD') ORDER BY TO_CHAR(ls.scheduled_start, 'YYYY-MM-DD')) AS occurrence_dates,
           COUNT(*)::int AS occurrence_count,
           COUNT(*) FILTER (WHERE ls.status::text = 'completed_by_teacher')::int AS completed_count,
           COUNT(*) FILTER (WHERE ls.status::text = 'verified_by_coordinator')::int AS verified_count,

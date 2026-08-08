@@ -55,6 +55,9 @@ function buildClassSchedulerEvents(item) {
   const endDate = parseDateOnly(item?.end_date);
   const startTimeParts = String(item?.start_time || "00:00").split(":").map(Number);
   const endTimeParts = String(item?.end_time || "00:00").split(":").map(Number);
+  const occurrenceDates = Array.isArray(item?.occurrence_dates)
+    ? item.occurrence_dates.map(parseDateOnly).filter(Boolean)
+    : [];
   const weekdaySet = new Set(
     String(item?.days_active || "")
       .split(",")
@@ -82,6 +85,10 @@ function buildClassSchedulerEvents(item) {
       eventType: "class-schedulers",
     },
   });
+
+  if (occurrenceDates.length) {
+    return occurrenceDates.map((date) => makeEvent(date, `-${date.toISOString().slice(0, 10)}`));
+  }
 
   if (!startDate || !endDate || !weekdaySet.size) {
     const fallbackStart = parseDateTime(item?.rescheduled_start || item?.scheduled_start);
