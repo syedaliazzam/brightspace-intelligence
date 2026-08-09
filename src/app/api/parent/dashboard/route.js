@@ -106,10 +106,24 @@ export async function GET(request) {
         COALESCE((
           SELECT COALESCE(fs.status::text, fv.status::text, 'not_available')
           FROM allowed_students a
-          LEFT JOIN registration_leads rl ON LOWER(rl.student_name) = LOWER(a.full_name)
-          LEFT JOIN fee_vouchers fv ON fv.student_id = a.id OR (fv.student_id IS NULL AND fv.registration_id = rl.id)
+          LEFT JOIN LATERAL (
+            SELECT
+              fv.id,
+              fv.status,
+              fv.student_id,
+              fv.registration_id
+            FROM fee_vouchers fv
+            WHERE fv.student_id = a.id
+               OR fv.registration_id IN (
+                 SELECT e.registration_id
+                 FROM enrollments e
+                 WHERE e.student_id = a.id
+                   AND e.registration_id IS NOT NULL
+               )
+            ORDER BY fv.created_at DESC NULLS LAST
+            LIMIT 1
+          ) fv ON TRUE
           LEFT JOIN fee_submissions fs ON fs.voucher_id = fv.id
-          ORDER BY fv.created_at DESC NULLS LAST, fs.created_at DESC NULLS LAST
           LIMIT 1
         ), 'not_available') AS fee_status
       `,
