@@ -26,10 +26,11 @@ export default function ParentDashboardPage() {
     if (!response.ok) {
       throw new Error(data?.message || "Unable to load children.");
     }
+    const children = Array.isArray(data.children) ? data.children : [];
     setState((current) => ({
       ...current,
-      children: data.children || [],
-      selectedChildId: "",
+      children,
+      selectedChildId: children.length === 1 ? String(children[0]?.id || "") : "",
       loading: false,
       error: "",
     }));

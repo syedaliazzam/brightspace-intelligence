@@ -34,10 +34,11 @@ export default function ParentProfilePage() {
     const profileData = await profileResponse.json();
     const childrenData = await childrenResponse.json();
     if (!profileResponse.ok || !childrenResponse.ok) throw new Error(profileData?.message || childrenData?.message || "Unable to load profile.");
+    const children = Array.isArray(childrenData.children) ? childrenData.children : [];
     setState({
       profile: profileData.profile || null,
-      children: childrenData.children || [],
-      selectedChildId: "",
+      children,
+      selectedChildId: children.length === 1 ? String(children[0]?.id || "") : "",
       error: "",
     });
   }

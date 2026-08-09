@@ -234,7 +234,7 @@ export default function LMSCalendar({ apiUrl, filters = {}, extraParams = {}, on
           }}
           eventClassNames={() => ["cursor-pointer"]}
           eventContent={(arg) => (
-            <div className="overflow-hidden px-1 text-[11px] leading-tight text-white">
+            <div className="overflow-hidden px-1 mb-1 text-[11px] leading-tight text-white">
               <div className="truncate font-semibold">{arg.event.title}</div>
               {arg.event.extendedProps?.class_level ? (
                 <div className="truncate text-[10px] text-white/90">{arg.event.extendedProps.class_level}</div>

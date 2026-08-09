@@ -124,30 +124,70 @@ function mapClassSchedulerEvents(items = []) {
 }
 
 function mapPublicEvents(items = []) {
-  return (items || []).map((item) => {
+  return (items || []).flatMap((item) => {
     const start = parseDateTime(item?.start_at || item?.startAt);
     const end = parseDateTime(item?.end_at || item?.endAt);
+    const events = [];
 
-    return {
-      id: `public-${item.id}`,
-      title: item?.title || "Public event",
-      start: start ? toCalendarDate(start) : "",
-      end: end ? toCalendarDate(end) : "",
-      backgroundColor: "#2563EB",
-      borderColor: "#1D4ED8",
-      textColor: "#FFFFFF",
-      extendedProps: {
-        type: "public-events",
-        typeLabel: "Public",
-        subtitle: item?.publication_status || "Public event",
-        meetLink: item?.meet_link || item?.google_meet_link || item?.meeting_link || "",
-        recordingLink: item?.recording_drive_url || item?.recording_link || item?.event_detail_link?.href || "",
-        recordingKind: item?.recording_drive_url ? "recording" : item?.event_detail_link?.kind || "",
-        recordingLabel: item?.recording_drive_url ? "View Recording" : item?.event_detail_link?.label || "",
-        eventId: item?.id,
-        eventType: "public-events",
-      },
-    };
+    if (start && end) {
+      const cursor = new Date(start);
+      cursor.setHours(0, 0, 0, 0);
+      const endDate = new Date(end);
+      endDate.setHours(0, 0, 0, 0);
+
+      while (cursor <= endDate) {
+        const occurrenceStart = new Date(cursor);
+        occurrenceStart.setHours(start.getHours(), start.getMinutes(), start.getSeconds(), 0);
+        const occurrenceEnd = new Date(cursor);
+        occurrenceEnd.setHours(end.getHours(), end.getMinutes(), end.getSeconds(), 0);
+
+        events.push({
+          id: `public-${item.id}-${cursor.toISOString().slice(0, 10)}`,
+          title: item?.title || "Public event",
+          start: toCalendarDate(occurrenceStart),
+          end: toCalendarDate(occurrenceEnd),
+          backgroundColor: "#2563EB",
+          borderColor: "#1D4ED8",
+          textColor: "#FFFFFF",
+          extendedProps: {
+            type: "public-events",
+            typeLabel: "Public",
+            subtitle: item?.publication_status || "Public event",
+            meetLink: item?.meet_link || item?.google_meet_link || item?.meeting_link || "",
+            recordingLink: item?.recording_drive_url || item?.recording_link || item?.event_detail_link?.href || "",
+            recordingKind: item?.recording_drive_url ? "recording" : item?.event_detail_link?.kind || "",
+            recordingLabel: item?.recording_drive_url ? "View Recording" : item?.event_detail_link?.label || "",
+            eventId: item?.id,
+            eventType: "public-events",
+          },
+        });
+
+        cursor.setDate(cursor.getDate() + 1);
+      }
+    }
+
+    return events.length
+      ? events
+      : [{
+          id: `public-${item.id}`,
+          title: item?.title || "Public event",
+          start: start ? toCalendarDate(start) : "",
+          end: end ? toCalendarDate(end) : "",
+          backgroundColor: "#2563EB",
+          borderColor: "#1D4ED8",
+          textColor: "#FFFFFF",
+          extendedProps: {
+            type: "public-events",
+            typeLabel: "Public",
+            subtitle: item?.publication_status || "Public event",
+            meetLink: item?.meet_link || item?.google_meet_link || item?.meeting_link || "",
+            recordingLink: item?.recording_drive_url || item?.recording_link || item?.event_detail_link?.href || "",
+            recordingKind: item?.recording_drive_url ? "recording" : item?.event_detail_link?.kind || "",
+            recordingLabel: item?.recording_drive_url ? "View Recording" : item?.event_detail_link?.label || "",
+            eventId: item?.id,
+            eventType: "public-events",
+          },
+        }];
   });
 }
 
@@ -339,7 +379,7 @@ export default function SuperAdminUnifiedCalendarPage() {
             eventClassNames={() => ["cursor-pointer"]}
             eventClick={(info) => setSelectedEvent(info.event)}
             eventContent={(arg) => (
-              <div className="overflow-hidden px-1 text-[11px] leading-tight text-white">
+              <div className="overflow-hidden px-1 mb-1 text-[11px] leading-tight text-white">
                 <div className="flex items-center gap-1">
                   <span className="rounded-full bg-white/15 px-1.5 py-[1px] text-[8px] font-semibold uppercase tracking-[0.12em]">
                     {arg.event.extendedProps?.typeLabel || "Event"}

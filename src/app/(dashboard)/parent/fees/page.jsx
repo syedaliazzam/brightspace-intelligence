@@ -11,7 +11,14 @@ export default function ParentFeesPage() {
     const childrenResponse = await fetch("/api/parent/children", { cache: "no-store" });
     const childrenData = await childrenResponse.json();
     if (!childrenResponse.ok) throw new Error(childrenData?.message || "Unable to load children.");
-    setState((current) => ({ ...current, children: childrenData.children || [], selectedChildId: "", loading: false, error: "" }));
+    const children = Array.isArray(childrenData.children) ? childrenData.children : [];
+    setState((current) => ({
+      ...current,
+      children,
+      selectedChildId: children.length === 1 ? String(children[0]?.id || "") : "",
+      loading: false,
+      error: "",
+    }));
   }
 
   async function load(childId = state.selectedChildId) {
