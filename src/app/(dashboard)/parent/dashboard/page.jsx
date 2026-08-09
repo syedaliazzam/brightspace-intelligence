@@ -97,6 +97,11 @@ export default function ParentDashboardPage() {
     return () => window.clearTimeout(timer);
   }, []);
 
+  useEffect(() => {
+    if (!state.selectedChildId) return;
+    loadDashboard(state.selectedChildId).catch((error) => setState((current) => ({ ...current, error: error.message })));
+  }, [state.selectedChildId]);
+
   return (
     <div className="relative min-h-screen overflow-hidden bg-[#FAF7F0]">
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(201,162,39,0.12),transparent_35%),radial-gradient(circle_at_top_right,rgba(45,138,106,0.12),transparent_32%),linear-gradient(180deg,#FAF7F0_0%,#F7F1E3_100%)]" />
