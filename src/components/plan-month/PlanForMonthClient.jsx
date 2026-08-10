@@ -2,6 +2,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { Plus } from "lucide-react";
 import ClientPortal from "@/components/shared/ClientPortal";
 
 function formatDate(d) {
@@ -12,12 +13,27 @@ function formatDate(d) {
   }
 }
 
+function getPreviewSrc(item) {
+  if (!item) return "";
+  if (typeof item === "string") return item;
+  if (item instanceof File) return URL.createObjectURL(item);
+  return "";
+}
+
+function buildPreviewUrl(value) {
+  const text = String(value || "").trim();
+  if (!text) return "";
+  if (/^https?:\/\//i.test(text) || text.startsWith("blob:") || text.startsWith("data:")) return text;
+  return `/api/file-preview?path=${encodeURIComponent(text)}`;
+}
+
 export default function PlanForMonthClient({ canCreate = true }) {
   const [form, setForm] = useState({ name: "", startDate: "", endDate: "", images: [] });
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
   const [editingPlan, setEditingPlan] = useState(null);
+  const [showCreateModal, setShowCreateModal] = useState(false);
   const [editForm, setEditForm] = useState({ name: "", startDate: "", endDate: "", images: [] });
   const [plans, setPlans] = useState([]);
   const [search, setSearch] = useState("");
@@ -83,12 +99,7 @@ export default function PlanForMonthClient({ canCreate = true }) {
 
   const handleImageChange = (e) => {
     const files = Array.from(e.target.files || []);
-    const readers = files.map((file) => new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.onloadend = () => resolve(reader.result);
-      reader.readAsDataURL(file);
-    }));
-    Promise.all(readers).then((urls) => setForm((p) => ({ ...p, images: [...p.images, ...urls] })));
+    setForm((p) => ({ ...p, images: [...p.images, ...files] }));
   };
 
   function openEdit(plan) {
@@ -119,12 +130,7 @@ export default function PlanForMonthClient({ canCreate = true }) {
 
   const handleEditImageChange = (e) => {
     const files = Array.from(e.target.files || []);
-    const readers = files.map((file) => new Promise((resolve) => {
-      const reader = new FileReader();
-      reader.onloadend = () => resolve(reader.result);
-      reader.readAsDataURL(file);
-    }));
-    Promise.all(readers).then((urls) => setEditForm((p) => ({ ...p, images: [...p.images, ...urls] })));
+    setEditForm((p) => ({ ...p, images: [...p.images, ...files] }));
   };
 
   const handleEditRemoveImage = (idx) => setEditForm((p) => ({ ...p, images: p.images.filter((_, i) => i !== idx) }));
@@ -138,7 +144,21 @@ export default function PlanForMonthClient({ canCreate = true }) {
     }
     setSaving(true);
     try {
-      const res = await fetch(`/api/monthly-plans/${editingPlan.id}`, {
+      const editHasFiles = editForm.images.some((item) => item instanceof File);
+      const res = await fetch(`/api/monthly-plans/${editingPlan.id}`, editHasFiles ? {
+        method: "PUT",
+        body: (() => {
+          const fd = new FormData();
+          fd.append("name", editForm.name);
+          fd.append("startDate", editForm.startDate);
+          fd.append("endDate", editForm.endDate);
+          editForm.images.forEach((item) => {
+            if (item instanceof File) fd.append("files", item);
+            else fd.append("imageUrls", item);
+          });
+          return fd;
+        })(),
+      } : {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: editForm.name, startDate: editForm.startDate, endDate: editForm.endDate, imageUrls: editForm.images }),
@@ -168,6 +188,12 @@ export default function PlanForMonthClient({ canCreate = true }) {
   }
 
   const handleRemoveImage = (idx) => setForm((p) => ({ ...p, images: p.images.filter((_, i) => i !== idx) }));
+  const isVideoSource = (value = "") => {
+    if (value instanceof File) {
+      return String(value.type || "").toLowerCase().startsWith("video/");
+    }
+    return /^data:video\//i.test(String(value || "")) || /\.(mp4|webm|ogg|mov|m4v)(\?.*)?$/i.test(String(value || ""));
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -196,7 +222,21 @@ export default function PlanForMonthClient({ canCreate = true }) {
 
     setSaving(true);
     try {
-      const res = await fetch("/api/monthly-plans", {
+      const createHasFiles = form.images.some((item) => item instanceof File);
+      const res = await fetch("/api/monthly-plans", createHasFiles ? {
+        method: "POST",
+        body: (() => {
+          const fd = new FormData();
+          fd.append("name", form.name);
+          fd.append("startDate", form.startDate);
+          fd.append("endDate", form.endDate);
+          form.images.forEach((item) => {
+            if (item instanceof File) fd.append("files", item);
+            else fd.append("imageUrls", item);
+          });
+          return fd;
+        })(),
+      } : {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: form.name, startDate: form.startDate, endDate: form.endDate, imageUrls: form.images }),
@@ -230,6 +270,26 @@ export default function PlanForMonthClient({ canCreate = true }) {
 
   return (
     <div className="space-y-6">
+      <section className="relative overflow-hidden rounded-[2rem] border border-[#2D8A6A]/15 bg-[linear-gradient(135deg,rgba(13,59,46,0.98),rgba(13,92,72,0.94))] p-6 text-[#FAF7F0] shadow-[0_24px_80px_-36px_rgba(13,59,46,0.32)] sm:p-8">
+        <div className="relative flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <p className="inline-flex w-fit rounded-full border border-[#E4C766]/30 bg-[#FFF5D6]/12 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.28em] text-[#FFF5D6]">Coordinator portal</p>
+            <h1 className="mt-4 font-display text-3xl font-bold tracking-tight text-[#FAF7F0] sm:text-4xl">Plan for this month</h1>
+            <p className="mt-3 text-sm leading-7 text-[#EAF6EF] sm:text-base">Create and manage monthly plans; upload images and share with students and admins.</p>
+          </div>
+          {canCreate ? (
+            <button
+              type="button"
+              onClick={() => setShowCreateModal(true)}
+              className="inline-flex items-center justify-center gap-2 self-start rounded-2xl bg-[#FFF5D6] px-4 py-2 text-sm font-semibold text-[#063F32] transition hover:bg-[#F1EADC] lg:self-auto"
+            >
+              <Plus size={18} />
+              Add Monthly Plan
+            </button>
+          ) : null}
+        </div>
+      </section>
+
       {successMessage && (
         <div className="fixed right-6 top-6 z-50 rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-3 shadow-xl shadow-emerald-200/40 text-sm font-semibold text-emerald-800">
           {successMessage}
@@ -268,13 +328,17 @@ export default function PlanForMonthClient({ canCreate = true }) {
                 <label className="mt-2 flex cursor-pointer items-center justify-between rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 text-sm font-medium text-[#063F32]">
                   <span>{editForm.images.length > 0 ? `${editForm.images.length} image(s)` : "Choose images"}</span>
                   <span className="rounded-full bg-[#EAF6EF] px-3 py-1 text-xs font-semibold text-[#0D5C48]">Browse</span>
-                  <input type="file" multiple accept="image/*" className="hidden" onChange={handleEditImageChange} />
+                  <input type="file" multiple accept="image/*,video/*" className="hidden" onChange={handleEditImageChange} />
                 </label>
                 {editForm.images.length > 0 && (
                   <div className="mt-3 grid grid-cols-3 gap-3">
                     {editForm.images.map((img, idx) => (
                       <div key={idx} className="relative overflow-hidden rounded-2xl border border-[#2D8A6A]/10 bg-white shadow-sm">
-                        <img src={img} alt={`edit-preview-${idx}`} className="h-20 w-full object-cover" />
+                        {isVideoSource(img) ? (
+                          <video src={buildPreviewUrl(getPreviewSrc(img))} className="h-20 w-full object-cover" muted playsInline />
+                        ) : (
+                          <img src={buildPreviewUrl(getPreviewSrc(img))} alt={`edit-preview-${idx}`} className="h-20 w-full object-cover" />
+                        )}
                         <button type="button" onClick={() => handleEditRemoveImage(idx)} className="absolute right-2 top-2 rounded-full bg-red-500 px-2 py-1 text-xs text-white">×</button>
                       </div>
                     ))}
@@ -291,63 +355,69 @@ export default function PlanForMonthClient({ canCreate = true }) {
         </div>
       </ClientPortal>
       )}
-      {canCreate ? (
-        <section className="rounded-2xl border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(250,247,240,0.98)_100%)] p-6 shadow-[0_20px_70px_-36px_rgba(13,59,46,0.18)] backdrop-blur-xl">
-          <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="grid gap-4 lg:grid-cols-2">
-            <div>
-              <label className="block text-sm font-semibold text-[#245C4F]">Plan Name</label>
-              <input
-                type="text"
-                value={form.name}
-                onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))}
-                placeholder="Enter plan name"
-                className="mt-2 w-full rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 text-sm text-[#063F32] outline-none focus:border-[#2D8A6A] focus:ring-4 focus:ring-[#C9A227]/20"
-              />
-            </div>
-
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div>
-                <label className="block text-sm font-semibold text-[#245C4F]">Start Date</label>
-                <input type="date" value={form.startDate} onChange={(e) => setForm((p) => ({ ...p, startDate: e.target.value }))} className="mt-2 w-full rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 text-sm text-[#063F32] outline-none focus:border-[#2D8A6A] focus:ring-4 focus:ring-[#C9A227]/20" />
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-[#245C4F]">End Date</label>
-                <input type="date" value={form.endDate} onChange={(e) => setForm((p) => ({ ...p, endDate: e.target.value }))} className="mt-2 w-full rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 text-sm text-[#063F32] outline-none focus:border-[#2D8A6A] focus:ring-4 focus:ring-[#C9A227]/20" />
-              </div>
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-semibold text-[#245C4F]">Upload Images</label>
-            <label className="mt-2 flex cursor-pointer items-center justify-between rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 text-sm font-medium text-[#063F32] transition hover:border-[#2D8A6A] hover:bg-white">
-              <span>{form.images.length > 0 ? `${form.images.length} image(s) selected` : "Choose images"}</span>
-              <span className="rounded-full bg-[#EAF6EF] px-3 py-1 text-xs font-semibold text-[#0D5C48]">Browse</span>
-              <input type="file" multiple accept="image/*" className="hidden" onChange={handleImageChange} />
-            </label>
-          </div>
-
-          {form.images.length > 0 && (
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-              {form.images.map((img, idx) => (
-                <div key={idx} className="relative overflow-hidden rounded-2xl border border-[#2D8A6A]/10 bg-white shadow-sm">
-                  <img src={img} alt={`preview-${idx}`} className="h-24 w-full object-cover" />
-                  <button type="button" onClick={() => handleRemoveImage(idx)} className="absolute right-2 top-2 rounded-full bg-red-500 px-2 py-1 text-xs text-white">×</button>
+      {showCreateModal && canCreate ? (
+        <ClientPortal targetId="coordinator-page-portal-root">
+          <div onClick={() => setShowCreateModal(false)} className="fixed inset-0 z-[9999] flex items-center justify-center bg-[#063F32]/45 px-4 py-8">
+            <div onClick={(e) => e.stopPropagation()} className="w-full max-w-2xl max-h-[85vh] overflow-y-auto rounded-[2rem] border border-[#2D8A6A]/15 bg-[#FAF7F0] p-5 shadow-[0_24px_80px_-36px_rgba(13,59,46,0.24)] sm:p-6">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-sm font-semibold uppercase tracking-[0.24em] text-[#0D5C48]">Monthly plan</p>
+                  <h2 className="mt-2 text-2xl font-semibold tracking-tight text-[#063F32]">Add monthly plan</h2>
                 </div>
-              ))}
+                <button type="button" onClick={() => setShowCreateModal(false)} className="rounded-xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-3 py-2 text-sm font-semibold text-[#063F32] transition hover:bg-[#F1EADC]">Close</button>
+              </div>
+              <form onSubmit={handleSubmit} className="mt-6 space-y-6">
+                <div className="grid gap-4 lg:grid-cols-2">
+                  <div>
+                    <label className="block text-sm font-semibold text-[#245C4F]">Plan Name</label>
+                    <input type="text" value={form.name} onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))} placeholder="Enter plan name" className="mt-2 w-full rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 text-sm text-[#063F32] outline-none focus:border-[#2D8A6A] focus:ring-4 focus:ring-[#C9A227]/20" />
+                  </div>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div>
+                      <label className="block text-sm font-semibold text-[#245C4F]">Start Date</label>
+                      <input type="date" value={form.startDate} onChange={(e) => setForm((p) => ({ ...p, startDate: e.target.value }))} className="mt-2 w-full rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 text-sm text-[#063F32] outline-none focus:border-[#2D8A6A] focus:ring-4 focus:ring-[#C9A227]/20" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-semibold text-[#245C4F]">End Date</label>
+                      <input type="date" value={form.endDate} onChange={(e) => setForm((p) => ({ ...p, endDate: e.target.value }))} className="mt-2 w-full rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 text-sm text-[#063F32] outline-none focus:border-[#2D8A6A] focus:ring-4 focus:ring-[#C9A227]/20" />
+                    </div>
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-[#245C4F]">Upload Images or Videos</label>
+                  <label className="mt-2 flex cursor-pointer items-center justify-between rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 text-sm font-medium text-[#063F32] transition hover:border-[#2D8A6A] hover:bg-white">
+                    <span>{form.images.length > 0 ? `${form.images.length} file(s) selected` : "Choose files"}</span>
+                    <span className="rounded-full bg-[#EAF6EF] px-3 py-1 text-xs font-semibold text-[#0D5C48]">Browse</span>
+                    <input type="file" multiple accept="image/*,video/*" className="hidden" onChange={handleImageChange} />
+                  </label>
+                </div>
+                {form.images.length > 0 && (
+                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                    {form.images.map((img, idx) => (
+                      <div key={idx} className="relative overflow-hidden rounded-2xl border border-[#2D8A6A]/10 bg-white shadow-sm">
+                        {isVideoSource(img) ? (
+                          <video src={getPreviewSrc(img)} className="h-24 w-full object-cover" muted playsInline />
+                        ) : (
+                          <img src={getPreviewSrc(img)} alt={`preview-${idx}`} className="h-24 w-full object-cover" />
+                        )}
+                        <button type="button" onClick={() => handleRemoveImage(idx)} className="absolute right-2 top-2 rounded-full bg-red-500 px-2 py-1 text-xs text-white">×</button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {message && <p className={`text-sm ${message.includes("success") ? "text-green-600" : "text-red-600"}`}>{message}</p>}
+                <div className="flex justify-end gap-3">
+                  <button type="button" onClick={() => setShowCreateModal(false)} className="rounded-2xl border px-4 py-2 text-sm">Cancel</button>
+                  <button type="submit" disabled={saving} className="inline-flex rounded-2xl bg-[#0D5C48] px-5 py-3 text-sm font-semibold text-[#FAF7F0] transition hover:bg-[#063F32]">
+                    {saving ? "Saving..." : "Save Plan"}
+                  </button>
+                </div>
+              </form>
             </div>
-          )}
-
-          {message && <p className={`text-sm ${message.includes("success") ? "text-green-600" : "text-red-600"}`}>{message}</p>}
-
-          <div className="flex justify-end">
-            <button type="submit" disabled={saving} className="inline-flex rounded-2xl bg-[#0D5C48] px-5 py-3 text-sm font-semibold text-[#FAF7F0] transition hover:bg-[#063F32]">
-              {saving ? "Saving..." : "Save Plan"}
-            </button>
           </div>
-        </form>
-      </section>
-      ) : (
+        </ClientPortal>
+      ) : null}
+      {canCreate ? null : (
         <section className="rounded-2xl border border-[#2D8A6A]/15 bg-white p-6 shadow-[0_20px_70px_-36px_rgba(13,59,46,0.18)] backdrop-blur-xl">
           <div className="space-y-3">
             <p className="text-sm font-semibold text-[#063F32]">Monthly plans (view only)</p>
@@ -392,7 +462,16 @@ export default function PlanForMonthClient({ canCreate = true }) {
                     <div className="flex flex-wrap gap-2">
                       {(Array.isArray(row.image_urls) ? row.image_urls : []).map((img, i) => (
                           <button key={i} onClick={() => setPreviewImage(img)} className="inline-block hover:opacity-80 transition">
-                            <img src={img} alt={`img-${i}`} className="h-10 w-10 rounded object-cover cursor-pointer" />
+                            {isVideoSource(img) ? (
+                              <video
+                                src={buildPreviewUrl(img)}
+                                className="h-10 w-10 rounded object-cover cursor-pointer"
+                                muted
+                                playsInline
+                              />
+                            ) : (
+                              <img src={buildPreviewUrl(img)} alt={`img-${i}`} className="h-10 w-10 rounded object-cover cursor-pointer" />
+                            )}
                           </button>
                         ))}
                     </div>
@@ -417,7 +496,11 @@ export default function PlanForMonthClient({ canCreate = true }) {
               <button onClick={() => setPreviewImage("")} className="rounded-full text-[#245C4F] hover:text-[#063F32] text-xl">×</button>
             </div>
             <div className="rounded-xl overflow-hidden bg-[#F1EADC]">
-              <img src={previewImage} alt="preview" className="w-full h-auto max-h-[80vh] object-contain" />
+              {isVideoSource(previewImage) ? (
+                <video src={buildPreviewUrl(previewImage)} className="w-full h-auto max-h-[80vh] object-contain" controls playsInline />
+              ) : (
+                <img src={buildPreviewUrl(previewImage)} alt="preview" className="w-full h-auto max-h-[80vh] object-contain" />
+              )}
             </div>
           </div>
         </div>
@@ -426,4 +509,6 @@ export default function PlanForMonthClient({ canCreate = true }) {
     </div>
   );
 }
+
+
 

@@ -12,6 +12,7 @@ export default function MonthlyPlanSlider() {
   const timerRef = useRef(null);
   const scrollerRef = useRef(null);
   const isAutoScrollingRef = useRef(false);
+  const isVideoPlayingRef = useRef(false);
 
   useEffect(() => {
     async function loadPlan() {
@@ -54,7 +55,7 @@ export default function MonthlyPlanSlider() {
     if (timerRef.current) clearInterval(timerRef.current);
 
     timerRef.current = setInterval(() => {
-      if (isAutoScrollingRef.current) return;
+      if (isAutoScrollingRef.current || isVideoPlayingRef.current) return;
       isAutoScrollingRef.current = true;
       if (!plan?.image_urls?.length) return;
 
@@ -75,6 +76,13 @@ export default function MonthlyPlanSlider() {
   }, [plan, loading, startAutoSlide]);
 
   const images = plan?.image_urls || [];
+  const isVideoSource = (value = "") => /^data:video\//i.test(String(value || "")) || /\.(mp4|webm|ogg|mov|m4v)(\?.*)?$/i.test(String(value || ""));
+  const buildPreviewUrl = (value) => {
+    const text = String(value || "").trim();
+    if (!text) return "";
+    if (/^https?:\/\//i.test(text) || text.startsWith("blob:") || text.startsWith("data:")) return text;
+    return `/api/file-preview?path=${encodeURIComponent(text)}`;
+  };
   const monthName = plan?.start_date
     ? new Date(plan.start_date).toLocaleDateString("en-US", { month: "long", year: "numeric" })
     : "";
@@ -165,6 +173,11 @@ export default function MonthlyPlanSlider() {
     startAutoSlide();
   };
 
+  const handleCardClick = (img, event) => {
+    if (event?.defaultPrevented) return;
+    setPreviewImage(img);
+  };
+
   if (loading || !images.length) return null;
 
   return (
@@ -186,17 +199,34 @@ export default function MonthlyPlanSlider() {
               <button
                 key={`${img}-${idx}`}
                 data-plan-card
-                onClick={() => {
-                  setPreviewImage(img);
-                }}
+                onClick={(event) => handleCardClick(img, event)}
                 className="group/card block w-full snap-start snap-always overflow-hidden rounded-3xl border border-emerald/10 bg-transparent shadow-[0_20px_50px_rgba(13,59,46,0.10)] transition-all duration-500 hover:border-gold/30 hover:shadow-[0_28px_60px_rgba(13,59,46,0.14)] cursor-pointer"
               >
                 <div className="relative flex h-[300px] w-full items-center justify-center overflow-hidden sm:h-[360px] lg:h-[420px]">
-                  <img
-                    src={img}
-                    alt={`plan-image-${idx}`}
-                    className="max-h-full max-w-full h-auto w-auto object-contain transition-transform duration-500 group-hover/card:scale-[1.02]"
-                  />
+                  {isVideoSource(img) ? (
+                    <video
+                      src={buildPreviewUrl(img)}
+                      className="max-h-full max-w-full h-auto w-auto object-contain transition-transform duration-500 group-hover/card:scale-[1.02]"
+                      controls
+                      playsInline
+                      onPlay={() => {
+                        isVideoPlayingRef.current = true;
+                      }}
+                      onPause={() => {
+                        isVideoPlayingRef.current = false;
+                      }}
+                      onEnded={() => {
+                        isVideoPlayingRef.current = false;
+                      }}
+                      onClick={(event) => event.stopPropagation()}
+                    />
+                  ) : (
+                    <img
+                      src={buildPreviewUrl(img)}
+                      alt={`plan-image-${idx}`}
+                      className="max-h-full max-w-full h-auto w-auto object-contain transition-transform duration-500 group-hover/card:scale-[1.02]"
+                    />
+                  )}
                   <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-emerald-deep/10 via-transparent to-transparent opacity-0 transition-opacity duration-500 group-hover/card:opacity-100" />
                 </div>
               </button>
@@ -244,8 +274,27 @@ export default function MonthlyPlanSlider() {
                   <X size={28} />
                 </button>
               </div>
-              <div className="rounded-2xl overflow-hidden">
-                <img src={previewImage} alt="preview" className="w-full h-auto max-h-[75vh] object-contain" />
+            <div className="rounded-2xl overflow-hidden">
+                {isVideoSource(previewImage) ? (
+                  <video
+                    src={buildPreviewUrl(previewImage)}
+                    className="w-full h-auto max-h-[75vh] object-contain"
+                    controls
+                    autoPlay
+                    playsInline
+                    onPlay={() => {
+                      isVideoPlayingRef.current = true;
+                    }}
+                    onPause={() => {
+                      isVideoPlayingRef.current = false;
+                    }}
+                    onEnded={() => {
+                      isVideoPlayingRef.current = false;
+                    }}
+                  />
+                ) : (
+                  <img src={buildPreviewUrl(previewImage)} alt="preview" className="w-full h-auto max-h-[75vh] object-contain" />
+                )}
               </div>
             </div>
           </div>
