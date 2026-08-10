@@ -28,6 +28,8 @@ function buildPreviewUrl(value) {
 }
 
 export default function PlanForMonthClient({ canCreate = true }) {
+  const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
+  const MAX_VIDEO_BYTES = 18 * 1024 * 1024;
   const [form, setForm] = useState({ name: "", startDate: "", endDate: "", images: [] });
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
@@ -130,7 +132,23 @@ export default function PlanForMonthClient({ canCreate = true }) {
 
   const handleEditImageChange = (e) => {
     const files = Array.from(e.target.files || []);
-    setEditForm((p) => ({ ...p, images: [...p.images, ...files] }));
+    const allowedFiles = [];
+    for (const file of files) {
+      const isVideo = String(file?.type || "").toLowerCase().startsWith("video/");
+      const maxBytes = isVideo ? MAX_VIDEO_BYTES : MAX_IMAGE_BYTES;
+      if (file.size > maxBytes) {
+        setMessage(
+          isVideo
+            ? "One selected video is too large to upload from this page. Please choose a smaller video."
+            : "One selected image is too large to upload from this page. Please choose a smaller image."
+        );
+        continue;
+      }
+      allowedFiles.push(file);
+    }
+    if (allowedFiles.length) {
+      setEditForm((p) => ({ ...p, images: [...p.images, ...allowedFiles] }));
+    }
   };
 
   const handleEditRemoveImage = (idx) => setEditForm((p) => ({ ...p, images: p.images.filter((_, i) => i !== idx) }));
@@ -140,6 +158,20 @@ export default function PlanForMonthClient({ canCreate = true }) {
     setMessage("");
     if (!editForm.name || !editForm.startDate || !editForm.endDate) {
       setMessage("Please fill all fields");
+      return;
+    }
+    const oversized = editForm.images.find((item) => {
+      if (!(item instanceof File)) return false;
+      const isVideo = String(item.type || "").toLowerCase().startsWith("video/");
+      const maxBytes = isVideo ? MAX_VIDEO_BYTES : MAX_IMAGE_BYTES;
+      return item.size > maxBytes;
+    });
+    if (oversized) {
+      setMessage(
+        String(oversized.type || "").toLowerCase().startsWith("video/")
+          ? "The selected video is too large to submit here. Please use a smaller video."
+          : "The selected image is too large to submit here. Please use a smaller image."
+      );
       return;
     }
     setSaving(true);

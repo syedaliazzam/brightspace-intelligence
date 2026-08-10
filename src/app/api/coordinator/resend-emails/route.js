@@ -18,6 +18,44 @@ function buildDedupKey(item) {
   return [to, from, subject, createdAt].join("::");
 }
 
+async function fetchAllSentEmails(apiKey) {
+  const items = [];
+  let after = "";
+
+  while (true) {
+    const url = new URL(`${RESEND_API_BASE_URL}/emails`);
+    url.searchParams.set("limit", "100");
+    if (after) url.searchParams.set("after", after);
+
+    const response = await fetch(url.toString(), {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+        "User-Agent": "ALH-LMS/1.0",
+      },
+      cache: "no-store",
+    });
+
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      return { error: data?.message || data?.error?.message || "Unable to fetch sent emails from Resend." };
+    }
+
+    const pageItems = Array.isArray(data?.data) ? data.data : [];
+    items.push(...pageItems);
+
+    if (!data?.has_more || pageItems.length === 0) {
+      break;
+    }
+
+    after = String(pageItems[pageItems.length - 1]?.id || "");
+    if (!after) break;
+  }
+
+  return { items };
+}
+
 export async function GET() {
   const session = await auth();
   const role = String(session?.user?.role || "").toLowerCase();
@@ -31,28 +69,13 @@ export async function GET() {
   }
 
   try {
-    const response = await fetch(`${RESEND_API_BASE_URL}/emails?limit=100`, {
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-        "User-Agent": "ALH-LMS/1.0",
-      },
-      cache: "no-store",
-    });
-
-    const data = await response.json().catch(() => ({}));
-
-    if (!response.ok) {
-      return json(
-        data?.message || data?.error?.message || "Unable to fetch sent emails from Resend.",
-        response.status,
-        { items: [] }
-      );
+    const result = await fetchAllSentEmails(apiKey);
+    if (result.error) {
+      return json(result.error, 500, { items: [] });
     }
 
-    const rawItems = Array.isArray(data?.data)
-      ? data.data.map((item) => ({
+    const rawItems = Array.isArray(result.items)
+      ? result.items.map((item) => ({
           id: String(item?.id || ""),
           to: Array.isArray(item?.to) ? item.to : [],
           from: String(item?.from || ""),
@@ -77,7 +100,7 @@ export async function GET() {
 
     return json("Resend sent emails fetched.", 200, {
       items,
-      has_more: Boolean(data?.has_more),
+      has_more: false,
     });
   } catch (error) {
     return json(error instanceof Error ? error.message : "Unable to fetch sent emails from Resend.", 500, { items: [] });

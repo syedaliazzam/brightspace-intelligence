@@ -6,9 +6,15 @@ import { formatEventDate, formatEventDateTime, formatMoney, formatRegistrationSt
 
 const INITIAL_CREATE_FORM = {
   eventId: "",
-  participantName: "",
+  eventCategory: "",
   email: "",
+  whatsappCountryCode: "+92",
   whatsapp: "",
+  studentName: "",
+  studentNames: [""],
+  parentName: "",
+  schoolName: "",
+  className: "",
   notes: "",
 };
 
@@ -18,6 +24,265 @@ function isValidName(value) {
 
 function normalizePhoneDigits(value) {
   return String(value || "").replace(/\D/g, "");
+}
+
+const COUNTRY_PHONE_DIGIT_LIMITS = {
+  "+1": 10,
+  "+20": 10,
+  "+27": 9,
+  "+30": 10,
+  "+31": 9,
+  "+32": 9,
+  "+33": 9,
+  "+34": 9,
+  "+36": 9,
+  "+39": 10,
+  "+40": 9,
+  "+41": 9,
+  "+43": 10,
+  "+44": 10,
+  "+45": 8,
+  "+46": 9,
+  "+47": 8,
+  "+48": 9,
+  "+49": 10,
+  "+51": 9,
+  "+52": 10,
+  "+53": 8,
+  "+54": 10,
+  "+55": 11,
+  "+56": 9,
+  "+57": 10,
+  "+58": 10,
+  "+60": 9,
+  "+61": 9,
+  "+62": 10,
+  "+63": 10,
+  "+64": 9,
+  "+65": 8,
+  "+66": 9,
+  "+81": 10,
+  "+82": 10,
+  "+84": 9,
+  "+86": 11,
+  "+90": 10,
+  "+91": 10,
+  "+92": 10,
+  "+93": 9,
+  "+94": 9,
+  "+95": 9,
+  "+98": 10,
+  "+211": 9,
+  "+212": 9,
+  "+213": 9,
+  "+216": 8,
+  "+218": 9,
+  "+220": 7,
+  "+221": 9,
+  "+222": 8,
+  "+223": 8,
+  "+224": 9,
+  "+225": 10,
+  "+226": 8,
+  "+227": 8,
+  "+228": 8,
+  "+229": 8,
+  "+230": 8,
+  "+231": 8,
+  "+232": 8,
+  "+233": 9,
+  "+234": 10,
+  "+235": 8,
+  "+236": 8,
+  "+237": 9,
+  "+238": 7,
+  "+239": 7,
+  "+240": 9,
+  "+241": 8,
+  "+242": 9,
+  "+243": 9,
+  "+244": 9,
+  "+245": 7,
+  "+246": 7,
+  "+248": 7,
+  "+249": 9,
+  "+250": 9,
+  "+251": 9,
+  "+252": 8,
+  "+253": 8,
+  "+254": 9,
+  "+255": 9,
+  "+256": 9,
+  "+257": 8,
+  "+258": 9,
+  "+260": 9,
+  "+261": 9,
+  "+262": 9,
+  "+263": 9,
+  "+264": 9,
+  "+265": 9,
+  "+266": 8,
+  "+267": 8,
+  "+268": 8,
+  "+269": 7,
+  "+290": 4,
+  "+291": 7,
+  "+297": 7,
+  "+298": 6,
+  "+299": 6,
+  "+350": 8,
+  "+351": 9,
+  "+352": 9,
+  "+353": 9,
+  "+354": 7,
+  "+355": 9,
+  "+356": 8,
+  "+357": 8,
+  "+358": 9,
+  "+359": 9,
+  "+370": 8,
+  "+371": 8,
+  "+372": 8,
+  "+373": 8,
+  "+374": 8,
+  "+375": 9,
+  "+376": 6,
+  "+377": 8,
+  "+378": 10,
+  "+380": 9,
+  "+381": 9,
+  "+382": 8,
+  "+385": 9,
+  "+386": 8,
+  "+387": 8,
+  "+389": 8,
+  "+420": 9,
+  "+421": 9,
+  "+423": 7,
+  "+500": 5,
+  "+501": 7,
+  "+502": 8,
+  "+503": 8,
+  "+504": 8,
+  "+505": 8,
+  "+506": 8,
+  "+507": 8,
+  "+508": 6,
+  "+509": 8,
+  "+590": 9,
+  "+591": 8,
+  "+592": 7,
+  "+593": 9,
+  "+594": 9,
+  "+595": 9,
+  "+596": 9,
+  "+597": 7,
+  "+598": 8,
+  "+599": 7,
+  "+670": 8,
+  "+672": 6,
+  "+673": 7,
+  "+674": 7,
+  "+675": 8,
+  "+676": 7,
+  "+677": 7,
+  "+678": 7,
+  "+679": 7,
+  "+680": 7,
+  "+681": 6,
+  "+682": 5,
+  "+683": 4,
+  "+685": 7,
+  "+686": 5,
+  "+687": 6,
+  "+688": 5,
+  "+689": 8,
+  "+690": 4,
+  "+691": 7,
+  "+692": 7,
+  "+850": 10,
+  "+852": 8,
+  "+853": 8,
+  "+855": 9,
+  "+856": 9,
+  "+880": 10,
+  "+886": 9,
+  "+960": 7,
+  "+961": 8,
+  "+962": 9,
+  "+963": 9,
+  "+964": 10,
+  "+965": 8,
+  "+966": 9,
+  "+967": 9,
+  "+968": 8,
+  "+970": 9,
+  "+971": 9,
+  "+972": 9,
+  "+973": 8,
+  "+974": 8,
+  "+975": 8,
+  "+976": 8,
+  "+977": 10,
+  "+992": 9,
+  "+993": 8,
+  "+994": 9,
+  "+995": 9,
+  "+996": 9,
+  "+998": 9,
+};
+
+function getCountryDialLength(code) {
+  const value = String(code || "").trim();
+  if (COUNTRY_PHONE_DIGIT_LIMITS[value]) return COUNTRY_PHONE_DIGIT_LIMITS[value];
+  const dialDigits = value.replace(/\D/g, "").length;
+  return Math.max(6, Math.min(12, 15 - dialDigits));
+}
+
+const WHATSAPP_COUNTRY_CODES = [
+  "+92",
+  "+1",
+  "+44",
+  "+971",
+  "+61",
+  "+91",
+  "+86",
+  "+966",
+  "+973",
+  "+974",
+  "+968",
+  "+20",
+  "+33",
+  "+49",
+  "+39",
+  "+81",
+  "+65",
+  "+60",
+  "+880",
+];
+
+function getSelectedEvent(events, eventId) {
+  return events.find((item) => item.id === eventId) || null;
+}
+
+function normalizeEventCategory(value) {
+  const key = String(value || "").toLowerCase().trim().replace(/[_\s]+/g, "-");
+  if (key === "ashshajrah-students" || key === "alh-students") return "alh-students";
+  if (key === "ashshajrah-parents" || key === "alh-parents") return "alh-parents";
+  if (key === "general-students") return "general-students";
+  if (key === "general-parents") return "general-parents";
+  return key;
+}
+
+function isEventRegistrationOpen(eventItem) {
+  if (!eventItem) return false;
+  const now = Date.now();
+  const deadline = eventItem.registration_deadline ? new Date(eventItem.registration_deadline).getTime() : NaN;
+  const endTime = eventItem.end_at ? new Date(eventItem.end_at).getTime() : NaN;
+  const published = String(eventItem.publication_status || "").toLowerCase() === "published";
+  const deadlineOpen = Number.isNaN(deadline) ? true : deadline >= now;
+  const endOpen = Number.isNaN(endTime) ? true : endTime >= now;
+  return published && deadlineOpen && endOpen;
 }
 
 function statusTone(status) {
@@ -42,6 +307,29 @@ export default function PublicEventRegistrationsPage({ portalLabel = "Coordinato
   const showReceivedAmountColumn = normalizedPortalLabel === "coordinator portal" || normalizedPortalLabel === "super admin portal" || normalizedPortalLabel === "superadmin portal";
   const [items, setItems] = useState([]);
   const [events, setEvents] = useState([]);
+  const [countryCodes, setCountryCodes] = useState([
+    "+1", "+20", "+27", "+30", "+31", "+32", "+33", "+34", "+36", "+39",
+    "+40", "+41", "+43", "+44", "+45", "+46", "+47", "+48", "+49", "+51",
+    "+52", "+53", "+54", "+55", "+56", "+57", "+58", "+60", "+61", "+62",
+    "+63", "+64", "+65", "+66", "+81", "+82", "+84", "+86", "+90", "+91",
+    "+92", "+93", "+94", "+95", "+98", "+211", "+212", "+213", "+216", "+218",
+    "+220", "+221", "+222", "+223", "+224", "+225", "+226", "+227", "+228", "+229",
+    "+230", "+231", "+232", "+233", "+234", "+235", "+236", "+237", "+238", "+239",
+    "+240", "+241", "+242", "+243", "+244", "+245", "+246", "+248", "+249", "+250",
+    "+251", "+252", "+253", "+254", "+255", "+256", "+257", "+258", "+260", "+261",
+    "+262", "+263", "+264", "+265", "+266", "+267", "+268", "+269", "+290", "+291",
+    "+297", "+298", "+299", "+350", "+351", "+352", "+353", "+354", "+355", "+356",
+    "+357", "+358", "+359", "+370", "+371", "+372", "+373", "+374", "+375", "+376",
+    "+377", "+378", "+380", "+381", "+382", "+385", "+386", "+387", "+389", "+420",
+    "+421", "+423", "+500", "+501", "+502", "+503", "+504", "+505", "+506", "+507",
+    "+508", "+509", "+590", "+591", "+592", "+593", "+594", "+595", "+596", "+597",
+    "+598", "+599", "+670", "+672", "+673", "+674", "+675", "+676", "+677", "+678",
+    "+679", "+680", "+681", "+682", "+683", "+685", "+686", "+687", "+688", "+689",
+    "+690", "+691", "+692", "+850", "+852", "+853", "+855", "+856", "+880", "+886",
+    "+960", "+961", "+962", "+963", "+964", "+965", "+966", "+967", "+968", "+970",
+    "+971", "+972", "+973", "+974", "+975", "+976", "+977", "+992", "+993", "+994",
+    "+995", "+996", "+998"
+  ]);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState("");
   const [tone, setTone] = useState("success");
@@ -50,6 +338,7 @@ export default function PublicEventRegistrationsPage({ portalLabel = "Coordinato
   const [createErrors, setCreateErrors] = useState({});
   const [createSubmitting, setCreateSubmitting] = useState(false);
   const [createSubmitError, setCreateSubmitError] = useState("");
+  const [createSuccess, setCreateSuccess] = useState(null);
   const [createEventOpen, setCreateEventOpen] = useState(false);
   const [selected, setSelected] = useState(null);
   const [receivedAmountDrafts, setReceivedAmountDrafts] = useState({});
@@ -97,6 +386,48 @@ export default function PublicEventRegistrationsPage({ portalLabel = "Coordinato
   }, []);
 
   useEffect(() => {
+    let active = true;
+    (async () => {
+      try {
+        const response = await fetch("/api/public/country-calling-codes", { cache: "no-store" });
+        const data = await response.json();
+        if (!active || !response.ok) return;
+        const nextCodes = Array.isArray(data?.codes) ? data.codes.map((item) => String(item || "").trim()).filter(Boolean) : [];
+        if (nextCodes.length > 0) {
+          setCountryCodes(Array.from(new Set(["+92", ...nextCodes])));
+        }
+      } catch {
+        if (active) {
+          setCountryCodes([
+            "+1", "+20", "+27", "+30", "+31", "+32", "+33", "+34", "+36", "+39",
+            "+40", "+41", "+43", "+44", "+45", "+46", "+47", "+48", "+49", "+51",
+            "+52", "+53", "+54", "+55", "+56", "+57", "+58", "+60", "+61", "+62",
+            "+63", "+64", "+65", "+66", "+81", "+82", "+84", "+86", "+90", "+91",
+            "+92", "+93", "+94", "+95", "+98", "+211", "+212", "+213", "+216", "+218",
+            "+220", "+221", "+222", "+223", "+224", "+225", "+226", "+227", "+228", "+229",
+            "+230", "+231", "+232", "+233", "+234", "+235", "+236", "+237", "+238", "+239",
+            "+240", "+241", "+242", "+243", "+244", "+245", "+246", "+248", "+249", "+250",
+            "+251", "+252", "+253", "+254", "+255", "+256", "+257", "+258", "+260", "+261",
+            "+262", "+263", "+264", "+265", "+266", "+267", "+268", "+269", "+290", "+291",
+            "+297", "+298", "+299", "+350", "+351", "+352", "+353", "+354", "+355", "+356",
+            "+357", "+358", "+359", "+370", "+371", "+372", "+373", "+374", "+375", "+376",
+            "+377", "+378", "+380", "+381", "+382", "+385", "+386", "+387", "+389", "+420",
+            "+421", "+423", "+500", "+501", "+502", "+503", "+504", "+505", "+506", "+507",
+            "+508", "+509", "+590", "+591", "+592", "+593", "+594", "+595", "+596", "+597",
+            "+598", "+599", "+670", "+672", "+673", "+674", "+675", "+676", "+677", "+678",
+            "+679", "+680", "+681", "+682", "+683", "+685", "+686", "+687", "+688", "+689",
+            "+690", "+691", "+692", "+850", "+852", "+853", "+855", "+856", "+880", "+886",
+            "+960", "+961", "+962", "+963", "+964", "+965", "+966", "+967", "+968", "+970",
+            "+971", "+972", "+973", "+974", "+975", "+976", "+977", "+992", "+993", "+994",
+            "+995", "+996", "+998"
+          ]);
+        }
+      }
+    })();
+    return () => { active = false; };
+  }, []);
+
+  useEffect(() => {
     if (!message) return;
     const timer = window.setTimeout(() => setMessage(""), 3500);
     return () => window.clearTimeout(timer);
@@ -109,16 +440,15 @@ export default function PublicEventRegistrationsPage({ portalLabel = "Coordinato
 
 
   const availableCreateEvents = useMemo(() => {
-    const now = Date.now();
-    return events.filter((item) => {
-      const deadline = item.registration_deadline ? new Date(item.registration_deadline).getTime() : NaN;
-      const endTime = item.end_at ? new Date(item.end_at).getTime() : NaN;
-      const published = String(item.publication_status || "").toLowerCase() === "published";
-      const deadlineOpen = Number.isNaN(deadline) ? true : deadline >= now;
-      const endOpen = Number.isNaN(endTime) ? true : endTime >= now;
-      return published && deadlineOpen && endOpen;
-    });
+    return events.filter((item) => isEventRegistrationOpen(item));
   }, [events]);
+
+  const selectedCreateEvent = useMemo(() => getSelectedEvent(events, createForm.eventId), [createForm.eventId, events]);
+  const selectedCreateEventCategory = normalizeEventCategory(selectedCreateEvent?.event_category || createForm.eventCategory || "");
+  const createFormLocked = createForm.eventId ? !isEventRegistrationOpen(selectedCreateEvent) : false;
+  const selectedWhatsappDigitsRequired = getCountryDialLength(createForm.whatsappCountryCode);
+  const whatsappDigitsEntered = normalizePhoneDigits(createForm.whatsapp).length;
+  const whatsappDigitsRemaining = Math.max(selectedWhatsappDigitsRequired - whatsappDigitsEntered, 0);
 
   const filteredItems = useMemo(() => {
     const filtered = items.filter((item) => {
@@ -208,12 +538,14 @@ export default function PublicEventRegistrationsPage({ portalLabel = "Coordinato
     });
     setCreateErrors({});
     setCreateSubmitError("");
+    setCreateSuccess(null);
     setCreateSubmitting(false);
   }
 
   function openCreateModal() {
     setCreateErrors({});
     setCreateSubmitError("");
+    setCreateSuccess(null);
     setCreateSubmitting(false);
     setCreateEventOpen(false);
     setCreateModalOpen(true);
@@ -224,6 +556,7 @@ export default function PublicEventRegistrationsPage({ portalLabel = "Coordinato
     setCreateModalOpen(false);
     setCreateErrors({});
     setCreateSubmitError("");
+    setCreateSuccess(null);
     setCreateSubmitting(false);
     resetCreateForm();
   }
@@ -232,16 +565,16 @@ export default function PublicEventRegistrationsPage({ portalLabel = "Coordinato
     const nextErrors = {};
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     const whatsappDigits = normalizePhoneDigits(createForm.whatsapp);
-    const nameValue = String(createForm.participantName || "").trim();
+    const category = String(selectedCreateEventCategory || "").trim();
     const emailValue = String(createForm.email || "").trim().toLowerCase();
+    const studentNameValue = String(createForm.studentName || "").trim();
+    const parentNameValue = String(createForm.parentName || "").trim();
+    const schoolNameValue = String(createForm.schoolName || "").trim();
+    const classValue = String(createForm.className || "").trim();
+    const studentNames = Array.isArray(createForm.studentNames) ? createForm.studentNames.map((item) => String(item || "").trim()).filter(Boolean) : [];
 
     if (!createForm.eventId) {
       nextErrors.eventId = "Please select an event.";
-    }
-    if (!nameValue) {
-      nextErrors.participantName = "Participant name is required.";
-    } else if (!isValidName(nameValue)) {
-      nextErrors.participantName = "Please enter a valid participant name.";
     }
     if (!emailValue) {
       nextErrors.email = "Email is required.";
@@ -250,8 +583,19 @@ export default function PublicEventRegistrationsPage({ portalLabel = "Coordinato
     }
     if (!whatsappDigits) {
       nextErrors.whatsapp = "WhatsApp number is required.";
-    } else if (whatsappDigits.length < 10 || whatsappDigits.length > 15) {
+    } else if (whatsappDigits.length !== selectedWhatsappDigitsRequired) {
       nextErrors.whatsapp = "Please enter a valid WhatsApp number.";
+    }
+    if ((category === "alh-students" || category === "general-students") && !studentNameValue) {
+      nextErrors.studentName = "Student name is required.";
+    }
+    if (category === "general-students") {
+      if (!schoolNameValue) nextErrors.schoolName = "School name is required.";
+      if (!classValue) nextErrors.className = "Class is required.";
+    }
+    if (category === "alh-parents" || category === "general-parents") {
+      if (studentNames.length === 0) nextErrors.studentNames = "At least one student name is required.";
+      if (!parentNameValue) nextErrors.parentName = "Parent name is required.";
     }
 
     return nextErrors;
@@ -272,17 +616,23 @@ export default function PublicEventRegistrationsPage({ portalLabel = "Coordinato
     setCreateSubmitError("");
 
     try {
-      const response = await fetch("/api/public-event-registrations", {
+      const response = await fetch("/api/event-registrations", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          eventId: createForm.eventId,
-          participantName: String(createForm.participantName || "").trim(),
-          email: String(createForm.email || "").trim(),
-          whatsapp: String(createForm.whatsapp || "").trim(),
-          notes: String(createForm.notes || "").trim(),
-        }),
-      });
+      body: JSON.stringify({
+        eventId: createForm.eventId,
+        eventCategory: selectedCreateEventCategory,
+        email: String(createForm.email || "").trim(),
+        whatsappCountryCode: String(createForm.whatsappCountryCode || "").trim(),
+        whatsapp: normalizePhoneDigits(createForm.whatsapp),
+        studentName: String(createForm.studentName || "").trim(),
+        studentNames: Array.isArray(createForm.studentNames) ? createForm.studentNames.map((item) => String(item || "").trim()).filter(Boolean) : [],
+        parentName: String(createForm.parentName || "").trim(),
+        schoolName: String(createForm.schoolName || "").trim(),
+        className: String(createForm.className || "").trim(),
+        notes: String(createForm.notes || "").trim(),
+      }),
+    });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) {
         const apiMessage = data?.message || "Unable to create event registration.";
@@ -291,8 +641,12 @@ export default function PublicEventRegistrationsPage({ portalLabel = "Coordinato
       }
 
       setTone("success");
-      setMessage("Registration created successfully" + (data?.registrationNo ? " (" + data.registrationNo + ")" : "") + ".");
-      closeCreateModal();
+      setCreateSuccess({
+        registrationNo: data?.registrationNo || data?.registrationNumber || "",
+        coordinatorName: selectedCreateEvent?.coordinator_name || "Coordinator",
+        coordinatorEmail: selectedCreateEvent?.coordinator_email || "",
+        coordinatorPhone: selectedCreateEvent?.coordinator_phone || "+92 3473547036",
+      });
       await load();
     } catch (error) {
       setTone("error");
@@ -414,7 +768,6 @@ export default function PublicEventRegistrationsPage({ portalLabel = "Coordinato
                   <th className="whitespace-nowrap px-6 py-4">Registration No</th>
                   <th className="whitespace-nowrap px-6 py-4">Event</th>
                   <th className="whitespace-nowrap px-6 py-4">Event Date</th>
-                  <th className="whitespace-nowrap px-6 py-4">Participant</th>
                   <th className="whitespace-nowrap px-6 py-4">Student Name</th>
                   <th className="whitespace-nowrap px-6 py-4">Parent Name</th>
                   <th className="whitespace-nowrap px-6 py-4">School Name</th>
@@ -433,7 +786,6 @@ export default function PublicEventRegistrationsPage({ portalLabel = "Coordinato
                     <td className="px-6 py-4 font-semibold text-[#063F32]">{item.registration_no}</td>
                     <td className="px-6 py-4 font-medium text-[#063F32]">{item.event_name}</td>
                     <td className="px-6 py-4 text-[#245C4F]">{formatEventDate(item.event_start_at)}</td>
-                    <td className="px-6 py-4 text-[#245C4F]">{item.participant_name || "-"}</td>
                     <td className="px-6 py-4 text-[#245C4F]">
                       {Array.isArray(item.student_names) && item.student_names.length > 0
                         ? item.student_names.join(", ")
@@ -516,105 +868,250 @@ export default function PublicEventRegistrationsPage({ portalLabel = "Coordinato
         </section>
 
         {createModalOpen ? (
-          <div className="fixed inset-0 z-[10000] flex items-start justify-center bg-[#063F32]/45 px-4 py-10 backdrop-blur-sm">
-            <div className="w-full max-w-3xl overflow-hidden rounded-[2rem] border border-[#2D8A6A]/15 bg-[#FAF7F0] shadow-[0_24px_80px_-36px_rgba(13,59,46,0.24)]">
+          <div className="fixed inset-0 z-[10000] flex items-center justify-center overflow-y-auto bg-[#063F32]/45 px-4 py-6 backdrop-blur-sm">
+            <div className="w-full max-w-3xl max-h-[calc(100vh-48px)] overflow-y-auto rounded-[2rem] border border-[#2D8A6A]/15 bg-[#FAF7F0] shadow-[0_24px_80px_-36px_rgba(13,59,46,0.24)]">
               <div className="flex items-start justify-between gap-4 border-b border-[#F1EADC] px-6 py-4">
                 <div>
                   <p className="text-sm font-semibold uppercase tracking-[0.24em] text-[#C9A227]">Create event registration</p>
                 </div>
                 <button type="button" onClick={closeCreateModal} className="rounded-xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-3 py-2 text-sm font-semibold text-[#063F32] transition hover:bg-[#F1EADC]">Close</button>
               </div>
-              <form onSubmit={handleCreateRegistration} className="space-y-5 p-6 text-sm text-[#245C4F]">
-                <div className="grid gap-4 md:grid-cols-2">
-                  {createSubmitError ? <div className="md:col-span-2 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700">{createSubmitError}</div> : null}
-                  <label className="block md:col-span-2">
-                    <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.16em] text-[#0D5C48]">Event *</span>
-                    <div className="relative">
-                      <select
-                        value={createForm.eventId}
-                        onFocus={() => setCreateEventOpen(true)}
-                        onBlur={() => setCreateEventOpen(false)}
-                        onChange={(event) => {
-                          const nextEventId = event.target.value;
-                          setCreateForm((current) => ({ ...current, eventId: nextEventId }));
-                        }}
-                        className="w-full appearance-none rounded-2xl border border-[#2D8A6A]/20 bg-white px-4 py-3 pr-11 text-sm text-[#063F32] outline-none focus:border-[#2D8A6A]"
-                      >
-                        <option value="">Select an open event</option>
-                        {availableCreateEvents.map((item) => (
-                          <option key={item.id} value={item.id}>
-                            {item.title}
-                          </option>
-                        ))}
-                      </select>
-                      <ChevronDown className={`pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#0D5C48] transition-transform duration-200 ${createEventOpen ? 'rotate-180' : ''}`} />
+              {createSuccess ? (
+                <div className="space-y-5 p-6 text-sm text-[#245C4F]">
+                  <div className="rounded-[1.5rem] border border-[#2D8A6A]/12 bg-white px-5 py-5">
+                    <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#0D5C48]">Registration submitted successfully</p>
+                    <p className="mt-3 text-2xl font-bold text-[#063F32]">{createSuccess.registrationNo || "-"}</p>
+                    <div className="mt-4 grid gap-3 md:grid-cols-2">
+                      <div className="rounded-2xl border border-[#2D8A6A]/12 bg-[#FAF7F0] px-4 py-3">
+                        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#0D5C48]">Coordinator name</p>
+                        <p className="mt-1 font-semibold text-[#063F32]">{createSuccess.coordinatorName || "-"}</p>
+                      </div>
+                      <div className="rounded-2xl border border-[#2D8A6A]/12 bg-[#FAF7F0] px-4 py-3">
+                        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#0D5C48]">Coordinator contact</p>
+                        <p className="mt-1 font-semibold text-[#063F32]">{createSuccess.coordinatorEmail || createSuccess.coordinatorPhone || "-"}</p>
+                      </div>
                     </div>
-                    {createErrors.eventId ? <p className="mt-2 text-xs font-semibold text-rose-700">{createErrors.eventId}</p> : null}
+                  </div>
+                  <div className="flex items-center justify-end">
+                    <button type="button" onClick={closeCreateModal} className="rounded-full bg-[#0D5C48] px-5 py-2 text-sm font-semibold text-[#FAF7F0] transition hover:bg-[#063F32]">Close</button>
+                  </div>
+                </div>
+              ) : (
+                <form onSubmit={handleCreateRegistration} className="space-y-5 p-6 text-sm text-[#245C4F]">
+                  <div className="grid gap-4 md:grid-cols-2">
+                    {createSubmitError ? <div className="md:col-span-2 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700">{createSubmitError}</div> : null}
+                    <label className="block md:col-span-2">
+                      <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.16em] text-[#0D5C48]">Event *</span>
+                      <div className="relative">
+                        <select
+                          value={createForm.eventId}
+                          onFocus={() => setCreateEventOpen(true)}
+                          onBlur={() => setCreateEventOpen(false)}
+                          onChange={(event) => {
+                            const nextEventId = event.target.value;
+                            const nextEvent = getSelectedEvent(events, nextEventId);
+                            setCreateForm((current) => ({
+                              ...current,
+                              eventId: nextEventId,
+                            eventCategory: normalizeEventCategory(nextEvent?.event_category || ""),
+                              studentName: "",
+                              studentNames: [""],
+                              parentName: "",
+                              schoolName: "",
+                              className: "",
+                            }));
+                          }}
+                          disabled={createSubmitting}
+                          className="w-full appearance-none rounded-2xl border border-[#2D8A6A]/20 bg-white px-4 py-3 pr-11 text-sm text-[#063F32] outline-none focus:border-[#2D8A6A]"
+                        >
+                          <option value="">Select an open event</option>
+                          {availableCreateEvents.map((item) => (
+                            <option key={item.id} value={item.id}>{item.title}</option>
+                          ))}
+                        </select>
+                        <ChevronDown className={`pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#0D5C48] transition-transform duration-200 ${createEventOpen ? "rotate-180" : ""}`} />
+                      </div>
+                      {createErrors.eventId ? <p className="mt-2 text-xs font-semibold text-rose-700">{createErrors.eventId}</p> : null}
+                      {createForm.eventId ? (
+                        <div className="mt-3 rounded-2xl border border-[#2D8A6A]/12 bg-white px-4 py-3 text-xs text-[#245C4F]">
+                          {(() => {
+                            const selectedEvent = selectedCreateEvent || availableCreateEvents.find((item) => item.id === createForm.eventId) || events.find((item) => item.id === createForm.eventId);
+                            const selectedFee = selectedEvent?.event_fee_amount ?? 0;
+                            const selectedDeadline = selectedEvent?.registration_deadline || selectedEvent?.deadline || null;
+                            return selectedEvent ? (
+                              <div className="grid gap-2 sm:grid-cols-2">
+                                <div className="sm:col-span-2">
+                                  <p className="font-semibold text-[#063F32]">{selectedEvent.title || "-"}</p>
+                                </div>
+                                <div>
+                                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#0D5C48]">Start</p>
+                                  <p className="mt-1">{formatEventDateTime(selectedEvent.start_at)}</p>
+                                </div>
+                                <div>
+                                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#0D5C48]">End</p>
+                                  <p className="mt-1">{formatEventDateTime(selectedEvent.end_at)}</p>
+                                </div>
+                                <div>
+                                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#0D5C48]">Deadline</p>
+                                  <p className="mt-1">{formatEventDateTime(selectedDeadline)}</p>
+                                </div>
+                                <div>
+                                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#0D5C48]">Fee</p>
+                                  <p className="mt-1">{formatMoney(selectedFee)}</p>
+                                </div>
+                              </div>
+                            ) : null;
+                          })()}
+                        </div>
+                      ) : null}
+                    </label>
+
                     {createForm.eventId ? (
-                      <div className="mt-3 rounded-2xl border border-[#2D8A6A]/12 bg-white px-4 py-3 text-xs text-[#245C4F]">
-                        {(() => {
-                          const selectedEvent = availableCreateEvents.find((item) => item.id === createForm.eventId) || events.find((item) => item.id === createForm.eventId);
-                          const selectedFee = selectedEvent?.event_fee_amount ?? 0;
-                          const selectedDeadline = selectedEvent?.registration_deadline || selectedEvent?.deadline || null;
-                          return selectedEvent ? (
-                            <div className="grid gap-2 sm:grid-cols-2">
-                              <div className="sm:col-span-2">
-                                <p className="font-semibold text-[#063F32]">{selectedEvent.title || "-"}</p>
-                              </div>
-                              <div>
-                                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#0D5C48]">Start</p>
-                                <p className="mt-1">{formatEventDateTime(selectedEvent.start_at)}</p>
-                              </div>
-                              <div>
-                                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#0D5C48]">End</p>
-                                <p className="mt-1">{formatEventDateTime(selectedEvent.end_at)}</p>
-                              </div>
-                              <div>
-                                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#0D5C48]">Deadline</p>
-                                <p className="mt-1">{formatEventDateTime(selectedDeadline)}</p>
-                              </div>
-                              <div>
-                                <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#0D5C48]">Fee</p>
-                                <p className="mt-1">{formatMoney(selectedFee)}</p>
-                              </div>
+                      <>
+                        {selectedCreateEventCategory === "alh-students" || selectedCreateEventCategory === "general-students" ? (
+                          <label className="block md:col-span-2">
+                            <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.16em] text-[#0D5C48]">Student name *</span>
+                            <input value={createForm.studentName} onChange={(event) => setCreateForm((current) => ({ ...current, studentName: event.target.value }))} placeholder="Student full name" disabled={createSubmitting || createFormLocked} className="w-full rounded-2xl border border-[#2D8A6A]/20 bg-white px-4 py-3 text-sm text-[#063F32] outline-none focus:border-[#2D8A6A] disabled:cursor-not-allowed disabled:bg-[#F7F2E8]" />
+                            {createErrors.studentName ? <p className="mt-2 text-xs font-semibold text-rose-700">{createErrors.studentName}</p> : null}
+                          </label>
+                        ) : null}
+
+                        {(selectedCreateEventCategory === "alh-students" || selectedCreateEventCategory === "general-students") ? (
+                          <label className="block md:col-span-2">
+                            <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.16em] text-[#0D5C48]">Parent / guardian name</span>
+                            <input value={createForm.parentName} onChange={(event) => setCreateForm((current) => ({ ...current, parentName: event.target.value }))} placeholder="Parent / guardian name" disabled={createSubmitting || createFormLocked} className="w-full rounded-2xl border border-[#2D8A6A]/20 bg-white px-4 py-3 text-sm text-[#063F32] outline-none focus:border-[#2D8A6A] disabled:cursor-not-allowed disabled:bg-[#F7F2E8]" />
+                            {createErrors.parentName ? <p className="mt-2 text-xs font-semibold text-rose-700">{createErrors.parentName}</p> : null}
+                          </label>
+                        ) : null}
+
+                        {selectedCreateEventCategory === "general-students" ? (
+                          <div className="md:col-span-2 grid gap-4 md:grid-cols-2">
+                            <label className="block">
+                              <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.16em] text-[#0D5C48]">School name *</span>
+                              <input value={createForm.schoolName} onChange={(event) => setCreateForm((current) => ({ ...current, schoolName: event.target.value }))} placeholder="School name" disabled={createSubmitting || createFormLocked} className="w-full rounded-2xl border border-[#2D8A6A]/20 bg-white px-4 py-3 text-sm text-[#063F32] outline-none focus:border-[#2D8A6A] disabled:cursor-not-allowed disabled:bg-[#F7F2E8]" />
+                              {createErrors.schoolName ? <p className="mt-2 text-xs font-semibold text-rose-700">{createErrors.schoolName}</p> : null}
+                            </label>
+                            <label className="block">
+                              <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.16em] text-[#0D5C48]">Class *</span>
+                              <input value={createForm.className} onChange={(event) => setCreateForm((current) => ({ ...current, className: event.target.value }))} placeholder="Class name" disabled={createSubmitting || createFormLocked} className="w-full rounded-2xl border border-[#2D8A6A]/20 bg-white px-4 py-3 text-sm text-[#063F32] outline-none focus:border-[#2D8A6A] disabled:cursor-not-allowed disabled:bg-[#F7F2E8]" />
+                              {createErrors.className ? <p className="mt-2 text-xs font-semibold text-rose-700">{createErrors.className}</p> : null}
+                            </label>
+                          </div>
+                        ) : null}
+
+                      {selectedCreateEventCategory === "alh-parents" || selectedCreateEventCategory === "general-parents" ? (
+                        <div className="md:col-span-2 rounded-[1.5rem] border border-[#2D8A6A]/12 bg-white p-4">
+                          <label className="mt-4 block">
+                            <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.16em] text-[#0D5C48]">Parent name *</span>
+                            <input value={createForm.parentName} onChange={(event) => setCreateForm((current) => ({ ...current, parentName: event.target.value }))} placeholder="Parent / guardian name" disabled={createSubmitting || createFormLocked} className="w-full rounded-2xl border border-[#2D8A6A]/20 bg-white px-4 py-3 text-sm text-[#063F32] outline-none focus:border-[#2D8A6A] disabled:cursor-not-allowed disabled:bg-[#F7F2E8]" />
+                            {createErrors.parentName ? <p className="mt-2 text-xs font-semibold text-rose-700">{createErrors.parentName}</p> : null}
+                          </label>
+                          <div className="mt-4 flex items-center justify-between gap-3">
+                            <div>
+                              <span className="block text-xs font-semibold uppercase tracking-[0.16em] text-[#0D5C48]">Student names *</span>
+                              <p className="mt-1 text-xs text-[#245C4F]">Add one or more student names for parent registrations.</p>
                             </div>
-                          ) : null;
-                        })()}
+                            <button type="button" onClick={() => setCreateForm((current) => ({ ...current, studentNames: [...(Array.isArray(current.studentNames) ? current.studentNames : []), ""] }))} disabled={createSubmitting || createFormLocked} className="rounded-full border border-[#2D8A6A]/20 bg-[#FAF7F0] px-3 py-2 text-xs font-semibold text-[#063F32] transition hover:bg-[#F1EADC] disabled:opacity-70">
+                              Add student
+                            </button>
+                          </div>
+                          <div className="mt-4 space-y-3">
+                            {(Array.isArray(createForm.studentNames) ? createForm.studentNames : [""]).map((studentName, index) => (
+                              <div key={index} className="flex gap-2">
+                                <input
+                                  value={studentName}
+                                  onChange={(event) => {
+                                    const nextValue = event.target.value;
+                                    setCreateForm((current) => {
+                                      const nextStudentNames = Array.isArray(current.studentNames) ? [...current.studentNames] : [""];
+                                      nextStudentNames[index] = nextValue;
+                                      return { ...current, studentNames: nextStudentNames };
+                                    });
+                                  }}
+                                  placeholder={`Student name ${index + 1}`}
+                                  disabled={createSubmitting || createFormLocked}
+                                  className="min-w-0 flex-1 rounded-2xl border border-[#2D8A6A]/20 bg-white px-4 py-3 text-sm text-[#063F32] outline-none focus:border-[#2D8A6A] disabled:cursor-not-allowed disabled:bg-[#F7F2E8]"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => setCreateForm((current) => {
+                                    const nextStudentNames = Array.isArray(current.studentNames) ? [...current.studentNames] : [""];
+                                    nextStudentNames.splice(index, 1);
+                                    return { ...current, studentNames: nextStudentNames.length ? nextStudentNames : [""] };
+                                  })}
+                                  disabled={createSubmitting || createFormLocked || (Array.isArray(createForm.studentNames) ? createForm.studentNames.length <= 1 : true)}
+                                  className="rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-3 py-2 text-xs font-semibold text-[#063F32] transition hover:bg-[#F1EADC] disabled:opacity-70"
+                                >
+                                  Remove
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                          {createErrors.studentNames ? <p className="mt-2 text-xs font-semibold text-rose-700">{createErrors.studentNames}</p> : null}
+                        </div>
+                      ) : null}
+
+                        <div className="grid gap-4 md:col-span-2 md:grid-cols-2">
+                          <label className="block">
+                            <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.16em] text-[#0D5C48]">Email *</span>
+                            <input type="email" value={createForm.email} onChange={(event) => setCreateForm((current) => ({ ...current, email: event.target.value }))} placeholder="name@gmail.com" disabled={createSubmitting || createFormLocked} className="w-full rounded-2xl border border-[#2D8A6A]/20 bg-white px-4 py-3 text-sm text-[#063F32] outline-none focus:border-[#2D8A6A] disabled:cursor-not-allowed disabled:bg-[#F7F2E8]" />
+                            {createErrors.email ? <p className="mt-2 text-xs font-semibold text-rose-700">{createErrors.email}</p> : null}
+                          </label>
+
+                          <label className="block">
+                            <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.16em] text-[#0D5C48]">WhatsApp *</span>
+                            <div className="grid gap-3 sm:grid-cols-[140px_minmax(0,1fr)]">
+                            <select value={createForm.whatsappCountryCode} onChange={(event) => setCreateForm((current) => ({ ...current, whatsappCountryCode: event.target.value }))} disabled={createSubmitting || createFormLocked} className="w-full rounded-2xl border border-[#2D8A6A]/20 bg-white px-4 py-3 text-sm text-[#063F32] outline-none focus:border-[#2D8A6A] disabled:cursor-not-allowed disabled:bg-[#F7F2E8]">
+                                {countryCodes.map((code) => (
+                                  <option key={code} value={code}>{code}</option>
+                                ))}
+                              </select>
+                              <input
+                                value={createForm.whatsapp}
+                                onChange={(event) => {
+                                  const digits = normalizePhoneDigits(event.target.value).slice(0, selectedWhatsappDigitsRequired);
+                                  setCreateForm((current) => ({ ...current, whatsapp: digits }));
+                                }}
+                                placeholder="Local digits only"
+                                inputMode="tel"
+                                maxLength={selectedWhatsappDigitsRequired}
+                                disabled={createSubmitting || createFormLocked}
+                                className="w-full rounded-2xl border border-[#2D8A6A]/20 bg-white px-4 py-3 text-sm text-[#063F32] outline-none focus:border-[#2D8A6A] disabled:cursor-not-allowed disabled:bg-[#F7F2E8]"
+                              />
+                            </div>
+                            <div className="mt-2 flex items-center justify-between text-xs text-[#245C4F]">
+                              <span>{createForm.whatsapp ? `${whatsappDigitsRemaining} digits remaining` : `${selectedWhatsappDigitsRequired} digits required`}</span>
+                            </div>
+                            {createErrors.whatsapp ? <p className="mt-2 text-xs font-semibold text-rose-700">{createErrors.whatsapp}</p> : null}
+                          </label>
+                        </div>
+
+                        <label className="block md:col-span-2">
+                          <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.16em] text-[#0D5C48]">Comments</span>
+                          <textarea value={createForm.notes} onChange={(event) => setCreateForm((current) => ({ ...current, notes: event.target.value }))} rows={4} placeholder="If you want to share anything in advance with the coordinator" disabled={createSubmitting || createFormLocked} className="w-full rounded-[24px] border border-[#2D8A6A]/20 bg-white px-4 py-3 text-sm text-[#063F32] outline-none focus:border-[#2D8A6A] disabled:cursor-not-allowed disabled:bg-[#F7F2E8]" />
+                        </label>
+                      </>
+                    ) : (
+                      <div className="md:col-span-2 rounded-2xl border border-dashed border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-5 text-sm text-[#245C4F]">
+                        Select an event to load the registration fields.
+                      </div>
+                    )}
+
+                    {createFormLocked ? (
+                      <div className="md:col-span-2 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800">
+                        Registration is closed for this event, so the form is disabled.
                       </div>
                     ) : null}
-                  </label>
+                  </div>
 
-                  <label className="block">
-                    <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.16em] text-[#0D5C48]">Participant name *</span>
-                    <input value={createForm.participantName} onChange={(event) => setCreateForm((current) => ({ ...current, participantName: event.target.value }))} placeholder="Full name" className="w-full rounded-2xl border border-[#2D8A6A]/20 bg-white px-4 py-3 text-sm text-[#063F32] outline-none focus:border-[#2D8A6A]" />
-                    {createErrors.participantName ? <p className="mt-2 text-xs font-semibold text-rose-700">{createErrors.participantName}</p> : null}
-                  </label>
-
-                  <label className="block">
-                    <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.16em] text-[#0D5C48]">Email *</span>
-                    <input type="email" value={createForm.email} onChange={(event) => setCreateForm((current) => ({ ...current, email: event.target.value }))} placeholder="name@gmail.com" className="w-full rounded-2xl border border-[#2D8A6A]/20 bg-white px-4 py-3 text-sm text-[#063F32] outline-none focus:border-[#2D8A6A]" />
-                    {createErrors.email ? <p className="mt-2 text-xs font-semibold text-rose-700">{createErrors.email}</p> : null}
-                  </label>
-
-                  <label className="block md:col-span-2">
-                    <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.16em] text-[#0D5C48]">WhatsApp *</span>
-                    <input value={createForm.whatsapp} onChange={(event) => setCreateForm((current) => ({ ...current, whatsapp: event.target.value }))} placeholder="Enter whatsapp number" inputMode="tel" className="w-full rounded-2xl border border-[#2D8A6A]/20 bg-white px-4 py-3 text-sm text-[#063F32] outline-none focus:border-[#2D8A6A]" />
-                    {createErrors.whatsapp ? <p className="mt-2 text-xs font-semibold text-rose-700">{createErrors.whatsapp}</p> : null}
-                  </label>
-
-                  <label className="block md:col-span-2">
-                    <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.16em] text-[#0D5C48]">Notes</span>
-                    <textarea value={createForm.notes} onChange={(event) => setCreateForm((current) => ({ ...current, notes: event.target.value }))} rows={4} placeholder="If you want to share anything in advance with the coordinator" className="w-full rounded-[24px] border border-[#2D8A6A]/20 bg-white px-4 py-3 text-sm text-[#063F32] outline-none focus:border-[#2D8A6A]" />
-                  </label>
-                </div>
-
-                <div className="flex items-center justify-end gap-3">
-                  <button type="button" onClick={closeCreateModal} className="rounded-full border border-[#2D8A6A]/20 bg-white px-4 py-2 text-sm font-semibold text-[#063F32] transition hover:bg-[#F1EADC]">Cancel</button>
-                  <button type="submit" disabled={createSubmitting} className="rounded-full bg-[#0D5C48] px-5 py-2 text-sm font-semibold text-[#FAF7F0] transition hover:bg-[#063F32] disabled:opacity-70">
-                    {createSubmitting ? "Creating..." : "Create event registration"}
-                  </button>
-                </div>
-              </form>
+                  <div className="flex items-center justify-end gap-3">
+                    <button type="button" onClick={closeCreateModal} className="rounded-full border border-[#2D8A6A]/20 bg-white px-4 py-2 text-sm font-semibold text-[#063F32] transition hover:bg-[#F1EADC]">Cancel</button>
+                    <button type="submit" disabled={createSubmitting || createFormLocked} className="inline-flex w-full items-center justify-center rounded-full bg-[#0D5C48] px-5 py-3 text-sm font-semibold text-[#FAF7F0] transition hover:bg-[#063F32] disabled:opacity-70 sm:w-auto">
+                      {createSubmitting ? "Creating..." : "Create event registration"}
+                    </button>
+                  </div>
+                </form>
+              )}
             </div>
           </div>
         ) : null}
@@ -639,7 +1136,6 @@ export default function PublicEventRegistrationsPage({ portalLabel = "Coordinato
                   <div className="rounded-2xl border border-[#2D8A6A]/12 bg-white px-4 py-4">
                     <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]">Participant information</p>
                     <div className="mt-3 space-y-2">
-                      <p><span className="font-semibold text-[#063F32]">Participant:</span> {selected.participant_name || "-"}</p>
                       <p><span className="font-semibold text-[#063F32]">Student Name:</span> {Array.isArray(selected.student_names) && selected.student_names.length > 0 ? selected.student_names.join(", ") : selected.student_name || "-"}</p>
                       <p><span className="font-semibold text-[#063F32]">Parent Name:</span> {selected.parent_name || "-"}</p>
                       <p><span className="font-semibold text-[#063F32]">School Name:</span> {selected.school_name || "-"}</p>

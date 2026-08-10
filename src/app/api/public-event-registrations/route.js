@@ -11,17 +11,40 @@ function normalizePhone(value) {
   return String(value || "").replace(/\D/g, "");
 }
 
+function cleanList(values) {
+  return Array.isArray(values)
+    ? values.map((item) => cleanText(item)).filter(Boolean)
+    : [];
+}
+
+function deriveDisplayName(category, studentName, parentName, studentNames) {
+  const key = String(category || "").toLowerCase().trim();
+  if (key === "alh-students" || key === "general-students") {
+    return studentName || "Student";
+  }
+  if (key === "alh-parents" || key === "general-parents") {
+    return parentName || studentNames?.[0] || "Parent";
+  }
+  return studentName || parentName || "Participant";
+}
+
 export async function POST(request) {
   try {
     const body = await request.json();
     const eventId = cleanText(body?.eventId);
-    const participantName = cleanText(body?.participantName);
+    const eventCategory = cleanText(body?.eventCategory);
     const email = cleanText(body?.email).toLowerCase();
+    const whatsappCountryCode = cleanText(body?.whatsappCountryCode) || "+92";
     const whatsapp = cleanText(body?.whatsapp);
+    const studentName = cleanText(body?.studentName);
+    const studentNames = cleanList(body?.studentNames);
+    const parentName = cleanText(body?.parentName);
+    const schoolName = cleanText(body?.schoolName);
+    const className = cleanText(body?.className);
     const notes = cleanText(body?.notes);
+    const displayName = deriveDisplayName(eventCategory, studentName, parentName, studentNames);
 
     if (!eventId) return json("Event id is required.", 400);
-    if (!participantName) return json("Participant name is required.", 400);
     if (!email || !email.includes("@")) return json("A valid email is required.", 400);
     if (!whatsapp) return json("WhatsApp number is required.", 400);
 
@@ -34,6 +57,7 @@ export async function POST(request) {
         pe.end_at,
         pe.event_fee_amount::float8 AS event_fee_amount,
         pe.registration_deadline,
+        pe.event_category,
         LOWER(pe.publication_status::text) AS publication_status,
         pe.created_by::text AS created_by,
         creator.full_name AS coordinator_name,
@@ -61,6 +85,19 @@ export async function POST(request) {
       return json("This event has already ended, and registration is now closed.", 400);
     }
 
+    const category = String(eventCategory || event.event_category || "").toLowerCase().trim();
+    if ((category === "alh-students" || category === "general-students") && !studentName) {
+      return json("Student name is required for this event category.", 400);
+    }
+    if (category === "general-students") {
+      if (!schoolName) return json("School name is required for this event category.", 400);
+      if (!className) return json("Class is required for this event category.", 400);
+    }
+    if (category === "alh-parents" || category === "general-parents") {
+      if (!parentName) return json("Parent name is required for this event category.", 400);
+      if (!studentNames.length) return json("At least one student name is required for this event category.", 400);
+    }
+
     const [duplicate] = await prisma.$queryRaw`
       SELECT id::text AS id
       FROM public_event_registrations
@@ -84,12 +121,18 @@ export async function POST(request) {
     const isFreeRegistration = Boolean(existingUser?.id);
     const registrationAmount = isFreeRegistration ? 0 : Number(event.event_fee_amount || 0);
     const registrationStatus = isFreeRegistration ? 'free' : 'pending';
+    const studentNamesJson = studentNames.length ? JSON.stringify(studentNames) : null;
 
     const [created] = await prisma.$queryRaw`
       INSERT INTO public_event_registrations (
         id,
         event_id,
         participant_name,
+        student_name,
+        student_names,
+        parent_name,
+        school_name,
+        class_input,
         email,
         whatsapp,
         notes,
@@ -102,9 +145,14 @@ export async function POST(request) {
       VALUES (
         gen_random_uuid(),
         ${eventId}::uuid,
-        ${participantName},
+        ${displayName},
+        ${studentName || null},
+        ${studentNamesJson}::jsonb,
+        ${parentName || null},
+        ${schoolName || null},
+        ${className || null},
         ${email},
-        ${whatsapp},
+        ${whatsappCountryCode && whatsapp ? `${whatsappCountryCode} ${whatsapp}` : whatsapp},
         ${notes || null},
         ${registrationAmount},
         ${registrationStatus},
@@ -136,7 +184,7 @@ export async function POST(request) {
           to: email,
           subject: "Public event registration received",
           html: buildPublicEventRegistrationEmailHtml({
-            recipientName: participantName,
+            recipientName: displayName,
             registrationNo: created?.registration_no || "-",
             eventName: event.title || "Public Event",
             eventSchedule: `${formatEventDateTime(event.start_at)} - ${formatEventDateTime(event.end_at)}`,

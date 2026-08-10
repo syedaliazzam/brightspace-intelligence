@@ -63,6 +63,7 @@ export async function GET() {
       SELECT
         pe.id::text AS id,
         pe.title,
+        pe.event_category,
         pe.start_at,
         pe.end_at,
         pe.event_fee_amount::float8 AS event_fee_amount,
