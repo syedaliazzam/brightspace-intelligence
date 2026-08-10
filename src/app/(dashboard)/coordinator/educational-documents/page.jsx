@@ -48,6 +48,37 @@ function filterAllowedFiles(files) {
   return Array.from(files || []).filter((file) => Number(file?.size || 0) <= STORAGE_SAFE_UPLOAD_MAX_BYTES);
 }
 
+async function uploadEducationalDocumentAsset(file, documentType) {
+  const response = await fetch("/api/coordinator/educational-documents/upload-url", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      fileName: file?.name || "document",
+      contentType: file?.type || "application/octet-stream",
+      documentType,
+    }),
+  });
+  const responseData = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(responseData?.message || responseData?.error || "Unable to prepare document upload.");
+  }
+
+  const uploadResponse = await fetch(responseData.signedUrl, {
+    method: "PUT",
+    headers: {
+      "Content-Type": file?.type || "application/octet-stream",
+    },
+    body: file,
+  });
+
+  if (!uploadResponse.ok) {
+    const text = await uploadResponse.text().catch(() => "");
+    throw new Error(text || "Unable to upload document file.");
+  }
+
+  return responseData.path;
+}
+
 export default function EducationalDocumentsPage({
   allowManage = true,
   showActionsColumn = true,
@@ -141,37 +172,27 @@ export default function EducationalDocumentsPage({
         return data;
       }
 
+      const uploadedPaths = [];
+      for (const file of selectedFiles) {
+        uploadedPaths.push(await uploadEducationalDocumentAsset(file, basePayload.documentType));
+      }
+
       if (!editingItem) {
-        const payload = new FormData();
-        payload.append("title", basePayload.title);
-        payload.append("documentType", basePayload.documentType);
-        payload.append("classLevel", basePayload.classLevel);
-        selectedFiles.forEach((file) => payload.append("files", file));
-        await submitForm("/api/coordinator/educational-documents", "POST", payload);
+        await submitJson("/api/coordinator/educational-documents", "POST", {
+          ...basePayload,
+          fileUrls: uploadedPaths,
+        });
       } else if (!selectedFiles.length) {
         await submitJson("/api/coordinator/educational-documents", "PATCH", {
           id: editingItem.id,
           ...basePayload,
         });
       } else {
-        const [firstFile, ...extraFiles] = selectedFiles;
-
-        const updatePayload = new FormData();
-        updatePayload.append("id", editingItem.id);
-        updatePayload.append("title", basePayload.title);
-        updatePayload.append("documentType", basePayload.documentType);
-        updatePayload.append("classLevel", basePayload.classLevel);
-        updatePayload.append("files", firstFile);
-        await submitForm("/api/coordinator/educational-documents", "PATCH", updatePayload);
-
-        for (const extraFile of extraFiles) {
-          const extraPayload = new FormData();
-          extraPayload.append("title", basePayload.title);
-          extraPayload.append("documentType", basePayload.documentType);
-          extraPayload.append("classLevel", basePayload.classLevel);
-          extraPayload.append("files", extraFile);
-          await submitForm("/api/coordinator/educational-documents", "POST", extraPayload);
-        }
+        await submitJson("/api/coordinator/educational-documents", "PATCH", {
+          id: editingItem.id,
+          ...basePayload,
+          fileUrls: uploadedPaths,
+        });
       }
 
       setShowAddModal(false);

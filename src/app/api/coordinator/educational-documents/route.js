@@ -47,11 +47,15 @@ export async function POST(request) {
     const classLevel = normalizeText(body?.get ? body.get("classLevel") : body?.classLevel || "");
     const fileValues = body?.getAll ? body.getAll("files") : body?.files;
     const fileUrl = normalizeText(body?.get ? body.get("fileUrl") : body?.fileUrl);
+    const fileUrls = body?.getAll
+      ? body.getAll("fileUrls").map((value) => normalizeText(value)).filter(Boolean)
+      : Array.isArray(body?.fileUrls) ? body.fileUrls.map((value) => normalizeText(value)).filter(Boolean) : [];
 
     if (!title) return json("Document title is required.", 400);
     if (!documentType) return json("Document type is required.", 400);
     const files = Array.isArray(fileValues) ? fileValues.filter((value) => value instanceof File && value.size) : [];
-    if (!files.length && !fileUrl) return json("Document file is required.", 400);
+    const directUrls = fileUrls.length ? fileUrls : fileUrl ? [fileUrl] : [];
+    if (!files.length && !directUrls.length) return json("Document file is required.", 400);
 
     const createdItems = [];
 
@@ -72,13 +76,15 @@ export async function POST(request) {
         createdItems.push(result);
       }
     } else {
-      const documentId = crypto.randomUUID();
-      const [result] = await prisma.$queryRaw`
-        INSERT INTO educational_documents (id, title, document_type, class_level, file_url, created_by, created_at, updated_at, is_active)
-        VALUES (${documentId}::uuid, ${title}, ${documentType}, ${classLevel || null}, ${fileUrl}, ${session.user.id}::uuid, NOW(), NOW(), true)
-        RETURNING id::text AS id, title, document_type, class_level, file_url, created_at
-      `;
-      createdItems.push(result);
+      for (const directUrl of directUrls) {
+        const documentId = crypto.randomUUID();
+        const [result] = await prisma.$queryRaw`
+          INSERT INTO educational_documents (id, title, document_type, class_level, file_url, created_by, created_at, updated_at, is_active)
+          VALUES (${documentId}::uuid, ${title}, ${documentType}, ${classLevel || null}, ${directUrl}, ${session.user.id}::uuid, NOW(), NOW(), true)
+          RETURNING id::text AS id, title, document_type, class_level, file_url, created_at
+        `;
+        createdItems.push(result);
+      }
     }
 
     return json("Educational document created successfully.", 201, {
@@ -104,6 +110,9 @@ export async function PATCH(request) {
     const fileValues = body?.getAll ? body.getAll("files") : body?.files;
     const fileValue = body?.get ? body.get("file") : body?.file;
     const fileUrl = normalizeText(body?.get ? body.get("fileUrl") : body?.fileUrl);
+    const fileUrls = body?.getAll
+      ? body.getAll("fileUrls").map((value) => normalizeText(value)).filter(Boolean)
+      : Array.isArray(body?.fileUrls) ? body.fileUrls.map((value) => normalizeText(value)).filter(Boolean) : [];
 
     if (!id) return json("Document ID is required.", 400);
     if (!title) return json("Document title is required.", 400);
@@ -116,14 +125,14 @@ export async function PATCH(request) {
       LIMIT 1
     `;
 
-    let storedFileUrl = fileUrl || normalizeText(existing?.file_url);
+    let storedFileUrl = fileUrls[0] || fileUrl || normalizeText(existing?.file_url);
     const files = Array.isArray(fileValues) ? fileValues.filter((value) => value instanceof File && value.size) : [];
     const replacementFile = files[0] || (fileValue instanceof File && fileValue.size ? fileValue : null);
 
-    if (files.length > 1) {
+    if (files.length > 1 || fileUrls.length > 1) {
       if (!storedFileUrl) return json("Document file is required.", 400);
 
-      const uploadedPaths = [];
+      const uploadedPaths = [...fileUrls];
       for (const file of files) {
         const upload = await uploadAdmissionDocument({
           applicationId: id,
