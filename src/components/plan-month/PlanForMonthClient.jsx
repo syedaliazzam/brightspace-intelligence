@@ -176,42 +176,57 @@ export default function PlanForMonthClient({ canCreate = true }) {
     }
     setSaving(true);
     try {
-      const editHasFiles = editForm.images.some((item) => item instanceof File);
-      const res = await fetch(`/api/monthly-plans/${editingPlan.id}`, editHasFiles ? {
-        method: "PUT",
-        body: (() => {
-          const fd = new FormData();
-          fd.append("name", editForm.name);
-          fd.append("startDate", editForm.startDate);
-          fd.append("endDate", editForm.endDate);
-          editForm.images.forEach((item) => {
-            if (item instanceof File) fd.append("files", item);
-            else fd.append("imageUrls", item);
-          });
-          return fd;
-        })(),
-      } : {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: editForm.name, startDate: editForm.startDate, endDate: editForm.endDate, imageUrls: editForm.images }),
-      });
+      const existingUrls = editForm.images.filter((item) => !(item instanceof File));
+      const newFiles = editForm.images.filter((item) => item instanceof File);
 
-      if (res.ok) {
-          // optimistic update
-          const id = editingPlan.id;
-          setPlans((current) => current.map((p) => (p.id === id ? { ...p, name: editForm.name, start_date: editForm.startDate, end_date: editForm.endDate, image_urls: editForm.images } : p)));
-          closeEdit();
-          setSuccessMessage("Plan updated successfully!");
-          // refresh from server to ensure canonical state
-          const d = await fetch("/api/monthly-plans", { cache: "no-store" });
-          const newData = await d.json();
-          setPlans(Array.isArray(newData?.items) ? newData.items : []);
-      } else if (res.status === 403) {
-        setMessage("Forbidden: you do not have permission to update plans.");
-      } else {
+      const sendJson = async (payload) => {
+        const res = await fetch(`/api/monthly-plans/${editingPlan.id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
         const data = await res.json().catch(() => ({}));
-        setMessage(data?.error || "Failed to update plan");
+        if (!res.ok) throw new Error(data?.error || "Failed to update plan");
+        return data;
+      };
+
+      const sendForm = async (file, keepUrls = []) => {
+        const fd = new FormData();
+        fd.append("name", editForm.name);
+        fd.append("startDate", editForm.startDate);
+        fd.append("endDate", editForm.endDate);
+        keepUrls.forEach((url) => fd.append("imageUrls", url));
+        if (file) fd.append("files", file);
+        const res = await fetch(`/api/monthly-plans/${editingPlan.id}`, {
+          method: "PUT",
+          body: fd,
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data?.error || "Failed to update plan");
+        return data;
+      };
+
+      if (!newFiles.length) {
+        await sendJson({
+          name: editForm.name,
+          startDate: editForm.startDate,
+          endDate: editForm.endDate,
+          imageUrls: existingUrls,
+        });
+      } else {
+        await sendForm(newFiles[0], existingUrls);
+        for (const extraFile of newFiles.slice(1)) {
+          await sendForm(extraFile, existingUrls);
+        }
       }
+
+      const id = editingPlan.id;
+      setPlans((current) => current.map((p) => (p.id === id ? { ...p, name: editForm.name, start_date: editForm.startDate, end_date: editForm.endDate, image_urls: editForm.images } : p)));
+      closeEdit();
+      setSuccessMessage("Plan updated successfully!");
+      const d = await fetch("/api/monthly-plans", { cache: "no-store" });
+      const newData = await d.json();
+      setPlans(Array.isArray(newData?.items) ? newData.items : []);
     } catch (err) {
       setMessage("Error: " + (err?.message || String(err)));
     } finally {

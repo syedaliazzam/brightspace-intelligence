@@ -104,26 +104,65 @@ export default function EducationalDocumentsPage({
     setSubmitting(true);
     setError("");
     try {
-      const endpoint = "/api/coordinator/educational-documents";
-      const method = editingItem ? "PATCH" : "POST";
-      const payload = new FormData();
-      payload.append("title", form.title);
-      payload.append("documentType", resolvedDocumentType);
-      payload.append("classLevel", form.classLevel || "");
-      if (editingItem) {
-        payload.append("id", editingItem.id);
+      const basePayload = {
+        title: form.title,
+        documentType: resolvedDocumentType,
+        classLevel: form.classLevel || "",
+      };
+
+      async function submitJson(endpoint, method, payload) {
+        const response = await fetch(endpoint, {
+          method,
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(data?.message || "Unable to save document.");
+        return data;
       }
-      if (selectedFiles.length) {
+
+      async function submitForm(endpoint, method, payload) {
+        const response = await fetch(endpoint, {
+          method,
+          body: payload,
+        });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) throw new Error(data?.message || "Unable to save document.");
+        return data;
+      }
+
+      if (!editingItem) {
+        const payload = new FormData();
+        payload.append("title", basePayload.title);
+        payload.append("documentType", basePayload.documentType);
+        payload.append("classLevel", basePayload.classLevel);
         selectedFiles.forEach((file) => payload.append("files", file));
+        await submitForm("/api/coordinator/educational-documents", "POST", payload);
+      } else if (!selectedFiles.length) {
+        await submitJson("/api/coordinator/educational-documents", "PATCH", {
+          id: editingItem.id,
+          ...basePayload,
+        });
+      } else {
+        const [firstFile, ...extraFiles] = selectedFiles;
+
+        const updatePayload = new FormData();
+        updatePayload.append("id", editingItem.id);
+        updatePayload.append("title", basePayload.title);
+        updatePayload.append("documentType", basePayload.documentType);
+        updatePayload.append("classLevel", basePayload.classLevel);
+        updatePayload.append("files", firstFile);
+        await submitForm("/api/coordinator/educational-documents", "PATCH", updatePayload);
+
+        for (const extraFile of extraFiles) {
+          const extraPayload = new FormData();
+          extraPayload.append("title", basePayload.title);
+          extraPayload.append("documentType", basePayload.documentType);
+          extraPayload.append("classLevel", basePayload.classLevel);
+          extraPayload.append("files", extraFile);
+          await submitForm("/api/coordinator/educational-documents", "POST", extraPayload);
+        }
       }
-
-      const response = await fetch(endpoint, {
-        method,
-        body: payload,
-      });
-
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(data?.message || "Unable to save document.");
 
       setShowAddModal(false);
       setForm({ title: "", documentType: "", customDocumentType: "", classLevel: "" });
