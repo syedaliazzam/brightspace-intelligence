@@ -20,9 +20,12 @@ function getDocumentTypeLabel(documentType) {
     curriculum: "Curriculum Plan",
     material_list: "Material List",
     yearly_plan: "Yearly Planning",
-    other: "Document",
+    parent_guide: "Parent Guide",
   };
-  return labels[documentType] || "Document";
+  if (labels[documentType]) return labels[documentType];
+  return String(documentType || "Document")
+    .replace(/[_-]+/g, " ")
+    .replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
 function normalizeClassLevel(value) {
@@ -38,6 +41,10 @@ function isPdfPath(value) {
 
 function isImagePath(value) {
   return /\.(png|jpe?g|webp|gif|bmp|svg)(\?.*)?$/i.test(String(value || ""));
+}
+
+function isVideoPath(value) {
+  return /\.(mp4|webm|ogg|mov|m4v)(\?.*)?$/i.test(String(value || ""));
 }
 
 function buildPreviewUrl(value) {
@@ -146,14 +153,22 @@ export default function EducationalDocumentsSection({ studentClassLevel }) {
                       setPreviewItem(doc);
                       return;
                     }
+                    if (isVideoPath(doc.file_url)) {
+                      window.open(buildPreviewUrl(doc.file_url), "_blank", "noopener,noreferrer");
+                      return;
+                    }
                     window.open(buildPreviewUrl(doc.file_url), "_blank", "noopener,noreferrer");
                   }}
-                  className={`w-full rounded-xl border border-[#2D8A6A]/20 bg-[#FAF7F0] p-4 text-sm transition hover:bg-[#F1EADC] ${isImagePath(doc.file_url) ? "text-left" : "flex items-center justify-between"}`}
+                  className={`w-full rounded-xl border border-[#2D8A6A]/20 bg-[#FAF7F0] p-4 text-sm transition hover:bg-[#F1EADC] ${(isImagePath(doc.file_url) || isVideoPath(doc.file_url)) ? "text-left" : "flex items-center justify-between"}`}
                 >
-                  {isImagePath(doc.file_url) ? (
+                  {isImagePath(doc.file_url) || isVideoPath(doc.file_url) ? (
                     <div className="flex items-center gap-4">
                       <span className="flex h-16 w-16 shrink-0 overflow-hidden rounded-xl border border-[#2D8A6A]/15 bg-white shadow-sm">
-                        <img src={buildPreviewUrl(doc.file_url)} alt={doc.title || "Document preview"} className="h-full w-full object-cover" />
+                        {isImagePath(doc.file_url) ? (
+                          <img src={buildPreviewUrl(doc.file_url)} alt={doc.title || "Document preview"} className="h-full w-full object-cover" />
+                        ) : (
+                          <video src={buildPreviewUrl(doc.file_url)} className="h-full w-full object-cover" muted playsInline />
+                        )}
                       </span>
                       <span className="min-w-0 flex-1">
                         <span className="block truncate text-base font-semibold text-[#063F32]">{doc.title}</span>
@@ -166,7 +181,7 @@ export default function EducationalDocumentsSection({ studentClassLevel }) {
                       <span className="min-w-0 truncate font-medium text-[#063F32]">{doc.title}</span>
                     </span>
                   )}
-                  {!isImagePath(doc.file_url) ? (
+                  {!isImagePath(doc.file_url) && !isVideoPath(doc.file_url) ? (
                     <span className="mt-2 block text-xs font-semibold uppercase tracking-[0.16em] text-[#0D5C48]">Open</span>
                   ) : null}
                 </button>

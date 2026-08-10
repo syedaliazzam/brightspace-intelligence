@@ -45,32 +45,46 @@ export async function POST(request) {
     const title = normalizeText(body?.get ? body.get("title") : body?.title);
     const documentType = normalizeText(body?.get ? body.get("documentType") : body?.documentType);
     const classLevel = normalizeText(body?.get ? body.get("classLevel") : body?.classLevel || "");
-    const fileValue = body?.get ? body.get("file") : body?.file;
+    const fileValues = body?.getAll ? body.getAll("files") : body?.files;
     const fileUrl = normalizeText(body?.get ? body.get("fileUrl") : body?.fileUrl);
 
     if (!title) return json("Document title is required.", 400);
     if (!documentType) return json("Document type is required.", 400);
-    if (!(fileValue instanceof File) && !fileUrl) return json("Document file is required.", 400);
+    const files = Array.isArray(fileValues) ? fileValues.filter((value) => value instanceof File && value.size) : [];
+    if (!files.length && !fileUrl) return json("Document file is required.", 400);
 
-    const documentId = crypto.randomUUID();
-    let storedFileUrl = fileUrl;
+    const createdItems = [];
 
-    if (fileValue instanceof File && fileValue.size) {
-      const upload = await uploadAdmissionDocument({
-        applicationId: documentId,
-        documentType,
-        file: fileValue,
-      });
-      storedFileUrl = upload.storedPath;
+    if (files.length) {
+      for (const file of files) {
+        const documentId = crypto.randomUUID();
+        const upload = await uploadAdmissionDocument({
+          applicationId: documentId,
+          documentType,
+          file,
+        });
+
+        const [result] = await prisma.$queryRaw`
+          INSERT INTO educational_documents (id, title, document_type, class_level, file_url, created_by, created_at, updated_at, is_active)
+          VALUES (${documentId}::uuid, ${title}, ${documentType}, ${classLevel || null}, ${upload.storedPath}, ${session.user.id}::uuid, NOW(), NOW(), true)
+          RETURNING id::text AS id, title, document_type, class_level, file_url, created_at
+        `;
+        createdItems.push(result);
+      }
+    } else {
+      const documentId = crypto.randomUUID();
+      const [result] = await prisma.$queryRaw`
+        INSERT INTO educational_documents (id, title, document_type, class_level, file_url, created_by, created_at, updated_at, is_active)
+        VALUES (${documentId}::uuid, ${title}, ${documentType}, ${classLevel || null}, ${fileUrl}, ${session.user.id}::uuid, NOW(), NOW(), true)
+        RETURNING id::text AS id, title, document_type, class_level, file_url, created_at
+      `;
+      createdItems.push(result);
     }
 
-    const [result] = await prisma.$queryRaw`
-      INSERT INTO educational_documents (id, title, document_type, class_level, file_url, created_by, created_at, updated_at, is_active)
-      VALUES (${documentId}::uuid, ${title}, ${documentType}, ${classLevel || null}, ${storedFileUrl}, ${session.user.id}::uuid, NOW(), NOW(), true)
-      RETURNING id::text AS id, title, document_type, class_level, file_url, created_at
-    `;
-
-    return json("Educational document created successfully.", 201, { item: result });
+    return json("Educational document created successfully.", 201, {
+      item: createdItems[0] || null,
+      items: createdItems,
+    });
   } catch (error) {
     const guard = roleGuardResponse(error);
     if (guard) return guard;
@@ -80,13 +94,14 @@ export async function POST(request) {
 
 export async function PATCH(request) {
   try {
-    await requireRole(ALLOWED_ROLES);
+    const session = await requireRole(ALLOWED_ROLES);
     const contentType = String(request.headers.get("content-type") || "").toLowerCase();
     const body = contentType.includes("multipart/form-data") ? await request.formData() : await request.json();
     const id = normalizeText(body?.get ? body.get("id") : body?.id);
     const title = normalizeText(body?.get ? body.get("title") : body?.title);
     const documentType = normalizeText(body?.get ? body.get("documentType") : body?.documentType);
     const classLevel = normalizeText(body?.get ? body.get("classLevel") : body?.classLevel || "");
+    const fileValues = body?.getAll ? body.getAll("files") : body?.files;
     const fileValue = body?.get ? body.get("file") : body?.file;
     const fileUrl = normalizeText(body?.get ? body.get("fileUrl") : body?.fileUrl);
 
@@ -102,11 +117,49 @@ export async function PATCH(request) {
     `;
 
     let storedFileUrl = fileUrl || normalizeText(existing?.file_url);
-    if (fileValue instanceof File && fileValue.size) {
+    const files = Array.isArray(fileValues) ? fileValues.filter((value) => value instanceof File && value.size) : [];
+    const replacementFile = files[0] || (fileValue instanceof File && fileValue.size ? fileValue : null);
+
+    if (files.length > 1) {
+      if (!storedFileUrl) return json("Document file is required.", 400);
+
+      const uploadedPaths = [];
+      for (const file of files) {
+        const upload = await uploadAdmissionDocument({
+          applicationId: id,
+          documentType,
+          file,
+        });
+        uploadedPaths.push(upload.storedPath);
+      }
+
+      await prisma.$executeRaw`
+        UPDATE educational_documents
+        SET
+          title = ${title},
+          document_type = ${documentType},
+          class_level = ${classLevel || null},
+          file_url = ${uploadedPaths[0] || storedFileUrl},
+          updated_at = NOW()
+        WHERE id = ${id}::uuid
+      `;
+
+      for (const extraPath of uploadedPaths.slice(1)) {
+        const newDocumentId = crypto.randomUUID();
+        await prisma.$executeRaw`
+          INSERT INTO educational_documents (id, title, document_type, class_level, file_url, created_by, created_at, updated_at, is_active)
+          VALUES (${newDocumentId}::uuid, ${title}, ${documentType}, ${classLevel || null}, ${extraPath}, ${session.user.id}::uuid, NOW(), NOW(), true)
+        `;
+      }
+
+      return json("Educational document updated successfully.", 200);
+    }
+
+    if (replacementFile) {
       const upload = await uploadAdmissionDocument({
         applicationId: id,
         documentType,
-        file: fileValue,
+        file: replacementFile,
       });
       storedFileUrl = upload.storedPath;
     }

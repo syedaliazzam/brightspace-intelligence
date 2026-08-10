@@ -10,6 +10,7 @@ const DOCUMENT_TYPES = [
   { id: "timetable", label: "Timetable" },
   { id: "curriculum", label: "Curriculum Plan" },
   { id: "material_list", label: "Material List" },
+  { id: "parent_guide", label: "Parent Guide" },
   { id: "yearly_plan", label: "Yearly Planning" },
   { id: "other", label: "Other" },
 ];
@@ -32,6 +33,10 @@ function isPdfPath(value) {
 
 function isImagePath(value) {
   return /\.(png|jpe?g|webp|gif|bmp|svg)(\?.*)?$/i.test(String(value || ""));
+}
+
+function isVideoPath(value) {
+  return /\.(mp4|webm|ogg|mov|m4v)(\?.*)?$/i.test(String(value || ""));
 }
 
 function buildPreviewUrl(value) {
@@ -60,8 +65,8 @@ export default function EducationalDocumentsPage({
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
   const [deleteTargetId, setDeleteTargetId] = useState(null);
-  const [form, setForm] = useState({ title: "", documentType: "", classLevel: "" });
-  const [selectedFile, setSelectedFile] = useState(null);
+  const [form, setForm] = useState({ title: "", documentType: "", customDocumentType: "", classLevel: "" });
+  const [selectedFiles, setSelectedFiles] = useState([]);
   const [submitting, setSubmitting] = useState(false);
 
   async function loadDocuments() {
@@ -86,7 +91,12 @@ export default function EducationalDocumentsPage({
       setError("All fields are required.");
       return;
     }
-    if (!editingItem && !selectedFile) {
+    const resolvedDocumentType = form.documentType === "other" ? normalizeText(form.customDocumentType) : form.documentType;
+    if (!resolvedDocumentType) {
+      setError("Custom document type is required.");
+      return;
+    }
+    if (!editingItem && !selectedFiles.length) {
       setError("Document file is required.");
       return;
     }
@@ -98,13 +108,13 @@ export default function EducationalDocumentsPage({
       const method = editingItem ? "PATCH" : "POST";
       const payload = new FormData();
       payload.append("title", form.title);
-      payload.append("documentType", form.documentType);
+      payload.append("documentType", resolvedDocumentType);
       payload.append("classLevel", form.classLevel || "");
       if (editingItem) {
         payload.append("id", editingItem.id);
       }
-      if (selectedFile) {
-        payload.append("file", selectedFile);
+      if (selectedFiles.length) {
+        selectedFiles.forEach((file) => payload.append("files", file));
       }
 
       const response = await fetch(endpoint, {
@@ -116,8 +126,8 @@ export default function EducationalDocumentsPage({
       if (!response.ok) throw new Error(data?.message || "Unable to save document.");
 
       setShowAddModal(false);
-      setForm({ title: "", documentType: "", classLevel: "" });
-      setSelectedFile(null);
+      setForm({ title: "", documentType: "", customDocumentType: "", classLevel: "" });
+      setSelectedFiles([]);
       setEditingItem(null);
       setMessage(data?.message || "Document saved successfully.");
       window.setTimeout(() => setMessage(""), 3000);
@@ -201,8 +211,8 @@ export default function EducationalDocumentsPage({
               <button
                 onClick={() => {
                   setEditingItem(null);
-                  setForm({ title: "", documentType: "", classLevel: "" });
-                  setSelectedFile(null);
+                  setForm({ title: "", documentType: "", customDocumentType: "", classLevel: "" });
+                  setSelectedFiles([]);
                   setShowAddModal(true);
                 }}
                 className="inline-flex items-center justify-center gap-2 self-start rounded-2xl bg-[#FFF5D6] px-4 py-2 text-sm font-semibold text-[#063F32] transition hover:bg-[#F1EADC] lg:self-auto"
@@ -320,9 +330,10 @@ export default function EducationalDocumentsPage({
                                   setForm({
                                     title: item.title || "",
                                     documentType: item.document_type || "",
+                                    customDocumentType: "",
                                     classLevel: item.class_level || "",
                                   });
-                                  setSelectedFile(null);
+                                  setSelectedFiles([]);
                                   setShowAddModal(true);
                                 }}
                                 className="rounded-xl border border-[#2D8A6A]/20 bg-[#FAF7F0] p-2 text-[#063F32] transition hover:bg-[#F1EADC]"
@@ -389,7 +400,13 @@ export default function EducationalDocumentsPage({
                   <span className="mb-2 block text-sm font-medium text-[#245C4F]">Document Type *</span>
                   <select
                     value={form.documentType}
-                    onChange={(e) => setForm((c) => ({ ...c, documentType: e.target.value }))}
+                    onChange={(e) =>
+                      setForm((c) => ({
+                        ...c,
+                        documentType: e.target.value,
+                        customDocumentType: e.target.value === "other" ? c.customDocumentType : "",
+                      }))
+                    }
                     className="w-full appearance-none rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 text-sm text-[#063F32] outline-none transition focus:border-[#2D8A6A] focus:bg-white focus:ring-4 focus:ring-[#FFF5D6]"
                     required
                   >
@@ -401,6 +418,20 @@ export default function EducationalDocumentsPage({
                     ))}
                   </select>
                 </label>
+
+                {form.documentType === "other" ? (
+                  <label className="block">
+                    <span className="mb-2 block text-sm font-medium text-[#245C4F]">Custom Type *</span>
+                    <input
+                      type="text"
+                      value={form.customDocumentType}
+                      onChange={(e) => setForm((c) => ({ ...c, customDocumentType: e.target.value }))}
+                      placeholder="e.g., Parent Guide"
+                      className="w-full rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 text-sm text-[#063F32] outline-none transition focus:border-[#2D8A6A] focus:bg-white focus:ring-4 focus:ring-[#FFF5D6]"
+                      required
+                    />
+                  </label>
+                ) : null}
 
                 <label className="block">
                   <span className="mb-2 block text-sm font-medium text-[#245C4F]">Class Level</span>
@@ -422,10 +453,25 @@ export default function EducationalDocumentsPage({
                   <span className="mb-2 block text-sm font-medium text-[#245C4F]">File *</span>
                   <input
                     type="file"
-                    onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
+                    multiple
+                    accept=".pdf,.png,.jpg,.jpeg,.webp,.gif,.bmp,.svg,.mp4,.webm,.ogg,.mov,.m4v"
+                    onChange={(e) => setSelectedFiles(Array.from(e.target.files || []))}
                     className="w-full rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 text-sm text-[#063F32] outline-none transition file:mr-4 file:rounded-xl file:border-0 file:bg-[#0D5C48] file:px-4 file:py-2 file:text-sm file:font-semibold file:text-[#FAF7F0] focus:border-[#2D8A6A] focus:bg-white focus:ring-4 focus:ring-[#FFF5D6]"
                     required={!editingItem}
                   />
+                  {selectedFiles.length ? (
+                    <div className="mt-2 space-y-1 text-xs text-[#245C4F]">
+                      <p>{selectedFiles.length} file{selectedFiles.length === 1 ? "" : "s"} selected</p>
+                      <ul className="max-h-28 space-y-1 overflow-auto rounded-xl bg-white/70 p-2">
+                        {selectedFiles.map((file) => (
+                          <li key={`${file.name}-${file.size}`} className="truncate">
+                            {file.name}
+                            {isVideoPath(file.name) ? " (video)" : ""}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : null}
                   {editingItem ? <p className="mt-2 text-xs text-[#245C4F]">Leave blank to keep the current file.</p> : null}
                 </label>
 
@@ -435,8 +481,8 @@ export default function EducationalDocumentsPage({
                     onClick={() => {
                       setShowAddModal(false);
                       setEditingItem(null);
-                      setForm({ title: "", documentType: "", classLevel: "" });
-                      setSelectedFile(null);
+                      setForm({ title: "", documentType: "", customDocumentType: "", classLevel: "" });
+                      setSelectedFiles([]);
                       setError("");
                     }}
                     className="flex-1 rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 text-sm font-semibold text-[#063F32] transition hover:bg-[#F1EADC]"
