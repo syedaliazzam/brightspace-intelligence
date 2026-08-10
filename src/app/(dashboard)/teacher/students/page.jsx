@@ -5,7 +5,7 @@ import { ChevronDown } from "lucide-react";
 import AssignedStudentsTable from "@/components/teacher/AssignedStudentsTable";
 
 export default function TeacherStudentsPage() {
-  const [state, setState] = useState({ items: [], subject: "", error: "" });
+  const [state, setState] = useState({ items: [], subject: "", search: "", error: "" });
   const [subjectOpen, setSubjectOpen] = useState(false);
 
   const subjects = Array.from(
@@ -16,9 +16,23 @@ export default function TeacherStudentsPage() {
     ).values()
   );
 
-  const visibleItems = state.subject
-    ? state.items.filter((item) => String(item.subject_name || "") === String(state.subject))
-    : state.items;
+  const visibleItems = state.items.filter((item) => {
+    const matchesSubject = !state.subject || String(item.subject_name || "") === String(state.subject);
+    const term = String(state.search || "").trim().toLowerCase();
+    const matchesSearch =
+      !term ||
+      [
+        item.full_name,
+        item.username,
+        item.grade_level,
+        item.subject_name,
+        item.course_title,
+      ]
+        .filter(Boolean)
+        .some((value) => String(value).toLowerCase().includes(term));
+    return matchesSubject && matchesSearch;
+  });
+  const filteredCount = visibleItems.length;
 
   useEffect(() => {
     fetch("/api/teacher/students", { cache: "no-store" }).then((response) => response.json().then((data) => {
@@ -41,32 +55,46 @@ export default function TeacherStudentsPage() {
           </div>
         </section>
         <div className="rounded-[2rem] border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(250,247,240,0.98)_100%)] p-5 shadow-[0_20px_70px_-36px_rgba(13,59,46,0.18)] backdrop-blur-xl">
-          <label className="block max-w-sm">
-            <span className="mb-2 block text-sm font-medium text-[#245C4F]">Subject</span>
-            <div className="relative">
-              <select
-                value={state.subject}
-                onMouseDown={() => setSubjectOpen((current) => !current)}
-                onChange={(event) => {
-                  setSubjectOpen(false);
-                  setState((current) => ({ ...current, subject: event.target.value }));
-                }}
-                onFocus={() => setSubjectOpen(true)}
-                onBlur={() => setSubjectOpen(false)}
-                className="w-full appearance-none rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 pr-11 text-sm font-medium text-[#063F32] outline-none transition focus:border-[#2D8A6A] focus:ring-2 focus:ring-[#2D8A6A]/20"
-              >
-                <option value="">All subjects</option>
-                {subjects.map((item) => (
-                  <option key={item.value} value={item.value}>
-                    {item.label}
-                  </option>
-                ))}
-              </select>
-              <ChevronDown
-                className={`pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#0D5C48] transition-transform duration-200 ${subjectOpen ? "rotate-180" : "rotate-0"}`}
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+            <label className="block max-w-sm flex-1">
+              <span className="mb-2 block text-sm font-medium text-[#245C4F]">Subject</span>
+              <div className="relative">
+                <select
+                  value={state.subject}
+                  onMouseDown={() => setSubjectOpen((current) => !current)}
+                  onChange={(event) => {
+                    setSubjectOpen(false);
+                    setState((current) => ({ ...current, subject: event.target.value }));
+                  }}
+                  onFocus={() => setSubjectOpen(true)}
+                  onBlur={() => setSubjectOpen(false)}
+                  className="w-full appearance-none rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 pr-11 text-sm font-medium text-[#063F32] outline-none transition focus:border-[#2D8A6A] focus:ring-2 focus:ring-[#2D8A6A]/20"
+                >
+                  <option value="">All subjects</option>
+                  {subjects.map((item) => (
+                    <option key={item.value} value={item.value}>
+                      {item.label}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown
+                  className={`pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#0D5C48] transition-transform duration-200 ${subjectOpen ? "rotate-180" : "rotate-0"}`}
+                />
+              </div>
+            </label>
+            <label className="block max-w-sm flex-1 lg:max-w-md">
+              <span className="mb-2 block text-sm font-medium text-[#245C4F]">Search</span>
+              <input
+                value={state.search}
+                onChange={(event) => setState((current) => ({ ...current, search: event.target.value }))}
+                placeholder="Search students..."
+                className="w-full rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 text-sm font-medium text-[#063F32] outline-none transition focus:border-[#2D8A6A] focus:ring-2 focus:ring-[#2D8A6A]/20"
               />
+            </label>
+            <div className="rounded-2xl border border-[#2D8A6A]/15 bg-white px-4 py-3 text-sm font-semibold text-[#0D5C48] shadow-sm lg:ml-auto">
+              Students: <span className="text-[#063F32]">{filteredCount}</span>
             </div>
-          </label>
+          </div>
         </div>
         {state.error ? <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">{state.error}</div> : null}
         <AssignedStudentsTable items={visibleItems} />
