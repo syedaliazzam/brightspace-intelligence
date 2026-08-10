@@ -29,6 +29,8 @@ export async function GET(request) {
         h.description,
         h.due_date,
         h.status::text AS status,
+        h.homework_attachment_path,
+        h.homework_attachment_name,
         h.submission_note,
         h.submission_attachment_path,
         h.submission_attachment_name,
@@ -65,6 +67,9 @@ export async function GET(request) {
     const items = await Promise.all(
       itemsRaw.map(async (item) => ({
         ...item,
+        homework_attachment_url: item.homework_attachment_path
+          ? await createSignedAdmissionDocumentUrl(item.homework_attachment_path)
+          : "",
         submission_attachment_url: item.submission_attachment_path
           ? await createSignedAdmissionDocumentUrl(item.submission_attachment_path)
           : "",

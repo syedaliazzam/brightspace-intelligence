@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireRole, roleGuardResponse } from "@/lib/roleGuard";
 import prisma from "@/lib/prisma";
+import { uploadHomeworkSubmission, createSignedAdmissionDocumentUrl } from "@/lib/supabaseStorage";
 
 const ALLOWED_ROLES = ["teacher", "admin"];
 
@@ -34,6 +35,8 @@ export async function GET() {
         h.title,
         h.description,
         h.due_date,
+        MAX(h.homework_attachment_path) AS homework_attachment_path,
+        MAX(h.homework_attachment_name) AS homework_attachment_name,
         MAX(h.created_at) AS created_at,
         MAX(h.updated_at) AS updated_at,
         h.teacher_id::text AS teacher_id,
@@ -77,7 +80,13 @@ export async function GET() {
       `,
       ...filter.values
     );
-    return json("Homework fetched.", 200, { items });
+    const enriched = await Promise.all(items.map(async (item) => ({
+      ...item,
+      homework_attachment_url: item.homework_attachment_path
+        ? await createSignedAdmissionDocumentUrl(item.homework_attachment_path)
+        : "",
+    })));
+    return json("Homework fetched.", 200, { items: enriched });
   } catch (error) {
     const guard = roleGuardResponse(error);
     return guard || json(error instanceof Error ? error.message : "Unable to load homework.", 500);
@@ -87,11 +96,28 @@ export async function GET() {
 export async function POST(request) {
   try {
     const session = await requireRole(ALLOWED_ROLES);
-    const body = await request.json();
-    const lectureId = clean(body?.lectureId);
-    const title = clean(body?.title);
-    const description = clean(body?.description);
-    const dueDate = clean(body?.dueDate);
+    const contentType = request.headers.get("content-type") || "";
+    let lectureId = "";
+    let title = "";
+    let description = "";
+    let dueDate = "";
+    let file = null;
+
+    if (contentType.includes("multipart/form-data")) {
+      const formData = await request.formData();
+      lectureId = clean(formData.get("lectureId"));
+      title = clean(formData.get("title"));
+      description = clean(formData.get("description"));
+      dueDate = clean(formData.get("dueDate"));
+      const maybeFile = formData.get("file");
+      file = maybeFile instanceof File && maybeFile.size > 0 ? maybeFile : null;
+    } else {
+      const body = await request.json();
+      lectureId = clean(body?.lectureId);
+      title = clean(body?.title);
+      description = clean(body?.description);
+      dueDate = clean(body?.dueDate);
+    }
     if (!lectureId || !title) return json("Lecture and homework title are required.", 400);
 
     const isAdmin = String(session.user.role).toLowerCase() === "admin";
@@ -129,42 +155,50 @@ export async function POST(request) {
 
     if (!students.length) return json("No active students found for this class.", 404);
 
-    const created = await prisma.$transaction(async (tx) => {
-      const rows = [];
-      for (const student of students) {
-        const [row] = await tx.$queryRaw`
-          INSERT INTO homework (
-            id,
-            lecture_id,
-            student_id,
-            teacher_id,
-            subject_id,
-            title,
-            description,
-            due_date,
-            status,
-            created_at,
-            updated_at
-          )
-          VALUES (
-            gen_random_uuid(),
-            ${lectureId}::uuid,
-            ${student.student_id}::uuid,
-            ${lecture.teacher_id}::uuid,
-            ${lecture.subject_id}::uuid,
-            ${title},
-            ${description || null},
-            ${dueDate || null}::date,
-            'pending'::homework_status,
-            NOW(),
-            NOW()
-          )
-          RETURNING id::text AS id
-        `;
-        if (row?.id) rows.push(row);
-      }
-      return rows;
-    });
+    let upload = null;
+    if (file) {
+      upload = await uploadHomeworkSubmission({ homeworkId: lectureId, file });
+    }
+
+    const created = [];
+    for (const student of students) {
+      const [row] = await prisma.$queryRaw`
+        INSERT INTO homework (
+          id,
+          lecture_id,
+          student_id,
+          teacher_id,
+          subject_id,
+          title,
+          description,
+          due_date,
+          homework_attachment_bucket,
+          homework_attachment_path,
+          homework_attachment_name,
+          status,
+          created_at,
+          updated_at
+        )
+        VALUES (
+          gen_random_uuid(),
+          ${lectureId}::uuid,
+          ${student.student_id}::uuid,
+          ${lecture.teacher_id}::uuid,
+          ${lecture.subject_id}::uuid,
+          ${title},
+          ${description || null},
+          ${dueDate || null}::date,
+          ${(upload?.bucket || null)}::text,
+          ${(upload?.storedPath || null)}::text,
+          ${(file?.name || null)}::text,
+          'pending'::homework_status,
+          NOW(),
+          NOW()
+        )
+        RETURNING id::text AS id
+      `;
+      if (row?.id) created.push(row);
+    }
 
     await prisma.$executeRaw`
       INSERT INTO audit_logs (id, actor_user_id, action, entity_type, entity_id, created_at)
@@ -180,11 +214,28 @@ export async function POST(request) {
 export async function PATCH(request) {
   try {
     const session = await requireRole(ALLOWED_ROLES);
-    const body = await request.json();
-    const lectureId = clean(body?.lectureId);
-    const title = clean(body?.title);
-    const description = clean(body?.description);
-    const dueDate = clean(body?.dueDate);
+    const contentType = request.headers.get("content-type") || "";
+    let lectureId = "";
+    let title = "";
+    let description = "";
+    let dueDate = "";
+    let file = null;
+
+    if (contentType.includes("multipart/form-data")) {
+      const formData = await request.formData();
+      lectureId = clean(formData.get("lectureId"));
+      title = clean(formData.get("title"));
+      description = clean(formData.get("description"));
+      dueDate = clean(formData.get("dueDate"));
+      const maybeFile = formData.get("file");
+      file = maybeFile instanceof File && maybeFile.size > 0 ? maybeFile : null;
+    } else {
+      const body = await request.json();
+      lectureId = clean(body?.lectureId);
+      title = clean(body?.title);
+      description = clean(body?.description);
+      dueDate = clean(body?.dueDate);
+    }
     if (!lectureId || !title) return json("Lecture and homework title are required.", 400);
 
     const isAdmin = String(session.user.role).toLowerCase() === "admin";
@@ -206,11 +257,19 @@ export async function PATCH(request) {
     const [lecture] = await lectureQuery;
     if (!lecture?.id) return json("Assigned lecture not found.", 404);
 
+    let upload = null;
+    if (file) {
+      upload = await uploadHomeworkSubmission({ homeworkId: lectureId, file });
+    }
+
     await prisma.$executeRaw`
       UPDATE homework
       SET title = ${title},
           description = ${description || null},
           due_date = ${dueDate || null}::date,
+          homework_attachment_bucket = COALESCE(${upload?.bucket || null}::text, homework_attachment_bucket),
+          homework_attachment_path = COALESCE(${upload?.storedPath || null}::text, homework_attachment_path),
+          homework_attachment_name = COALESCE(${file?.name || null}::text, homework_attachment_name),
           updated_at = NOW()
       WHERE lecture_id = ${lectureId}::uuid
     `;

@@ -73,6 +73,8 @@ export default function HomeworkList({ items = [], onRefresh }) {
           <thead className="bg-[linear-gradient(180deg,#FAF7F0_0%,#F1EADC_100%)]">
             <tr className="text-xs font-semibold uppercase tracking-[0.12em] text-[#0D5C48]">
               <th className="px-6 py-4">Title</th>
+              <th className="px-6 py-4">Description</th>
+              <th className="px-6 py-4">Document</th>
               <th className="px-6 py-4">Subject</th>
               <th className="px-6 py-4">Teacher</th>
               <th className="px-6 py-4">Due Date</th>
@@ -81,15 +83,29 @@ export default function HomeworkList({ items = [], onRefresh }) {
             </tr>
           </thead>
           <tbody className="divide-y divide-[#F1EADC] bg-transparent">
-            {items.map((item) => (
-              <tr key={item.id} className="align-top">
-                <td className="px-6 py-4 font-semibold text-[#063F32]">
-                  {item.title || "Homework"}
-                  <p className="mt-1 max-w-lg font-normal text-[#245C4F]">{item.description || item.lecture_title || "Homework details pending."}</p>
-                </td>
-                <td className="px-6 py-4 text-[#245C4F]">{item.subject_name || "Not available"}</td>
-                <td className="px-6 py-4 text-[#245C4F]">{item.teacher_name || "Not available"}</td>
-                <td className="px-6 py-4 text-[#245C4F]">{formatDate(item.due_date || item.created_at)}</td>
+              {items.map((item) => (
+                <tr key={item.id} className="align-top">
+                  <td className="px-6 py-4 font-semibold text-[#063F32]">
+                    {item.title || "Homework"}
+                  </td>
+                  <td className="px-6 py-4 text-[#245C4F]">{item.description || "No description provided."}</td>
+                  <td className="px-6 py-4 text-[#245C4F]">
+                    {item.homework_attachment_url ? (
+                      <a
+                        href={item.homework_attachment_url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex rounded-xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-3 py-2 text-xs font-semibold text-[#0D5C48] transition hover:bg-[#F1EADC]"
+                      >
+                        View document
+                      </a>
+                    ) : (
+                      "-"
+                    )}
+                  </td>
+                  <td className="px-6 py-4 text-[#245C4F]">{item.subject_name || "Not available"}</td>
+                  <td className="px-6 py-4 text-[#245C4F]">{item.teacher_name || "Not available"}</td>
+                  <td className="px-6 py-4 text-[#245C4F]">{formatDate(item.due_date || item.created_at)}</td>
                 <td className="px-6 py-4">
                   <span className="inline-flex rounded-full bg-[#FFF5D6] px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-[#8A6B00]">
                     {item.status || "pending"}
@@ -114,7 +130,7 @@ export default function HomeworkList({ items = [], onRefresh }) {
             ))}
             {!items.length ? (
               <tr>
-                <td colSpan={6} className="px-6 py-6 text-sm text-[#245C4F]">No homework assigned.</td>
+                <td colSpan={8} className="px-6 py-6 text-sm text-[#245C4F]">No homework assigned.</td>
               </tr>
             ) : null}
           </tbody>
@@ -146,6 +162,21 @@ export default function HomeworkList({ items = [], onRefresh }) {
                   <p className="font-semibold text-[#063F32]">Homework details</p>
                   <p className="mt-2">{activeItem.description || activeItem.lecture_title || "Homework details pending."}</p>
                 </div>
+
+                {activeItem.homework_attachment_url ? (
+                  <div className="overflow-hidden rounded-[1.5rem] border border-[#2D8A6A]/12 bg-[#FAF7F0]">
+                    <a href={activeItem.homework_attachment_url} target="_blank" rel="noreferrer" className="block">
+                      {String(activeItem.homework_attachment_name || activeItem.homework_attachment_url).toLowerCase().endsWith(".pdf") ? (
+                        <div className="flex items-center justify-between px-4 py-4 text-sm font-semibold text-[#0D5C48]">
+                          <span>Open homework PDF</span>
+                          <span className="rounded-full bg-[#E9F8F1] px-3 py-1 text-xs">PDF</span>
+                        </div>
+                      ) : (
+                        <img src={activeItem.homework_attachment_url} alt={activeItem.homework_attachment_name || "Homework attachment"} className="max-h-72 w-full object-contain" />
+                      )}
+                    </a>
+                  </div>
+                ) : null}
 
                 <label className="block">
                   <span className="mb-2 block text-sm font-medium text-[#063F32]">Your submission note</span>

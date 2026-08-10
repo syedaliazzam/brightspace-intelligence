@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireRole, roleGuardResponse } from "@/lib/roleGuard";
 import prisma from "@/lib/prisma";
+import { createSignedAdmissionDocumentUrl } from "@/lib/supabaseStorage";
 
 function json(message, status = 200, extra = {}) {
   return NextResponse.json({ message, ...extra }, { status });
@@ -17,6 +18,8 @@ export async function GET() {
         h.due_date,
         h.status::text AS status,
         h.created_at,
+        h.homework_attachment_path,
+        h.homework_attachment_name,
         ls.title AS lecture_title,
         sub.name AS subject_name,
         tu.full_name AS teacher_name
@@ -29,7 +32,13 @@ export async function GET() {
       WHERE sp.user_id = ${session.user.id}::uuid
       ORDER BY h.created_at DESC
     `;
-    return json("Homework fetched.", 200, { items });
+    const enriched = await Promise.all(items.map(async (item) => ({
+      ...item,
+      homework_attachment_url: item.homework_attachment_path
+        ? await createSignedAdmissionDocumentUrl(item.homework_attachment_path)
+        : "",
+    })));
+    return json("Homework fetched.", 200, { items: enriched });
   } catch (error) {
     const guard = roleGuardResponse(error);
     return guard || json(error instanceof Error ? error.message : "Unable to load homework.", 500);
