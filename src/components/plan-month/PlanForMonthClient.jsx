@@ -4,6 +4,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Plus } from "lucide-react";
 import ClientPortal from "@/components/shared/ClientPortal";
+import { STORAGE_SAFE_UPLOAD_MAX_BYTES, formatUploadLimit } from "@/lib/uploadLimits";
 
 function formatDate(d) {
   try {
@@ -58,8 +59,8 @@ async function uploadMonthlyPlanAsset(file) {
 }
 
 export default function PlanForMonthClient({ canCreate = true }) {
-  const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
-  const MAX_VIDEO_BYTES = 18 * 1024 * 1024;
+  const MAX_IMAGE_BYTES = STORAGE_SAFE_UPLOAD_MAX_BYTES;
+  const MAX_VIDEO_BYTES = STORAGE_SAFE_UPLOAD_MAX_BYTES;
   const [form, setForm] = useState({ name: "", startDate: "", endDate: "", images: [] });
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
@@ -169,8 +170,8 @@ export default function PlanForMonthClient({ canCreate = true }) {
       if (file.size > maxBytes) {
         setMessage(
           isVideo
-            ? "One selected video is too large to upload from this page. Please choose a smaller video."
-            : "One selected image is too large to upload from this page. Please choose a smaller image."
+            ? `One selected video is too large to upload. Please choose a file smaller than ${formatUploadLimit(maxBytes)}.`
+            : `One selected image is too large to upload. Please choose a file smaller than ${formatUploadLimit(maxBytes)}.`
         );
         continue;
       }
@@ -199,8 +200,8 @@ export default function PlanForMonthClient({ canCreate = true }) {
     if (oversized) {
       setMessage(
         String(oversized.type || "").toLowerCase().startsWith("video/")
-          ? "The selected video is too large to submit here. Please use a smaller video."
-          : "The selected image is too large to submit here. Please use a smaller image."
+          ? `The selected video is too large. Please use a file smaller than ${formatUploadLimit(MAX_VIDEO_BYTES)}.`
+          : `The selected image is too large. Please use a file smaller than ${formatUploadLimit(MAX_IMAGE_BYTES)}.`
       );
       return;
     }
@@ -383,6 +384,7 @@ export default function PlanForMonthClient({ canCreate = true }) {
 
               <div>
                 <label className="block text-sm font-semibold text-[#245C4F]">Images</label>
+                <p className="mt-1 text-xs text-[#245C4F]">Maximum file size: {formatUploadLimit(MAX_VIDEO_BYTES)} per image or video.</p>
                 <label className="mt-2 flex cursor-pointer items-center justify-between rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 text-sm font-medium text-[#063F32]">
                   <span>{editForm.images.length > 0 ? `${editForm.images.length} image(s)` : "Choose images"}</span>
                   <span className="rounded-full bg-[#EAF6EF] px-3 py-1 text-xs font-semibold text-[#0D5C48]">Browse</span>
@@ -443,6 +445,7 @@ export default function PlanForMonthClient({ canCreate = true }) {
                 </div>
                 <div>
                   <label className="block text-sm font-semibold text-[#245C4F]">Upload Images or Videos</label>
+                  <p className="mt-1 text-xs text-[#245C4F]">Maximum file size: {formatUploadLimit(MAX_VIDEO_BYTES)} per image or video.</p>
                   <label className="mt-2 flex cursor-pointer items-center justify-between rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 text-sm font-medium text-[#063F32] transition hover:border-[#2D8A6A] hover:bg-white">
                     <span>{form.images.length > 0 ? `${form.images.length} file(s) selected` : "Choose files"}</span>
                     <span className="rounded-full bg-[#EAF6EF] px-3 py-1 text-xs font-semibold text-[#0D5C48]">Browse</span>
@@ -463,7 +466,11 @@ export default function PlanForMonthClient({ canCreate = true }) {
                     ))}
                   </div>
                 )}
-                {message && <p className={`text-sm ${message.includes("success") ? "text-green-600" : "text-red-600"}`}>{message}</p>}
+                {message ? (
+                  <div className="rounded-2xl border border-rose-200 bg-[linear-gradient(180deg,#FFF6F5_0%,#FDEDEC_100%)] px-4 py-3 text-sm font-medium text-rose-700 shadow-[0_12px_30px_-20px_rgba(190,24,93,0.35)]">
+                    {message}
+                  </div>
+                ) : null}
                 <div className="flex justify-end gap-3">
                   <button type="button" onClick={() => setShowCreateModal(false)} className="rounded-2xl border px-4 py-2 text-sm">Cancel</button>
                   <button type="submit" disabled={saving} className="inline-flex rounded-2xl bg-[#0D5C48] px-5 py-3 text-sm font-semibold text-[#FAF7F0] transition hover:bg-[#063F32]">

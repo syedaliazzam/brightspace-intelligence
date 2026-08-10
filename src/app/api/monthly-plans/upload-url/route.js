@@ -15,18 +15,6 @@ function getRequiredEnv(name) {
   return value;
 }
 
-function buildAbsoluteUrl(baseUrl, pathOrUrl) {
-  const value = String(pathOrUrl || "").trim();
-  if (!value) return "";
-  if (/^https?:\/\//i.test(value)) return value;
-  const normalizedBase = String(baseUrl || "").replace(/\/+$/, "");
-  const normalizedValue = value.replace(/^\/+/, "");
-  if (normalizedValue.startsWith("object/")) {
-    return `${normalizedBase}/storage/v1/${normalizedValue}`;
-  }
-  return `${normalizedBase}/${normalizedValue}`;
-}
-
 export async function POST(request) {
   const session = await auth();
   const role = String(session?.user?.role || "").toLowerCase();
@@ -61,14 +49,16 @@ export async function POST(request) {
     }
 
     const responseData = await response.json();
-    const signedUrl = buildAbsoluteUrl(supabaseUrl, responseData?.signedUrl || responseData?.signedURL || responseData?.url);
     const token = String(responseData?.token || "").trim() || (() => {
       try {
-        return new URL(signedUrl).searchParams.get("token") || "";
+        const rawUrl = String(responseData?.signedUrl || responseData?.signedURL || responseData?.url || "").trim();
+        const absoluteUrl = /^https?:\/\//i.test(rawUrl) ? rawUrl : `${supabaseUrl}${rawUrl.startsWith("/") ? "" : "/"}${rawUrl}`;
+        return new URL(absoluteUrl).searchParams.get("token") || "";
       } catch {
         return "";
       }
     })();
+    const signedUrl = `${String(supabaseUrl || "").replace(/\/+$/, "")}/storage/v1/object/upload/sign/${bucket}/${objectPath}?token=${encodeURIComponent(token)}`;
     if (!signedUrl || !token) {
       throw new Error("Unable to create signed upload URL.");
     }

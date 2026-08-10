@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { ChevronDown, Plus, Trash2, Edit2, Search } from "lucide-react";
 import ClientPortal from "@/components/shared/ClientPortal";
 import PaginationControls from "@/components/teacher/PaginationControls";
+import { STORAGE_SAFE_UPLOAD_MAX_BYTES, formatUploadLimit } from "@/lib/uploadLimits";
 
 const PAGE_SIZE = 7;
 const DOCUMENT_TYPES = [
@@ -41,6 +42,10 @@ function isVideoPath(value) {
 
 function buildPreviewUrl(value) {
   return `/api/file-preview?path=${encodeURIComponent(String(value || ""))}`;
+}
+
+function filterAllowedFiles(files) {
+  return Array.from(files || []).filter((file) => Number(file?.size || 0) <= STORAGE_SAFE_UPLOAD_MAX_BYTES);
 }
 
 export default function EducationalDocumentsPage({
@@ -98,6 +103,11 @@ export default function EducationalDocumentsPage({
     }
     if (!editingItem && !selectedFiles.length) {
       setError("Document file is required.");
+      return;
+    }
+    const oversizedFile = selectedFiles.find((file) => Number(file?.size || 0) > STORAGE_SAFE_UPLOAD_MAX_BYTES);
+    if (oversizedFile) {
+      setError(`One selected file is too large. Please upload files smaller than ${formatUploadLimit()}.`);
       return;
     }
 
@@ -494,10 +504,18 @@ export default function EducationalDocumentsPage({
                     type="file"
                     multiple
                     accept=".pdf,.png,.jpg,.jpeg,.webp,.gif,.bmp,.svg,.mp4,.webm,.ogg,.mov,.m4v"
-                    onChange={(e) => setSelectedFiles(Array.from(e.target.files || []))}
+                    onChange={(e) => {
+                      const files = Array.from(e.target.files || []);
+                      const allowedFiles = filterAllowedFiles(files);
+                      if (allowedFiles.length !== files.length) {
+                        setError(`One or more selected files are too large. Please upload files smaller than ${formatUploadLimit()}.`);
+                      }
+                      setSelectedFiles(allowedFiles);
+                    }}
                     className="w-full rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 text-sm text-[#063F32] outline-none transition file:mr-4 file:rounded-xl file:border-0 file:bg-[#0D5C48] file:px-4 file:py-2 file:text-sm file:font-semibold file:text-[#FAF7F0] focus:border-[#2D8A6A] focus:bg-white focus:ring-4 focus:ring-[#FFF5D6]"
                     required={!editingItem}
                   />
+                  <p className="mt-2 text-xs text-[#245C4F]">Maximum file size: {formatUploadLimit()} per file.</p>
                   {selectedFiles.length ? (
                     <div className="mt-2 space-y-1 text-xs text-[#245C4F]">
                       <p>{selectedFiles.length} file{selectedFiles.length === 1 ? "" : "s"} selected</p>

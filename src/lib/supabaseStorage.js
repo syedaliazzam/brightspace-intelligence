@@ -1,3 +1,5 @@
+import { STORAGE_SAFE_UPLOAD_MAX_BYTES, formatUploadLimit } from "@/lib/uploadLimits";
+
 const DEFAULT_BUCKET = "payment_proofs";
 const DEFAULT_ADMISSION_BUCKET = "ash-shajrah";
 
@@ -44,7 +46,23 @@ function splitStoredPath(storedPath) {
   };
 }
 
+function validateUploadSize(file) {
+  const size = Number(file?.size || 0);
+  if (size > STORAGE_SAFE_UPLOAD_MAX_BYTES) {
+    throw new Error(`File is too large. Please upload a file smaller than ${formatUploadLimit()}.`);
+  }
+}
+
+async function throwSupabaseUploadError(response) {
+  const errorText = await response.text();
+  if (errorText.includes('"code":"EntityTooLarge"') || errorText.includes('"statusCode":"413"')) {
+    throw new Error(`File is too large for storage. Please upload a file smaller than ${formatUploadLimit()}.`);
+  }
+  throw new Error(`Supabase upload failed: ${errorText}`);
+}
+
 export async function uploadPaymentProof({ voucherNo, file }) {
+  validateUploadSize(file);
   const { url, serviceRoleKey, bucket } = getSupabaseConfig();
   const safeVoucherNo = sanitizeFilename(voucherNo);
   const timestamp = Date.now();
@@ -66,8 +84,7 @@ export async function uploadPaymentProof({ voucherNo, file }) {
   });
 
   if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`Supabase upload failed: ${errorText}`);
+    await throwSupabaseUploadError(response);
   }
 
   return {
@@ -86,6 +103,7 @@ function getAdmissionSupabaseConfig() {
 }
 
 async function uploadHomeworkSubmission({ homeworkId, file }) {
+  validateUploadSize(file);
   const { url, serviceRoleKey, bucket } = getAdmissionSupabaseConfig();
   const safeHomeworkId = sanitizeFilename(homeworkId);
   const timestamp = Date.now();
@@ -107,8 +125,7 @@ async function uploadHomeworkSubmission({ homeworkId, file }) {
   });
 
   if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`Supabase upload failed: ${errorText}`);
+    await throwSupabaseUploadError(response);
   }
 
   return {
@@ -119,6 +136,7 @@ async function uploadHomeworkSubmission({ homeworkId, file }) {
 }
 
 export async function uploadAdmissionDocument({ applicationId, documentType, file }) {
+  validateUploadSize(file);
   const { url, serviceRoleKey, bucket } = getAdmissionSupabaseConfig();
   const safeApplicationId = sanitizeFilename(applicationId);
   const safeDocumentType = sanitizeFilename(documentType || "document");
@@ -141,8 +159,7 @@ export async function uploadAdmissionDocument({ applicationId, documentType, fil
   });
 
   if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`Supabase upload failed: ${errorText}`);
+    await throwSupabaseUploadError(response);
   }
 
   return {
