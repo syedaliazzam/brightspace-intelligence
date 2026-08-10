@@ -27,6 +27,36 @@ function buildPreviewUrl(value) {
   return `/api/file-preview?path=${encodeURIComponent(text)}`;
 }
 
+async function uploadMonthlyPlanAsset(file) {
+  const signedResponse = await fetch("/api/monthly-plans/upload-url", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      fileName: file?.name || "plan-file",
+      contentType: file?.type || "application/octet-stream",
+    }),
+  });
+  const signedData = await signedResponse.json().catch(() => ({}));
+  if (!signedResponse.ok) {
+    throw new Error(signedData?.error || "Unable to prepare upload.");
+  }
+
+  const uploadResponse = await fetch(signedData.signedUrl, {
+    method: "PUT",
+    headers: {
+      "Content-Type": file?.type || "application/octet-stream",
+    },
+    body: file,
+  });
+
+  if (!uploadResponse.ok) {
+    const text = await uploadResponse.text().catch(() => "");
+    throw new Error(text || "Unable to upload file.");
+  }
+
+  return signedData.path;
+}
+
 export default function PlanForMonthClient({ canCreate = true }) {
   const MAX_IMAGE_BYTES = 8 * 1024 * 1024;
   const MAX_VIDEO_BYTES = 18 * 1024 * 1024;
@@ -178,50 +208,33 @@ export default function PlanForMonthClient({ canCreate = true }) {
     try {
       const existingUrls = editForm.images.filter((item) => !(item instanceof File));
       const newFiles = editForm.images.filter((item) => item instanceof File);
+      const uploadedUrls = [];
 
-      const sendJson = async (payload) => {
-        const res = await fetch(`/api/monthly-plans/${editingPlan.id}`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        });
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(data?.error || "Failed to update plan");
-        return data;
-      };
+      for (const file of newFiles) {
+        uploadedUrls.push(await uploadMonthlyPlanAsset(file));
+      }
 
-      const sendForm = async (file, keepUrls = []) => {
-        const fd = new FormData();
-        fd.append("name", editForm.name);
-        fd.append("startDate", editForm.startDate);
-        fd.append("endDate", editForm.endDate);
-        keepUrls.forEach((url) => fd.append("imageUrls", url));
-        if (file) fd.append("files", file);
-        const res = await fetch(`/api/monthly-plans/${editingPlan.id}`, {
-          method: "PUT",
-          body: fd,
-        });
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(data?.error || "Failed to update plan");
-        return data;
-      };
-
-      if (!newFiles.length) {
-        await sendJson({
+      const updateResponse = await fetch(`/api/monthly-plans/${editingPlan.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
           name: editForm.name,
           startDate: editForm.startDate,
           endDate: editForm.endDate,
-          imageUrls: existingUrls,
-        });
-      } else {
-        await sendForm(newFiles[0], existingUrls);
-        for (const extraFile of newFiles.slice(1)) {
-          await sendForm(extraFile, existingUrls);
-        }
-      }
+          imageUrls: [...existingUrls, ...uploadedUrls],
+        }),
+      });
+      const updateData = await updateResponse.json().catch(() => ({}));
+      if (!updateResponse.ok) throw new Error(updateData?.error || "Failed to update plan");
 
       const id = editingPlan.id;
-      setPlans((current) => current.map((p) => (p.id === id ? { ...p, name: editForm.name, start_date: editForm.startDate, end_date: editForm.endDate, image_urls: editForm.images } : p)));
+      setPlans((current) =>
+        current.map((p) =>
+          p.id === id
+            ? { ...p, name: editForm.name, start_date: editForm.startDate, end_date: editForm.endDate, image_urls: [...existingUrls, ...uploadedUrls] }
+            : p
+        )
+      );
       closeEdit();
       setSuccessMessage("Plan updated successfully!");
       const d = await fetch("/api/monthly-plans", { cache: "no-store" });
@@ -269,36 +282,34 @@ export default function PlanForMonthClient({ canCreate = true }) {
 
     setSaving(true);
     try {
-      const createHasFiles = form.images.some((item) => item instanceof File);
-      const res = await fetch("/api/monthly-plans", createHasFiles ? {
-        method: "POST",
-        body: (() => {
-          const fd = new FormData();
-          fd.append("name", form.name);
-          fd.append("startDate", form.startDate);
-          fd.append("endDate", form.endDate);
-          form.images.forEach((item) => {
-            if (item instanceof File) fd.append("files", item);
-            else fd.append("imageUrls", item);
-          });
-          return fd;
-        })(),
-      } : {
+      const existingUrls = form.images.filter((item) => !(item instanceof File));
+      const newFiles = form.images.filter((item) => item instanceof File);
+      const uploadedUrls = [];
+      for (const file of newFiles) {
+        uploadedUrls.push(await uploadMonthlyPlanAsset(file));
+      }
+
+      const createResponse = await fetch("/api/monthly-plans", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: form.name, startDate: form.startDate, endDate: form.endDate, imageUrls: form.images }),
+        body: JSON.stringify({
+          name: form.name,
+          startDate: form.startDate,
+          endDate: form.endDate,
+          imageUrls: [...existingUrls, ...uploadedUrls],
+        }),
       });
-      if (res.ok) {
+      const createData = await createResponse.json().catch(() => ({}));
+      if (createResponse.ok) {
         setSuccessMessage("Plan saved successfully!");
         setForm({ name: "", startDate: "", endDate: "", images: [] });
         const d = await fetch("/api/monthly-plans", { cache: "no-store" });
         const newData = await d.json();
         setPlans(Array.isArray(newData?.items) ? newData.items : []);
-      } else if (res.status === 403) {
+      } else if (createResponse.status === 403) {
         setMessage("Forbidden: you do not have permission to create plans.");
       } else {
-        const data = await res.json().catch(() => ({}));
-        setMessage(data?.error || "Failed to save plan");
+        setMessage(createData?.error || "Failed to save plan");
       }
     } catch (error) {
       setMessage("Error: " + (error?.message || String(error)));

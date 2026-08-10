@@ -168,7 +168,7 @@ export default function EducationalDocumentsPage({
       setForm({ title: "", documentType: "", customDocumentType: "", classLevel: "" });
       setSelectedFiles([]);
       setEditingItem(null);
-      setMessage(data?.message || "Document saved successfully.");
+      setMessage("Document saved successfully.");
       window.setTimeout(() => setMessage(""), 3000);
       await loadDocuments();
     } catch (submitError) {
