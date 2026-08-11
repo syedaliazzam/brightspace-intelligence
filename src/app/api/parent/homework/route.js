@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireRole, roleGuardResponse } from "@/lib/roleGuard";
 import prisma from "@/lib/prisma";
-import { createSignedAdmissionDocumentUrl } from "@/lib/supabaseStorage";
+import { createSignedAdmissionDocumentUrl, createSignedHomeworkSubmissionUrls } from "@/lib/supabaseStorage";
 
 const ALLOWED_ROLES = ["parent", "admin"];
 
@@ -9,9 +9,22 @@ function json(message, status = 200, extra = {}) {
   return NextResponse.json({ message, ...extra }, { status });
 }
 
+async function ensureHomeworkAttachmentColumns() {
+  await prisma.$executeRaw`
+    ALTER TABLE homework
+    ADD COLUMN IF NOT EXISTS homework_attachment_buckets jsonb,
+    ADD COLUMN IF NOT EXISTS homework_attachment_paths jsonb,
+    ADD COLUMN IF NOT EXISTS homework_attachment_names jsonb,
+    ADD COLUMN IF NOT EXISTS submission_attachment_buckets jsonb,
+    ADD COLUMN IF NOT EXISTS submission_attachment_paths jsonb,
+    ADD COLUMN IF NOT EXISTS submission_attachment_names jsonb
+  `;
+}
+
 export async function GET(request) {
   try {
     const session = await requireRole(ALLOWED_ROLES);
+    await ensureHomeworkAttachmentColumns();
     const { searchParams } = new URL(request.url);
     const childId = String(searchParams.get("childId") || "").trim();
     const isAdmin = String(session.user.role).toLowerCase() === "admin";
@@ -31,9 +44,13 @@ export async function GET(request) {
         h.status::text AS status,
         h.homework_attachment_path,
         h.homework_attachment_name,
+        h.homework_attachment_paths,
+        h.homework_attachment_names,
         h.submission_note,
         h.submission_attachment_path,
         h.submission_attachment_name,
+        h.submission_attachment_paths,
+        h.submission_attachment_names,
         ls.title AS lecture_title,
         sub.name AS subject_name,
         tu.full_name AS teacher_name,
@@ -70,9 +87,15 @@ export async function GET(request) {
         homework_attachment_url: item.homework_attachment_path
           ? await createSignedAdmissionDocumentUrl(item.homework_attachment_path)
           : "",
+        homework_attachment_urls: await createSignedHomeworkSubmissionUrls(
+          Array.isArray(item.homework_attachment_paths) ? item.homework_attachment_paths : []
+        ),
         submission_attachment_url: item.submission_attachment_path
           ? await createSignedAdmissionDocumentUrl(item.submission_attachment_path)
           : "",
+        submission_attachment_urls: await createSignedHomeworkSubmissionUrls(
+          Array.isArray(item.submission_attachment_paths) ? item.submission_attachment_paths : []
+        ),
       }))
     );
 

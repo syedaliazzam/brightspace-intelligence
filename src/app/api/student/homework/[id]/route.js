@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireRole, roleGuardResponse } from "@/lib/roleGuard";
 import prisma from "@/lib/prisma";
-import { uploadHomeworkSubmission } from "@/lib/supabaseStorage";
+import { uploadHomeworkSubmissions } from "@/lib/supabaseStorage";
 
 const ALLOWED_ROLES = ["student"];
 
@@ -9,19 +9,28 @@ function json(message, status = 200, extra = {}) {
   return NextResponse.json({ message, ...extra }, { status });
 }
 
+async function ensureHomeworkAttachmentColumns() {
+  await prisma.$executeRaw`
+    ALTER TABLE homework
+    ADD COLUMN IF NOT EXISTS submission_attachment_buckets jsonb,
+    ADD COLUMN IF NOT EXISTS submission_attachment_paths jsonb,
+    ADD COLUMN IF NOT EXISTS submission_attachment_names jsonb
+  `;
+}
+
 export async function PATCH(request, { params }) {
   try {
     const session = await requireRole(ALLOWED_ROLES);
+    await ensureHomeworkAttachmentColumns();
     const { id } = await params;
     const contentType = request.headers.get("content-type") || "";
     let note = "";
-    let file = null;
+    let files = [];
 
     if (contentType.includes("multipart/form-data")) {
       const formData = await request.formData();
       note = typeof formData.get("note") === "string" ? String(formData.get("note")).trim() : "";
-      const maybeFile = formData.get("file");
-      file = maybeFile instanceof File && maybeFile.size > 0 ? maybeFile : null;
+      files = formData.getAll("file").filter((entry) => entry instanceof File && entry.size > 0);
     } else {
       const body = await request.json().catch(() => ({}));
       note = typeof body?.note === "string" ? body.note.trim() : "";
@@ -44,10 +53,8 @@ export async function PATCH(request, { params }) {
       return json("Homework not found.", 404);
     }
 
-    let upload = null;
-    if (file) {
-      upload = await uploadHomeworkSubmission({ homeworkId: id, file });
-    }
+    const uploads = files.length ? await uploadHomeworkSubmissions({ homeworkId: id, files }) : [];
+    const upload = uploads[0] || null;
 
     await prisma.$executeRaw`
       UPDATE homework
@@ -56,7 +63,10 @@ export async function PATCH(request, { params }) {
         submission_note = ${note}::text,
         submission_attachment_bucket = ${(upload?.bucket || null)}::text,
         submission_attachment_path = ${(upload?.storedPath || null)}::text,
-        submission_attachment_name = ${(file?.name || null)}::text,
+        submission_attachment_name = ${(files[0]?.name || null)}::text,
+        submission_attachment_buckets = ${JSON.stringify(uploads.map((item) => item.bucket || null))}::jsonb,
+        submission_attachment_paths = ${JSON.stringify(uploads.map((item) => item.storedPath || null))}::jsonb,
+        submission_attachment_names = ${JSON.stringify(uploads.map((item) => item.name || null))}::jsonb,
         submitted_at = NOW(),
         updated_at = NOW()
       WHERE id = ${id}::uuid
@@ -74,7 +84,8 @@ export async function PATCH(request, { params }) {
         jsonb_build_object(
           'note', ${note}::text,
           'attachment_path', ${(upload?.storedPath || null)}::text,
-          'attachment_name', ${(file?.name || null)}::text
+          'attachment_name', ${(files[0]?.name || null)}::text,
+          'attachment_paths', ${JSON.stringify(uploads.map((item) => item.storedPath || null))}::jsonb
         )
       )
     `;

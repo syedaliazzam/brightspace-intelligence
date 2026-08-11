@@ -83,7 +83,7 @@ export async function GET(request) {
          )
          WHERE ls.scheduled_start >= NOW()
            AND ls.status::text NOT IN ('cancelled','rescheduled')) AS upcoming_classes,
-        (SELECT COUNT(DISTINCT ls.id)::int
+        (SELECT COUNT(ls.id)::int
          FROM lecture_schedules ls
          INNER JOIN enrollments e ON e.id = ls.enrollment_id
          INNER JOIN course_subjects cs ON cs.course_id = e.course_id AND cs.subject_id = ls.subject_id
@@ -100,9 +100,26 @@ export async function GET(request) {
          FROM lecture_attendance la
          INNER JOIN student_profiles sp ON sp.user_id = la.user_id
          INNER JOIN allowed_students a ON a.id = sp.id
-         WHERE LOWER(la.status::text) = 'present') AS present_lectures,
+         WHERE LOWER(la.status::text) IN ('present', 'partial')) AS present_lectures,
         (SELECT COUNT(*)::int FROM homework h INNER JOIN allowed_students a ON a.id = h.student_id WHERE COALESCE(h.status::text, 'pending') = 'pending') AS pending_homework,
-        COALESCE((SELECT ROUND(100.0 * COUNT(*) FILTER (WHERE la.status::text = 'present') / NULLIF(COUNT(*), 0))::int FROM lecture_attendance la INNER JOIN student_profiles sp ON sp.user_id = la.user_id INNER JOIN allowed_students a ON a.id = sp.id INNER JOIN lecture_schedules ls ON ls.id = la.lecture_id AND ls.status::text = 'verified_by_coordinator'), 0) AS attendance_percentage,
+        COALESCE((SELECT ROUND(
+          (COUNT(*) FILTER (WHERE COALESCE(la.status::text, 'absent') IN ('present', 'partial'))::numeric
+            / NULLIF(COUNT(ls.id), 0)) * 100
+        )::int
+          FROM lecture_schedules ls
+          INNER JOIN enrollments e ON e.id = ls.enrollment_id
+          INNER JOIN course_subjects cs ON cs.course_id = e.course_id AND cs.subject_id = ls.subject_id
+          INNER JOIN allowed_students a ON (
+            a.id = e.student_id
+            OR e.course_id IN (
+              SELECT course_id FROM enrollments
+              WHERE student_id = a.id
+                AND LOWER(status) = 'active'
+            )
+          )
+          LEFT JOIN lecture_attendance la ON la.lecture_id = ls.id AND la.user_id IN (SELECT sp.user_id FROM student_profiles sp WHERE sp.id = a.id)
+          WHERE ls.status::text = 'verified_by_coordinator'
+        ), 0) AS attendance_percentage,
         COALESCE((
           SELECT COALESCE(fs.status::text, fv.status::text, 'not_available')
           FROM allowed_students a

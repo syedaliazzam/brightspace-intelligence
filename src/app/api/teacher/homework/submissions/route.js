@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
 import { requireRole, roleGuardResponse } from "@/lib/roleGuard";
 import prisma from "@/lib/prisma";
-import { createSignedAdmissionDocumentUrl } from "@/lib/supabaseStorage";
+import {
+  createSignedAdmissionDocumentUrl,
+  createSignedHomeworkSubmissionUrls,
+} from "@/lib/supabaseStorage";
 
 const ALLOWED_ROLES = ["teacher", "admin"];
 
@@ -35,6 +38,8 @@ export async function GET() {
         h.submission_note,
         h.submission_attachment_path,
         h.submission_attachment_name,
+        h.submission_attachment_paths,
+        h.submission_attachment_names,
         h.created_at,
         h.updated_at,
         h.teacher_id::text AS teacher_id,
@@ -86,6 +91,11 @@ export async function GET() {
         submission_attachment_url: item.submission_attachment_path
           ? await createSignedAdmissionDocumentUrl(item.submission_attachment_path)
           : "",
+        submission_attachment_urls: await createSignedHomeworkSubmissionUrls(
+          Array.isArray(item.submission_attachment_paths)
+            ? item.submission_attachment_paths
+            : []
+        ),
       }))
     );
 

@@ -135,6 +135,26 @@ async function uploadHomeworkSubmission({ homeworkId, file }) {
   };
 }
 
+async function uploadHomeworkSubmissions({ homeworkId, files = [] }) {
+  const uploaded = [];
+
+  for (const file of files) {
+    if (!(file instanceof File) || file.size <= 0) continue;
+    // Keep the existing single-file storage path structure for compatibility.
+    // Each attachment is stored as its own object and later exposed as a list.
+    // eslint-disable-next-line no-await-in-loop
+    const result = await uploadHomeworkSubmission({ homeworkId, file });
+    uploaded.push({
+      ...result,
+      name: file.name || "homework",
+      type: file.type || "",
+      size: file.size || 0,
+    });
+  }
+
+  return uploaded;
+}
+
 export async function uploadAdmissionDocument({ applicationId, documentType, file }) {
   validateUploadSize(file);
   const { url, serviceRoleKey, bucket } = getAdmissionSupabaseConfig();
@@ -265,4 +285,17 @@ export async function createSignedHomeworkSubmissionUrl(storedPath, expiresIn = 
   return createSignedAdmissionDocumentUrl(storedPath, expiresIn);
 }
 
-export { uploadHomeworkSubmission };
+export async function createSignedHomeworkSubmissionUrls(storedPaths = [], expiresIn = 3600) {
+  const paths = Array.isArray(storedPaths) ? storedPaths : [storedPaths];
+  const uniquePaths = [...new Set(paths.map((item) => String(item || "").trim()).filter(Boolean))];
+  const results = [];
+
+  for (const path of uniquePaths) {
+    // eslint-disable-next-line no-await-in-loop
+    results.push(await createSignedHomeworkSubmissionUrl(path, expiresIn));
+  }
+
+  return results.filter(Boolean);
+}
+
+export { uploadHomeworkSubmission, uploadHomeworkSubmissions };

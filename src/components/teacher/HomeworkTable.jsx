@@ -14,6 +14,13 @@ function formatLectureLabel(item) {
   return item.lecture_title || item.title || "-";
 }
 
+function getAttachmentUrls(item) {
+  if (Array.isArray(item?.homework_attachment_urls) && item.homework_attachment_urls.length) {
+    return item.homework_attachment_urls;
+  }
+  return item?.homework_attachment_url ? [item.homework_attachment_url] : [];
+}
+
 function HomeworkDetailsModal({ item, onClose }) {
   if (!item) return null;
 
@@ -52,25 +59,19 @@ function HomeworkDetailsModal({ item, onClose }) {
             </div>
           </div>
 
-          {item.homework_attachment_url ? (
-            <div className="mt-4 overflow-hidden rounded-[1.5rem] border border-[#2D8A6A]/12 bg-[#FAF7F0]">
-              <a href={item.homework_attachment_url} target="_blank" rel="noreferrer" className="block">
-                {String(item.homework_attachment_name || item.homework_attachment_url).toLowerCase().endsWith(".pdf") ? (
-                  <div className="flex items-center justify-between px-4 py-5 text-sm font-semibold text-[#0D5C48]">
-                    <span>Open homework PDF</span>
-                    <span className="rounded-full bg-[#E9F8F1] px-3 py-1 text-xs">PDF</span>
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-4 px-4 py-4">
-                    <div className="h-20 w-20 overflow-hidden rounded-2xl border border-[#2D8A6A]/15 bg-white">
-                      <img src={item.homework_attachment_url} alt={item.homework_attachment_name || "Homework attachment"} className="h-full w-full object-cover" />
-                    </div>
-                    <div className="text-sm font-semibold text-[#0D5C48]">
-                      Tap to open attachment
-                    </div>
-                  </div>
-                )}
-              </a>
+          {getAttachmentUrls(item).length ? (
+            <div className="mt-4 flex gap-3 overflow-x-auto pb-2">
+              {getAttachmentUrls(item).map((url, index) => (
+                <a
+                  key={`${url}-${index}`}
+                  href={url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex min-w-[180px] shrink-0 items-center justify-center rounded-[1.25rem] border border-[#2D8A6A]/12 bg-[#FAF7F0] px-4 py-3 text-center text-sm font-semibold text-[#0D5C48] transition hover:bg-[#F1EADC]"
+                >
+                  Open homework file {index + 1}
+                </a>
+              ))}
             </div>
           ) : null}
 
@@ -117,49 +118,54 @@ export default function HomeworkTable({ items = [], onEdit }) {
     <>
       <section className="overflow-hidden rounded-[2rem] border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(250,247,240,0.98)_100%)] shadow-[0_20px_70px_-36px_rgba(13,59,46,0.18)] backdrop-blur-xl">
         <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-[#F1EADC] text-left text-sm">
+          <table className="min-w-[1600px] divide-y divide-[#F1EADC] text-left text-sm">
             <thead className="bg-[linear-gradient(180deg,#FAF7F0_0%,#F1EADC_100%)] text-xs uppercase tracking-[0.18em] text-[#0D5C48]">
               <tr>
-                <th className="px-6 py-4">Homework</th>
-                <th className="px-6 py-4">Description</th>
-                <th className="px-6 py-4">Document</th>
-                <th className="px-6 py-4">Lecture</th>
-                <th className="px-6 py-4">Class</th>
-                <th className="px-6 py-4">Subject</th>
-                <th className="px-6 py-4">Due Date</th>
-                <th className="px-6 py-4">Submitted</th>
-                <th className="px-6 py-4">Pending</th>
-                <th className="px-6 py-4">Actions</th>
+                <th className="w-[240px] px-6 py-4">Homework</th>
+                <th className="w-[340px] px-6 py-4">Description</th>
+                <th className="w-[240px] px-6 py-4">Document</th>
+                <th className="w-[220px] px-6 py-4">Lecture</th>
+                <th className="w-[180px] px-6 py-4">Class</th>
+                <th className="w-[180px] px-6 py-4">Subject</th>
+                <th className="w-[160px] px-6 py-4">Due Date</th>
+                <th className="w-[120px] px-6 py-4">Submitted</th>
+                <th className="w-[120px] px-6 py-4">Pending</th>
+                <th className="w-[180px] px-6 py-4">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[#F1EADC]">
               {visibleItems.length ? visibleItems.map((item, index) => (
                 <tr key={`${item.lecture_id}-${index}`}>
-                  <td className="px-6 py-4">
+                  <td className="w-[240px] px-6 py-4">
                     <p className="font-semibold text-[#063F32]">{item.title}</p>
                   </td>
-                  <td className="px-6 py-4 text-[#245C4F]">{item.description || "No description."}</td>
-                  <td className="px-6 py-4 text-[#245C4F]">
-                    {item.homework_attachment_url ? (
-                      <a
-                        href={item.homework_attachment_url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="inline-flex rounded-xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-3 py-2 text-xs font-semibold text-[#063F32] transition hover:bg-[#F1EADC]"
-                      >
-                        View document
-                      </a>
+                  <td className="w-[340px] px-6 py-4 text-[#245C4F]">{item.description || "No description."}</td>
+                  <td className="w-[240px] px-6 py-4 text-[#245C4F]">
+                    {getAttachmentUrls(item).length ? (
+                      <div className="flex flex-wrap gap-2">
+                        {getAttachmentUrls(item).map((url, index) => (
+                          <a
+                            key={`${url}-${index}`}
+                            href={url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex rounded-xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-3 py-2 text-xs font-semibold text-[#063F32] transition hover:bg-[#F1EADC]"
+                          >
+                            View {index + 1}
+                          </a>
+                        ))}
+                      </div>
                     ) : (
                       "-"
                     )}
                   </td>
-                  <td className="px-6 py-4 text-[#245C4F]">{formatLectureLabel(item)}</td>
-                  <td className="px-6 py-4 text-[#245C4F]">{item.class_level || item.course_title || "-"}</td>
-                  <td className="px-6 py-4 text-[#245C4F]">{item.subject_name || "-"}</td>
-                  <td className="px-6 py-4 text-[#245C4F]">{formatDate(item.due_date)}</td>
-                  <td className="px-6 py-4 text-[#245C4F]">{item.submitted_count || 0}</td>
-                  <td className="px-6 py-4 text-[#245C4F]">{item.pending_count || 0}</td>
-                  <td className="px-6 py-4">
+                  <td className="w-[220px] px-6 py-4 text-[#245C4F]">{formatLectureLabel(item)}</td>
+                  <td className="w-[180px] px-6 py-4 text-[#245C4F]">{item.class_level || item.course_title || "-"}</td>
+                  <td className="w-[180px] px-6 py-4 text-[#245C4F]">{item.subject_name || "-"}</td>
+                  <td className="w-[160px] px-6 py-4 text-[#245C4F]">{formatDate(item.due_date)}</td>
+                  <td className="w-[120px] px-6 py-4 text-[#245C4F]">{item.submitted_count || 0}</td>
+                  <td className="w-[120px] px-6 py-4 text-[#245C4F]">{item.pending_count || 0}</td>
+                  <td className="w-[180px] px-6 py-4">
                     <div className="flex flex-nowrap gap-2 whitespace-nowrap">
                       <button type="button" onClick={() => setDetailsItem(item)} className="rounded-xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-3 py-2 text-xs font-semibold text-[#063F32] transition hover:bg-[#F1EADC]">View details</button>
                       <button type="button" onClick={() => setEditItem(item)} className="rounded-xl bg-[#0D5C48] hover:bg-[#063F32] px-3 py-2 text-xs font-semibold text-[#FAF7F0]">Edit</button>
@@ -204,7 +210,7 @@ function EditHomeworkModal({ item, onClose, onSaved }) {
     title: item.title || "",
     description: item.description || "",
     dueDate: item.due_date ? String(item.due_date).slice(0, 10) : "",
-    file: null,
+    files: [],
   });
   const [pending, setPending] = useState(false);
 
@@ -214,7 +220,7 @@ function EditHomeworkModal({ item, onClose, onSaved }) {
       title: item.title || "",
       description: item.description || "",
       dueDate: item.due_date ? String(item.due_date).slice(0, 10) : "",
-      file: null,
+      files: [],
     });
   }, [item]);
 
@@ -227,7 +233,7 @@ function EditHomeworkModal({ item, onClose, onSaved }) {
       payload.append("title", form.title);
       payload.append("description", form.description);
       payload.append("dueDate", form.dueDate);
-      if (form.file) payload.append("file", form.file);
+      form.files.forEach((file) => payload.append("file", file));
       const response = await fetch("/api/teacher/homework", {
         method: "PATCH",
         body: payload,
@@ -269,35 +275,26 @@ function EditHomeworkModal({ item, onClose, onSaved }) {
             <span className="mb-2 block text-sm font-medium text-[#063F32]">Description</span>
             <textarea value={form.description} onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))} placeholder="Description" className="min-h-28 w-full rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 text-sm text-[#063F32] outline-none focus:border-[#2D8A6A] focus:ring-2 focus:ring-[#2D8A6A]/20" />
           </label>
-          {item.homework_attachment_url ? (
-            <div className="mt-3 overflow-hidden rounded-[1.5rem] border border-[#2D8A6A]/12 bg-[#FAF7F0]">
-              <a href={item.homework_attachment_url} target="_blank" rel="noreferrer" className="block">
-                {String(item.homework_attachment_name || item.homework_attachment_url).toLowerCase().endsWith(".pdf") ? (
-                  <div className="flex items-center justify-between px-4 py-4 text-sm font-semibold text-[#0D5C48]">
-                    <span>Current homework PDF</span>
-                    <span className="rounded-full bg-[#E9F8F1] px-3 py-1 text-xs">PDF</span>
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-4 px-4 py-4">
-                    <div className="h-20 w-20 overflow-hidden rounded-2xl border border-[#2D8A6A]/15 bg-white">
-                      <img src={item.homework_attachment_url} alt={item.homework_attachment_name || "Homework attachment"} className="h-full w-full object-cover" />
-                    </div>
-                    <div className="text-sm font-semibold text-[#0D5C48]">
-                      Tap to open attachment
-                    </div>
-                  </div>
-                )}
-              </a>
+          {getAttachmentUrls(item).length ? (
+            <div className="mt-3 grid gap-3">
+              {getAttachmentUrls(item).map((url, index) => (
+                <div key={`${url}-${index}`} className="overflow-hidden rounded-[1.5rem] border border-[#2D8A6A]/12 bg-[#FAF7F0]">
+                  <a href={url} target="_blank" rel="noreferrer" className="block px-4 py-4 text-sm font-semibold text-[#0D5C48]">
+                    Current homework file {index + 1}
+                  </a>
+                </div>
+              ))}
             </div>
           ) : null}
           <label className="mt-3 block">
             <span className="mb-2 block text-sm font-medium text-[#063F32]">Upload document</span>
             <input
               type="file"
+              multiple
               accept="image/*,.pdf"
               onChange={(event) => {
-                const selected = event.target.files?.[0] || null;
-                setForm((current) => ({ ...current, file: selected }));
+                const selectedFiles = Array.from(event.target.files || []).filter((file) => file.size > 0);
+                setForm((current) => ({ ...current, files: selectedFiles }));
               }}
               className="block w-full rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 text-sm text-[#063F32] file:mr-4 file:rounded-xl file:border-0 file:bg-[#0D5C48] file:px-4 file:py-2 file:text-sm file:font-semibold file:text-[#FAF7F0] focus:border-[#C9A227] focus:bg-white focus:ring-4 focus:ring-[#FFF5D6]"
             />

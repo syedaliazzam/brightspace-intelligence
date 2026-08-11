@@ -5,10 +5,11 @@ import { ChevronDown } from "lucide-react";
 import { LeafSpinnerInline } from "@/components/shared/AshShajrahLoaders";
 
 export default function HomeworkForm({ lectures = [], excludeLectureIds = [], initialValue = null, onSaved }) {
-  const [form, setForm] = useState({ lectureId: "", title: "", description: "", dueDate: "", file: null });
+  const [form, setForm] = useState({ lectureId: "", title: "", description: "", dueDate: "", files: [] });
   const [pending, setPending] = useState(false);
   const [lectureOpen, setLectureOpen] = useState(false);
-  const [filePreview, setFilePreview] = useState("");
+  const [filePreviews, setFilePreviews] = useState([]);
+  const [fileInputKey, setFileInputKey] = useState(0);
 
   const allowedLectures = useMemo(() => lectures.filter((item) => {
     const status = String(item.display_status || item.status || "").toLowerCase();
@@ -27,8 +28,9 @@ export default function HomeworkForm({ lectures = [], excludeLectureIds = [], in
 
   useEffect(() => {
     if (!initialValue) {
-      setForm({ lectureId: "", title: "", description: "", dueDate: "", file: null });
-      setFilePreview("");
+      setForm({ lectureId: "", title: "", description: "", dueDate: "", files: [] });
+      setFilePreviews([]);
+      setFileInputKey((current) => current + 1);
       return;
     }
     setForm({
@@ -36,16 +38,34 @@ export default function HomeworkForm({ lectures = [], excludeLectureIds = [], in
       title: initialValue.title || "",
       description: initialValue.description || "",
       dueDate: initialValue.due_date ? String(initialValue.due_date).slice(0, 10) : "",
-      file: null,
+      files: [],
     });
-    setFilePreview(initialValue.homework_attachment_url || "");
+    setFilePreviews(
+      Array.isArray(initialValue.homework_attachment_urls) && initialValue.homework_attachment_urls.length
+        ? initialValue.homework_attachment_urls.map((url) => ({
+            url,
+            name: String(url || "").split("/").pop() || "homework",
+            type: String(url || "").toLowerCase().endsWith(".pdf") ? "application/pdf" : "",
+            isExisting: true,
+          }))
+        : (initialValue.homework_attachment_url
+          ? [{
+              url: initialValue.homework_attachment_url,
+              name: initialValue.homework_attachment_name || "homework",
+              type: String(initialValue.homework_attachment_url || "").toLowerCase().endsWith(".pdf") ? "application/pdf" : "",
+              isExisting: true,
+            }]
+          : [])
+    );
   }, [initialValue]);
 
   useEffect(() => {
     return () => {
-      if (filePreview.startsWith("blob:")) URL.revokeObjectURL(filePreview);
+      filePreviews.forEach((preview) => {
+        if (String(preview || "").startsWith("blob:")) URL.revokeObjectURL(preview);
+      });
     };
-  }, [filePreview]);
+  }, [filePreviews]);
 
   async function submit(event) {
     event.preventDefault();
@@ -56,21 +76,36 @@ export default function HomeworkForm({ lectures = [], excludeLectureIds = [], in
       payload.append("title", form.title);
       payload.append("description", form.description);
       payload.append("dueDate", form.dueDate);
-      if (form.file) payload.append("file", form.file);
+      form.files.forEach((file) => payload.append("file", file));
       const response = await fetch("/api/teacher/homework", {
         method: initialValue ? "PATCH" : "POST",
         body: payload,
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data?.message || "Unable to save homework.");
-      setForm({ lectureId: "", title: "", description: "", dueDate: "", file: null });
-      setFilePreview("");
+      setForm({ lectureId: "", title: "", description: "", dueDate: "", files: [] });
+      setFilePreviews([]);
+      setFileInputKey((current) => current + 1);
       onSaved?.();
     } catch (error) {
       window.alert(error instanceof Error ? error.message : "Unable to save homework.");
     } finally {
       setPending(false);
     }
+  }
+
+  function removePreview(indexToRemove) {
+    setFilePreviews((current) => {
+      const target = current[indexToRemove];
+      if (target?.url && String(target.url).startsWith("blob:")) {
+        URL.revokeObjectURL(target.url);
+      }
+      return current.filter((_, index) => index !== indexToRemove);
+    });
+    setForm((current) => ({
+      ...current,
+      files: current.files.filter((_, index) => index !== indexToRemove),
+    }));
   }
 
   return (
@@ -110,29 +145,67 @@ export default function HomeworkForm({ lectures = [], excludeLectureIds = [], in
         <span className="mb-2 block text-sm font-medium text-[#063F32]">Description</span>
         <textarea value={form.description} onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))} placeholder="Description" className="min-h-28 w-full rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 text-sm text-[#063F32] outline-none focus:border-[#2D8A6A] focus:ring-2 focus:ring-[#2D8A6A]/20" />
       </label>
-      <label className="block">
-        <span className="mb-2 block text-sm font-medium text-[#063F32]">Upload document</span>
-        <input
-          type="file"
-          accept="image/*,.pdf"
-          onChange={(event) => {
-            const selected = event.target.files?.[0] || null;
-            setForm((current) => ({ ...current, file: selected }));
-            if (filePreview.startsWith("blob:")) URL.revokeObjectURL(filePreview);
-            setFilePreview(selected ? URL.createObjectURL(selected) : initialValue?.homework_attachment_url || "");
-          }}
-          className="block w-full rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 text-sm text-[#063F32] file:mr-4 file:rounded-xl file:border-0 file:bg-[#0D5C48] file:px-4 file:py-2 file:text-sm file:font-semibold file:text-[#FAF7F0] focus:border-[#C9A227] focus:bg-white focus:ring-4 focus:ring-[#FFF5D6]"
-        />
-      </label>
-      {filePreview ? (
-        <div className="overflow-hidden rounded-2xl border border-[#2D8A6A]/12 bg-[#FAF7F0]">
-          {String(form.file?.type || "").includes("pdf") || String(filePreview).toLowerCase().endsWith(".pdf") ? (
-            <a href={filePreview} target="_blank" rel="noreferrer" className="block px-4 py-6 text-sm font-semibold text-[#0D5C48]">Open uploaded PDF</a>
-          ) : (
-            <a href={filePreview} target="_blank" rel="noreferrer" className="block">
-              <img src={filePreview} alt="Homework attachment preview" className="max-h-56 w-full object-contain" />
-            </a>
-          )}
+        <label className="block">
+          <span className="mb-2 block text-sm font-medium text-[#063F32]">Upload document</span>
+          <input
+            key={fileInputKey}
+            type="file"
+            multiple
+            accept="image/*,.pdf"
+            onChange={(event) => {
+              const selectedFiles = Array.from(event.target.files || []).filter((file) => file.size > 0);
+              const nextPreviews = selectedFiles.map((file) => ({
+                url: URL.createObjectURL(file),
+                name: file.name || "homework",
+                type: file.type || "",
+                isExisting: false,
+              }));
+              setForm((current) => ({ ...current, files: [...(current.files || []), ...selectedFiles] }));
+              setFilePreviews((current) => [...current, ...nextPreviews]);
+              event.target.value = "";
+              setFileInputKey((current) => current + 1);
+            }}
+            className="block w-full rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 text-sm text-[#063F32] file:mr-4 file:rounded-xl file:border-0 file:bg-[#0D5C48] file:px-4 file:py-2 file:text-sm file:font-semibold file:text-[#FAF7F0] focus:border-[#C9A227] focus:bg-white focus:ring-4 focus:ring-[#FFF5D6]"
+          />
+        </label>
+      {filePreviews.length ? (
+        <div className="overflow-hidden rounded-2xl border border-[#2D8A6A]/12 bg-[#FAF7F0] p-3">
+          <div className="flex gap-3 overflow-x-auto pb-1">
+            {filePreviews.map((preview, index) => {
+              const isPdf = String(preview.type || preview.url || "").toLowerCase().includes("pdf") || String(preview.name || "").toLowerCase().endsWith(".pdf") || String(preview.url || "").toLowerCase().endsWith(".pdf");
+              return (
+                <div
+                  key={`${preview.url}-${index}`}
+                  className="relative flex w-44 min-w-44 flex-col overflow-hidden rounded-xl border border-[#2D8A6A]/10 bg-white shadow-sm"
+                >
+                  <button
+                    type="button"
+                    onClick={() => removePreview(index)}
+                    className="absolute right-2 top-2 z-10 inline-flex h-7 w-7 items-center justify-center rounded-full bg-[#c70a0a] text-sm font-semibold text-[#FAF7F0] shadow-md transition hover:bg-[#c70a0a] cursor-pointer"
+                    aria-label={`Remove file ${index + 1}`}
+                  >
+                    ×
+                  </button>
+                  <a href={preview.url} target="_blank" rel="noreferrer" className="block">
+                    <div className="flex h-28 items-center justify-center overflow-hidden bg-[#FAF7F0]">
+                      {isPdf ? (
+                        <iframe
+                          src={preview.url}
+                          title={`Homework attachment PDF preview ${index + 1}`}
+                          className="h-full w-full"
+                        />
+                      ) : (
+                        <img src={preview.url} alt={`Homework attachment preview ${index + 1}`} className="h-full w-full object-cover" />
+                      )}
+                    </div>
+                    <div className="border-t border-[#2D8A6A]/10 px-3 py-2 text-xs font-semibold text-[#0D5C48]">
+                      {isPdf ? `Open PDF preview${preview.name ? ` · ${preview.name}` : ""}` : "Open image preview"}
+                    </div>
+                  </a>
+                </div>
+              );
+            })}
+          </div>
         </div>
       ) : null}
       <div className="flex justify-end">

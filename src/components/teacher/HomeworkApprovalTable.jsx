@@ -6,6 +6,17 @@ import PaginationControls from "@/components/teacher/PaginationControls";
 function HomeworkSubmissionModal({ item, onClose, onAction }) {
   if (!item) return null;
 
+  function isPdfUrl(value) {
+    const path = String(value || "").split("?")[0].split("#")[0].toLowerCase();
+    return path.endsWith(".pdf");
+  }
+
+  const submissionUrls = Array.isArray(item.submission_attachment_urls) && item.submission_attachment_urls.length
+    ? item.submission_attachment_urls
+    : item.submission_attachment_url
+      ? [item.submission_attachment_url]
+      : [];
+
   return (
     <div className="fixed inset-x-0 top-0 z-50 flex min-h-screen items-start justify-center bg-[#063F32]/45 px-4 pt-14 pb-8">
       <div className="w-full max-w-3xl overflow-hidden rounded-[2rem] border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(250,247,240,0.98)_100%)] shadow-[0_24px_80px_-36px_rgba(13,59,46,0.32)]">
@@ -41,11 +52,42 @@ function HomeworkSubmissionModal({ item, onClose, onAction }) {
             </div>
           </div>
 
-          {item.submission_attachment_url ? (
-            <div className="mt-4 overflow-hidden rounded-[1.5rem] border border-[#2D8A6A]/12 bg-[#FAF7F0]">
-              <a href={item.submission_attachment_url} target="_blank" rel="noreferrer" className="block">
-                <img src={item.submission_attachment_url} alt={item.submission_attachment_name || "Homework submission"} className="h-72 w-full object-contain" />
-              </a>
+          {submissionUrls.length ? (
+            <div className="mt-4 flex gap-3 overflow-x-auto pb-2">
+              {submissionUrls.map((url, index) => {
+                const isPdf = isPdfUrl(url);
+                return (
+                  <a
+                    key={`${url}-${index}`}
+                    href={url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="min-w-[220px] max-w-[220px] shrink-0 overflow-hidden rounded-[1.35rem] border border-[#2D8A6A]/12 bg-[#FAF7F0] transition hover:border-[#2D8A6A]/25 hover:bg-[#F1EADC]"
+                  >
+                    <div className="flex items-center justify-between border-b border-[#2D8A6A]/10 px-3 py-2">
+                      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#0D5C48]">
+                        {isPdf ? "PDF" : "Image"} {index + 1}
+                      </p>
+                      <span className="text-[11px] font-semibold text-[#245C4F]">Open</span>
+                    </div>
+                    <div className="flex h-52 items-center justify-center bg-white px-2 py-2">
+                      {isPdf ? (
+                        <iframe
+                          src={url}
+                          title={`Homework submission PDF ${index + 1}`}
+                          className="h-full w-full rounded-[0.9rem]"
+                        />
+                      ) : (
+                        <img
+                          src={url}
+                          alt={item.submission_attachment_name || "Homework submission"}
+                          className="h-full w-full object-contain"
+                        />
+                      )}
+                    </div>
+                  </a>
+                );
+              })}
             </div>
           ) : null}
 

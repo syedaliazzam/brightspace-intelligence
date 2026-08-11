@@ -18,6 +18,15 @@ export default function HomeworkList({ items = [] }) {
     return items.slice(startIndex, startIndex + pageSize);
   }, [items, page]);
 
+  function getAttachmentUrls(row, key) {
+    const pluralKey = `${key}_urls`;
+    const singleKey = `${key}_url`;
+    if (Array.isArray(row?.[pluralKey]) && row[pluralKey].length) {
+      return row[pluralKey];
+    }
+    return row?.[singleKey] ? [row[singleKey]] : [];
+  }
+
   return (
     <section className="overflow-hidden rounded-[2rem] border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(250,247,240,0.98)_100%)] shadow-[0_20px_70px_-36px_rgba(13,59,46,0.18)] backdrop-blur-xl">
       <div className="overflow-x-auto">
@@ -31,7 +40,7 @@ export default function HomeworkList({ items = [] }) {
               <th className="px-4 py-3 min-w-[160px]">Teacher</th>
               <th className="px-4 py-3 min-w-[150px]">Homework Attachment</th>
               <th className="px-4 py-3 min-w-[150px]">Submitted Attachment</th>
-              <th className="px-4 py-3">Submitted Text</th>
+              <th className="px-4 py-3 min-w-[260px]">Submitted Text</th>
               <th className="px-4 py-3">Status</th>
               <th className="px-4 py-3 min-w-[140px]">Due Date</th>
             </tr>
@@ -49,54 +58,44 @@ export default function HomeworkList({ items = [] }) {
                   <td className="px-4 py-3 min-w-[150px] text-[#245C4F]">{item.subject_name || "-"}</td>
                   <td className="px-4 py-3 min-w-[160px] text-[#245C4F]">{item.teacher_name || "-"}</td>
                   <td className="px-4 py-3 min-w-[150px] text-[#245C4F]">
-                    {item.homework_attachment_url ? (
-                      <a
-                        href={item.homework_attachment_url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="block w-24 overflow-hidden rounded-xl border border-[#2D8A6A]/12 bg-[#FAF7F0]"
-                      >
-                        {String(item.homework_attachment_name || item.homework_attachment_url).toLowerCase().endsWith(".pdf") ? (
-                          <div className="flex h-16 items-center justify-center px-2 text-center text-[0.7rem] font-semibold uppercase tracking-[0.12em] text-[#0D5C48]">
-                            PDF
-                          </div>
-                        ) : (
-                          <img
-                            src={item.homework_attachment_url}
-                            alt={item.homework_attachment_name || "Homework attachment"}
-                            className="h-16 w-full object-cover"
-                          />
-                        )}
-                      </a>
+                    {getAttachmentUrls(item, "homework_attachment").length ? (
+                      <div className="flex flex-nowrap gap-2 overflow-x-auto pb-1 whitespace-nowrap">
+                        {getAttachmentUrls(item, "homework_attachment").map((url, index) => (
+                          <a
+                            key={`${url}-${index}`}
+                            href={url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex shrink-0 rounded-xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-3 py-2 text-xs font-semibold text-[#0D5C48] transition hover:bg-[#F1EADC]"
+                          >
+                            File {index + 1}
+                          </a>
+                        ))}
+                      </div>
                     ) : (
                       "-"
                     )}
                   </td>
                   <td className="px-4 py-3 min-w-[150px] text-[#245C4F]">
-                    {submitted && item.submission_attachment_url ? (
-                      <a
-                        href={item.submission_attachment_url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="block w-24 overflow-hidden rounded-xl border border-[#2D8A6A]/12 bg-[#FAF7F0]"
-                      >
-                        {String(item.submission_attachment_name || item.submission_attachment_url).toLowerCase().endsWith(".pdf") ? (
-                          <div className="flex h-16 items-center justify-center px-2 text-center text-[0.7rem] font-semibold uppercase tracking-[0.12em] text-[#0D5C48]">
-                            PDF
-                          </div>
-                        ) : (
-                          <img
-                            src={item.submission_attachment_url}
-                            alt={item.submission_attachment_name || "Homework submission"}
-                            className="h-16 w-full object-cover"
-                          />
-                        )}
-                      </a>
+                    {submitted && getAttachmentUrls(item, "submission_attachment").length ? (
+                      <div className="flex flex-nowrap gap-2 overflow-x-auto pb-1 whitespace-nowrap">
+                        {getAttachmentUrls(item, "submission_attachment").map((url, index) => (
+                          <a
+                            key={`${url}-${index}`}
+                            href={url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex shrink-0 rounded-xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-3 py-2 text-xs font-semibold text-[#0D5C48] transition hover:bg-[#F1EADC]"
+                          >
+                            File {index + 1}
+                          </a>
+                        ))}
+                      </div>
                     ) : (
                       "-"
                     )}
                   </td>
-                  <td className="px-4 py-3 text-[#245C4F]">{submitted ? item.submission_note || "No text submitted." : "-"}</td>
+                  <td className="px-4 py-3 min-w-[260px] text-[#245C4F]">{submitted ? item.submission_note || "No text submitted." : "-"}</td>
                   <td className="px-4 py-3 text-[#245C4F]">
                     <span className={`rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] ${
                       submitted ? "bg-[#E9F8F1] text-[#0D5C48]" : "bg-[#FAF7F0] text-[#245C4F]"

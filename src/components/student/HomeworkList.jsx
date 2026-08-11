@@ -11,29 +11,51 @@ function formatDate(value) {
   return date.toLocaleDateString("en-PK", { timeZone: "Asia/Karachi", dateStyle: "medium" });
 }
 
+function getHomeworkAttachmentUrls(item) {
+  if (Array.isArray(item?.homework_attachment_urls) && item.homework_attachment_urls.length) {
+    return item.homework_attachment_urls;
+  }
+  return item?.homework_attachment_url ? [item.homework_attachment_url] : [];
+}
+
 export default function HomeworkList({ items = [], onRefresh }) {
   const [submittingId, setSubmittingId] = useState("");
   const [activeItem, setActiveItem] = useState(null);
   const [note, setNote] = useState("");
-  const [file, setFile] = useState(null);
-  const [filePreview, setFilePreview] = useState("");
+  const [files, setFiles] = useState([]);
+  const [filePreviews, setFilePreviews] = useState([]);
   const [modalError, setModalError] = useState("");
   const [pending, setPending] = useState(false);
+
+  function syncFilePreviews(nextFiles) {
+    setFilePreviews((currentPreviews) => {
+      currentPreviews.forEach((preview) => {
+        if (preview?.url && String(preview.url || "").startsWith("blob:")) URL.revokeObjectURL(preview.url);
+      });
+      return nextFiles.map((selected) => ({
+        url: URL.createObjectURL(selected),
+        name: selected.name || `file-${Date.now()}`,
+        type: selected.type || "",
+      }));
+    });
+  }
 
   useEffect(() => {
     if (activeItem) {
       setNote("");
-      setFile(null);
-      setFilePreview("");
+      setFiles([]);
+      setFilePreviews([]);
       setModalError("");
     }
   }, [activeItem]);
 
   useEffect(() => {
     return () => {
-      if (filePreview) URL.revokeObjectURL(filePreview);
+      filePreviews.forEach((preview) => {
+        if (preview?.url && String(preview.url || "").startsWith("blob:")) URL.revokeObjectURL(preview.url);
+      });
     };
-  }, [filePreview]);
+  }, [filePreviews]);
 
   async function submitHomework(event) {
     event.preventDefault();
@@ -47,7 +69,7 @@ export default function HomeworkList({ items = [], onRefresh }) {
     try {
       const formData = new FormData();
       formData.append("note", note);
-      if (file) formData.append("file", file);
+      files.forEach((selectedFile) => formData.append("file", selectedFile));
       const response = await fetch(`/api/student/homework/${activeItem.id}`, {
         method: "PATCH",
         body: formData,
@@ -90,15 +112,20 @@ export default function HomeworkList({ items = [], onRefresh }) {
                   </td>
                   <td className="px-6 py-4 text-[#245C4F]">{item.description || "No description provided."}</td>
                   <td className="px-6 py-4 text-[#245C4F]">
-                    {item.homework_attachment_url ? (
-                      <a
-                        href={item.homework_attachment_url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="inline-flex rounded-xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-3 py-2 text-xs font-semibold text-[#0D5C48] transition hover:bg-[#F1EADC]"
-                      >
-                        View document
-                      </a>
+                    {getHomeworkAttachmentUrls(item).length ? (
+                      <div className="flex flex-nowrap gap-2 overflow-x-auto pb-1 whitespace-nowrap">
+                        {getHomeworkAttachmentUrls(item).map((url, index) => (
+                          <a
+                            key={`${url}-${index}`}
+                            href={url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex shrink-0 rounded-xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-3 py-2 text-xs font-semibold text-[#0D5C48] transition hover:bg-[#F1EADC]"
+                          >
+                            View {index + 1}
+                          </a>
+                        ))}
+                      </div>
                     ) : (
                       "-"
                     )}
@@ -163,18 +190,38 @@ export default function HomeworkList({ items = [], onRefresh }) {
                   <p className="mt-2">{activeItem.description || activeItem.lecture_title || "Homework details pending."}</p>
                 </div>
 
-                {activeItem.homework_attachment_url ? (
-                  <div className="overflow-hidden rounded-[1.5rem] border border-[#2D8A6A]/12 bg-[#FAF7F0]">
-                    <a href={activeItem.homework_attachment_url} target="_blank" rel="noreferrer" className="block">
-                      {String(activeItem.homework_attachment_name || activeItem.homework_attachment_url).toLowerCase().endsWith(".pdf") ? (
-                        <div className="flex items-center justify-between px-4 py-4 text-sm font-semibold text-[#0D5C48]">
-                          <span>Open homework PDF</span>
-                          <span className="rounded-full bg-[#E9F8F1] px-3 py-1 text-xs">PDF</span>
-                        </div>
-                      ) : (
-                        <img src={activeItem.homework_attachment_url} alt={activeItem.homework_attachment_name || "Homework attachment"} className="max-h-72 w-full object-contain" />
-                      )}
-                    </a>
+                {getHomeworkAttachmentUrls(activeItem).length ? (
+                  <div className="flex gap-3 overflow-x-auto pb-2">
+                    {getHomeworkAttachmentUrls(activeItem).map((url, index) => (
+                      <div
+                        key={`${url}-${index}`}
+                        className="flex min-w-[180px] max-w-[180px] shrink-0 flex-col overflow-hidden rounded-[1.35rem] border border-[#2D8A6A]/12 bg-[#FAF7F0] transition hover:border-[#2D8A6A]/25 hover:bg-[#F1EADC]"
+                      >
+                        <a href={url} target="_blank" rel="noreferrer" className="block">
+                          <div className="flex items-center justify-between border-b border-[#2D8A6A]/10 px-3 py-2">
+                            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#0D5C48]">
+                              {String(url).split("?")[0].toLowerCase().endsWith(".pdf") ? "PDF" : "Image"} {index + 1}
+                            </p>
+                            <span className="text-[11px] font-semibold text-[#245C4F]">Open</span>
+                          </div>
+                          <div className="flex h-28 items-center justify-center bg-white px-2 py-2">
+                            {String(url).split("?")[0].toLowerCase().endsWith(".pdf") ? (
+                              <iframe
+                                src={url}
+                                title={`Homework file preview ${index + 1}`}
+                                className="h-full w-full rounded-[0.9rem]"
+                              />
+                            ) : (
+                              <img
+                                src={url}
+                                alt={`Homework submission preview ${index + 1}`}
+                                className="h-full w-full object-contain"
+                              />
+                            )}
+                          </div>
+                        </a>
+                      </div>
+                    ))}
                   </div>
                 ) : null}
 
@@ -189,24 +236,66 @@ export default function HomeworkList({ items = [], onRefresh }) {
                 </label>
 
                 <label className="block">
-                  <span className="mb-2 block text-sm font-medium text-[#063F32]">Upload picture</span>
+                  <span className="mb-2 block text-sm font-medium text-[#063F32]">Upload documents</span>
                   <input
                     type="file"
-                    accept="image/*"
+                    multiple
+                    accept="image/*,.pdf"
                     onChange={(event) => {
-                      const selected = event.target.files?.[0] || null;
-                      setFile(selected);
-                      if (filePreview) URL.revokeObjectURL(filePreview);
-                      setFilePreview(selected ? URL.createObjectURL(selected) : "");
+                      const selectedFiles = Array.from(event.target.files || []).filter((selected) => selected.size > 0);
+                      if (!selectedFiles.length) return;
+                      setFiles((currentFiles) => {
+                        const nextFiles = [...currentFiles, ...selectedFiles];
+                        syncFilePreviews(nextFiles);
+                        return nextFiles;
+                      });
+                      event.target.value = "";
                     }}
-                    className="block w-full rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 text-sm text-[#063F32] file:mr-4 file:rounded-xl file:border-0 file:bg-[#0D5C48] file:px-4 file:py-2 file:text-sm file:font-semibold file:text-[#FAF7F0] focus:border-[#C9A227] focus:bg-white focus:ring-4 focus:ring-[#FFF5D6]"
+                    className="block w-full rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 text-sm text-transparent file:mr-4 file:rounded-xl file:border-0 file:bg-[#0D5C48] file:px-4 file:py-2 file:text-sm file:font-semibold file:text-[#FAF7F0] focus:border-[#C9A227] focus:bg-white focus:ring-4 focus:ring-[#FFF5D6]"
                   />
+                  <span className="mt-2 block text-xs font-semibold uppercase tracking-[0.14em] text-[#245C4F]">
+                    {files.length ? `${files.length} file${files.length === 1 ? "" : "s"} chosen` : "No file chosen"}
+                  </span>
                 </label>
 
-                {filePreview ? (
-                  <a href={filePreview} target="_blank" rel="noreferrer" className="block overflow-hidden rounded-[1.5rem] border border-[#2D8A6A]/12 bg-[#FAF7F0]">
-                    <img src={filePreview} alt="Homework submission preview" className="max-h-56 w-full object-contain" />
-                  </a>
+                {filePreviews.length ? (
+                  <div className="flex gap-3 overflow-x-auto pb-2">
+                    {filePreviews.map((preview, index) => (
+                      <a
+                        key={`${preview.url}-${index}`}
+                        href={preview.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="group min-w-[220px] max-w-[220px] overflow-hidden rounded-[1.5rem] border border-[#2D8A6A]/12 bg-[#FAF7F0] shadow-[0_12px_32px_-24px_rgba(13,59,46,0.24)] transition hover:-translate-y-0.5 hover:border-[#2D8A6A]/25 hover:bg-[#F1EADC]"
+                      >
+                        <div className="flex items-center justify-between border-b border-[#2D8A6A]/10 px-4 py-3">
+                          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#0D5C48]">
+                            {preview.type?.includes("pdf") ? "PDF" : "Image"} {index + 1}
+                          </p>
+                          <span className="text-[11px] font-semibold text-[#245C4F] group-hover:text-[#063F32]">
+                            Open
+                          </span>
+                        </div>
+                        {preview.type?.includes("pdf") ? (
+                          <div className="h-48 bg-white">
+                            <iframe
+                              src={preview.url}
+                              title={`Homework PDF preview ${index + 1}`}
+                              className="h-full w-full"
+                            />
+                          </div>
+                        ) : (
+                          <div className="flex h-48 items-center justify-center bg-white px-3 py-3">
+                            <img
+                              src={preview.url}
+                              alt={`Homework submission preview ${index + 1}`}
+                              className="max-h-full w-full object-contain"
+                            />
+                          </div>
+                        )}
+                      </a>
+                    ))}
+                  </div>
                 ) : null}
 
                 {modalError ? <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{modalError}</div> : null}

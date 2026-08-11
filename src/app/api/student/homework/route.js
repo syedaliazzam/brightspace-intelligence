@@ -1,15 +1,25 @@
 import { NextResponse } from "next/server";
 import { requireRole, roleGuardResponse } from "@/lib/roleGuard";
 import prisma from "@/lib/prisma";
-import { createSignedAdmissionDocumentUrl } from "@/lib/supabaseStorage";
+import { createSignedAdmissionDocumentUrl, createSignedHomeworkSubmissionUrls } from "@/lib/supabaseStorage";
 
 function json(message, status = 200, extra = {}) {
   return NextResponse.json({ message, ...extra }, { status });
 }
 
+async function ensureHomeworkAttachmentColumns() {
+  await prisma.$executeRaw`
+    ALTER TABLE homework
+    ADD COLUMN IF NOT EXISTS homework_attachment_buckets jsonb,
+    ADD COLUMN IF NOT EXISTS homework_attachment_paths jsonb,
+    ADD COLUMN IF NOT EXISTS homework_attachment_names jsonb
+  `;
+}
+
 export async function GET() {
   try {
     const session = await requireRole(["student"]);
+    await ensureHomeworkAttachmentColumns();
     const items = await prisma.$queryRaw`
       SELECT
         h.id::text AS id,
@@ -20,6 +30,8 @@ export async function GET() {
         h.created_at,
         h.homework_attachment_path,
         h.homework_attachment_name,
+        h.homework_attachment_paths,
+        h.homework_attachment_names,
         ls.title AS lecture_title,
         sub.name AS subject_name,
         tu.full_name AS teacher_name
@@ -37,6 +49,9 @@ export async function GET() {
       homework_attachment_url: item.homework_attachment_path
         ? await createSignedAdmissionDocumentUrl(item.homework_attachment_path)
         : "",
+      homework_attachment_urls: await createSignedHomeworkSubmissionUrls(
+        Array.isArray(item.homework_attachment_paths) ? item.homework_attachment_paths : []
+      ),
     })));
     return json("Homework fetched.", 200, { items: enriched });
   } catch (error) {

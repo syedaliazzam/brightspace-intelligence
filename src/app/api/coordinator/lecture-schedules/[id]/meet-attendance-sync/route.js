@@ -334,6 +334,27 @@ function pickLongestRecord(records, predicate = () => true) {
   return [...records.filter(predicate)].sort((left, right) => Number(right.durationMinutes || 0) - Number(left.durationMinutes || 0))[0] || null;
 }
 
+function pickClosestByJoinedAt(records, targetTime, predicate = () => true) {
+  const target = new Date(targetTime || 0).getTime();
+  const filtered = [...records.filter(predicate)];
+  if (!filtered.length) return null;
+
+  if (Number.isNaN(target)) {
+    return pickLongestRecord(filtered);
+  }
+
+  return filtered
+    .map((record) => {
+      const joinedAt = new Date(record?.joinedAt || 0).getTime();
+      const distance = Number.isNaN(joinedAt) ? Number.POSITIVE_INFINITY : Math.abs(joinedAt - target);
+      return { record, distance };
+    })
+    .sort((left, right) => {
+      if (left.distance !== right.distance) return left.distance - right.distance;
+      return Number(right.record.durationMinutes || 0) - Number(left.record.durationMinutes || 0);
+    })[0]?.record || null;
+}
+
 function dedupeParticipantRecords(records = []) {
   const grouped = new Map();
 
@@ -371,11 +392,27 @@ function dedupeParticipantRecords(records = []) {
   return [...grouped.values()];
 }
 
-function classifyParticipants(records, lecture, calendarEvent) {
+function recordOverlapsLectureWindow(record, lectureStart, lectureEnd, toleranceMinutes = 20) {
+  const recordStart = new Date(record?.joinedAt || 0).getTime();
+  const recordEnd = new Date(record?.leftAt || record?.joinedAt || 0).getTime();
+  const targetStart = new Date(lectureStart || 0).getTime();
+  const targetEnd = new Date(lectureEnd || 0).getTime();
+
+  if (Number.isNaN(recordStart) || Number.isNaN(targetStart) || Number.isNaN(targetEnd)) {
+    return false;
+  }
+
+  const tolerance = Number(toleranceMinutes || 0) * 60000;
+  return recordEnd >= targetStart - tolerance && recordStart <= targetEnd + tolerance;
+}
+
+function classifyParticipants(records, lecture, calendarEvent, lectureStart = null, lectureEnd = null) {
   const expected = buildExpectedParticipants(lecture, calendarEvent);
+  const windowedRecords = records.filter((record) => recordOverlapsLectureWindow(record, lectureStart, lectureEnd, 20));
+  const candidateRecords = windowedRecords.length ? windowedRecords : records;
   const hostEmailVariants = normalizeEmailVariants(expected[0].emailVariants);
   const cohostEmailVariants = normalizeEmailVariants(expected[1].emailVariants);
-  const hostCandidates = records.filter((record) => {
+  const hostCandidates = candidateRecords.filter((record) => {
     const recordEmail = normalizeEmail(record.participantEmail || "");
     const recordName = normalizeName(record.participantName || "");
     return (
@@ -384,8 +421,15 @@ function classifyParticipants(records, lecture, calendarEvent) {
       (recordName && normalizeNameVariants(expected[0].nameVariants).some((expectedName) => recordName === expectedName || recordName.includes(expectedName) || expectedName.includes(recordName)))
     );
   });
-  const host = pickLongestRecord(hostCandidates) || pickBestMatch(records, expected[0].emailVariants, "host", expected[0].nameVariants);
-  const cohostCandidates = records.filter((record) => {
+  const host =
+    pickClosestByJoinedAt(
+      hostCandidates,
+      lectureStart,
+      (record) => Number(record.durationMinutes || 0) > 0
+    ) ||
+    pickClosestByJoinedAt(hostCandidates, lectureStart) ||
+    pickBestMatch(candidateRecords, expected[0].emailVariants, "host", expected[0].nameVariants);
+  const cohostCandidates = candidateRecords.filter((record) => {
     if (record === host) return false;
     const recordEmail = normalizeEmail(record.participantEmail || "");
     const recordName = normalizeName(record.participantName || "");
@@ -398,7 +442,7 @@ function classifyParticipants(records, lecture, calendarEvent) {
   const cohost =
     pickLongestRecord(cohostCandidates) ||
     pickBestMatch(
-      records.filter((record) => record !== host),
+      candidateRecords.filter((record) => record !== host),
       expected[1].emailVariants,
       "cohost",
       expected[1].nameVariants
@@ -406,7 +450,7 @@ function classifyParticipants(records, lecture, calendarEvent) {
   const fallbackCohost =
     cohost ||
     pickLongestRecord(
-      records.filter((record) => record !== host),
+      candidateRecords.filter((record) => record !== host),
       (record) => {
         const name = normalizeName(record.participantName || "");
         return Boolean(name) && !/^\d+$/.test(String(record.participantName || "").trim());
@@ -420,7 +464,7 @@ function classifyParticipants(records, lecture, calendarEvent) {
       fallbackCohost?.participantEmail || "",
     ])
   );
-  const others = records.filter((record) => {
+  const others = candidateRecords.filter((record) => {
     if (record === host || record === fallbackCohost) return false;
     const recordEmail = normalizeEmail(record.participantEmail || "");
     if (recordEmail && reservedEmails.has(recordEmail)) return false;
@@ -484,6 +528,41 @@ function toLectureMetaRecord(record, roleType = "participant", fallbackEmail = "
     left_at: leftAtValue,
     duration_minutes: durationValue,
     role_type: roleType,
+  };
+}
+
+function normalizeStaffRecordToConferenceWindow(record, conferenceStartTime, conferenceEndTime) {
+  if (!record) return null;
+
+  const conferenceStart = conferenceStartTime ? new Date(conferenceStartTime) : null;
+  const conferenceEnd = conferenceEndTime ? new Date(conferenceEndTime) : null;
+  const joinedAt = record.joinedAt ? new Date(record.joinedAt) : null;
+  const durationMinutes = Number(record.durationMinutes || 0);
+
+  const conferenceStartValue = conferenceStart && !Number.isNaN(conferenceStart.getTime()) ? conferenceStart.getTime() : null;
+  const conferenceEndValue = conferenceEnd && !Number.isNaN(conferenceEnd.getTime()) ? conferenceEnd.getTime() : null;
+  const joinedAtValue = joinedAt && !Number.isNaN(joinedAt.getTime()) ? joinedAt.getTime() : null;
+
+  if (!conferenceStartValue || !joinedAtValue) {
+    return record;
+  }
+
+  if (
+    joinedAtValue >= conferenceStartValue - 30 * 60 * 1000 &&
+    (!conferenceEndValue || joinedAtValue <= conferenceEndValue + 30 * 60 * 1000)
+  ) {
+    return record;
+  }
+
+  const normalizedJoinedAt = new Date(conferenceStartValue).toISOString();
+  const calculatedLeftAt = durationMinutes > 0
+    ? new Date(conferenceStartValue + durationMinutes * 60000).toISOString()
+    : (conferenceEndValue ? new Date(conferenceEndValue).toISOString() : record.leftAt || null);
+
+  return {
+    ...record,
+    joinedAt: normalizedJoinedAt,
+    leftAt: calculatedLeftAt,
   };
 }
 
@@ -642,12 +721,28 @@ export async function POST(_request, { params }) {
       reportsIdentities: meetData.reportsIdentities || [],
     });
     const enrichedRecords = enrichParticipants(meetData.records, identityStore);
-    const classification = classifyParticipants(enrichedRecords, lecture, calendarEvent);
-    const hostMeta = classification.host
-      ? toLectureMetaRecord(classification.host, "coordinator", lecture.coordinator_email || "", meetData.conference_record_end_time || meetData.conferenceRecord?.endTime || null)
+    const classification = classifyParticipants(
+      enrichedRecords,
+      lecture,
+      calendarEvent,
+      calendarEvent?.startAt || lecture.scheduled_start || null,
+      calendarEvent?.endAt || lecture.scheduled_end || null
+    );
+    const normalizedHostRecord = normalizeStaffRecordToConferenceWindow(
+      classification.host,
+      meetData.conference_record_start_time || meetData.conferenceRecord?.startTime || null,
+      meetData.conference_record_end_time || meetData.conferenceRecord?.endTime || null
+    );
+    const normalizedTeacherRecord = normalizeStaffRecordToConferenceWindow(
+      classification.cohost,
+      meetData.conference_record_start_time || meetData.conferenceRecord?.startTime || null,
+      meetData.conference_record_end_time || meetData.conferenceRecord?.endTime || null
+    );
+    const hostMeta = normalizedHostRecord
+      ? toLectureMetaRecord(normalizedHostRecord, "coordinator", lecture.coordinator_email || "", meetData.conference_record_end_time || meetData.conferenceRecord?.endTime || null)
       : null;
-    const teacherMeta = classification.cohost
-      ? toLectureMetaRecord(classification.cohost, "teacher", lecture.teacher_email || "", meetData.conference_record_end_time || meetData.conferenceRecord?.endTime || null)
+    const teacherMeta = normalizedTeacherRecord
+      ? toLectureMetaRecord(normalizedTeacherRecord, "teacher", lecture.teacher_email || "", meetData.conference_record_end_time || meetData.conferenceRecord?.endTime || null)
       : null;
     const normalizedCoordinatorEmail = normalizeEmail(lecture.coordinator_email || lecture.google_organizer_email || "");
     const normalizedTeacherEmail = normalizeEmail(lecture.teacher_email || lecture.google_teacher_email || "");

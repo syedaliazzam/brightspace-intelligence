@@ -1,7 +1,11 @@
 import { NextResponse } from "next/server";
 import { requireRole, roleGuardResponse } from "@/lib/roleGuard";
 import prisma from "@/lib/prisma";
-import { uploadHomeworkSubmission, createSignedAdmissionDocumentUrl } from "@/lib/supabaseStorage";
+import {
+  uploadHomeworkSubmissions,
+  createSignedAdmissionDocumentUrl,
+  createSignedHomeworkSubmissionUrls,
+} from "@/lib/supabaseStorage";
 
 const ALLOWED_ROLES = ["teacher", "admin"];
 
@@ -11,6 +15,29 @@ function json(message, status = 200, extra = {}) {
 
 function clean(value) {
   return typeof value === "string" ? value.trim() : "";
+}
+
+function parseJsonArray(value) {
+  if (Array.isArray(value)) return value;
+  if (typeof value !== "string") return [];
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+async function ensureHomeworkAttachmentColumns() {
+  await prisma.$executeRaw`
+    ALTER TABLE homework
+    ADD COLUMN IF NOT EXISTS homework_attachment_buckets jsonb,
+    ADD COLUMN IF NOT EXISTS homework_attachment_paths jsonb,
+    ADD COLUMN IF NOT EXISTS homework_attachment_names jsonb,
+    ADD COLUMN IF NOT EXISTS submission_attachment_buckets jsonb,
+    ADD COLUMN IF NOT EXISTS submission_attachment_paths jsonb,
+    ADD COLUMN IF NOT EXISTS submission_attachment_names jsonb
+  `;
 }
 
 async function teacherFilter(session) {
@@ -25,6 +52,7 @@ async function teacherFilter(session) {
 export async function GET() {
   try {
     const session = await requireRole(ALLOWED_ROLES);
+    await ensureHomeworkAttachmentColumns();
     const filter = await teacherFilter(session);
     const items = await prisma.$queryRawUnsafe(
       `
@@ -37,6 +65,8 @@ export async function GET() {
         h.due_date,
         MAX(h.homework_attachment_path) AS homework_attachment_path,
         MAX(h.homework_attachment_name) AS homework_attachment_name,
+        MAX(h.homework_attachment_paths::text) AS homework_attachment_paths,
+        MAX(h.homework_attachment_names::text) AS homework_attachment_names,
         MAX(h.created_at) AS created_at,
         MAX(h.updated_at) AS updated_at,
         h.teacher_id::text AS teacher_id,
@@ -85,6 +115,9 @@ export async function GET() {
       homework_attachment_url: item.homework_attachment_path
         ? await createSignedAdmissionDocumentUrl(item.homework_attachment_path)
         : "",
+      homework_attachment_urls: await createSignedHomeworkSubmissionUrls(
+        parseJsonArray(item.homework_attachment_paths)
+      ),
     })));
     return json("Homework fetched.", 200, { items: enriched });
   } catch (error) {
@@ -96,12 +129,13 @@ export async function GET() {
 export async function POST(request) {
   try {
     const session = await requireRole(ALLOWED_ROLES);
+    await ensureHomeworkAttachmentColumns();
     const contentType = request.headers.get("content-type") || "";
     let lectureId = "";
     let title = "";
     let description = "";
     let dueDate = "";
-    let file = null;
+    let files = [];
 
     if (contentType.includes("multipart/form-data")) {
       const formData = await request.formData();
@@ -109,8 +143,9 @@ export async function POST(request) {
       title = clean(formData.get("title"));
       description = clean(formData.get("description"));
       dueDate = clean(formData.get("dueDate"));
-      const maybeFile = formData.get("file");
-      file = maybeFile instanceof File && maybeFile.size > 0 ? maybeFile : null;
+      files = formData
+        .getAll("file")
+        .filter((entry) => entry instanceof File && entry.size > 0);
     } else {
       const body = await request.json();
       lectureId = clean(body?.lectureId);
@@ -155,10 +190,10 @@ export async function POST(request) {
 
     if (!students.length) return json("No active students found for this class.", 404);
 
-    let upload = null;
-    if (file) {
-      upload = await uploadHomeworkSubmission({ homeworkId: lectureId, file });
-    }
+    const uploads = files.length
+      ? await uploadHomeworkSubmissions({ homeworkId: lectureId, files })
+      : [];
+    const upload = uploads[0] || null;
 
     const created = [];
     for (const student of students) {
@@ -175,6 +210,9 @@ export async function POST(request) {
           homework_attachment_bucket,
           homework_attachment_path,
           homework_attachment_name,
+          homework_attachment_buckets,
+          homework_attachment_paths,
+          homework_attachment_names,
           status,
           created_at,
           updated_at
@@ -190,7 +228,10 @@ export async function POST(request) {
           ${dueDate || null}::date,
           ${(upload?.bucket || null)}::text,
           ${(upload?.storedPath || null)}::text,
-          ${(file?.name || null)}::text,
+          ${(files[0]?.name || null)}::text,
+          ${JSON.stringify(uploads.map((item) => item.bucket || null))}::jsonb,
+          ${JSON.stringify(uploads.map((item) => item.storedPath || null))}::jsonb,
+          ${JSON.stringify(uploads.map((item) => item.name || null))}::jsonb,
           'pending'::homework_status,
           NOW(),
           NOW()
@@ -214,12 +255,13 @@ export async function POST(request) {
 export async function PATCH(request) {
   try {
     const session = await requireRole(ALLOWED_ROLES);
+    await ensureHomeworkAttachmentColumns();
     const contentType = request.headers.get("content-type") || "";
     let lectureId = "";
     let title = "";
     let description = "";
     let dueDate = "";
-    let file = null;
+    let files = [];
 
     if (contentType.includes("multipart/form-data")) {
       const formData = await request.formData();
@@ -227,8 +269,9 @@ export async function PATCH(request) {
       title = clean(formData.get("title"));
       description = clean(formData.get("description"));
       dueDate = clean(formData.get("dueDate"));
-      const maybeFile = formData.get("file");
-      file = maybeFile instanceof File && maybeFile.size > 0 ? maybeFile : null;
+      files = formData
+        .getAll("file")
+        .filter((entry) => entry instanceof File && entry.size > 0);
     } else {
       const body = await request.json();
       lectureId = clean(body?.lectureId);
@@ -257,10 +300,10 @@ export async function PATCH(request) {
     const [lecture] = await lectureQuery;
     if (!lecture?.id) return json("Assigned lecture not found.", 404);
 
-    let upload = null;
-    if (file) {
-      upload = await uploadHomeworkSubmission({ homeworkId: lectureId, file });
-    }
+    const uploads = files.length
+      ? await uploadHomeworkSubmissions({ homeworkId: lectureId, files })
+      : [];
+    const upload = uploads[0] || null;
 
     await prisma.$executeRaw`
       UPDATE homework
@@ -269,7 +312,10 @@ export async function PATCH(request) {
           due_date = ${dueDate || null}::date,
           homework_attachment_bucket = COALESCE(${upload?.bucket || null}::text, homework_attachment_bucket),
           homework_attachment_path = COALESCE(${upload?.storedPath || null}::text, homework_attachment_path),
-          homework_attachment_name = COALESCE(${file?.name || null}::text, homework_attachment_name),
+          homework_attachment_name = COALESCE(${files[0]?.name || null}::text, homework_attachment_name),
+          homework_attachment_buckets = COALESCE(${JSON.stringify(uploads.map((item) => item.bucket || null))}::jsonb, homework_attachment_buckets),
+          homework_attachment_paths = COALESCE(${JSON.stringify(uploads.map((item) => item.storedPath || null))}::jsonb, homework_attachment_paths),
+          homework_attachment_names = COALESCE(${JSON.stringify(uploads.map((item) => item.name || null))}::jsonb, homework_attachment_names),
           updated_at = NOW()
       WHERE lecture_id = ${lectureId}::uuid
     `;

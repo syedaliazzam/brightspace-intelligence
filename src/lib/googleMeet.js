@@ -503,9 +503,13 @@ function mergeAuditRecords(records) {
   const grouped = new Map();
 
   for (const record of records) {
-    const key = normalizeDisplayName(
+    const baseKey = normalizeDisplayName(
       record.participantKey || record.email || record.endpointId || record.displayName || ""
     );
+    const sessionKey = normalizeDisplayName(
+      record.googleSessionId || record.googleParticipantId || record.endpointId || ""
+    );
+    const key = sessionKey ? `${baseKey}::${sessionKey}` : baseKey;
     const existing = grouped.get(key);
 
     if (!existing) {
@@ -541,7 +545,7 @@ function mergeMeetSessionAndAuditRecords(auditRecords = [], meetRecords = []) {
   const grouped = new Map();
 
   function getKey(record) {
-    return normalizeDisplayName(
+    const baseKey = normalizeDisplayName(
       normalizeEmail(record?.participantEmail || "") ||
       record?.googleParticipantId ||
       record?.endpointId ||
@@ -550,6 +554,37 @@ function mergeMeetSessionAndAuditRecords(auditRecords = [], meetRecords = []) {
       record?.displayName ||
       ""
     );
+    const sessionKey = normalizeDisplayName(
+      record?.googleSessionId ||
+      record?.googleParticipantId ||
+      record?.endpointId ||
+      ""
+    );
+
+    return sessionKey ? `${baseKey}::${sessionKey}` : baseKey;
+  }
+
+  function pickClosestAuditRecord(records = [], record = null, matcher = () => false) {
+    const matches = records.filter(matcher);
+    if (!matches.length) return null;
+
+    const targetTime = new Date(record?.joinedAt || 0).getTime();
+    if (Number.isNaN(targetTime)) {
+      return matches[0];
+    }
+
+    return matches
+      .map((candidate) => {
+        const candidateTime = new Date(candidate?.joinedAt || 0).getTime();
+        const distance = Number.isNaN(candidateTime)
+          ? Number.POSITIVE_INFINITY
+          : Math.abs(candidateTime - targetTime);
+        return { candidate, distance };
+      })
+      .sort((left, right) => {
+        if (left.distance !== right.distance) return left.distance - right.distance;
+        return Number(right.candidate?.durationMinutes || 0) - Number(left.candidate?.durationMinutes || 0);
+      })[0]?.candidate || null;
   }
 
   function upsert(record, source) {
@@ -593,12 +628,16 @@ function mergeMeetSessionAndAuditRecords(auditRecords = [], meetRecords = []) {
 
   for (const record of meetRecords) {
     const directEmailMatch = record?.participantEmail
-      ? auditRecords.find(
+      ? pickClosestAuditRecord(
+          auditRecords,
+          record,
           (auditRecord) => normalizeEmail(auditRecord?.participantEmail || "") === normalizeEmail(record.participantEmail)
         )
       : null;
     const directNameMatch = !directEmailMatch && record?.participantName
-      ? auditRecords.find(
+      ? pickClosestAuditRecord(
+          auditRecords,
+          record,
           (auditRecord) => normalizeDisplayName(auditRecord?.participantName || "") === normalizeDisplayName(record.participantName)
         )
       : null;
@@ -612,9 +651,9 @@ function mergeMeetSessionAndAuditRecords(auditRecords = [], meetRecords = []) {
           participantName: matched.participantName || record.participantName || "",
           googleParticipantId: record.googleParticipantId || matched.googleParticipantId || "",
           googleSessionId: record.googleSessionId || matched.googleSessionId || "",
-          joinedAt: record.joinedAt || matched.joinedAt,
-          leftAt: record.leftAt || matched.leftAt,
-          durationMinutes: Math.max(Number(record.durationMinutes || 0), Number(matched.durationMinutes || 0)),
+          joinedAt: matched.joinedAt || record.joinedAt,
+          leftAt: matched.leftAt || record.leftAt,
+          durationMinutes: Number(matched.durationMinutes || 0) || Number(record.durationMinutes || 0),
           raw: matched.raw || record.raw,
         },
         "audit"
@@ -797,7 +836,19 @@ async function getAdminReportsMeetAttendanceRecords({
           participantEmail,
           participantName,
           googleParticipantId: participant.endpointId || "",
-          googleSessionId: normalizeDisplayName(getParamValue(parameters.get("identifier")) || item?.id?.uniqueQualifier || ""),
+          googleSessionId: normalizeDisplayName(
+            getParameterCandidate(parameters, [
+              "session_id",
+              "sessionId",
+              "endpoint_id",
+              "endpointId",
+              "streaming_session_id",
+            ]) ||
+            participant.endpointId ||
+            item?.id?.uniqueQualifier ||
+            item?.id?.timeUsec ||
+            ""
+          ),
           joinedAt,
           leftAt: null,
           durationMinutes: 0,
@@ -1000,7 +1051,7 @@ export async function getMeetAttendanceRecords({
 
   const fallbackRecords = await getMeetConferenceParticipantRecords(conferenceRecord.name, impersonateUserEmail);
   const records = mergeMeetSessionAndAuditRecords(
-    mergeAuditRecords(reportsAttendance.records || []),
+    reportsAttendance.records || [],
     fallbackRecords
   );
 

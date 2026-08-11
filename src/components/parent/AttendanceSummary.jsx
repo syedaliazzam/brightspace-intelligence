@@ -7,6 +7,9 @@ import PaginationControls from "@/components/parent/PaginationControls";
 export default function AttendanceSummary({ summary = {}, items = [] }) {
   const pageSize = 7;
   const [page, setPage] = useState(1);
+  const totalConducted = Number(summary.total_conducted || summary.total || 0);
+  const attendedClasses = Number(summary.attended_classes || summary.present || 0);
+  const attendancePercentage = Number(summary.attendance_percentage || summary.percentage || 0);
 
   useEffect(() => {
     setPage(1);
@@ -23,9 +26,9 @@ export default function AttendanceSummary({ summary = {}, items = [] }) {
       <div className="mb-5">
         <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-[#0D5C48]">Attendance</p>
         <h2 className="mt-2 font-body text-2xl font-semibold tracking-tight text-[#063F32]">
-          {summary.percentage || 0}% present
+          {attendancePercentage}% present
         </h2>
-        <p className="mt-2 text-sm text-[#245C4F]">{summary.present || 0} of {summary.total || 0} records marked present.</p>
+        <p className="mt-2 text-sm text-[#245C4F]">{attendedClasses} of {totalConducted} conducted lectures marked present.</p>
       </div>
       <div className="space-y-3">
         {items.length ? (
