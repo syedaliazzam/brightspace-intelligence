@@ -21,6 +21,17 @@ function getAttachmentUrls(item) {
   return item?.homework_attachment_url ? [item.homework_attachment_url] : [];
 }
 
+function parseAttachmentArray(value) {
+  if (Array.isArray(value)) return value;
+  if (typeof value !== "string") return [];
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
 function HomeworkDetailsModal({ item, onClose }) {
   if (!item) return null;
 
@@ -143,15 +154,15 @@ export default function HomeworkTable({ items = [], onEdit }) {
                   <td className="w-[240px] px-6 py-4 text-[#245C4F]">
                     {getAttachmentUrls(item).length ? (
                       <div className="flex flex-wrap gap-2">
-                        {getAttachmentUrls(item).map((url, index) => (
+                        {getAttachmentUrls(item).map((url, attachmentIndex) => (
                           <a
-                            key={`${url}-${index}`}
+                            key={`${url}-${attachmentIndex}`}
                             href={url}
                             target="_blank"
                             rel="noreferrer"
                             className="inline-flex rounded-xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-3 py-2 text-xs font-semibold text-[#063F32] transition hover:bg-[#F1EADC]"
                           >
-                            View {index + 1}
+                            View {attachmentIndex + 1}
                           </a>
                         ))}
                       </div>
@@ -194,9 +205,9 @@ export default function HomeworkTable({ items = [], onEdit }) {
         <EditHomeworkModal
           item={editItem}
           onClose={() => setEditItem(null)}
-          onSaved={(nextItem) => {
+          onSaved={async (nextItem) => {
             setEditItem(null);
-            onEdit?.(nextItem || editItem);
+            await onEdit?.(nextItem || editItem);
           }}
         />
       ) : null}
@@ -210,30 +221,68 @@ function EditHomeworkModal({ item, onClose, onSaved }) {
     title: item.title || "",
     description: item.description || "",
     dueDate: item.due_date ? String(item.due_date).slice(0, 10) : "",
-    files: [],
   });
+  const [existingFiles, setExistingFiles] = useState([]);
+  const [newFiles, setNewFiles] = useState([]);
   const [pending, setPending] = useState(false);
 
+  function isPdfUrl(value) {
+    const path = String(value || "").split("?")[0].split("#")[0].toLowerCase();
+    return path.endsWith(".pdf");
+  }
+
   useEffect(() => {
+    const existingUrls = getAttachmentUrls(item);
+    const existingBuckets = parseAttachmentArray(item.homework_attachment_buckets);
+    const existingPaths = parseAttachmentArray(item.homework_attachment_paths);
+    const existingNames = parseAttachmentArray(item.homework_attachment_names);
     setForm({
       lectureId: item.lecture_id || "",
       title: item.title || "",
       description: item.description || "",
       dueDate: item.due_date ? String(item.due_date).slice(0, 10) : "",
-      files: [],
     });
+    setExistingFiles(
+      existingUrls.map((url, index) => ({
+        id: `existing-${index}`,
+        url,
+        name: existingNames[index] || String(url || "").split("/").pop() || `homework-${index + 1}`,
+        type: isPdfUrl(url) ? "application/pdf" : "",
+        bucket: existingBuckets[index] || "",
+        path: existingPaths[index] || "",
+      }))
+    );
+    setNewFiles([]);
   }, [item]);
+
+  useEffect(() => {
+    return () => {
+      newFiles.forEach((preview) => {
+        if (preview?.url && String(preview.url).startsWith("blob:")) {
+          URL.revokeObjectURL(preview.url);
+        }
+      });
+    };
+  }, [newFiles]);
+
+  const allFiles = [...existingFiles, ...newFiles];
 
   async function submit(event) {
     event.preventDefault();
     setPending(true);
     try {
       const payload = new FormData();
+      if (item.homework_id) {
+        payload.append("homeworkId", item.homework_id);
+      }
       payload.append("lectureId", item.lecture_id);
       payload.append("title", form.title);
       payload.append("description", form.description);
       payload.append("dueDate", form.dueDate);
-      form.files.forEach((file) => payload.append("file", file));
+      payload.append("retainedAttachmentBuckets", JSON.stringify(existingFiles.map((file) => file.bucket || "")));
+      payload.append("retainedAttachmentPaths", JSON.stringify(existingFiles.map((file) => file.path || "")));
+      payload.append("retainedAttachmentNames", JSON.stringify(existingFiles.map((file) => file.name || "")));
+      newFiles.forEach((file) => payload.append("file", file.file));
       const response = await fetch("/api/teacher/homework", {
         method: "PATCH",
         body: payload,
@@ -275,17 +324,6 @@ function EditHomeworkModal({ item, onClose, onSaved }) {
             <span className="mb-2 block text-sm font-medium text-[#063F32]">Description</span>
             <textarea value={form.description} onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))} placeholder="Description" className="min-h-28 w-full rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 text-sm text-[#063F32] outline-none focus:border-[#2D8A6A] focus:ring-2 focus:ring-[#2D8A6A]/20" />
           </label>
-          {getAttachmentUrls(item).length ? (
-            <div className="mt-3 grid gap-3">
-              {getAttachmentUrls(item).map((url, index) => (
-                <div key={`${url}-${index}`} className="overflow-hidden rounded-[1.5rem] border border-[#2D8A6A]/12 bg-[#FAF7F0]">
-                  <a href={url} target="_blank" rel="noreferrer" className="block px-4 py-4 text-sm font-semibold text-[#0D5C48]">
-                    Current homework file {index + 1}
-                  </a>
-                </div>
-              ))}
-            </div>
-          ) : null}
           <label className="mt-3 block">
             <span className="mb-2 block text-sm font-medium text-[#063F32]">Upload document</span>
             <input
@@ -294,11 +332,75 @@ function EditHomeworkModal({ item, onClose, onSaved }) {
               accept="image/*,.pdf"
               onChange={(event) => {
                 const selectedFiles = Array.from(event.target.files || []).filter((file) => file.size > 0);
-                setForm((current) => ({ ...current, files: selectedFiles }));
+                const nextPreviews = selectedFiles.map((file) => ({
+                  id: `new-${Date.now()}-${file.name}-${Math.random().toString(36).slice(2, 8)}`,
+                  url: URL.createObjectURL(file),
+                  name: file.name || "homework",
+                  type: file.type || "",
+                  file,
+                }));
+                setNewFiles((current) => [...current, ...nextPreviews]);
+                event.target.value = "";
               }}
-              className="block w-full rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 text-sm text-[#063F32] file:mr-4 file:rounded-xl file:border-0 file:bg-[#0D5C48] file:px-4 file:py-2 file:text-sm file:font-semibold file:text-[#FAF7F0] focus:border-[#C9A227] focus:bg-white focus:ring-4 focus:ring-[#FFF5D6]"
+              className="block w-full rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 text-sm text-transparent file:mr-4 file:rounded-xl file:border-0 file:bg-[#0D5C48] file:px-4 file:py-2 file:text-sm file:font-semibold file:text-[#FAF7F0] focus:border-[#C9A227] focus:bg-white focus:ring-4 focus:ring-[#FFF5D6]"
             />
+            <span className="mt-2 block text-xs font-semibold uppercase tracking-[0.14em] text-[#245C4F]">
+              {allFiles.length ? `${allFiles.length} file${allFiles.length === 1 ? "" : "s"} selected` : "No file chosen"}
+            </span>
           </label>
+          {allFiles.length ? (
+            <div className="mt-3 overflow-hidden rounded-2xl border border-[#2D8A6A]/12 bg-[#FAF7F0] p-3">
+              <div className="flex gap-3 overflow-x-auto pb-1">
+                {allFiles.map((preview, index) => {
+                  const previewIsPdf = preview.type?.includes("pdf") || isPdfUrl(preview.url);
+                  return (
+                    <div
+                      key={preview.id || `${preview.url}-${index}`}
+                      className="relative flex w-44 min-w-44 flex-col overflow-hidden rounded-xl border border-[#2D8A6A]/10 bg-white shadow-sm"
+                    >
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (preview.file) {
+                            if (preview.url && String(preview.url).startsWith("blob:")) {
+                              URL.revokeObjectURL(preview.url);
+                            }
+                            setNewFiles((current) => current.filter((file) => file.id !== preview.id));
+                            return;
+                          }
+                          setExistingFiles((current) => current.filter((file) => file.id !== preview.id));
+                        }}
+                        className="absolute right-2 top-2 z-10 inline-flex h-7 w-7 items-center justify-center rounded-full bg-[#c70a0a] text-sm font-semibold text-[#FAF7F0] shadow-md transition hover:bg-[#a80707]"
+                        aria-label={`Remove file ${index + 1}`}
+                      >
+                        x
+                      </button>
+                      <a href={preview.url} target="_blank" rel="noreferrer" className="block">
+                        <div className="flex h-28 items-center justify-center overflow-hidden bg-[#FAF7F0]">
+                          {previewIsPdf ? (
+                            <iframe
+                              src={preview.url}
+                              title={`Current homework PDF preview ${index + 1}`}
+                              className="h-full w-full"
+                            />
+                          ) : (
+                            <img
+                              src={preview.url}
+                              alt={`Current homework preview ${index + 1}`}
+                              className="h-full w-full object-cover"
+                            />
+                          )}
+                        </div>
+                        <div className="border-t border-[#2D8A6A]/10 px-3 py-2 text-xs font-semibold text-[#0D5C48]">
+                          {previewIsPdf ? `PDF ${index + 1}` : `Image ${index + 1}`}
+                        </div>
+                      </a>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ) : null}
           <div className="mt-4 flex justify-end">
             <button type="submit" disabled={pending} className="rounded-2xl bg-[#0D5C48] px-4 py-3 text-sm font-semibold text-[#FAF7F0]">
               {pending ? "Saving..." : "Update homework"}

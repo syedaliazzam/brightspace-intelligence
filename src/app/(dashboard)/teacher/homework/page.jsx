@@ -68,9 +68,13 @@ export default function TeacherHomeworkPage() {
 
         <HomeworkTable
           items={state.items}
-          onEdit={() => {
+          onEdit={async () => {
             setState((current) => ({ ...current, selected: null }));
-            load().catch((error) => setState((current) => ({ ...current, error: error.message })));
+            try {
+              await load();
+            } catch (error) {
+              setState((current) => ({ ...current, error: error.message }));
+            }
           }}
         />
       </div>
