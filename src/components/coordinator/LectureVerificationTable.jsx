@@ -11,6 +11,8 @@ export default function LectureVerificationTable({ items = [], onRefresh }) {
   const [rejectingItem, setRejectingItem] = useState(null);
   const [rejectRemarks, setRejectRemarks] = useState("");
   const [submittingReject, setSubmittingReject] = useState(false);
+  const [manualApproveItem, setManualApproveItem] = useState(null);
+  const [manualApproving, setManualApproving] = useState(false);
 
   useEffect(() => {
     if (!syncNotice) return undefined;
@@ -77,6 +79,18 @@ export default function LectureVerificationTable({ items = [], onRefresh }) {
       setRejectRemarks("");
     } finally {
       setSubmittingReject(false);
+    }
+  }
+
+  async function submitManualApprove() {
+    if (!manualApproveItem) return;
+
+    setManualApproving(true);
+    try {
+      await updateVerification(manualApproveItem.id, { action: "approve", manualConfirm: true });
+      setManualApproveItem(null);
+    } finally {
+      setManualApproving(false);
     }
   }
 
@@ -210,11 +224,11 @@ export default function LectureVerificationTable({ items = [], onRefresh }) {
                     <button
                       type="button"
                       onClick={() => {
-                        const manualConfirm = !item.summary && !item.topic_covered
-                          ? window.confirm("Teacher completion report is missing. Approve manually?")
-                          : false;
-                        if (!item.summary && !item.topic_covered && !manualConfirm) return;
-                        updateVerification(item.id, { action: "approve", manualConfirm }).catch((error) => window.alert(error.message));
+                        if (!item.summary && !item.topic_covered) {
+                          setManualApproveItem(item);
+                          return;
+                        }
+                        updateVerification(item.id, { action: "approve", manualConfirm: false }).catch((error) => window.alert(error.message));
                       }}
                       className="rounded-xl bg-[#0D5C48] px-3 py-2 text-xs font-semibold text-[#FAF7F0] transition hover:bg-[#063F32] hover:shadow-sm focus:outline-none focus:ring-4 focus:ring-[#C9A227]/20"
                     >
@@ -405,6 +419,57 @@ export default function LectureVerificationTable({ items = [], onRefresh }) {
                   {submittingReject ? "Rejecting..." : "Reject lecture"}
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {manualApproveItem ? (
+        <div className="fixed inset-0 z-[90] flex items-center justify-center bg-[#063F32]/45 px-4 py-8 backdrop-blur-sm">
+          <div className="w-full max-w-xl rounded-[2rem] border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(250,247,240,0.99)_100%)] p-6 shadow-[0_30px_90px_-36px_rgba(13,59,46,0.28)]">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="inline-flex rounded-full border border-[#E4C766]/30 bg-[#FFF5D6] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.24em] text-[#8A6B00]">
+                  Manual approval
+                </p>
+                <h3 className="mt-3 text-2xl font-semibold text-[#063F32]">Teacher completion report is missing</h3>
+                <p className="mt-2 text-sm text-[#245C4F]">
+                  Approve manually for <span className="font-semibold text-[#063F32]">{manualApproveItem.title}</span>?
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setManualApproveItem(null)}
+                className="rounded-xl border border-[#2D8A6A]/15 bg-[#FAF7F0] px-3 py-2 text-sm font-semibold text-[#063F32] transition hover:bg-[#F1EADC]"
+              >
+                Close
+              </button>
+            </div>
+
+            <div className="mt-5 rounded-[1.5rem] border border-[#2D8A6A]/15 bg-white/80 p-4 text-sm text-[#245C4F]">
+              <p className="font-semibold text-[#063F32]">Lecture</p>
+              <p className="mt-2">{manualApproveItem.title}</p>
+              <p className="mt-1">Class roster: {manualApproveItem.course_title || manualApproveItem.class_level || "-"}</p>
+              <p className="mt-1">Subject: {manualApproveItem.subject_name || "-"}</p>
+              <p className="mt-1">Scheduled: {formatDateTimeRange(manualApproveItem.scheduled_start, manualApproveItem.scheduled_end)}</p>
+            </div>
+
+            <div className="mt-5 flex flex-wrap justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setManualApproveItem(null)}
+                className="rounded-xl border border-[#2D8A6A]/15 bg-[#FAF7F0] px-4 py-3 text-sm font-semibold text-[#245C4F] transition hover:bg-[#F1EADC]"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={manualApproving}
+                onClick={() => submitManualApprove().catch((error) => window.alert(error.message))}
+                className="rounded-xl bg-[#0D5C48] px-4 py-3 text-sm font-semibold text-[#FAF7F0] transition hover:bg-[#063F32] disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {manualApproving ? "Approving..." : "Approve manually"}
+              </button>
             </div>
           </div>
         </div>

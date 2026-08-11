@@ -47,6 +47,11 @@ export function NeedBasedScholarshipsPage({
   const [page, setPage] = useState(1);
   const [selectedItem, setSelectedItem] = useState(null);
   const [voucherTarget, setVoucherTarget] = useState(null);
+  const [paymentApproveTarget, setPaymentApproveTarget] = useState(null);
+  const [manualPaidAmount, setManualPaidAmount] = useState("");
+  const [manualProofFile, setManualProofFile] = useState(null);
+  const [manualApproving, setManualApproving] = useState(false);
+  const [manualApproveError, setManualApproveError] = useState("");
 
   async function load() {
     setLoading(true);
@@ -145,6 +150,49 @@ export function NeedBasedScholarshipsPage({
       ]
     : [];
 
+  const canShowPaymentApprove = (item) => {
+    const status = String(item?.status || "").toLowerCase();
+    return Boolean(item?.voucher_id)
+      && !Boolean(item?.has_fee_submission)
+      && status !== "verified"
+      && status !== "rejected";
+  };
+
+  async function approveScholarshipPayment() {
+    if (!paymentApproveTarget?.id || !(manualProofFile instanceof File)) {
+      setManualApproveError("Payment proof screenshot is required.");
+      return;
+    }
+
+    setManualApproving(true);
+    setManualApproveError("");
+
+    try {
+      const payload = new FormData();
+      payload.append("scholarshipFormId", paymentApproveTarget.id);
+      payload.append("paidAmount", String(Number(manualPaidAmount || paymentApproveTarget.voucher_amount || paymentApproveTarget.voucher_total_amount || 0)));
+      payload.append("proofFile", manualProofFile);
+
+      const response = await fetch("/api/coordinator/need-based-scholarships/manual-payment-approve", {
+        method: "POST",
+        body: payload,
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(data?.message || "Unable to approve scholarship payment.");
+      }
+
+      setPaymentApproveTarget(null);
+      setManualPaidAmount("");
+      setManualProofFile(null);
+      await load();
+    } catch (error) {
+      setManualApproveError(error instanceof Error ? error.message : "Unable to approve scholarship payment.");
+    } finally {
+      setManualApproving(false);
+    }
+  }
+
   const detailsPopupWrapperClassName = allowCreateVoucher
     ? "absolute inset-x-0 top-0 z-[9999] flex items-start justify-center px-4 pb-10 pt-10 sm:px-6 lg:-mx-10 lg:px-4"
     : "absolute inset-x-0 top-0 z-[9999] mx-auto flex min-h-full w-full max-w-7xl items-start justify-center px-4 pb-10 pt-10 sm:px-6 lg:px-8";
@@ -227,9 +275,24 @@ export function NeedBasedScholarshipsPage({
                         <button type="button" onClick={() => setSelectedItem(item)} className="rounded-xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-3 py-2 text-xs font-semibold text-[#063F32] transition hover:bg-[#F1EADC]">View details</button>
                         {allowCreateVoucher ? (
                           item.voucher_created ? (
-                            <span className="rounded-xl border border-[#2D8A6A]/20 bg-[#EAF6EF] px-3 py-2 text-xs font-semibold text-[#0D5C48] text-center">
-                              Voucher created
-                            </span>
+                            canShowPaymentApprove(item) ? (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setPaymentApproveTarget(item);
+                                  setManualPaidAmount(String(Number(item.voucher_amount || item.voucher_total_amount || 0)));
+                                  setManualProofFile(null);
+                                  setManualApproveError("");
+                                }}
+                                className="rounded-xl bg-[#0D5C48] px-3 py-2 text-xs font-semibold text-[#FAF7F0] transition hover:bg-[#063F32]"
+                              >
+                                Payment approve
+                              </button>
+                            ) : (
+                              <span className="rounded-xl border border-[#2D8A6A]/20 bg-[#EAF6EF] px-3 py-2 text-xs font-semibold text-[#0D5C48] text-center">
+                                Voucher created
+                              </span>
+                            )
                           ) : (
                             <button
                               type="button"
@@ -314,6 +377,96 @@ export function NeedBasedScholarshipsPage({
             }}
             onClose={() => setVoucherTarget(null)}
           />
+        ) : null}
+
+        {paymentApproveTarget ? (
+          <div className="fixed inset-0 z-[9999] flex items-start justify-center overflow-hidden bg-[#063F32]/45 px-4 py-8 pt-24 backdrop-blur-sm sm:px-6">
+            <div className="relative flex max-h-[calc(100vh-7rem)] w-full max-w-3xl flex-col overflow-hidden rounded-[2rem] border border-[#2D8A6A]/15 bg-[#FAF7F0] shadow-[0_24px_80px_-36px_rgba(13,59,46,0.24)]">
+              <div className="flex items-start justify-between gap-4 border-b border-[#2D8A6A]/12 px-6 py-5">
+                <div>
+                  <p className="text-sm font-semibold uppercase tracking-[0.24em] text-[#C9A227]">Scholarship payment</p>
+                  <h2 className="mt-2 text-2xl font-semibold text-[#063F32]">{paymentApproveTarget.student_name}</h2>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setPaymentApproveTarget(null)}
+                  className="rounded-xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-3 py-2 text-sm font-semibold text-[#063F32] transition hover:bg-[#F1EADC]"
+                >
+                  Close
+                </button>
+              </div>
+
+              <div className="flex-1 space-y-5 overflow-y-auto p-6">
+                <div className="overflow-hidden rounded-2xl border border-[#2D8A6A]/15 bg-white">
+                  <table className="w-full border-collapse text-sm text-[#245C4F]">
+                    <tbody>
+                      {[
+                        ["Voucher no", paymentApproveTarget.voucher_no || "-"],
+                        ["Requested amount", formatMoney(paymentApproveTarget.requested_amount)],
+                        ["Voucher amount", formatMoney(paymentApproveTarget.voucher_amount || paymentApproveTarget.voucher_total_amount)],
+                        ["Regular fee", formatMoney(paymentApproveTarget.regular_fee_amount)],
+                        ["Admission fee", formatMoney(paymentApproveTarget.admission_fee_amount)],
+                        ["Discount", formatMoney(paymentApproveTarget.discount_amount)],
+                        ["Scholarship", formatMoney(paymentApproveTarget.voucher_scholarship_amount || paymentApproveTarget.scholarship_amount)],
+                        ["Due date", formatDate(paymentApproveTarget.due_date)],
+                      ].map(([label, value]) => (
+                        <tr key={label} className="border-b border-[#F1EADC] last:border-b-0">
+                          <td className="w-[38%] px-4 py-3 text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]">{label}</td>
+                          <td className="px-4 py-3 text-[#245C4F]">{value}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                <label className="block">
+                  <span className="mb-2 block text-sm font-medium text-[#063F32]">Paid amount</span>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={manualPaidAmount}
+                    onChange={(event) => setManualPaidAmount(event.target.value)}
+                    className="w-full rounded-2xl border border-[#2D8A6A]/20 bg-white px-4 py-3 text-sm text-[#063F32] outline-none transition focus:border-[#2D8A6A] focus:ring-4 focus:ring-[#FFF5D6]"
+                  />
+                </label>
+
+                <label className="block">
+                  <span className="mb-2 block text-sm font-medium text-[#063F32]">Upload proof</span>
+                  <input
+                    type="file"
+                    accept="image/*,.pdf"
+                    onChange={(event) => setManualProofFile(event.target.files?.[0] || null)}
+                    className="block w-full rounded-2xl border border-[#2D8A6A]/20 bg-white px-4 py-3 text-sm text-[#063F32] file:mr-4 file:rounded-xl file:border-0 file:bg-[#0D5C48] file:px-4 file:py-2 file:text-sm file:font-semibold file:text-[#FAF7F0] focus:border-[#2D8A6A] focus:ring-4 focus:ring-[#FFF5D6]"
+                  />
+                </label>
+
+                {manualApproveError ? (
+                  <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                    {manualApproveError}
+                  </div>
+                ) : null}
+              </div>
+
+              <div className="flex items-center justify-end gap-3 border-t border-[#2D8A6A]/12 px-6 py-5">
+                <button
+                  type="button"
+                  onClick={() => setPaymentApproveTarget(null)}
+                  className="rounded-xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-2 text-sm font-semibold text-[#063F32] transition hover:bg-[#F1EADC]"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void approveScholarshipPayment()}
+                  disabled={manualApproving}
+                  className="rounded-xl bg-[#0D5C48] px-4 py-2 text-sm font-semibold text-[#FAF7F0] transition hover:bg-[#063F32] disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {manualApproving ? "Approving..." : "Approve payment"}
+                </button>
+              </div>
+            </div>
+          </div>
         ) : null}
       </div>
     </div>

@@ -267,8 +267,9 @@ export async function PATCH(request, context) {
       return json("Invalid verification action.", 400);
     }
 
-    const result = await prisma.$transaction(async (tx) => {
-      if (action === "approve") {
+    const tx = prisma;
+
+    if (action === "approve") {
         if (!lecture.completion_report_id && body?.manualConfirm !== true) {
           throw new Error("Teacher completion report is required before approval, unless coordinator confirms manually.");
         }
@@ -338,10 +339,10 @@ export async function PATCH(request, context) {
           tx
         );
 
-        return { status: "verified_by_coordinator" };
-      }
+        return json("Lecture verification updated.", 200, { status: "verified_by_coordinator" });
+    }
 
-      if (action === "reject") {
+    if (action === "reject") {
         const verificationId = await upsertVerification(tx, {
           lectureId: id,
           verifiedBy: session.user.id,
@@ -367,10 +368,10 @@ export async function PATCH(request, context) {
           tx
         );
 
-        return { status: "disputed" };
-      }
+        return json("Lecture verification updated.", 200, { status: "disputed" });
+    }
 
-      if (action === "mark_missed") {
+    if (action === "mark_missed") {
         const verificationId = await upsertVerification(tx, {
           lectureId: id,
           verifiedBy: session.user.id,
@@ -396,12 +397,12 @@ export async function PATCH(request, context) {
           tx
         );
 
-        return { status: "missed" };
-      }
+        return json("Lecture verification updated.", 200, { status: "missed" });
+    }
 
-      if (!scheduledStart || !scheduledEnd) {
-        throw new Error("New schedule start and end are required for rescheduling.");
-      }
+    if (!scheduledStart || !scheduledEnd) {
+      throw new Error("New schedule start and end are required for rescheduling.");
+    }
 
       let calendarData = { eventId: "", meetLink: "", meetSpaceId: "" };
       try {
@@ -481,10 +482,7 @@ export async function PATCH(request, context) {
         tx
       );
 
-      return { status: "rescheduled", newLectureId: newLecture.id };
-    });
-
-    return json("Lecture verification updated.", 200, result);
+    return json("Lecture verification updated.", 200, { status: "rescheduled", newLectureId: newLecture.id });
   } catch (error) {
     const guard = roleGuardResponse(error);
     if (guard) {
