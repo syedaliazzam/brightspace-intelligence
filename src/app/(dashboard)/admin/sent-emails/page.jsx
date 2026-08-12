@@ -5,7 +5,7 @@ export default function AdminSentEmailsPage() {
     <ResendEmailsPage
       portalLabel="Admin portal"
       title="Sent emails"
-      description="Review emails sent to users through Resend, with filters and 7-row pagination in one place."
+      description="Review emails sent to users."
     />
   );
 }
