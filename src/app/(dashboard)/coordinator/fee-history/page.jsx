@@ -222,6 +222,7 @@ export default function CoordinatorFeeHistoryPage() {
         ["Student", safeText(voucher.student_name || selectedStudent?.student_name || "-")],
         ["Parent", safeText(voucher.parent_name || selectedStudent?.parent_name || "-")],
         ["Class", safeText(voucher.class_level || selectedStudent?.class_level || "-")],
+        ["Month", safeText(row.month_label || voucher.month_label || "-")],
         ["Due Date", formatDate(voucher.due_date || row.due_date)],
         ["Monthly Fee", formatMoney(parts.regularFee)],
         ["Admission Fee", formatMoney(parts.admissionFee)],
@@ -312,6 +313,7 @@ export default function CoordinatorFeeHistoryPage() {
         ["Student", safeText(voucher.student_name || selectedStudent?.student_name || "-")],
         ["Parent", safeText(voucher.parent_name || selectedStudent?.parent_name || "-")],
         ["Class", safeText(voucher.class_level || selectedStudent?.class_level || "-")],
+        ["Month", safeText(row.month_label || voucher.month_label || "-")],
         ["Due Date", formatDate(voucher.due_date || row.due_date)],
       ];
       const summarySectionHeight = addSection("Voucher details", summaryItems, y);
@@ -325,15 +327,10 @@ export default function CoordinatorFeeHistoryPage() {
         ["Previous Month Due", formatMoney(previousMonthDueValue)],
         ["Current Month Fee", formatMoney(parts.currentMonthFee)],
         ["Total Amount", formatMoney(computedTotalAmount)],
-      ];
-      const feeSectionHeight = addSection("Fee breakdown", feeItems, y, 20);
-
-      y += feeSectionHeight + 24;
-      const balanceItems = [
         ["This Month Paid", formatMoney(row.this_month_paid)],
         ["Remaining Due", formatMoney(paymentSummary.remaining)],
       ];
-      addSection("Payment summary", balanceItems, y, 22);
+      const feeSectionHeight = addSection("Fee breakdown", feeItems, y, 20);
 
       const fileName = `${String(voucher.voucher_no || row.voucher_no || "voucher").replace(/[^\w.-]+/g, "_")}.pdf`;
       const blob = doc.output("blob");
