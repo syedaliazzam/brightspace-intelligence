@@ -470,7 +470,15 @@ export default function PublicEventRegistrationsPage({ portalLabel = "Coordinato
     });
   }, [filters, items]);
 
-  const verifiedTotalAmount = useMemo(() => items.reduce((sum, item) => (normalizeRegistrationStatus(item.status) === "verified" ? sum + Number(item.amount_due || 0) : sum), 0), [items]);
+  const summaryItems = useMemo(() => {
+    if (filters.eventId === "all") return items;
+    return items.filter((item) => item.event_id === filters.eventId);
+  }, [filters.eventId, items]);
+
+  const verifiedTotalAmount = useMemo(
+    () => summaryItems.reduce((sum, item) => (normalizeRegistrationStatus(item.status) === "verified" ? sum + Number(item.amount_due || 0) : sum), 0),
+    [summaryItems]
+  );
   const totalPages = Math.max(1, Math.ceil(filteredItems.length / pageSize));
   const safePage = Math.min(page, totalPages);
   const visibleItems = useMemo(() => filteredItems.slice((safePage - 1) * pageSize, (safePage - 1) * pageSize + pageSize), [filteredItems, safePage]);
@@ -675,10 +683,10 @@ export default function PublicEventRegistrationsPage({ portalLabel = "Coordinato
               ) : null}
             </div>
             <div className="grid grid-cols-2 gap-2 text-center text-sm sm:grid-cols-2 lg:grid-cols-5">
-              <div className="rounded-2xl border border-[#E4C766]/30 bg-[#FAF7F0]/10 px-4 py-3"><p className="font-semibold">{items.length}</p><p className="text-xs text-[#EAF6EF]">Total</p></div>
-              <div className="rounded-2xl border border-[#E4C766]/30 bg-[#FAF7F0]/10 px-4 py-3"><p className="font-semibold">{items.filter((item) => normalizeRegistrationStatus(item.status) === "pending").length}</p><p className="text-xs text-[#EAF6EF]">Pending</p></div>
-              <div className="rounded-2xl border border-[#E4C766]/30 bg-[#FAF7F0]/10 px-4 py-3"><p className="font-semibold">{items.filter((item) => normalizeRegistrationStatus(item.status) === "verified").length}</p><p className="text-xs text-[#EAF6EF]">Verified</p></div>
-              <div className="rounded-2xl border border-[#E4C766]/30 bg-[#FAF7F0]/10 px-4 py-3"><p className="font-semibold">{items.filter((item) => normalizeRegistrationStatus(item.status) === "free").length}</p><p className="text-xs text-[#EAF6EF]">Free</p></div>
+              <div className="rounded-2xl border border-[#E4C766]/30 bg-[#FAF7F0]/10 px-4 py-3"><p className="font-semibold">{summaryItems.length}</p><p className="text-xs text-[#EAF6EF]">Total</p></div>
+              <div className="rounded-2xl border border-[#E4C766]/30 bg-[#FAF7F0]/10 px-4 py-3"><p className="font-semibold">{summaryItems.filter((item) => normalizeRegistrationStatus(item.status) === "pending").length}</p><p className="text-xs text-[#EAF6EF]">Pending</p></div>
+              <div className="rounded-2xl border border-[#E4C766]/30 bg-[#FAF7F0]/10 px-4 py-3"><p className="font-semibold">{summaryItems.filter((item) => normalizeRegistrationStatus(item.status) === "verified").length}</p><p className="text-xs text-[#EAF6EF]">Verified</p></div>
+              <div className="rounded-2xl border border-[#E4C766]/30 bg-[#FAF7F0]/10 px-4 py-3"><p className="font-semibold">{summaryItems.filter((item) => normalizeRegistrationStatus(item.status) === "free").length}</p><p className="text-xs text-[#EAF6EF]">Free</p></div>
               <div className="rounded-2xl border border-[#E4C766]/30 bg-[#FAF7F0]/10 px-4 py-3 flex justify-between flex-col"><p className="font-semibold whitespace-nowrap">{formatMoney(verifiedTotalAmount)}</p><p className="text-xs text-[#EAF6EF] whitespace-nowrap">Total Amount</p></div>
             </div>
           </div>
