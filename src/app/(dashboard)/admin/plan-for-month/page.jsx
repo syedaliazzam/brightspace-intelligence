@@ -31,7 +31,13 @@ export default async function AdminPlanForMonthPage() {
         </section>
 
         <div className="relative mx-auto max-w-7xl">
-          <PlanForMonthClient canCreate={true} />
+          <PlanForMonthClient
+            canCreate={false}
+            portalLabel="Admin portal"
+            title="Monthly plan manager"
+            description="Create and manage monthly plans. Admins can edit and upload plan images from this page."
+            showHeader={false}
+          />
         </div>
       </div>
     </div>

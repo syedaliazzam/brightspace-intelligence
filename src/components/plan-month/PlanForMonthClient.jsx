@@ -58,7 +58,14 @@ async function uploadMonthlyPlanAsset(file) {
   return signedData.path;
 }
 
-export default function PlanForMonthClient({ canCreate = true }) {
+export default function PlanForMonthClient({
+  canCreate = true,
+  portalLabel = "Coordinator portal",
+  title = "Plan for this month",
+  description = "Create and manage monthly plans; upload images and share with students and admins.",
+  createButtonLabel = "Add Monthly Plan",
+  showHeader = true,
+}) {
   const MAX_IMAGE_BYTES = STORAGE_SAFE_UPLOAD_MAX_BYTES;
   const MAX_VIDEO_BYTES = STORAGE_SAFE_UPLOAD_MAX_BYTES;
   const [form, setForm] = useState({ name: "", startDate: "", endDate: "", images: [] });
@@ -304,6 +311,7 @@ export default function PlanForMonthClient({ canCreate = true }) {
       if (createResponse.ok) {
         setSuccessMessage("Plan saved successfully!");
         setForm({ name: "", startDate: "", endDate: "", images: [] });
+        setShowCreateModal(false);
         const d = await fetch("/api/monthly-plans", { cache: "no-store" });
         const newData = await d.json();
         setPlans(Array.isArray(newData?.items) ? newData.items : []);
@@ -329,25 +337,40 @@ export default function PlanForMonthClient({ canCreate = true }) {
 
   return (
     <div className="space-y-6">
-      <section className="relative overflow-hidden rounded-[2rem] border border-[#2D8A6A]/15 bg-[linear-gradient(135deg,rgba(13,59,46,0.98),rgba(13,92,72,0.94))] p-6 text-[#FAF7F0] shadow-[0_24px_80px_-36px_rgba(13,59,46,0.32)] sm:p-8">
-        <div className="relative flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-          <div>
-            <p className="inline-flex w-fit rounded-full border border-[#E4C766]/30 bg-[#FFF5D6]/12 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.28em] text-[#FFF5D6]">Coordinator portal</p>
-            <h1 className="mt-4 font-display text-3xl font-bold tracking-tight text-[#FAF7F0] sm:text-4xl">Plan for this month</h1>
-            <p className="mt-3 text-sm leading-7 text-[#EAF6EF] sm:text-base">Create and manage monthly plans; upload images and share with students and admins.</p>
+      {showHeader ? (
+        <section className="relative overflow-hidden rounded-[2rem] border border-[#2D8A6A]/15 bg-[linear-gradient(135deg,rgba(13,59,46,0.98),rgba(13,92,72,0.94))] p-6 text-[#FAF7F0] shadow-[0_24px_80px_-36px_rgba(13,59,46,0.32)] sm:p-8">
+          <div className="relative flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+              <p className="inline-flex w-fit rounded-full border border-[#E4C766]/30 bg-[#FFF5D6]/12 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.28em] text-[#FFF5D6]">{portalLabel}</p>
+              <h1 className="mt-4 font-display text-3xl font-bold tracking-tight text-[#FAF7F0] sm:text-4xl">{title}</h1>
+              <p className="mt-3 text-sm leading-7 text-[#EAF6EF] sm:text-base">{description}</p>
+            </div>
+            {canCreate ? (
+              <button
+                type="button"
+                onClick={() => setShowCreateModal(true)}
+                className="inline-flex items-center justify-center gap-2 self-start rounded-2xl bg-[#FFF5D6] px-4 py-2 text-sm font-semibold text-[#063F32] transition hover:bg-[#F1EADC] lg:self-auto"
+              >
+                <Plus size={18} />
+                {createButtonLabel}
+              </button>
+            ) : null}
           </div>
-          {canCreate ? (
-            <button
-              type="button"
-              onClick={() => setShowCreateModal(true)}
-              className="inline-flex items-center justify-center gap-2 self-start rounded-2xl bg-[#FFF5D6] px-4 py-2 text-sm font-semibold text-[#063F32] transition hover:bg-[#F1EADC] lg:self-auto"
-            >
-              <Plus size={18} />
-              Add Monthly Plan
-            </button>
-          ) : null}
+        </section>
+      ) : null}
+
+      {!showHeader && canCreate ? (
+        <div className="flex justify-end">
+          <button
+            type="button"
+            onClick={() => setShowCreateModal(true)}
+            className="inline-flex items-center justify-center gap-2 rounded-2xl bg-[#FFF5D6] px-4 py-2 text-sm font-semibold text-[#063F32] transition hover:bg-[#F1EADC]"
+          >
+            <Plus size={18} />
+            {createButtonLabel}
+          </button>
         </div>
-      </section>
+      ) : null}
 
       {successMessage && (
         <div className="fixed right-6 top-6 z-50 rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-3 shadow-xl shadow-emerald-200/40 text-sm font-semibold text-emerald-800">
@@ -482,15 +505,6 @@ export default function PlanForMonthClient({ canCreate = true }) {
           </div>
         </ClientPortal>
       ) : null}
-      {canCreate ? null : (
-        <section className="rounded-2xl border border-[#2D8A6A]/15 bg-white p-6 shadow-[0_20px_70px_-36px_rgba(13,59,46,0.18)] backdrop-blur-xl">
-          <div className="space-y-3">
-            <p className="text-sm font-semibold text-[#063F32]">Monthly plans (view only)</p>
-            <p className="text-sm text-[#245C4F]">Admin portal view only. Contact a coordinator to create or edit monthly plans.</p>
-          </div>
-        </section>
-      )}
-
       <section className="rounded-2xl border border-[#2D8A6A]/15 bg-white py-6 px-0 shadow-[0_20px_70px_-36px_rgba(13,59,46,0.18)] backdrop-blur-xl">
         <div className="mb-4 grid gap-3 sm:grid-cols-[1fr_240px] px-6">
           <input
@@ -514,7 +528,7 @@ export default function PlanForMonthClient({ canCreate = true }) {
                 <th className="px-6 py-4">Start</th>
                 <th className="px-6 py-4">End</th>
                 <th className="px-6 py-4">Images</th>
-                <th className="px-6 py-4">Actions</th>
+                {canCreate ? <th className="px-6 py-4">Actions</th> : null}
               </tr>
             </thead>
             <tbody className="divide-y divide-[#F1EADC] bg-[#FFFEFB]">
@@ -541,11 +555,11 @@ export default function PlanForMonthClient({ canCreate = true }) {
                         ))}
                     </div>
                   </td>
-                  <td className="px-6 py-5">
-                    {canCreate ? (
+                  {canCreate ? (
+                    <td className="px-6 py-5">
                       <button type="button" onClick={() => openEdit(row)} className="rounded-xl border px-3 py-2 text-xs font-semibold transition border-[#2D8A6A]/20 bg-[#FAF7F0] text-[#063F32] hover:bg-[#F1EADC]">Edit</button>
-                    ) : null}
-                  </td>
+                    </td>
+                  ) : null}
                 </tr>
               ))}
             </tbody>

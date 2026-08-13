@@ -9,6 +9,21 @@ function isValidPhone(value) {
   return typeof value === "string" && value.trim().replace(/\D/g, "").length >= 7;
 }
 
+function formatDate(value) {
+  if (!value) return "-";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return String(value);
+  return new Intl.DateTimeFormat("en-PK", {
+    timeZone: "Asia/Karachi",
+    weekday: "short",
+    month: "short",
+    day: "2-digit",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(date);
+}
+
 async function getStudentProfileId(userId) {
   const [row] = await prisma.$queryRaw`
     SELECT sp.id::text AS id
@@ -109,20 +124,24 @@ export default async function DashboardLayout({ children }) {
 
   if (blockedRecord?.voucher_no) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#FAF7F0] px-4">
-        <div className="w-full max-w-xl rounded-[2rem] border border-rose-200 bg-white p-8 text-center shadow-[0_24px_80px_-36px_rgba(15,23,42,0.28)]">
-          <p className="text-xs font-bold uppercase tracking-[0.24em] text-rose-700">LMS access paused</p>
-          <h1 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">
-            Monthly fee due date has passed
-          </h1>
-          <p className="mt-4 text-sm leading-7 text-slate-600">
-            Voucher {blockedRecord.voucher_no} is overdue. Please submit the payment to continue LMS access.
-          </p>
-          {blockedRecord.due_date ? (
-            <p className="mt-3 text-sm font-medium text-slate-700">
-              Due date: {String(blockedRecord.due_date)}
+      <div className="flex min-h-screen items-center justify-center bg-[linear-gradient(180deg,#FAF7F0_0%,#F7F1E3_100%)] px-4">
+        <div className="w-full max-w-xl overflow-hidden rounded-[2rem] border border-[#2D8A6A]/15 bg-white shadow-[0_24px_80px_-36px_rgba(13,59,46,0.24)]">
+          <div className="bg-[linear-gradient(135deg,rgba(13,59,46,0.98),rgba(13,92,72,0.94))] px-8 py-6 text-[#FAF7F0]">
+            <p className="text-xs font-bold uppercase tracking-[0.24em] text-[#FFF5D6]">LMS access paused</p>
+            <h1 className="mt-3 text-3xl font-semibold tracking-tight text-[#FAF7F0]">
+              Monthly fee due date has passed
+            </h1>
+          </div>
+          <div className="space-y-4 px-8 py-7 text-center">
+            <p className="text-sm leading-7 text-[#245C4F]">
+              Voucher <span className="font-bold text-[#063F32]">{blockedRecord.voucher_no}</span> is overdue. Please submit the payment to continue LMS access.
             </p>
-          ) : null}
+            {blockedRecord.due_date ? (
+              <div className="inline-flex rounded-full border border-[#2D8A6A]/15 bg-[#EAF6EF] px-4 py-2 text-sm font-semibold text-[#063F32]">
+                Due date: {formatDate(blockedRecord.due_date)}
+              </div>
+            ) : null}
+          </div>
         </div>
       </div>
     );
@@ -130,15 +149,19 @@ export default async function DashboardLayout({ children }) {
 
   if (blockedRecord?.error) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#FAF7F0] px-4">
-        <div className="w-full max-w-xl rounded-[2rem] border border-rose-200 bg-white p-8 text-center shadow-[0_24px_80px_-36px_rgba(15,23,42,0.28)]">
-          <p className="text-xs font-bold uppercase tracking-[0.24em] text-rose-700">LMS access paused</p>
-          <h1 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950">
-            Payment status could not be verified
-          </h1>
-          <p className="mt-4 text-sm leading-7 text-slate-600">
-            Please contact administration so we can confirm your monthly fee status.
-          </p>
+      <div className="flex min-h-screen items-center justify-center bg-[linear-gradient(180deg,#FAF7F0_0%,#F7F1E3_100%)] px-4">
+        <div className="w-full max-w-xl overflow-hidden rounded-[2rem] border border-[#2D8A6A]/15 bg-white shadow-[0_24px_80px_-36px_rgba(13,59,46,0.24)]">
+          <div className="bg-[linear-gradient(135deg,rgba(13,59,46,0.98),rgba(13,92,72,0.94))] px-8 py-6 text-[#FAF7F0]">
+            <p className="text-xs font-bold uppercase tracking-[0.24em] text-[#FFF5D6]">LMS access paused</p>
+            <h1 className="mt-3 text-3xl font-semibold tracking-tight text-[#FAF7F0]">
+              Payment status could not be verified
+            </h1>
+          </div>
+          <div className="px-8 py-7 text-center">
+            <p className="text-sm leading-7 text-[#245C4F]">
+              Please contact administration so we can confirm your monthly fee status.
+            </p>
+          </div>
         </div>
       </div>
     );
