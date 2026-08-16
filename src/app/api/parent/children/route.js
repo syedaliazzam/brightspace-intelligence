@@ -8,6 +8,17 @@ function json(message, status = 200, extra = {}) {
   return NextResponse.json({ message, ...extra }, { status });
 }
 
+function dedupeChildren(rows = []) {
+  const seen = new Set();
+  return rows.filter((row) => {
+    const key = String(row?.id || "").trim();
+    if (!key) return false;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
 async function getChildren(session) {
   const role = String(session?.user?.role || "").toLowerCase();
 
@@ -98,7 +109,7 @@ async function getChildren(session) {
 export async function GET() {
   try {
     const session = await requireRole(ALLOWED_ROLES);
-    const children = await getChildren(session);
+    const children = dedupeChildren(await getChildren(session));
     return json("Children fetched.", 200, { children });
   } catch (error) {
     const guard = roleGuardResponse(error);

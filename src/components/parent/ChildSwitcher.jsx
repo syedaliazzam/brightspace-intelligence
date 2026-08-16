@@ -4,8 +4,15 @@ import { useState } from "react";
 
 export default function ChildSwitcher({ childrenList = [], value = "", onChange }) {
   const [open, setOpen] = useState(false);
+  const uniqueChildren = Array.from(
+    new Map(
+      (Array.isArray(childrenList) ? childrenList : [])
+        .filter((child) => child?.id)
+        .map((child) => [String(child.id), child])
+    ).values()
+  );
 
-  if (!childrenList.length) {
+  if (!uniqueChildren.length) {
     return (
       <div className="rounded-2xl border border-[#E4C766]/70 bg-[#FFF5D6] px-4 py-3 text-sm text-[#8A6B00]">
         No linked children are available for this account.
@@ -32,7 +39,7 @@ export default function ChildSwitcher({ childrenList = [], value = "", onChange 
           <option value="" disabled>
             Select a child
           </option>
-          {childrenList.map((child) => (
+          {uniqueChildren.map((child) => (
             <option key={child.id} value={child.id}>
               {child.full_name} {child.grade_level ? `- ${child.grade_level}` : ""}
             </option>

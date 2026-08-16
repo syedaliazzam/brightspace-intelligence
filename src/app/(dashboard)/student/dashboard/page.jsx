@@ -27,7 +27,9 @@ function formatAgeValue(age, dateOfBirth) {
 
 function formatDateValue(value) {
   if (!value) return "";
-  return String(value);
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return String(value);
+  return new Intl.DateTimeFormat("en-US", { dateStyle: "medium" }).format(date);
 }
 
 export default function StudentDashboardPage() {

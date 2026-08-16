@@ -105,6 +105,21 @@ async function getUserById(id) {
   return row;
 }
 
+async function findCourseByClassLevel(classLevel, tx = prisma) {
+  const normalized = String(classLevel || "").trim();
+  if (!normalized) return null;
+
+  const [course] = await tx.$queryRaw`
+    SELECT id::text AS id
+    FROM courses
+    WHERE LOWER(COALESCE(class_level, title, '')) = ${normalized.toLowerCase()}
+    ORDER BY created_at DESC NULLS LAST, id DESC
+    LIMIT 1
+  `;
+
+  return course?.id || null;
+}
+
 export async function DELETE(_request, { params }) {
   const authState = await requireAdminSession();
 
@@ -205,6 +220,7 @@ export async function PATCH(request, { params }) {
             WHERE user_id = ${id}::uuid
           `;
         } else if (existing.role === "student") {
+          const resolvedCourseId = gradeLevel ? await findCourseByClassLevel(gradeLevel, tx) : null;
           await tx.$executeRaw`
             UPDATE student_profiles
             SET
@@ -215,6 +231,86 @@ export async function PATCH(request, { params }) {
               updated_at = NOW()
             WHERE user_id = ${id}::uuid
           `;
+
+          if (resolvedCourseId) {
+            const [existingTargetEnrollment] = await tx.$queryRaw`
+              SELECT id::text AS id
+              FROM enrollments
+              WHERE student_id = ${existing.student_profile_id}::uuid
+                AND course_id = ${resolvedCourseId}::uuid
+              ORDER BY updated_at DESC NULLS LAST, created_at DESC NULLS LAST
+              LIMIT 1
+            `;
+
+            const [activeEnrollment] = await tx.$queryRaw`
+              SELECT id::text AS id
+              FROM enrollments
+              WHERE student_id = ${existing.student_profile_id}::uuid
+                AND LOWER(status) = 'active'
+              ORDER BY updated_at DESC NULLS LAST, created_at DESC NULLS LAST
+              LIMIT 1
+            `;
+
+            if (existingTargetEnrollment?.id) {
+              await tx.$executeRaw`
+                UPDATE enrollments
+                SET
+                  status = 'active',
+                  end_date = NULL,
+                  updated_at = NOW()
+                WHERE id = ${existingTargetEnrollment.id}::uuid
+              `;
+
+              await tx.$executeRaw`
+                UPDATE enrollments
+                SET
+                  status = 'archived',
+                  end_date = CURRENT_DATE,
+                  updated_at = NOW()
+                WHERE student_id = ${existing.student_profile_id}::uuid
+                  AND id <> ${existingTargetEnrollment.id}::uuid
+                  AND LOWER(status) = 'active'
+              `;
+            } else if (activeEnrollment?.id) {
+              await tx.$executeRaw`
+                UPDATE enrollments
+                SET
+                  course_id = ${resolvedCourseId}::uuid,
+                  status = 'active',
+                  end_date = NULL,
+                  updated_at = NOW()
+                WHERE id = ${activeEnrollment.id}::uuid
+              `;
+            } else {
+              await tx.$executeRaw`
+                INSERT INTO enrollments (
+                  id,
+                  student_id,
+                  course_id,
+                  registration_id,
+                  start_date,
+                  status,
+                  created_at,
+                  updated_at
+                )
+                VALUES (
+                  gen_random_uuid(),
+                  ${existing.student_profile_id}::uuid,
+                  ${resolvedCourseId}::uuid,
+                  NULL,
+                  CURRENT_DATE,
+                  'active',
+                  NOW(),
+                  NOW()
+                )
+                ON CONFLICT (student_id, course_id)
+                DO UPDATE SET
+                  status = 'active',
+                  end_date = NULL,
+                  updated_at = NOW()
+              `;
+            }
+          }
         }
       });
     } else {

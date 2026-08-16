@@ -53,6 +53,7 @@ export default function StaffFormModal({
   onClose,
   onSuccess,
   roleOptions = ROLE_OPTIONS,
+  classOptions = [],
   createEndpoint = "/api/admin/staff",
   updateEndpoint,
   badgeLabel = "Super Admin staff",
@@ -66,6 +67,7 @@ export default function StaffFormModal({
   const [statusOpen, setStatusOpen] = useState(false);
   const isParentEdit = mode === "edit" && form.role === "parent";
   const isStudentEdit = mode === "edit" && form.role === "student";
+  const classSelectOptions = Array.from(new Set((Array.isArray(classOptions) ? classOptions : []).map((item) => String(item || "").trim()).filter(Boolean)));
 
   useEffect(() => {
     if (!open) {
@@ -279,12 +281,25 @@ export default function StaffFormModal({
                       <span className="mb-2 block text-sm font-medium text-[#245C4F]">
                         Class
                       </span>
-                      <input
-                        type="text"
+                      <div className="relative">
+                      <select
                         value={form.gradeLevel}
                         onChange={(event) => updateField("gradeLevel", event.target.value)}
-                        className={inputClass}
+                        className={selectClass}
+                        onFocus={() => setStatusOpen(true)}
+                        onBlur={() => window.setTimeout(() => setStatusOpen(false), 0)}
+                      >
+                        <option value="">Select class</option>
+                        {classSelectOptions.map((classLevel) => (
+                          <option key={classLevel} value={classLevel}>
+                            {classLevel}
+                          </option>
+                        ))}
+                      </select>
+                      <ChevronDown
+                        className={`${selectIconClass} ${statusOpen ? "rotate-180" : "rotate-0"}`}
                       />
+                      </div>
                     </label>
                     <label className="block">
                       <span className="mb-2 block text-sm font-medium text-[#245C4F]">

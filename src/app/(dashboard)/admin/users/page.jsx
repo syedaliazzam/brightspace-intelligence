@@ -383,10 +383,13 @@ export default function AdminUsersPage() {
       if (requestId !== loadOverviewRequestRef.current) {
         return data;
       }
+      const overviewItems = view === "students" || view === "parents"
+        ? dedupeUsersById(data.items || [])
+        : data.items || [];
       setState((current) => ({
         ...current,
         overviewLoading: false,
-        overviewItems: data.items || [],
+        overviewItems,
         allStaffItems: view === "staff" ? data.items || [] : current.allStaffItems,
         summary: data.summary || null,
       }));
@@ -520,7 +523,9 @@ export default function AdminUsersPage() {
           throw new Error(data?.message || "Unable to load users.");
         }
 
-        items = data.items || [];
+        items = view === "students" || view === "parents"
+          ? dedupeUsersById(data.items || [])
+          : data.items || [];
       }
 
       writeCache(cacheKey, { items });
@@ -1194,11 +1199,6 @@ export default function AdminUsersPage() {
                   render: (row) => row.age || "-",
                 },
                 {
-                  key: "course_title",
-                  label: "Course",
-                  render: (row) => row.course_title || "-",
-                },
-                {
                   key: "parent_name",
                   label: "Parent",
                   render: (row) => row.parent_name || "-",
@@ -1362,6 +1362,7 @@ export default function AdminUsersPage() {
           open={modal.open}
           record={modal.record}
           mode={modal.record ? "edit" : "create"}
+          classOptions={view === "students" ? classOptions : []}
           roleOptions={
             view === "staff"
               ? [
