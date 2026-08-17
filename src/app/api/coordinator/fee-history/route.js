@@ -590,11 +590,11 @@ export async function PATCH(request) {
             updated_at = NOW()
           WHERE id = ${effectiveRowId}::uuid
         `;
-
-        return propagateHistory(tx, effectiveRowId);
+        return { rowId: effectiveRowId, studentId };
       });
 
-      const items = applyCarryForwardHistoryRows(await loadStudentHistory(result.studentId));
+      const propagated = await propagateHistory(prisma, result.rowId);
+      const items = applyCarryForwardHistoryRows(await loadStudentHistory(propagated.studentId));
       const itemsWithProofUrls = await Promise.all(
         items.map(async (item) => ({
           ...item,
@@ -621,11 +621,17 @@ export async function PATCH(request) {
           updated_at = NOW()
         WHERE id = ${rowId}::uuid
       `;
-
-      return propagateHistory(tx, rowId);
+      const [updated] = await tx.$queryRaw`
+        SELECT student_id::text AS student_id
+        FROM fee_history_records
+        WHERE id = ${rowId}::uuid
+        LIMIT 1
+      `;
+      return { rowId, studentId: updated?.student_id || "" };
     });
 
-    const items = applyCarryForwardHistoryRows(await loadStudentHistory(result.studentId));
+    const propagated = await propagateHistory(prisma, result.rowId);
+    const items = applyCarryForwardHistoryRows(await loadStudentHistory(propagated.studentId || result.studentId));
     const itemsWithProofUrls = await Promise.all(
       items.map(async (item) => ({
         ...item,

@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { ChevronDown } from "lucide-react";
 import ClientPortal from "@/components/shared/ClientPortal";
+import PaginationControls from "@/components/teacher/PaginationControls";
+import { LeafSpinnerInline } from "@/components/shared/AshShajrahLoaders";
 
 function formatDate(value) {
   if (!value) return "-";
@@ -29,6 +31,7 @@ function formatStatus(value) {
 }
 
 export default function RegularFeeVouchersPage() {
+  const PAGE_SIZE = 7;
   const [classes, setClasses] = useState([]);
   const [history, setHistory] = useState([]);
   const [paymentMethods, setPaymentMethods] = useState([]);
@@ -38,6 +41,13 @@ export default function RegularFeeVouchersPage() {
   const [error, setError] = useState("");
   const [detailItem, setDetailItem] = useState(null);
   const [classOpen, setClassOpen] = useState(false);
+  const [approveRow, setApproveRow] = useState(null);
+  const [approveAmount, setApproveAmount] = useState("");
+  const [approveProofFile, setApproveProofFile] = useState(null);
+  const [approvePending, setApprovePending] = useState(false);
+  const [approveError, setApproveError] = useState("");
+  const [detailPage, setDetailPage] = useState(1);
+  const [historyPage, setHistoryPage] = useState(1);
 
   async function load() {
     setLoading(true);
@@ -83,6 +93,84 @@ export default function RegularFeeVouchersPage() {
       classId: value,
       baseAmount: nextClass?.regular_fee_amount ? String(nextClass.regular_fee_amount) : "",
     }));
+  }
+
+  const detailItems = useMemo(() => {
+    const items = Array.isArray(detailItem?.items) ? detailItem.items : [];
+    const start = (detailPage - 1) * PAGE_SIZE;
+    return items.slice(start, start + PAGE_SIZE);
+  }, [detailItem?.items, detailPage]);
+
+  const detailTotalItems = Array.isArray(detailItem?.items) ? detailItem.items.length : 0;
+  const historyItems = useMemo(() => {
+    const start = (historyPage - 1) * PAGE_SIZE;
+    return history.slice(start, start + PAGE_SIZE);
+  }, [history, historyPage]);
+
+  const historyTotalItems = history.length;
+
+  const approveProofLabel = useMemo(() => {
+    if (approveProofFile?.name) return approveProofFile.name;
+    if (approveRow?.proof_file_path) return "Existing proof available";
+    return "No file chosen";
+  }, [approveProofFile?.name, approveRow?.proof_file_path]);
+
+  const approveProofPreview = useMemo(() => {
+    if (!approveProofFile) return null;
+    const isImage = approveProofFile.type.startsWith("image/");
+    const previewUrl = isImage ? URL.createObjectURL(approveProofFile) : null;
+    return { name: approveProofFile.name, isImage, previewUrl };
+  }, [approveProofFile]);
+
+  async function submitApprovePayment(event) {
+    event.preventDefault();
+    if (!approveRow?.voucher_id && !approveRow?.fee_submission_id) return;
+
+    setApprovePending(true);
+    setApproveError("");
+
+    try {
+      const formData = new FormData();
+      formData.append("action", "approve");
+      formData.append(
+        "paidAmount",
+        String(approveAmount || approveRow.paid_amount || approveRow.base_amount || approveRow.current_pending_due || 0)
+      );
+      if (approveProofFile) {
+        formData.append("proofFile", approveProofFile);
+      }
+
+      const approvalId = approveRow.fee_submission_id || approveRow.voucher_id;
+      const response = await fetch(`/api/coordinator/payments/${encodeURIComponent(approvalId)}/verify`, {
+        method: "POST",
+        body: formData,
+      });
+
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(data?.message || "Unable to approve payment.");
+      }
+
+      setApproveRow(null);
+      setApproveAmount("");
+      setApproveProofFile(null);
+      setApproveError("");
+      window.location.reload();
+    } catch (approveError) {
+      setApproveError(approveError instanceof Error ? approveError.message : "Unable to approve payment.");
+    } finally {
+      setApprovePending(false);
+    }
+  }
+
+  function openDetailItem(item) {
+    setDetailItem(item);
+    setDetailPage(1);
+  }
+
+  function handleOpenDetailItem(item) {
+    setHistoryPage(1);
+    openDetailItem(item);
   }
 
   async function submit(event) {
@@ -221,7 +309,7 @@ export default function RegularFeeVouchersPage() {
                   <tr><th className="px-6 py-4">Batch</th><th className="px-6 py-4">Class</th><th className="px-6 py-4">Month</th><th className="px-6 py-4">Due</th><th className="px-6 py-4">Students</th><th className="px-6 py-4">Total</th><th className="px-6 py-4">Status</th><th className="px-6 py-4">Action</th></tr>
                 </thead>
                 <tbody className="divide-y divide-[#F1EADC]">
-                  {history.length ? history.map((item) => (
+                  {historyItems.length ? historyItems.map((item) => (
                     <tr key={item.id}>
                       <td className="px-6 py-4 font-semibold text-[#063F32]">{item.batch_no}</td>
                       <td className="px-6 py-4 text-[#245C4F]">{item.class_title}</td>
@@ -230,12 +318,22 @@ export default function RegularFeeVouchersPage() {
                       <td className="px-6 py-4 text-[#245C4F]">{item.student_count}</td>
                       <td className="px-6 py-4 text-[#245C4F]">{formatMoney(item.total_amount)}</td>
                       <td className="px-6 py-4 text-[#245C4F]">{item.status}</td>
-                      <td className="px-6 py-4"><button type="button" onClick={() => setDetailItem(item)} className="rounded-xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-3 py-2 text-xs font-semibold text-[#063F32] transition hover:bg-[#F1EADC]">View</button></td>
+                      <td className="px-6 py-4"><button type="button" onClick={() => handleOpenDetailItem(item)} className="rounded-xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-3 py-2 text-xs font-semibold text-[#063F32] transition hover:bg-[#F1EADC]">View</button></td>
                     </tr>
                   )) : <tr><td className="px-6 py-8 text-center text-[#245C4F]" colSpan={8}>{loading ? "Loading..." : "No regular fee voucher batches found."}</td></tr>}
                 </tbody>
               </table>
             </div>
+            {historyTotalItems > PAGE_SIZE ? (
+              <div className="mt-4">
+                <PaginationControls
+                  page={historyPage}
+                  pageSize={PAGE_SIZE}
+                  totalItems={historyTotalItems}
+                  onPageChange={setHistoryPage}
+                />
+              </div>
+            ) : null}
           </div>
         </section>
 
@@ -267,10 +365,11 @@ export default function RegularFeeVouchersPage() {
                         <th className="px-4 py-3">Total Amount</th>
                         <th className="px-4 py-3">Payment Status</th>
                         <th className="px-4 py-3">Voucher Status</th>
+                        <th className="px-4 py-3 text-right">Action</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-[#F1EADC]">
-                      {(detailItem.items || []).length ? detailItem.items.map((row) => (
+                      {detailItems.length ? detailItems.map((row) => (
                         <tr key={row.id}>
                           <td className="px-4 py-4">
                             <p className="font-semibold text-[#063F32]">{row.student_name || "-"}</p>
@@ -293,15 +392,129 @@ export default function RegularFeeVouchersPage() {
                               {formatStatus(row.voucher_status || "not_submitted")}
                             </span>
                           </td>
+                            <td className="px-4 py-4 text-right">
+                              {["pending", "not_submitted"].includes(String(row.payment_status || "").toLowerCase()) && (row.fee_submission_id || row.voucher_id) && String(row.voucher_status || "").toLowerCase() !== "submitted" ? (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setApproveRow(row);
+                                    setApproveAmount(String(row.paid_amount || row.total_amount || row.base_amount || ""));
+                                    setApproveProofFile(null);
+                                    setApproveError("");
+                                  }}
+                                  className="whitespace-nowrap rounded-xl bg-[#0D5C48] px-3 py-2 text-xs font-semibold text-[#FAF7F0] transition hover:bg-[#063F32]"
+                                >
+                                  Approve payment
+                                </button>
+                              ) : null}
+                            </td>
                         </tr>
                       )) : (
                         <tr>
-                          <td className="px-4 py-6 text-center text-[#245C4F]" colSpan={9}>No student voucher rows available.</td>
+                          <td className="px-4 py-6 text-center text-[#245C4F]" colSpan={10}>No student voucher rows available.</td>
                         </tr>
                       )}
                     </tbody>
                   </table>
                 </div>
+                {detailTotalItems > PAGE_SIZE ? (
+                  <div className="mt-4">
+                    <PaginationControls
+                      page={detailPage}
+                      pageSize={PAGE_SIZE}
+                      totalItems={detailTotalItems}
+                      onPageChange={setDetailPage}
+                    />
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          </ClientPortal>
+        ) : null}
+
+        {approveRow ? (
+          <ClientPortal targetId="coordinator-page-portal-root">
+            <div className="fixed inset-0 z-[10000] flex items-start justify-center bg-[#063F32]/45 px-4 pt-10 pb-10 backdrop-blur-sm">
+              <div className="w-full max-w-2xl rounded-[2rem] border border-[#2D8A6A]/15 bg-[#FAF7F0] p-6 shadow-[0_24px_80px_-36px_rgba(13,59,46,0.24)] sm:p-8">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <p className="text-sm font-semibold uppercase tracking-[0.24em] text-[#0D5C48]">Approve payment</p>
+                    <h3 className="mt-2 text-xl font-semibold text-[#063F32]">{approveRow.voucher_no || "Monthly voucher"}</h3>
+                    <p className="mt-1 text-sm text-[#245C4F]">{approveRow.student_name || ""}</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setApproveRow(null)}
+                    className="rounded-xl border border-[#2D8A6A]/20 bg-white px-3 py-2 text-sm font-semibold text-[#063F32]"
+                  >
+                    Close
+                  </button>
+                </div>
+                <form className="mt-6 grid gap-4" onSubmit={submitApprovePayment}>
+                  <label className="block">
+                    <span className="mb-2 block text-sm font-medium text-[#245C4F]">Amount paid</span>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={approveAmount}
+                      onChange={(event) => setApproveAmount(event.target.value)}
+                      className="w-full rounded-2xl border border-[#2D8A6A]/20 bg-white px-4 py-3 text-sm text-[#063F32] outline-none focus:border-[#2D8A6A] focus:ring-4 focus:ring-[#FFF5D6]"
+                      required
+                    />
+                  </label>
+                  <label className="block">
+                    <span className="mb-2 block text-sm font-medium text-[#245C4F]">Payment proof</span>
+                    <input
+                      type="file"
+                      accept="image/*,application/pdf"
+                      onChange={(event) => setApproveProofFile(event.target.files?.[0] || null)}
+                      className="w-full rounded-2xl border border-[#2D8A6A]/20 bg-white px-4 py-3 text-sm text-[#063F32] file:mr-4 file:rounded-xl file:border-0 file:bg-[#EAF6EF] file:px-4 file:py-2 file:text-sm file:font-semibold file:text-[#0D5C48]"
+                    />
+                    <p className="mt-2 text-xs font-medium text-[#245C4F]">Selected file: {approveProofLabel}</p>
+                    {approveProofPreview ? (
+                      <div className="mt-3 rounded-2xl border border-[#2D8A6A]/15 bg-white p-3">
+                        {approveProofPreview.isImage ? (
+                          <img
+                            src={approveProofPreview.previewUrl}
+                            alt={approveProofPreview.name}
+                            className="mt-2 h-32 w-full rounded-xl object-contain"
+                          />
+                        ) : (
+                          <p className="mt-2 text-xs text-[#245C4F]">PDF selected, preview available after upload.</p>
+                        )}
+                      </div>
+                    ) : null}
+                  </label>
+                  {approveError ? (
+                    <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                      {approveError}
+                    </div>
+                  ) : null}
+                  <div className="flex justify-end gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setApproveRow(null)}
+                      className="rounded-2xl border border-[#2D8A6A]/20 bg-white px-5 py-3 text-sm font-semibold text-[#063F32]"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={approvePending}
+                      className="inline-flex items-center justify-center rounded-2xl bg-[#0D5C48] px-5 py-3 text-sm font-semibold text-[#FAF7F0] disabled:opacity-60"
+                    >
+                      {approvePending ? (
+                        <span className="inline-flex items-center gap-2">
+                          <LeafSpinnerInline className="h-4 w-4 border-[#FAF7F0]/40 border-t-[#FAF7F0]" />
+                          Approving...
+                        </span>
+                      ) : (
+                        "Approve payment"
+                      )}
+                    </button>
+                  </div>
+                </form>
               </div>
             </div>
           </ClientPortal>

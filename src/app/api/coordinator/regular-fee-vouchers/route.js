@@ -105,6 +105,7 @@ async function getHistory() {
           'status', item.status,
           'voucher_no', fv.voucher_no,
           'voucher_status', fv.status::text,
+          'fee_submission_id', fs.id::text,
           'payment_status', COALESCE(fs.status::text, 'not_submitted'),
           'transaction_id', fs.transaction_id,
           'paid_amount', fs.paid_amount::float8,
@@ -165,6 +166,7 @@ async function getHistory() {
       ) previous_history ON TRUE
       LEFT JOIN LATERAL (
         SELECT
+          fs.id,
           status,
           transaction_id,
           paid_amount,

@@ -4,6 +4,8 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { buildCredentialsEmailHtml, buildPaymentDecisionEmailHtml, getAppUrl, sendEmail } from "@/lib/email";
 import prisma from "@/lib/prisma";
+import { uploadPaymentProof } from "@/lib/supabaseStorage";
+import { recalculateStudentFeeHistory } from "@/lib/feeHistory";
 
 const ALLOWED_ROLES = new Set(["admin", "coordinator"]);
 const TRANSACTION_OPTIONS = { maxWait: 10000, timeout: 30000 };
@@ -501,6 +503,7 @@ async function getSubmissionRecord(id, tx = prisma) {
       item.parent_phone,
       item.student_email,
       item.student_phone,
+      item.student_id::text AS student_id,
       rl.address,
       rl.city,
       COALESCE(
@@ -527,6 +530,42 @@ async function getSubmissionRecord(id, tx = prisma) {
   return submission;
 }
 
+async function getVoucherRecord(id, tx = prisma) {
+  const [voucher] = await tx.$queryRaw`
+      SELECT
+        fv.id::text AS fee_voucher_id,
+        fv.voucher_no,
+        fv.amount::float8 AS voucher_amount,
+        fv.total_amount::float8 AS total_amount,
+        fv.status::text AS voucher_status,
+        fv.registration_id::text AS registration_lead_id,
+      COALESCE(NULLIF(TRIM(item.student_name), ''), NULLIF(TRIM(su.full_name), ''), 'Student') AS student_name,
+      COALESCE(NULLIF(TRIM(item.parent_name), ''), NULLIF(TRIM(pu.full_name), ''), 'Parent') AS parent_name,
+      COALESCE(NULLIF(TRIM(item.student_email), ''), NULLIF(TRIM(su.email), ''), NULLIF(TRIM(rl.email), ''), NULLIF(TRIM(pu.email), '')) AS email,
+      COALESCE(NULLIF(TRIM(item.student_phone), ''), NULLIF(TRIM(su.phone), ''), NULLIF(TRIM(rl.phone), ''), NULLIF(TRIM(pu.phone), '')) AS phone,
+      item.student_id::text AS student_id,
+      item.batch_id::text AS batch_id,
+      item.base_amount::float8 AS base_amount,
+      COALESCE(item.base_amount::float8, fv.amount::float8, 0) AS current_month_fee
+    FROM fee_vouchers fv
+    LEFT JOIN regular_monthly_fee_voucher_items item ON item.voucher_id = fv.id
+    LEFT JOIN student_profiles sp ON sp.id = item.student_id
+    LEFT JOIN users su ON su.id = sp.user_id
+    LEFT JOIN registration_leads rl ON rl.id = fv.registration_id
+    LEFT JOIN parent_profiles pp ON pp.id = (
+      SELECT spp.parent_id
+      FROM student_parents spp
+      WHERE spp.student_id = item.student_id
+      ORDER BY spp.is_primary DESC, spp.id DESC
+      LIMIT 1
+    )
+    LEFT JOIN users pu ON pu.id = pp.user_id
+    WHERE fv.id = ${id}::uuid
+    LIMIT 1
+  `;
+  return voucher;
+}
+
 export async function POST(request, { params }) {
   const session = await auth();
   const role = String(session?.user?.role || "").toLowerCase();
@@ -536,7 +575,25 @@ export async function POST(request, { params }) {
 
   try {
     const { id } = await params;
-    const body = await request.json();
+    const contentType = String(request.headers.get("content-type") || "").toLowerCase();
+    let body = {};
+    let proofFile = null;
+
+    if (contentType.includes("multipart/form-data")) {
+      const formData = await request.formData();
+      body = {
+        action: normalizeText(formData.get("action")).toLowerCase(),
+        rejectionReason: normalizeText(formData.get("rejectionReason")),
+        paidAmount: formData.get("paidAmount"),
+      };
+      const candidateFile = formData.get("proofFile");
+      if (candidateFile instanceof File && candidateFile.size > 0) {
+        proofFile = candidateFile;
+      }
+    } else {
+      body = await request.json();
+    }
+
     const action = normalizeText(body?.action).toLowerCase();
     const rejectionReason = normalizeText(body?.rejectionReason);
 
@@ -547,8 +604,38 @@ export async function POST(request, { params }) {
       return json("Rejection reason is required.", 400);
     }
 
-    const submission = await getSubmissionRecord(id);
-    if (!submission?.id) return json("Payment submission not found.", 404);
+    let submission = await getSubmissionRecord(id);
+    const voucherFallback = !submission?.id ? await getVoucherRecord(id) : null;
+    if (!submission?.id && !voucherFallback?.fee_voucher_id) return json("Payment submission not found.", 404);
+
+    if (!submission?.id && voucherFallback?.fee_voucher_id) {
+      const createdSubmissionId = crypto.randomUUID();
+      const createdPaidAt = new Date().toISOString();
+      const createdPaidAmount = Number(body?.paidAmount || voucherFallback.total_amount || voucherFallback.voucher_amount || 0);
+      await prisma.$executeRaw`
+        INSERT INTO fee_submissions (
+          id,
+          voucher_id,
+          payer_name,
+          transaction_id,
+          paid_amount,
+          paid_at,
+          proof_file_path,
+          status
+        )
+        VALUES (
+          ${createdSubmissionId}::uuid,
+          ${voucherFallback.fee_voucher_id}::uuid,
+          ${voucherFallback.parent_name || voucherFallback.student_name || "Parent"},
+          ${`manual-${Date.now()}`},
+          ${createdPaidAmount},
+          ${createdPaidAt}::timestamp,
+          ${proofFile instanceof File && proofFile.size > 0 ? (await uploadPaymentProof({ voucherNo: voucherFallback.voucher_no, file: proofFile })).storedPath : null},
+          'pending'::fee_submission_status
+        )
+      `;
+      submission = await getSubmissionRecord(createdSubmissionId);
+    }
 
     // 🟢 FIXED: Check matching lowercase state
     if (String(submission.submission_status || "").toLowerCase() !== "pending") {
@@ -622,18 +709,42 @@ export async function POST(request, { params }) {
       submission.phone || submission.parent_phone || submission.parentPhone || "";
 
     const isMonthlyVoucher = Boolean(submission.is_monthly_voucher);
+    const submittedPaidAmount = Number(body?.paidAmount || 0);
+    const resolvedPaidAmount = Number.isFinite(submittedPaidAmount) && submittedPaidAmount > 0
+      ? submittedPaidAmount
+      : Number(submission.paid_amount || submission.voucher_amount || submission.total_amount || submission.amount || 0);
+    let resolvedProofPath = submission.proof_file_path || "";
+
+    if (proofFile instanceof File && proofFile.size > 0) {
+      const upload = await uploadPaymentProof({
+        voucherNo: submission.voucher_no,
+        file: proofFile,
+      });
+      resolvedProofPath = upload.storedPath;
+    }
 
     if (isMonthlyVoucher) {
       await prisma.$transaction(async (tx) => {
         await tx.$executeRaw`
           UPDATE fee_submissions
-          SET status = 'verified'::fee_submission_status
+          SET
+            status = 'verified'::fee_submission_status,
+            paid_amount = ${resolvedPaidAmount},
+            proof_file_path = COALESCE(${resolvedProofPath || null}, proof_file_path),
+            updated_at = NOW()
           WHERE id = ${submission.id}::uuid;
         `;
         await tx.$executeRaw`
           UPDATE fee_vouchers
           SET status = 'verified'::voucher_status
           WHERE id = ${submission.fee_voucher_id || submission.voucher_id}::uuid;
+        `;
+        await tx.$executeRaw`
+          UPDATE fee_history_records
+          SET
+            this_month_paid = ${resolvedPaidAmount},
+            updated_at = NOW()
+          WHERE voucher_id = ${submission.fee_voucher_id || submission.voucher_id}::uuid
         `;
         await insertFeeVerification({
           feeSubmissionId: submission.id,
@@ -654,6 +765,11 @@ export async function POST(request, { params }) {
           tx,
           { entityType: "fee_vouchers", entityId: submission.fee_voucher_id || submission.voucher_id }
         );
+
+        const resolvedStudentId = normalizeText(submission.student_id || voucherFallback?.student_id);
+        if (resolvedStudentId) {
+          await recalculateStudentFeeHistory(tx, resolvedStudentId);
+        }
       }, TRANSACTION_OPTIONS);
 
       if (submission.email) {
@@ -667,14 +783,14 @@ export async function POST(request, { params }) {
             title: "Your monthly fee payment has been approved",
             intro: `Hello, ${submission.student_name || submission.parent_name || "there"}. Your monthly fee payment for voucher ${submission.voucher_no} has been approved successfully.`,
             voucherNo: submission.voucher_no,
-            reason: `Paid Amount: ${submission.paid_amount || "-"}${paidAtLabel ? `\nPaid At: ${paidAtLabel}` : ""}`,
+            reason: `Paid Amount: ${resolvedPaidAmount || "-"}${paidAtLabel ? `\nPaid At: ${paidAtLabel}` : ""}`,
             portalUrl,
             ctaLabel: "Open LMS",
           });
           await sendEmail({
             to: submission.email,
             subject: "Monthly fee payment approved",
-            text: `Monthly fee payment approved\n\nVoucher No: ${submission.voucher_no}\nPaid Amount: ${submission.paid_amount || "-"}\n${paidAtLabel ? `Paid At: ${paidAtLabel}\n` : ""}\nOpen LMS: ${portalUrl}`,
+            text: `Monthly fee payment approved\n\nVoucher No: ${submission.voucher_no}\nPaid Amount: ${resolvedPaidAmount || "-"}\n${paidAtLabel ? `Paid At: ${paidAtLabel}\n` : ""}\nOpen LMS: ${portalUrl}`,
             html,
           });
         } catch (emailError) {

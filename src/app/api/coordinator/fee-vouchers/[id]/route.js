@@ -41,6 +41,11 @@ export async function GET(_request, { params }) {
         COALESCE(latest_history.remaining_due::float8, COALESCE(fv.total_amount::float8, fv.amount::float8, 0)) AS current_pending_due,
         fv.payment_method_id::text AS payment_method_id,
         fv.regular_fee_id::text AS regular_fee_id,
+        fs.id::text AS fee_submission_id,
+        LOWER(COALESCE(fs.status::text, '')) AS payment_submission_status,
+        fs.paid_amount::float8 AS paid_amount,
+        fs.paid_at,
+        fs.proof_file_path,
         rl.id::text AS registration_lead_id,
         rl.student_name,
         rl.parent_name,
@@ -57,6 +62,18 @@ export async function GET(_request, { params }) {
       FROM fee_vouchers fv
       LEFT JOIN registration_leads rl ON rl.id = COALESCE(fv.registration_id, fv.registration_lead_id)
       LEFT JOIN payment_methods pm ON pm.id = fv.payment_method_id
+      LEFT JOIN LATERAL (
+        SELECT
+          fs.id,
+          fs.status,
+          fs.paid_amount,
+          fs.paid_at,
+          fs.proof_file_path
+        FROM fee_submissions fs
+        WHERE fs.voucher_id = fv.id
+        ORDER BY fs.created_at DESC NULLS LAST, fs.id DESC
+        LIMIT 1
+      ) fs ON TRUE
       LEFT JOIN LATERAL (
         SELECT fhr.remaining_due
         FROM fee_history_records fhr
@@ -75,6 +92,11 @@ export async function GET(_request, { params }) {
     return json("Fee voucher fetched.", 200, {
       item: {
         ...item,
+        fee_submission_id: item.fee_submission_id || "",
+        payment_submission_status: item.payment_submission_status || "",
+        paid_amount: item.paid_amount || "",
+        paid_at: item.paid_at || "",
+        proof_file_path: item.proof_file_path || "",
         payment_method_details: {
           name: item.payment_method_name || item.payment_method || "",
           bank_name: item.bank_name || "",
