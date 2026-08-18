@@ -119,6 +119,7 @@ export async function GET(request) {
           ls.google_calendar_event_id,
           ls.google_meet_link,
           ls.meet_link_source,
+          NULLIF(LEFT(COALESCE(ls.google_meet_sync_meta->'recording'->>'start_time', ''), 10), '') AS recording_date,
           COALESCE(ls.google_meet_sync_meta->'recording'->>'url', ls.recording_drive_url) AS recording_drive_url,
           ls.title,
           ls.description,

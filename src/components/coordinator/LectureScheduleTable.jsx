@@ -73,14 +73,6 @@ export default function LectureScheduleTable({ items = [], onRefresh }) {
                 <p className="min-w-0 text-sm leading-6 text-[#245C4F] break-words">{item.display_status || item.status || getLectureDisplayStatus(item)}</p>
                 <div className="min-w-0 text-sm leading-6 text-[#245C4F] break-words">
                   <p>{item.course_title}</p>
-                  {item.meet_link_source ? <p className="mt-1 text-xs text-[#245C4F]">Link source: {item.meet_link_source}</p> : null}
-                  {primaryLink ? (
-                    <a href={primaryLink.href} target="_blank" rel="noreferrer" className="mt-1 inline-flex text-xs font-semibold text-[#0D5C48]">
-                      {primaryLink.label}
-                    </a>
-                  ) : (
-                    <p className="mt-1 text-xs text-[#245C4F]">No active Meet or recording link</p>
-                  )}
                 </div>
                 <div className="flex flex-wrap gap-2 lg:justify-end">
                   <button type="button" disabled={isFinal} onClick={() => patchSchedule(item.id, { action: "cancel" }).catch((error) => window.alert(error.message))} className="rounded-xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-3 py-2 text-xs font-semibold text-[#063F32] transition hover:bg-[#F1EADC] disabled:cursor-not-allowed disabled:opacity-50">

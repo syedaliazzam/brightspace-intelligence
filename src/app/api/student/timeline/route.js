@@ -31,7 +31,8 @@ export async function GET(request) {
         ls.status::text AS status,
         ls.scheduled_start AS occurred_at,
         ls.google_meet_link,
-        ls.recording_drive_url,
+        NULLIF(LEFT(COALESCE(ls.google_meet_sync_meta->'recording'->>'start_time', ''), 10), '') AS recording_date,
+        COALESCE(ls.google_meet_sync_meta->'recording'->>'url', ls.recording_drive_url) AS recording_drive_url,
         sub.name AS subject_name,
         tu.full_name AS teacher_name,
         su.full_name AS student_name

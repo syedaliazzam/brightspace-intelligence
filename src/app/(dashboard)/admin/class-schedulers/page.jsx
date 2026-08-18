@@ -55,9 +55,14 @@ function buildClassSchedulerEvents(item) {
   const endDate = parseDateOnly(item?.end_date);
   const startTimeParts = String(item?.start_time || "00:00").split(":").map(Number);
   const endTimeParts = String(item?.end_time || "00:00").split(":").map(Number);
+  const recordingDateKey = String(item?.recording_date || "").slice(0, 10);
   const occurrenceDates = Array.isArray(item?.occurrence_dates)
     ? item.occurrence_dates.map(parseDateOnly).filter(Boolean)
     : [];
+  const recordingByDate =
+    item?.recording_by_date && typeof item.recording_by_date === "object"
+      ? item.recording_by_date
+      : {};
   const weekdaySet = new Set(
     String(item?.days_active || "")
       .split(",")
@@ -65,7 +70,17 @@ function buildClassSchedulerEvents(item) {
       .filter(Boolean)
   );
 
-  const makeEvent = (date, suffix = "") => ({
+  const makeEvent = (date, suffix = "") => {
+    const occurrenceDateKey = date ? toCalendarDate(date).slice(0, 10) : "";
+    const occurrenceRecordingLink = String(recordingByDate?.[occurrenceDateKey] || "").trim();
+    const fallbackRecordingLink =
+      occurrenceDateKey && recordingDateKey && occurrenceDateKey === recordingDateKey
+        ? String(item?.recording_drive_url || "").trim()
+        : "";
+    const resolvedRecordingLink = occurrenceRecordingLink || fallbackRecordingLink;
+    const canShowRecording = Boolean(resolvedRecordingLink);
+
+    return ({
     id: `class-${item.id}${suffix}`,
     title: item?.title || item?.subject_name || "Class scheduler",
     start: date ? formatLocalCalendarDate(date, startTimeParts[0] || 0, startTimeParts[1] || 0) : "",
@@ -78,13 +93,14 @@ function buildClassSchedulerEvents(item) {
       typeLabel: "Class",
       subtitle: item?.subject_name || item?.class_level || item?.course_title || "Class schedule",
       meetLink: item?.google_meet_link || "",
-      recordingLink: item?.recording_drive_url || item?.event_detail_link?.href || "",
-      recordingKind: item?.recording_drive_url ? "recording" : item?.event_detail_link?.kind || "",
-      recordingLabel: item?.recording_drive_url ? "View Recording" : item?.event_detail_link?.label || "",
+      recordingLink: canShowRecording ? resolvedRecordingLink : item?.event_detail_link?.href || "",
+      recordingKind: canShowRecording ? "recording" : item?.event_detail_link?.kind || "",
+      recordingLabel: canShowRecording ? "View Recording" : item?.event_detail_link?.label || "",
       eventId: item?.id,
       eventType: "class-schedulers",
     },
   });
+  };
 
   if (occurrenceDates.length) {
     return occurrenceDates.map((date) => makeEvent(date, `-${date.toISOString().slice(0, 10)}`));
@@ -286,8 +302,11 @@ export default function AdminUnifiedCalendarPage() {
   const resolvedRecordingLink = selectedEvent?.extendedProps?.recordingLink || "";
   const resolvedRecordingLabel = selectedEvent?.extendedProps?.recordingLabel || "View Recording";
   const resolvedRecordingKind = selectedEvent?.extendedProps?.recordingKind || "";
+  const isClassEvent = selectedEvent?.extendedProps?.eventType === "class-schedulers";
   const showRecordingActionLink = Boolean(
-    resolvedRecordingLink && resolvedRecordingLink !== selectedEvent?.extendedProps?.meetLink
+    resolvedRecordingLink &&
+      resolvedRecordingLink !== selectedEvent?.extendedProps?.meetLink &&
+      (!isClassEvent || resolvedRecordingKind === "recording")
   );
 
   return (

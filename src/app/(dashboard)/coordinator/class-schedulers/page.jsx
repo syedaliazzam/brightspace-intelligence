@@ -67,13 +67,36 @@ function expandClassSchedulerEvent(item) {
     ? item.occurrence_dates.map(parseDateOnly).filter(Boolean)
     : [];
   const weekdaySet = getWeekdaySet(item?.days_active);
+  const recordingDateKey = String(item?.recording_date || item?.recorded_at || "").slice(0, 10);
+  const recordingByDate =
+    item?.recording_by_date && typeof item.recording_by_date === "object"
+      ? item.recording_by_date
+      : {};
+
+  function resolveRecordingProps(occurrenceDateKey) {
+    const occurrenceRecordingLink = String(recordingByDate?.[occurrenceDateKey] || "").trim();
+    const fallbackRecordingLink =
+      occurrenceDateKey && recordingDateKey && occurrenceDateKey === recordingDateKey
+        ? String(item?.recording_drive_url || "").trim()
+        : "";
+    const resolvedRecordingLink = occurrenceRecordingLink || fallbackRecordingLink;
+    const canShowRecording = Boolean(resolvedRecordingLink);
+
+    return {
+      recordingLink: canShowRecording ? resolvedRecordingLink : "",
+      recordingKind: canShowRecording ? "recording" : "",
+      recordingLabel: canShowRecording ? "View Recording" : "",
+    };
+  }
 
   if (occurrenceDates.length) {
     return occurrenceDates.map((date) => {
       const occurrenceStart = formatLocalCalendarDate(date, startTimeParts[0] || 0, startTimeParts[1] || 0);
       const occurrenceEnd = formatLocalCalendarDate(date, endTimeParts[0] || 0, endTimeParts[1] || 0);
+      const occurrenceDateKey = toCalendarDate(date).slice(0, 10);
+      const recordingProps = resolveRecordingProps(occurrenceDateKey);
       return {
-        id: `class-${item.id}-${date.toISOString().slice(0, 10)}`,
+        id: `class-${item.id}-${occurrenceDateKey}`,
         title: item?.title || item?.subject_name || "Class scheduler",
         start: occurrenceStart,
         end: occurrenceEnd,
@@ -85,9 +108,7 @@ function expandClassSchedulerEvent(item) {
           typeLabel: "Class",
           subtitle: item?.subject_name || item?.class_level || item?.course_title || "Class schedule",
           meetLink: item?.google_meet_link || "",
-          recordingLink: item?.recording_drive_url || item?.event_detail_link?.href || "",
-          recordingKind: item?.recording_drive_url ? "recording" : item?.event_detail_link?.kind || "",
-          recordingLabel: item?.recording_drive_url ? "View Recording" : item?.event_detail_link?.label || "",
+          ...recordingProps,
           eventId: item?.id,
           eventType: "class-schedulers",
         },
@@ -104,8 +125,10 @@ function expandClassSchedulerEvent(item) {
     if (weekdaySet.has(weekday)) {
       const occurrenceStart = formatLocalCalendarDate(cursor, startTimeParts[0] || 0, startTimeParts[1] || 0);
       const occurrenceEnd = formatLocalCalendarDate(cursor, endTimeParts[0] || 0, endTimeParts[1] || 0);
+      const occurrenceDateKey = toCalendarDate(cursor).slice(0, 10);
+      const recordingProps = resolveRecordingProps(occurrenceDateKey);
       events.push({
-        id: `class-${item.id}-${cursor.toISOString().slice(0, 10)}`,
+        id: `class-${item.id}-${occurrenceDateKey}`,
         title: item?.title || item?.subject_name || "Class scheduler",
         start: occurrenceStart,
         end: occurrenceEnd,
@@ -117,9 +140,7 @@ function expandClassSchedulerEvent(item) {
           typeLabel: "Class",
           subtitle: item?.subject_name || item?.class_level || item?.course_title || "Class schedule",
           meetLink: item?.google_meet_link || "",
-          recordingLink: item?.recording_drive_url || item?.event_detail_link?.href || "",
-          recordingKind: item?.recording_drive_url ? "recording" : item?.event_detail_link?.kind || "",
-          recordingLabel: item?.recording_drive_url ? "View Recording" : item?.event_detail_link?.label || "",
+          ...recordingProps,
           eventId: item?.id,
           eventType: "class-schedulers",
         },
@@ -141,9 +162,9 @@ function expandClassSchedulerEvent(item) {
       typeLabel: "Class",
       subtitle: item?.subject_name || item?.class_level || item?.course_title || "Class schedule",
       meetLink: item?.google_meet_link || "",
-      recordingLink: item?.recording_drive_url || item?.event_detail_link?.href || "",
-      recordingKind: item?.recording_drive_url ? "recording" : item?.event_detail_link?.kind || "",
-      recordingLabel: item?.recording_drive_url ? "View Recording" : item?.event_detail_link?.label || "",
+      ...resolveRecordingProps(
+        item?.scheduled_start ? toCalendarDate(new Date(item.scheduled_start)).slice(0, 10) : ""
+      ),
       eventId: item?.id,
       eventType: "class-schedulers",
     },
@@ -273,51 +294,51 @@ export default function CoordinatorUnifiedCalendarPage() {
     internalEvents: [],
   });
 
-  useEffect(() => {
-    let active = true;
-
-    async function load() {
+  const loadCalendar = async (setLoadingState = true) => {
+    if (setLoadingState) {
       setState((current) => ({ ...current, loading: true, error: "" }));
-
-      try {
-        const [lectureResult, publicResult, internalResult] = await Promise.allSettled([
-          fetch("/api/coordinator/lecture-schedules?range=all", { cache: "no-store" }),
-          fetch("/api/coordinator/public-events", { cache: "no-store" }),
-          fetch("/api/internal-events", { cache: "no-store" }),
-        ]);
-
-        const lectureData = lectureResult.status === "fulfilled" ? await lectureResult.value.json().catch(() => ({ items: [] })) : { items: [] };
-        const publicData = publicResult.status === "fulfilled" ? await publicResult.value.json().catch(() => ({ items: [] })) : { items: [] };
-        const internalData = internalResult.status === "fulfilled" ? await internalResult.value.json().catch(() => ({ items: [] })) : { items: [] };
-
-        if (!active) return;
-
-        const errors = [
-          lectureResult.status === "rejected" ? "Unable to load class schedulers." : null,
-          publicResult.status === "rejected" ? "Unable to load public events." : null,
-          internalResult.status === "rejected" ? "Unable to load internal events." : null,
-        ].filter(Boolean);
-
-        setState({
-          loading: false,
-          error: errors[0] || "",
-          classEvents: Array.isArray(lectureData?.items) ? mapClassSchedulerEvents(lectureData.items) : [],
-          publicEvents: Array.isArray(publicData?.items) ? mapPublicEvents(publicData.items) : [],
-          internalEvents: Array.isArray(internalData?.items) ? mapInternalEvents(internalData.items) : [],
-        });
-      } catch (error) {
-        if (!active) return;
-        setState({
-          loading: false,
-          error: error instanceof Error ? error.message : "Unable to load event calendar.",
-          classEvents: [],
-          publicEvents: [],
-          internalEvents: [],
-        });
-      }
     }
 
-    void load();
+    try {
+      const [lectureResult, publicResult, internalResult] = await Promise.allSettled([
+        fetch("/api/coordinator/lecture-schedules?range=all", { cache: "no-store" }),
+        fetch("/api/coordinator/public-events", { cache: "no-store" }),
+        fetch("/api/internal-events", { cache: "no-store" }),
+      ]);
+
+      const lectureData = lectureResult.status === "fulfilled" ? await lectureResult.value.json().catch(() => ({ items: [] })) : { items: [] };
+      const publicData = publicResult.status === "fulfilled" ? await publicResult.value.json().catch(() => ({ items: [] })) : { items: [] };
+      const internalData = internalResult.status === "fulfilled" ? await internalResult.value.json().catch(() => ({ items: [] })) : { items: [] };
+
+      const errors = [
+        lectureResult.status === "rejected" ? "Unable to load class schedulers." : null,
+        publicResult.status === "rejected" ? "Unable to load public events." : null,
+        internalResult.status === "rejected" ? "Unable to load internal events." : null,
+      ].filter(Boolean);
+
+      setState({
+        loading: false,
+        error: errors[0] || "",
+        classEvents: Array.isArray(lectureData?.items) ? mapClassSchedulerEvents(lectureData.items) : [],
+        publicEvents: Array.isArray(publicData?.items) ? mapPublicEvents(publicData.items) : [],
+        internalEvents: Array.isArray(internalData?.items) ? mapInternalEvents(internalData.items) : [],
+      });
+    } catch (error) {
+      setState({
+        loading: false,
+        error: error instanceof Error ? error.message : "Unable to load event calendar.",
+        classEvents: [],
+        publicEvents: [],
+        internalEvents: [],
+      });
+    }
+  };
+
+  useEffect(() => {
+    let active = true;
+    void loadCalendar(true).then(() => {
+      if (!active) return;
+    });
     return () => {
       active = false;
     };
@@ -362,8 +383,9 @@ export default function CoordinatorUnifiedCalendarPage() {
               recordingKind: "recording",
               recordingLabel: "View Recording",
             },
-          }));
-        }
+            }));
+          }
+          await loadCalendar(false);
       }
     } catch (error) {
       console.error("Sync recording error:", error);
@@ -391,10 +413,11 @@ export default function CoordinatorUnifiedCalendarPage() {
   const showRecordingActionLink = Boolean(
     resolvedRecordingLink && resolvedRecordingLink !== selectedEvent?.extendedProps?.meetLink
   );
-  const showSyncRecordingButton =
-    Boolean(selectedEventId) &&
-    ["class-schedulers", "public-events", "internal-events"].includes(selectedEventType) &&
-    !showRecordingActionLink;
+  const showSyncRecordingButton = Boolean(
+    selectedEventId &&
+    ["public-events", "internal-events"].includes(selectedEventType) &&
+    !showRecordingActionLink
+  );
 
   return (
     <div className="min-h-screen bg-[#FAF7F0] text-[#063F32]">

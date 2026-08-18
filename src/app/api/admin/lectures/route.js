@@ -59,6 +59,7 @@ export async function GET(request) {
         ls.description,
         ls.scheduled_start::text AS scheduled_start,
         ls.scheduled_end::text AS scheduled_end,
+        NULLIF(LEFT(COALESCE(ls.google_meet_sync_meta->'recording'->>'start_time', ''), 10), '') AS recording_date,
         ls.status::text AS status,
         LOWER(
           CASE

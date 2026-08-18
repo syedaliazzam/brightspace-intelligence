@@ -63,6 +63,28 @@ export async function GET(request) {
         cv.id::text AS id,
         cv.voucher_no,
         cv.amount::text AS amount,
+        COALESCE(fv_meta.total_amount::float8, cv.amount::float8, 0) AS total_payable_amount,
+        COALESCE(fv_meta.scholarship_amount::float8, 0) AS scholarship_amount,
+        CASE
+          WHEN cv.is_monthly_voucher THEN
+            COALESCE(
+              CASE
+                WHEN fs.status IS NOT NULL THEN latest_history.remaining_due::float8
+                ELSE NULL
+              END,
+              GREATEST(
+                COALESCE(fv_meta.total_amount::float8, cv.amount::float8, 0)
+                - COALESCE(fs_latest.paid_amount::float8, 0),
+                0
+              )
+            )
+          ELSE
+            GREATEST(
+              COALESCE(fv_meta.total_amount::float8, cv.amount::float8, 0)
+              - COALESCE(fs_latest.paid_amount::float8, 0),
+              0
+            )
+        END AS remaining_due,
         cv.due_date,
         cv.payment_method::text AS payment_method,
         cv.status::text AS voucher_status,
@@ -74,6 +96,7 @@ export async function GET(request) {
         fs.proof_file_path,
         cv.student_name
       FROM child_vouchers cv
+      LEFT JOIN fee_vouchers fv_meta ON fv_meta.id = cv.id
       LEFT JOIN LATERAL (
         SELECT fs.status, fs.transaction_id, fs.paid_amount, fs.paid_at, fs.proof_file_path
         FROM fee_submissions fs
@@ -81,6 +104,20 @@ export async function GET(request) {
         ORDER BY fs.created_at DESC
         LIMIT 1
       ) fs ON TRUE
+      LEFT JOIN LATERAL (
+        SELECT fs.paid_amount
+        FROM fee_submissions fs
+        WHERE fs.voucher_id = cv.id
+        ORDER BY fs.created_at DESC
+        LIMIT 1
+      ) fs_latest ON TRUE
+      LEFT JOIN LATERAL (
+        SELECT fhr.remaining_due
+        FROM fee_history_records fhr
+        WHERE fhr.voucher_id = cv.id
+        ORDER BY fhr.updated_at DESC NULLS LAST, fhr.created_at DESC NULLS LAST, fhr.id DESC
+        LIMIT 1
+      ) latest_history ON TRUE
       ORDER BY cv.created_at DESC NULLS LAST, cv.id DESC
       `,
       ...values

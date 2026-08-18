@@ -41,6 +41,9 @@ function mapTeacherLectures(items = []) {
     const start = parseDateTime(item?.rescheduled_start || item?.scheduled_start);
     const end = parseDateTime(item?.rescheduled_end || item?.scheduled_end);
     const title = item?.title || item?.subject_name || "Class";
+    const lectureDateKey = start ? toCalendarDate(start).slice(0, 10) : "";
+    const recordingDateKey = String(item?.recording_date || "").slice(0, 10);
+    const canShowRecording = Boolean(item?.recording_drive_url && (!recordingDateKey || recordingDateKey === lectureDateKey));
 
     return {
       id: `class-${item.id}`,
@@ -55,9 +58,9 @@ function mapTeacherLectures(items = []) {
         typeLabel: "Class",
         subtitle: item?.subject_name || item?.class_level || "Your lecture",
         meetLink: item?.google_meet_link || "",
-        recordingLink: item?.recording_drive_url || item?.event_detail_link?.href || "",
-        recordingKind: item?.recording_drive_url ? "recording" : item?.event_detail_link?.kind || "",
-        recordingLabel: item?.recording_drive_url ? "View Recording" : item?.event_detail_link?.label || "",
+        recordingLink: canShowRecording ? item?.recording_drive_url : item?.event_detail_link?.href || "",
+        recordingKind: canShowRecording ? "recording" : item?.event_detail_link?.kind || "",
+        recordingLabel: canShowRecording ? "View Recording" : item?.event_detail_link?.label || "",
         eventId: item?.id,
         eventType: "class-schedulers",
       },
@@ -228,8 +231,11 @@ export default function TeacherEventsCalendarPage() {
   const resolvedRecordingLink = selectedEvent?.extendedProps?.recordingLink || "";
   const resolvedRecordingLabel = selectedEvent?.extendedProps?.recordingLabel || "View Recording";
   const resolvedRecordingKind = selectedEvent?.extendedProps?.recordingKind || "";
+  const isClassEvent = selectedEvent?.extendedProps?.eventType === "class-schedulers";
   const showRecordingActionLink = Boolean(
-    resolvedRecordingLink && resolvedRecordingLink !== selectedEvent?.extendedProps?.meetLink
+    resolvedRecordingLink &&
+      resolvedRecordingLink !== selectedEvent?.extendedProps?.meetLink &&
+      (!isClassEvent || resolvedRecordingKind === "recording")
   );
 
   return (

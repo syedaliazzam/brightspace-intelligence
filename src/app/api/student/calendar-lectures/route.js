@@ -120,6 +120,7 @@ export async function GET(request) {
           ls.description,
           ls.scheduled_start::text AS scheduled_start,
           ls.scheduled_end::text AS scheduled_end,
+          NULLIF(LEFT(COALESCE(ls.google_meet_sync_meta->'recording'->>'start_time', ''), 10), '') AS recording_date,
           ls.google_meet_link,
           COALESCE(ls.google_meet_sync_meta->'recording'->>'url', ls.recording_drive_url) AS recording_drive_url,
           ls.status::text AS status,

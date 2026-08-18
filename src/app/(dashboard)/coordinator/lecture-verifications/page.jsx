@@ -36,6 +36,11 @@ function writeCache(key, payload) {
   window.sessionStorage.setItem(key, JSON.stringify({ timestamp: Date.now(), payload }));
 }
 
+function clearCache(key) {
+  if (typeof window === "undefined") return;
+  window.sessionStorage.removeItem(key);
+}
+
 export default function CoordinatorLectureVerificationsPage() {
   const [filter, setFilter] = useState("pending");
   const [state, setState] = useState({
@@ -45,9 +50,10 @@ export default function CoordinatorLectureVerificationsPage() {
     error: "",
   });
 
-  const load = useCallback(async (nextFilter = filter) => {
+  const load = useCallback(async (nextFilter = filter, options = {}) => {
+    const { bypassCache = false } = options;
     const cacheKey = getCacheKey(nextFilter);
-    const cached = readCache(cacheKey);
+    const cached = bypassCache ? null : readCache(cacheKey);
 
     if (cached) {
       setState({
@@ -69,6 +75,7 @@ export default function CoordinatorLectureVerificationsPage() {
       throw new Error(data?.message || "Unable to load lecture verifications.");
     }
 
+    clearCache(cacheKey);
     writeCache(cacheKey, data);
     setState({
       counts: data.counts || { pending: 0, verified: 0, rejected: 0 },
@@ -140,7 +147,7 @@ export default function CoordinatorLectureVerificationsPage() {
         renderItems={(visibleItems) => (
           <LectureVerificationTable
             items={visibleItems}
-            onRefresh={() => load(filter).catch((error) => window.alert(error.message))}
+            onRefresh={() => load(filter, { bypassCache: true }).catch((error) => window.alert(error.message))}
           />
         )}
         emptyMessage="No lecture verification records available."

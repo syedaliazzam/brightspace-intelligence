@@ -212,17 +212,19 @@ export default function StaffFormModal({
                   />
                 </label>
 
-                <label className="block">
-                  <span className="mb-2 block text-sm font-medium text-[#245C4F]">
-                    Email
-                  </span>
-                  <input
-                    type="email"
-                    value={form.email}
-                    onChange={(event) => updateField("email", event.target.value)}
-                    className={inputClass}
-                  />
-                </label>
+                {!isParentEdit ? (
+                  <label className="block">
+                    <span className="mb-2 block text-sm font-medium text-[#245C4F]">
+                      Email
+                    </span>
+                    <input
+                      type="email"
+                      value={form.email}
+                      onChange={(event) => updateField("email", event.target.value)}
+                      className={inputClass}
+                    />
+                  </label>
+                ) : null}
 
                 <label className="block">
                   <span className="mb-2 block text-sm font-medium text-[#245C4F]">

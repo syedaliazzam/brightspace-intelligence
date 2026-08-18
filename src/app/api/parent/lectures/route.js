@@ -146,6 +146,13 @@ export async function GET(request) {
         ls.description,
         ls.scheduled_start::text AS scheduled_start,
         ls.scheduled_end::text AS scheduled_end,
+        COALESCE(
+          TO_CHAR(
+            NULLIF(ls.google_meet_sync_meta->'recording'->>'start_time', '')::timestamptz AT TIME ZONE 'Asia/Karachi',
+            'YYYY-MM-DD'
+          ),
+          NULLIF(LEFT(COALESCE(ls.google_meet_sync_meta->'recording'->>'start_time', ''), 10), '')
+        ) AS recording_date,
         ls.status::text AS status,
         ${LECTURE_STATUS_SQL} AS display_status,
         ls.google_meet_link,

@@ -406,10 +406,106 @@ function recordOverlapsLectureWindow(record, lectureStart, lectureEnd, tolerance
   return recordEnd >= targetStart - tolerance && recordStart <= targetEnd + tolerance;
 }
 
+function toTimeValue(value) {
+  const time = new Date(value || 0).getTime();
+  return Number.isNaN(time) ? null : time;
+}
+
+function normalizeLectureScheduleUtc(value) {
+  if (!value) return null;
+
+  const source = new Date(value);
+  if (Number.isNaN(source.getTime())) return value;
+
+  // Lecture schedule rows are stored as local Pakistan time in a timestamp-without-time-zone column.
+  // Prisma materializes them like UTC dates, so we convert those wall-clock components back to UTC.
+  const utcMillis =
+    Date.UTC(
+      source.getUTCFullYear(),
+      source.getUTCMonth(),
+      source.getUTCDate(),
+      source.getUTCHours(),
+      source.getUTCMinutes(),
+      source.getUTCSeconds(),
+      source.getUTCMilliseconds()
+    ) -
+    5 * 60 * 60 * 1000;
+
+  return new Date(utcMillis).toISOString();
+}
+
+function toDateKey(value) {
+  const time = toTimeValue(value);
+  if (time === null) return "";
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Karachi",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date(time));
+}
+
+function pickRecordingForLecture(recordings = [], lectureStart, lectureEnd) {
+  if (!Array.isArray(recordings) || !recordings.length) return null;
+
+  const lectureStartTime = toTimeValue(lectureStart);
+  const lectureEndTime = toTimeValue(lectureEnd);
+  const lectureDate = toDateKey(lectureStart || lectureEnd || null);
+
+  const scored = recordings
+    .map((recording) => {
+      const startTime = toTimeValue(recording?.startTime);
+      const endTime = toTimeValue(recording?.endTime || recording?.startTime);
+      const recordingDate = toDateKey(recording?.startTime || recording?.endTime || null);
+      const overlaps =
+        lectureStartTime !== null &&
+        lectureEndTime !== null &&
+        startTime !== null &&
+        endTime !== null &&
+        endTime >= lectureStartTime - 20 * 60000 &&
+        startTime <= lectureEndTime + 20 * 60000;
+      const sameDay = Boolean(lectureDate && recordingDate && lectureDate === recordingDate);
+      const distance =
+        lectureStartTime !== null && startTime !== null
+          ? Math.abs(startTime - lectureStartTime)
+        : Number.POSITIVE_INFINITY;
+      const sortTime = endTime ?? startTime ?? 0;
+
+      return {
+        recording,
+        overlaps,
+        sameDay,
+        distance,
+        sortTime,
+      };
+    })
+    .sort((left, right) => {
+      if (left.overlaps !== right.overlaps) return left.overlaps ? -1 : 1;
+      if (left.sameDay !== right.sameDay) return left.sameDay ? -1 : 1;
+      if (left.distance !== right.distance) return left.distance - right.distance;
+      return right.sortTime - left.sortTime;
+    });
+
+  return scored[0]?.overlaps || scored[0]?.sameDay ? scored[0].recording : null;
+}
+
 function classifyParticipants(records, lecture, calendarEvent, lectureStart = null, lectureEnd = null) {
   const expected = buildExpectedParticipants(lecture, calendarEvent);
+  const lectureDate = toDateKey(lectureStart || lectureEnd || null);
+  const dateMatchedRecords = records.filter(
+    (record) =>
+      toDateKey(record?.joinedAt || record?.leftAt || null) &&
+      toDateKey(record?.joinedAt || record?.leftAt || null) === lectureDate
+  );
   const windowedRecords = records.filter((record) => recordOverlapsLectureWindow(record, lectureStart, lectureEnd, 20));
-  const candidateRecords = windowedRecords.length ? windowedRecords : records;
+  const candidateRecords = dateMatchedRecords.length ? dateMatchedRecords : windowedRecords;
+  if (!candidateRecords.length) {
+    return {
+      host: null,
+      cohost: null,
+      others: [],
+    };
+  }
   const hostEmailVariants = normalizeEmailVariants(expected[0].emailVariants);
   const cohostEmailVariants = normalizeEmailVariants(expected[1].emailVariants);
   const hostCandidates = candidateRecords.filter((record) => {
@@ -429,17 +525,28 @@ function classifyParticipants(records, lecture, calendarEvent, lectureStart = nu
     ) ||
     pickClosestByJoinedAt(hostCandidates, lectureStart) ||
     pickBestMatch(candidateRecords, expected[0].emailVariants, "host", expected[0].nameVariants);
+
+  const exactCohostEmail = normalizeEmail(expected[1]?.email || "");
+  const exactCohostName = normalizeName(expected[1]?.name || "");
   const cohostCandidates = candidateRecords.filter((record) => {
     if (record === host) return false;
     const recordEmail = normalizeEmail(record.participantEmail || "");
     const recordName = normalizeName(record.participantName || "");
     return (
       record.resolvedRole === "cohost" ||
+      (exactCohostEmail && recordEmail === exactCohostEmail) ||
+      (exactCohostName && recordName === exactCohostName) ||
       (recordEmail && cohostEmailVariants.includes(recordEmail)) ||
       (recordName && normalizeNameVariants(expected[1].nameVariants).some((expectedName) => recordName === expectedName || recordName.includes(expectedName) || expectedName.includes(recordName)))
     );
   });
   const cohost =
+    pickClosestByJoinedAt(
+      cohostCandidates,
+      lectureStart,
+      (record) => Number(record.durationMinutes || 0) > 0
+    ) ||
+    pickClosestByJoinedAt(cohostCandidates, lectureStart) ||
     pickLongestRecord(cohostCandidates) ||
     pickBestMatch(
       candidateRecords.filter((record) => record !== host),
@@ -447,15 +554,7 @@ function classifyParticipants(records, lecture, calendarEvent, lectureStart = nu
       "cohost",
       expected[1].nameVariants
     );
-  const fallbackCohost =
-    cohost ||
-    pickLongestRecord(
-      candidateRecords.filter((record) => record !== host),
-      (record) => {
-        const name = normalizeName(record.participantName || "");
-        return Boolean(name) && !/^\d+$/.test(String(record.participantName || "").trim());
-      }
-    );
+  const fallbackCohost = cohost || null;
   const reservedEmails = new Set(
     normalizeEmailVariants([
       ...(expected[0]?.emailVariants || []),
@@ -500,23 +599,32 @@ function classifyParticipants(records, lecture, calendarEvent, lectureStart = nu
 
 function toLectureMetaRecord(record, roleType = "participant", fallbackEmail = "", conferenceEndTime = null) {
   const joinedAt = record.joinedAt || null;
+  const leftAt = record.leftAt || null;
   const conferenceEnd = conferenceEndTime ? new Date(conferenceEndTime) : null;
   const joinedAtDate = joinedAt ? new Date(joinedAt) : null;
+  const leftAtDate = leftAt ? new Date(leftAt) : null;
   const conferenceEndTimeValue = conferenceEnd && !Number.isNaN(conferenceEnd.getTime()) ? conferenceEnd.getTime() : null;
   const joinedAtTime = joinedAtDate && !Number.isNaN(joinedAtDate.getTime()) ? joinedAtDate.getTime() : null;
+  const leftAtTime = leftAtDate && !Number.isNaN(leftAtDate.getTime()) ? leftAtDate.getTime() : null;
   const effectiveDurationMinutes =
-    joinedAtTime && conferenceEndTimeValue
-      ? Math.max(0, Math.round((conferenceEndTimeValue - joinedAtTime) / 60000))
-      : Number(record.durationMinutes || 0);
+    Number(record.durationMinutes || 0) > 0
+      ? Number(record.durationMinutes || 0)
+      : joinedAtTime && leftAtTime
+        ? Math.max(0, Math.round((leftAtTime - joinedAtTime) / 60000))
+        : joinedAtTime && conferenceEndTimeValue
+          ? Math.max(0, Math.round((conferenceEndTimeValue - joinedAtTime) / 60000))
+          : 0;
   const durationLeftAt =
-    joinedAtTime && effectiveDurationMinutes > 0
+    leftAt
+      ? leftAt
+      : joinedAtTime && effectiveDurationMinutes > 0
       ? new Date(joinedAtTime + effectiveDurationMinutes * 60000).toISOString()
-      : record.leftAt || null;
+      : null;
   const roleKey = String(roleType || "").toLowerCase();
   const isStaffRole = roleKey === "coordinator" || roleKey === "teacher";
   const joined = Boolean(effectiveDurationMinutes > 0 || joinedAt);
   const status = isStaffRole ? (joined ? "present" : "absent") : durationStatus(effectiveDurationMinutes);
-  const leftAtValue = durationLeftAt;
+  const leftAtValue = isStaffRole && !joined ? null : durationLeftAt;
   const durationValue = effectiveDurationMinutes;
 
   return {
@@ -554,16 +662,7 @@ function normalizeStaffRecordToConferenceWindow(record, conferenceStartTime, con
     return record;
   }
 
-  const normalizedJoinedAt = new Date(conferenceStartValue).toISOString();
-  const calculatedLeftAt = durationMinutes > 0
-    ? new Date(conferenceStartValue + durationMinutes * 60000).toISOString()
-    : (conferenceEndValue ? new Date(conferenceEndValue).toISOString() : record.leftAt || null);
-
-  return {
-    ...record,
-    joinedAt: normalizedJoinedAt,
-    leftAt: calculatedLeftAt,
-  };
+  return record;
 }
 
 function isMeaningfulParticipant(record) {
@@ -627,12 +726,14 @@ export async function POST(_request, { params }) {
     const calendarEvent = lecture.google_calendar_event_id
       ? await getCalendarLectureEvent(lecture.google_calendar_event_id, impersonatedEmail).catch(() => null)
       : null;
+    const normalizedLectureStart = normalizeLectureScheduleUtc(lecture.scheduled_start);
+    const normalizedLectureEnd = normalizeLectureScheduleUtc(lecture.scheduled_end);
 
     const meetSpaceId = lecture.google_meet_space_id || extractMeetCodeFromLink(lecture.google_meet_link);
     const meetData = await getMeetAttendanceRecords({
       meetSpaceId,
-      scheduledStart: lecture.scheduled_start,
-      scheduledEnd: lecture.scheduled_end,
+      scheduledStart: normalizedLectureStart,
+      scheduledEnd: normalizedLectureEnd,
       impersonateUserEmail: impersonatedEmail,
       lectureIdentifiers: {
         meetingCode: meetCodeSearch,
@@ -725,8 +826,8 @@ export async function POST(_request, { params }) {
       enrichedRecords,
       lecture,
       calendarEvent,
-      calendarEvent?.startAt || lecture.scheduled_start || null,
-      calendarEvent?.endAt || lecture.scheduled_end || null
+      calendarEvent?.startAt || normalizedLectureStart || null,
+      calendarEvent?.endAt || normalizedLectureEnd || null
     );
     const normalizedHostRecord = normalizeStaffRecordToConferenceWindow(
       classification.host,
@@ -796,14 +897,6 @@ export async function POST(_request, { params }) {
         duration_minutes: item.duration_minutes,
       })),
     });
-
-    if (!hostRecord && !teacherRecord && !othersMeta.length) {
-      return json("No matching Google Meet audit data found yet for this lecture.", 200, {
-        synced: 0,
-        unmatched_participants: [],
-        available: false,
-      });
-    }
 
     if (classification.host?.userId) {
       await prisma.$executeRaw`
@@ -903,19 +996,23 @@ export async function POST(_request, { params }) {
           meet_raw = EXCLUDED.meet_raw,
           updated_at = NOW()
       `;
+    } else {
+      await prisma.$executeRaw`
+        DELETE FROM lecture_attendance
+        WHERE lecture_id = ${id}::uuid
+          AND role_type = 'teacher'
+      `;
     }
 
-    const latestRecording =
-      [...(meetData.recordings || [])]
-        .sort((left, right) => {
-          const leftTime = new Date(left.endTime || left.startTime || 0).getTime();
-          const rightTime = new Date(right.endTime || right.startTime || 0).getTime();
-          return rightTime - leftTime;
-        })[0] || null;
+    const matchedRecording = pickRecordingForLecture(
+      meetData.recordings || [],
+      calendarEvent?.startAt || normalizedLectureStart || null,
+      calendarEvent?.endAt || normalizedLectureEnd || null
+    );
 
-    const recordingShare = latestRecording?.driveFileId
+    const recordingShare = matchedRecording?.driveFileId
       ? await shareDriveFileWithUsers({
-          fileId: latestRecording.driveFileId,
+          fileId: matchedRecording.driveFileId,
           impersonateUserEmail: impersonatedEmail,
           emails: [
             lecture.coordinator_email,
@@ -925,25 +1022,20 @@ export async function POST(_request, { params }) {
           ],
         })
       : { sharedWith: [] };
-    const recordingPreviewUrl = latestRecording?.driveFileId
-      ? `https://drive.google.com/file/d/${latestRecording.driveFileId}/preview`
+    const recordingPreviewUrl = matchedRecording?.driveFileId
+      ? `https://drive.google.com/file/d/${matchedRecording.driveFileId}/preview`
       : "";
-    const recordingDriveViewUrl = latestRecording?.driveFileId
-      ? `https://drive.google.com/file/d/${latestRecording.driveFileId}/view`
-      : latestRecording?.driveExportUri || "";
+    const recordingDriveViewUrl = matchedRecording?.driveFileId
+      ? `https://drive.google.com/file/d/${matchedRecording.driveFileId}/view`
+      : matchedRecording?.driveExportUri || "";
 
-    const existingSyncMeta =
-      lecture?.google_meet_sync_meta && typeof lecture.google_meet_sync_meta === "object"
-        ? lecture.google_meet_sync_meta
-        : null;
-    const preservedHost =
-      !hostMeta && existingSyncMeta?.host?.joined
-        ? existingSyncMeta.host
-        : null;
-    const preservedCohost =
-      !teacherMeta && existingSyncMeta?.cohost?.joined
-        ? existingSyncMeta.cohost
-        : null;
+    if (!hostRecord && !teacherRecord && !othersMeta.length && !matchedRecording) {
+      return json("No matching Google Meet audit data found yet for this lecture.", 200, {
+        synced: 0,
+        unmatched_participants: [],
+        available: false,
+      });
+    }
 
     const syncMeta = {
       synced_at: new Date().toISOString(),
@@ -960,8 +1052,6 @@ export async function POST(_request, { params }) {
             left_at: hostRecord.left_at,
             duration_minutes: hostRecord.duration_minutes,
           }
-        : preservedHost
-          ? preservedHost
         : {
             role: "coordinator",
             name: lecture.coordinator_name || "",
@@ -983,8 +1073,6 @@ export async function POST(_request, { params }) {
             left_at: teacherRecord.left_at,
             duration_minutes: teacherRecord.duration_minutes,
           }
-        : preservedCohost
-          ? preservedCohost
         : {
             role: "teacher",
             name: lecture.teacher_name || "",
@@ -996,14 +1084,14 @@ export async function POST(_request, { params }) {
             duration_minutes: 0,
           },
       others: [],
-      recording: latestRecording
+      recording: matchedRecording
         ? {
-            status: latestRecording.state || "available",
-            file_id: latestRecording.driveFileId || "",
-            url: recordingPreviewUrl || latestRecording.driveExportUri || "",
+            status: matchedRecording.state || "available",
+            file_id: matchedRecording.driveFileId || "",
+            url: recordingPreviewUrl || matchedRecording.driveExportUri || "",
             drive_view_url: recordingDriveViewUrl,
-            start_time: latestRecording.startTime || null,
-            end_time: latestRecording.endTime || null,
+            start_time: matchedRecording.startTime || null,
+            end_time: matchedRecording.endTime || null,
             shared_with: recordingShare.sharedWith || [],
             public_link_enabled: Boolean(recordingShare.publicLinkEnabled),
             share_errors: recordingShare.shareErrors || [],
@@ -1014,8 +1102,8 @@ export async function POST(_request, { params }) {
     await prisma.$executeRaw`
       UPDATE lecture_schedules
       SET google_meet_space_id = COALESCE(${meetSpaceId || null}, google_meet_space_id),
-          recording_drive_file_id = COALESCE(${latestRecording?.driveFileId || null}, recording_drive_file_id),
-          recording_drive_url = COALESCE(${latestRecording?.driveExportUri || null}, recording_drive_url),
+          recording_drive_file_id = COALESCE(${matchedRecording?.driveFileId || null}, recording_drive_file_id),
+          recording_drive_url = COALESCE(${matchedRecording?.driveExportUri || null}, recording_drive_url),
           google_meet_sync_meta = ${JSON.stringify(syncMeta)}::jsonb,
           updated_at = NOW()
       WHERE id = ${id}::uuid

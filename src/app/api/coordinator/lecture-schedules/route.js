@@ -338,10 +338,9 @@ export async function GET(request) {
           ls.google_meet_link,
           ls.meet_link_source,
           ls.google_meet_space_id,
-          COALESCE(
-            MAX(ls.google_meet_sync_meta->'recording'->>'url'),
-            MAX(ls.recording_drive_url)
-          ) AS recording_drive_url,
+          rec.recording_drive_url,
+          rec.recording_date,
+          COALESCE(rec.recording_by_date, '{}'::jsonb) AS recording_by_date,
           ls.teacher_id::text AS teacher_id,
           ls.subject_id::text AS subject_id,
           ls.title,
@@ -431,12 +430,74 @@ export async function GET(request) {
         INNER JOIN teacher_profiles tp ON tp.id = ls.teacher_id
         INNER JOIN users tu ON tu.id = tp.user_id
         INNER JOIN subjects sub ON sub.id = ls.subject_id
+        LEFT JOIN LATERAL (
+          SELECT
+            latest_recording.recording_drive_url,
+            latest_recording.recording_date,
+            recording_map.recording_by_date
+          FROM LATERAL (
+            SELECT
+              NULLIF(COALESCE(lsr.google_meet_sync_meta->'recording'->>'url', lsr.recording_drive_url), '') AS recording_drive_url,
+              NULLIF(LEFT(COALESCE(lsr.google_meet_sync_meta->'recording'->>'start_time', ''), 10), '') AS recording_date
+            FROM lecture_schedules lsr
+            INNER JOIN enrollments e3 ON e3.id = lsr.enrollment_id
+            WHERE
+              lsr.google_calendar_event_id IS NOT DISTINCT FROM ls.google_calendar_event_id
+              AND lsr.google_meet_link IS NOT DISTINCT FROM ls.google_meet_link
+              AND lsr.meet_link_source IS NOT DISTINCT FROM ls.meet_link_source
+              AND lsr.google_meet_space_id IS NOT DISTINCT FROM ls.google_meet_space_id
+              AND lsr.teacher_id = ls.teacher_id
+              AND lsr.subject_id = ls.subject_id
+              AND lsr.title = ls.title
+              AND lsr.description = ls.description
+              AND lsr.rescheduled_from_id IS NOT DISTINCT FROM ls.rescheduled_from_id
+              AND e3.course_id = e.course_id
+              AND NULLIF(COALESCE(lsr.google_meet_sync_meta->'recording'->>'url', lsr.recording_drive_url), '') IS NOT NULL
+            ORDER BY lsr.scheduled_start DESC, lsr.id DESC
+            LIMIT 1
+          ) latest_recording
+          CROSS JOIN LATERAL (
+            SELECT jsonb_object_agg(per_day.recording_date, per_day.recording_url) AS recording_by_date
+            FROM (
+              SELECT DISTINCT ON (recording_date)
+                recording_date,
+                recording_url
+              FROM (
+                SELECT
+                  NULLIF(LEFT(COALESCE(lsr2.google_meet_sync_meta->'recording'->>'start_time', ''), 10), '') AS recording_date,
+                  NULLIF(COALESCE(lsr2.google_meet_sync_meta->'recording'->>'url', lsr2.recording_drive_url), '') AS recording_url,
+                  lsr2.scheduled_start,
+                  lsr2.id
+                FROM lecture_schedules lsr2
+                INNER JOIN enrollments e4 ON e4.id = lsr2.enrollment_id
+                WHERE
+                  lsr2.google_calendar_event_id IS NOT DISTINCT FROM ls.google_calendar_event_id
+                  AND lsr2.google_meet_link IS NOT DISTINCT FROM ls.google_meet_link
+                  AND lsr2.meet_link_source IS NOT DISTINCT FROM ls.meet_link_source
+                  AND lsr2.google_meet_space_id IS NOT DISTINCT FROM ls.google_meet_space_id
+                  AND lsr2.teacher_id = ls.teacher_id
+                  AND lsr2.subject_id = ls.subject_id
+                  AND lsr2.title = ls.title
+                  AND lsr2.description = ls.description
+                  AND lsr2.rescheduled_from_id IS NOT DISTINCT FROM ls.rescheduled_from_id
+                  AND e4.course_id = e.course_id
+                  AND NULLIF(COALESCE(lsr2.google_meet_sync_meta->'recording'->>'url', lsr2.recording_drive_url), '') IS NOT NULL
+              ) raw_recordings
+              WHERE recording_date IS NOT NULL
+                AND recording_url IS NOT NULL
+              ORDER BY recording_date, scheduled_start DESC, id DESC
+            ) per_day
+          ) recording_map
+        ) rec ON TRUE
         ${whereClause}
         GROUP BY
           ls.google_calendar_event_id,
           ls.google_meet_link,
           ls.meet_link_source,
           ls.google_meet_space_id,
+          rec.recording_drive_url,
+          rec.recording_date,
+          rec.recording_by_date,
           ls.teacher_id,
           ls.subject_id,
           ls.title,

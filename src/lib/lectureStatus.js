@@ -17,6 +17,36 @@ function parseDate(value) {
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
+function getDateKey(value) {
+  const date = parseDate(value);
+  if (!date) return "";
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function getResolvedRecordingUrl(lecture) {
+  const recordingUrl = lecture?.recording_drive_url || lecture?.recording?.url || "";
+  if (!recordingUrl) return "";
+
+  const lectureDateKey =
+    getDateKey(lecture?.scheduled_start) ||
+    getDateKey(lecture?.rescheduled_start) ||
+    getDateKey(lecture?.scheduledStart) ||
+    getDateKey(lecture?.rescheduledStartTime);
+  const recordingDateKey =
+    String(lecture?.recording_date || "").trim() ||
+    getDateKey(lecture?.recording?.start_time) ||
+    getDateKey(lecture?.recording_start_time);
+
+  if (lectureDateKey && recordingDateKey && lectureDateKey !== recordingDateKey) {
+    return "";
+  }
+
+  return recordingUrl;
+}
+
 function getDbStatus(lecture) {
   return String(lecture?.status || lecture?.display_status || "").trim().toLowerCase();
 }
@@ -91,7 +121,7 @@ export function canShowJoinMeet(lecture) {
 }
 
 export function getLecturePrimaryLink(lecture) {
-  const recordingUrl = lecture?.recording_drive_url || lecture?.recording?.url || "";
+  const recordingUrl = getResolvedRecordingUrl(lecture);
   const displayStatus = getLectureDisplayStatus(lecture);
   const dbStatus = getDbStatus(lecture);
   const hasEnded = displayStatus === "ended" || FINAL_DB_STATUSES.has(dbStatus);
@@ -124,7 +154,7 @@ export function getLecturePrimaryLink(lecture) {
 }
 
 export function getLectureEventDetailLink(lecture) {
-  const recordingUrl = lecture?.recording_drive_url || lecture?.recording?.url || "";
+  const recordingUrl = getResolvedRecordingUrl(lecture);
   const dbStatus = getDbStatus(lecture);
   const end = parseDate(lecture?.scheduled_end);
   const now = new Date();
@@ -150,7 +180,7 @@ export function getLectureEventDetailLink(lecture) {
 }
 
 export function getTeacherLectureActionLink(lecture) {
-  const recordingUrl = lecture?.recording_drive_url || lecture?.recording?.url || "";
+  const recordingUrl = getResolvedRecordingUrl(lecture);
   const displayStatus = getLectureDisplayStatus(lecture);
   const dbStatus = getDbStatus(lecture);
   const hasEnded = displayStatus === "ended" || FINAL_DB_STATUSES.has(dbStatus);

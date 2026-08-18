@@ -197,7 +197,7 @@ export default function LectureVerificationTable({ items = [], onRefresh }) {
                 Boolean(cohost.joined) ||
                 Boolean(cohost.joined_at) ||
                 Number(cohost.duration_minutes || 0) > 0;
-              const hasRecording = Boolean(recording?.url || item.recording_drive_url);
+              const hasRecording = Boolean(recording?.url);
               const canShowReviewActions =
                 rawStatus === "completed_by_teacher" &&
                 !["approved", "rejected", "missed", "needs_review", "reschedule"].includes(decision);
@@ -287,9 +287,9 @@ export default function LectureVerificationTable({ items = [], onRefresh }) {
               </div>
               <div className="rounded-2xl bg-[#FAF7F0] p-4 text-sm text-[#245C4F]">
                 <p className="font-semibold text-[#063F32]">Recording</p>
-                {recording?.url || item.recording_drive_url ? (
+                {recording?.url ? (
                   <a
-                    href={recording?.url || item.recording_drive_url}
+                    href={recording?.url}
                     target="_blank"
                     rel="noreferrer"
                     className="mt-2 inline-flex rounded-xl border border-[#2D8A6A]/15 bg-white/80 px-3 py-2 text-sm font-semibold text-[#0D5C48]"
@@ -328,9 +328,6 @@ export default function LectureVerificationTable({ items = [], onRefresh }) {
                     <span>
                       <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold capitalize ${getAttendanceTone(row.pending_status || row.status, row.source)}`}>
                         {formatAttendanceLabel(row.pending_status || row.status, row.duration_minutes)}
-                      </span>
-                      <span className="ml-2 text-[11px] uppercase tracking-[0.14em] text-[#8A7A63]">
-                        {row.source === "manual" ? "Teacher mark" : "Meet sync"}
                       </span>
                     </span>
                     <span>

@@ -40,6 +40,7 @@ async function getLectureDetails(id) {
       ls.description,
       ls.scheduled_start::text AS scheduled_start,
       ls.scheduled_end::text AS scheduled_end,
+      TO_CHAR(ls.scheduled_start, 'YYYY-MM-DD') AS lecture_date,
       ls.status::text AS status,
       ls.google_meet_link,
       ls.recording_drive_url,
@@ -99,6 +100,19 @@ async function getLectureDetails(id) {
   `;
 
   if (!lecture?.id) return null;
+
+  const lectureDateKey = String(lecture.lecture_date || "").slice(0, 10);
+  const recordingMeta = lecture?.google_meet_sync_meta && typeof lecture.google_meet_sync_meta === "object"
+    ? lecture.google_meet_sync_meta.recording
+    : null;
+  const recordingDateKey = String(
+    recordingMeta?.start_time
+      ? new Date(recordingMeta.start_time).toISOString().slice(0, 10)
+      : lectureDateKey
+  ).slice(0, 10);
+  const resolvedRecordingUrl = recordingMeta?.url && (!recordingDateKey || recordingDateKey === lectureDateKey)
+    ? recordingMeta.url
+    : "";
 
   const roster = await prisma.$queryRaw`
     SELECT
@@ -179,6 +193,7 @@ async function getLectureDetails(id) {
       duration_minutes: lecture.coordinator_duration_minutes,
       status: lecture.coordinator_attendance_status,
     },
+    recording_drive_url: resolvedRecordingUrl,
     student_attendance_rows: mergedRoster || [],
     total_students_count: mergedRoster.length || 0,
     joined_students_count: mergedRoster.filter((row) => ["present", "partial"].includes(String(row.status || "").toLowerCase())).length,

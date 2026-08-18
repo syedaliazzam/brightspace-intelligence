@@ -359,12 +359,12 @@ function getActivityParticipant(item, event, parameters) {
       "participant_email",
       "participantEmail",
       "participant_email_address",
+      "identifier",
       "email",
       "email_address",
       "user_email",
       "actor_email",
       "organizer_email",
-      "identifier",
     ]) ||
     actor?.email ||
     actor?.callerEmail ||
@@ -452,6 +452,9 @@ function eventMatchesLecture({ item, event, parameters, lectureIdentifiers, conf
     conferenceRecordStartTime,
     conferenceRecordEndTime
   );
+  const lectureDate = lectureIdentifiers?.lectureDate || "";
+  const activityTime = getActivityTime(item, event);
+  const onLectureDate = lectureDate ? sameDateKey(activityTime, lectureDate) : false;
 
   if (meetingCode && eventTokens.some((token) => token === meetingCode || token.includes(meetingCode))) {
     return true;
@@ -477,6 +480,10 @@ function eventMatchesLecture({ item, event, parameters, lectureIdentifiers, conf
     return true;
   }
 
+  if (onLectureDate) {
+    return true;
+  }
+
   return false;
 }
 
@@ -497,6 +504,24 @@ function eventFallsWithinConferenceWindow(item, event, conferenceRecordStartTime
     activityTime.getTime() >= start.getTime() - 15 * 60 * 1000 &&
     activityTime.getTime() <= effectiveEnd.getTime() + 15 * 60 * 1000
   );
+}
+
+function sameDateKey(left, right) {
+  const leftRaw = String(left || "").trim();
+  const rightRaw = String(right || "").trim();
+  if (/^\d{4}-\d{2}-\d{2}/.test(leftRaw) && /^\d{4}-\d{2}-\d{2}/.test(rightRaw)) {
+    return leftRaw.slice(0, 10) === rightRaw.slice(0, 10);
+  }
+  const leftTime = new Date(left || 0).getTime();
+  const rightTime = new Date(right || 0).getTime();
+  if (Number.isNaN(leftTime) || Number.isNaN(rightTime)) return false;
+  const formatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Karachi",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+  return formatter.format(new Date(leftTime)) === formatter.format(new Date(rightTime));
 }
 
 function mergeAuditRecords(records) {
@@ -745,6 +770,7 @@ async function getAdminReportsMeetAttendanceRecords({
   const matchedRecords = [];
   const fallbackWindowRecords = [];
   const fallbackWindowIdentities = [];
+  const lectureDateKey = String(lectureIdentifiers?.lectureDate || scheduledStart || scheduledEnd || "").slice(0, 10);
   const identities = [];
   const sampleAuditParameters = [];
   const sampleEvents = [];
@@ -767,6 +793,18 @@ async function getAdminReportsMeetAttendanceRecords({
       const events = Array.isArray(item?.events) ? item.events : [];
       for (const event of events) {
         const parameters = getEventParameters(event);
+        const joinedAt = getActivityTime(item, event);
+        const sameLectureDate = lectureDateKey && sameDateKey(joinedAt, lectureDateKey);
+        const withinConferenceWindow = eventFallsWithinConferenceWindow(
+          item,
+          event,
+          conferenceRecordStartTime,
+          conferenceRecordEndTime
+        );
+        const allowSameDateFallback =
+          sameLectureDate &&
+          !conferenceRecordStartTime &&
+          !conferenceRecordEndTime;
         eventsReturned += 1;
         if (sampleEvents.length < 5) {
           sampleEvents.push({
@@ -783,7 +821,7 @@ async function getAdminReportsMeetAttendanceRecords({
           conferenceRecordStartTime,
           conferenceRecordEndTime,
         });
-        if (!matchesLecture) {
+        if (!matchesLecture && !withinConferenceWindow && !allowSameDateFallback) {
           continue;
         }
         if (sampleAuditParameters.length < 5) {
@@ -793,7 +831,6 @@ async function getAdminReportsMeetAttendanceRecords({
           });
         }
         const participant = getActivityParticipant(item, event, parameters);
-        const joinedAt = getActivityTime(item, event);
         const participantEmail =
           (participant.identifierType === "email address" || participant.identifierType === "email_address" || participant.email
             ? participant.email
@@ -863,7 +900,7 @@ async function getAdminReportsMeetAttendanceRecords({
           };
           identities.push(identityRecord);
           if (
-            eventFallsWithinConferenceWindow(item, event, conferenceRecordStartTime, conferenceRecordEndTime) &&
+            withinConferenceWindow &&
             normalizeEmail(getParameterCandidate(parameters, ["organizer_email"]) || "") === normalizeEmail(lectureIdentifiers?.organizerEmail || impersonateUserEmail || "")
           ) {
             fallbackWindowIdentities.push(identityRecord);
@@ -884,10 +921,7 @@ async function getAdminReportsMeetAttendanceRecords({
 
         matchedRecords.push(finalizedRecord);
 
-        if (
-          eventFallsWithinConferenceWindow(item, event, conferenceRecordStartTime, conferenceRecordEndTime) &&
-          normalizeEmail(getParameterCandidate(parameters, ["organizer_email"]) || "") === normalizeEmail(lectureIdentifiers?.organizerEmail || impersonateUserEmail || "")
-        ) {
+        if (withinConferenceWindow || allowSameDateFallback) {
           fallbackWindowRecords.push(finalizedRecord);
         }
       }
@@ -930,15 +964,40 @@ function selectBestConferenceRecord(records, scheduledStart, scheduledEnd) {
 
   const targetStart = new Date(scheduledStart || 0).getTime();
   const targetEnd = new Date(scheduledEnd || 0).getTime();
+  const target = targetStart || targetEnd;
+  const targetDate = target
+    ? new Intl.DateTimeFormat("en-CA", {
+        timeZone: "Asia/Karachi",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      }).format(new Date(target))
+    : "";
+  const scored = list
+    .map((record) => {
+      const start = new Date(record?.startTime || 0).getTime() || 0;
+      const end = new Date(record?.endTime || 0).getTime() || 0;
+      const sameDay = Boolean(targetDate && sameDateKey(record.startTime || record.endTime || 0, targetDate));
+      const overlaps =
+        targetStart &&
+        targetEnd &&
+        start &&
+        end &&
+        end >= targetStart - 20 * 60000 &&
+        start <= targetEnd + 20 * 60000;
+      const distance = target ? Math.min(Math.abs(start - target), Math.abs(end - target)) : Number.POSITIVE_INFINITY;
+      const duration = Math.max(end - start, 0);
+      return { record, overlaps, sameDay, distance, duration };
+    })
+    .sort((left, right) => {
+      if (left.overlaps !== right.overlaps) return left.overlaps ? -1 : 1;
+      if (left.sameDay !== right.sameDay) return left.sameDay ? -1 : 1;
+      if (left.distance !== right.distance) return left.distance - right.distance;
+      return right.duration - left.duration;
+    });
 
-  if (targetStart || targetEnd) {
-    const target = targetStart || targetEnd;
-    return [...list].sort((left, right) => {
-      const leftDiff = Math.abs(conferenceTimeValue(left) - target);
-      const rightDiff = Math.abs(conferenceTimeValue(right) - target);
-      if (leftDiff !== rightDiff) return leftDiff - rightDiff;
-      return conferenceTimeValue(right) - conferenceTimeValue(left);
-    })[0];
+  if (scored.length) {
+    return scored[0].overlaps || scored[0].sameDay ? scored[0].record : scored[0].record;
   }
 
   return [...list].sort((left, right) => conferenceTimeValue(right) - conferenceTimeValue(left))[0];
@@ -974,6 +1033,28 @@ export async function getMeetAttendanceRecords({
     } catch {}
   }
 
+  if (!conferenceRecords.length) {
+    try {
+      const payload = await meetRequest(`/conferenceRecords?maxResults=100`, {
+        impersonateUserEmail,
+      });
+      if (Array.isArray(payload?.conferenceRecords) && payload.conferenceRecords.length) {
+        conferenceRecords = payload.conferenceRecords;
+      }
+    } catch {}
+  }
+
+  if (!conferenceRecords.length) {
+    try {
+      const payload = await meetRequest(`/conferenceRecords`, {
+        impersonateUserEmail,
+      });
+      if (Array.isArray(payload?.conferenceRecords) && payload.conferenceRecords.length) {
+        conferenceRecords = payload.conferenceRecords;
+      }
+    } catch {}
+  }
+
   const conferenceRecord = selectBestConferenceRecord(
     conferenceRecords,
     scheduledStart,
@@ -992,6 +1073,7 @@ export async function getMeetAttendanceRecords({
     conferenceRecordEndTime: conferenceRecord.endTime || null,
     lectureIdentifiers: {
       ...lectureIdentifiers,
+      lectureDate: String(scheduledStart || scheduledEnd || "").slice(0, 10),
       meetingCode: identifiers.meetingCode,
       conferenceId: conferenceRecord.name,
       conferenceRecordName: conferenceRecord.name,
@@ -1001,12 +1083,13 @@ export async function getMeetAttendanceRecords({
   if (!reportsAttendance.available) {
     const fallbackRecords = await getMeetConferenceParticipantRecords(conferenceRecord.name, impersonateUserEmail);
     if (!fallbackRecords.length) {
+      const recordings = await getConferenceRecordings(conferenceRecord.name, impersonateUserEmail);
       return {
-        available: false,
+        available: Boolean(recordings.length),
         records: [],
         conferenceRecord,
-        recordings: await getConferenceRecordings(conferenceRecord.name, impersonateUserEmail),
-        reason: "no_matching_reports_data",
+        recordings,
+        reason: recordings.length ? "recording_available_without_participants" : "no_matching_reports_data",
         partial: true,
         emails_available: false,
         eventsReturned: reportsAttendance.eventsReturned || 0,
