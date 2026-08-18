@@ -36,6 +36,21 @@ function toCalendarDate(date) {
   return `${year}-${month}-${day}T${hours}:${minutes}:${seconds}`;
 }
 
+function formatLocalDateTime(value) {
+  if (!value) return "N/A";
+  const date = new Date(String(value));
+  if (Number.isNaN(date.getTime())) return "N/A";
+  return date.toLocaleString("en-PK", {
+    timeZone: "Asia/Karachi",
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  });
+}
+
 function parseDateOnly(value) {
   const text = String(value || "").trim();
   if (!text) return null;
@@ -323,6 +338,11 @@ export default function CoordinatorUnifiedCalendarPage() {
         publicEvents: Array.isArray(publicData?.items) ? mapPublicEvents(publicData.items) : [],
         internalEvents: Array.isArray(internalData?.items) ? mapInternalEvents(internalData.items) : [],
       });
+      return {
+        classEvents: Array.isArray(lectureData?.items) ? mapClassSchedulerEvents(lectureData.items) : [],
+        publicEvents: Array.isArray(publicData?.items) ? mapPublicEvents(publicData.items) : [],
+        internalEvents: Array.isArray(internalData?.items) ? mapInternalEvents(internalData.items) : [],
+      };
     } catch (error) {
       setState({
         loading: false,
@@ -331,6 +351,11 @@ export default function CoordinatorUnifiedCalendarPage() {
         publicEvents: [],
         internalEvents: [],
       });
+      return {
+        classEvents: [],
+        publicEvents: [],
+        internalEvents: [],
+      };
     }
   };
 
@@ -374,18 +399,25 @@ export default function CoordinatorUnifiedCalendarPage() {
           ...prev,
           [eventId]: { link: nextRecordingLink, kind: "recording", label: "View Recording" },
         }));
+        const refreshed = await loadCalendar(false);
         if (selectedEvent?.extendedProps?.eventId === eventId) {
-          setSelectedEvent((prev) => ({
-            ...prev,
-            extendedProps: {
-              ...prev.extendedProps,
-              recordingLink: nextRecordingLink,
-              recordingKind: "recording",
-              recordingLabel: "View Recording",
-            },
-            }));
+          const refreshedEvent =
+            [...(refreshed?.classEvents || []), ...(refreshed?.publicEvents || []), ...(refreshed?.internalEvents || [])]
+              .find((event) => String(event?.extendedProps?.eventId || event?.id || "") === String(eventId)) || null;
+          if (refreshedEvent) {
+            setSelectedEvent(refreshedEvent);
+          } else {
+            setSelectedEvent((prev) => prev ? ({
+              ...prev,
+              extendedProps: {
+                ...prev.extendedProps,
+                recordingLink: nextRecordingLink,
+                recordingKind: "recording",
+                recordingLabel: "View Recording",
+              },
+            }) : prev);
           }
-          await loadCalendar(false);
+        }
       }
     } catch (error) {
       console.error("Sync recording error:", error);
@@ -543,8 +575,8 @@ export default function CoordinatorUnifiedCalendarPage() {
                 {selectedEvent.extendedProps?.subtitle && (
                   <p><strong className="text-[#063F32]">Details:</strong> {selectedEvent.extendedProps.subtitle}</p>
                 )}
-                <p><strong className="text-[#063F32]">Start:</strong> {selectedEvent.start?.toLocaleString() || "N/A"}</p>
-                <p><strong className="text-[#063F32]">End:</strong> {selectedEvent.end?.toLocaleString() || "N/A"}</p>
+                <p><strong className="text-[#063F32]">Start:</strong> {formatLocalDateTime(selectedEvent.start || selectedEvent.startStr || selectedEvent.extendedProps?.scheduled_start)}</p>
+                <p><strong className="text-[#063F32]">End:</strong> {formatLocalDateTime(selectedEvent.end || selectedEvent.endStr || selectedEvent.extendedProps?.scheduled_end)}</p>
                 {selectedEvent.extendedProps?.meetLink && (
                   <div className="rounded-2xl border border-[#2D8A6A]/15 bg-[#FAF7F0] p-4">
                     <div className="flex flex-col gap-3">
