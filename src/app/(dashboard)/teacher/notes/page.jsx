@@ -1,12 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useSession } from "next-auth/react";
 import TeacherNotesPanel from "@/components/teacher/TeacherNotesPanel";
+import { useDashboardSession } from "@/components/layout/DashboardSessionContext";
 
 export default function TeacherNotesPage() {
   const [state, setState] = useState({ classes: [], notes: [], error: "" });
-  const { status } = useSession();
+  const session = useDashboardSession();
+  const status = session ? "authenticated" : "unauthenticated";
 
   async function load() {
     const [classesResponse, notesResponse] = await Promise.all([

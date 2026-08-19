@@ -55,14 +55,11 @@ function MessageBubble({ message, mode }) {
 }
 
 function Modal({ title, subtitle, onClose, children, actions, showTopClose = true, portalTargetId }) {
-  const insidePage = Boolean(portalTargetId);
   const content = (
     <div
-      className={`${
-        insidePage ? "absolute inset-0 z-40 flex items-start justify-center bg-[#063F32]/35 px-4 py-6 sm:py-8" : "fixed inset-0 z-[9999] isolate flex items-start justify-center bg-[#063F32]/45 px-4 pt-10 pb-8"
-      }`}
+      className="fixed inset-0 z-[9999] isolate flex items-center justify-center bg-[#063F32]/45 px-4 pt-10 pb-8"
     >
-      <div className={`relative ${insidePage ? "z-50 max-w-3xl" : "z-[10000] max-w-3xl"} w-full rounded-[2rem] border border-[#2D8A6A]/15 bg-white shadow-[0_24px_80px_-36px_rgba(13,59,46,0.24)]`}>
+      <div className="relative z-[10000] max-w-3xl w-full rounded-[2rem] border border-[#2D8A6A]/15 bg-white shadow-[0_24px_80px_-36px_rgba(13,59,46,0.24)]">
         <div className="border-b border-[#F1EADC] px-6 py-4">
           <div className="flex items-start justify-between gap-4">
             <div>
@@ -130,9 +127,12 @@ export default function NoteThreadsBoard({ mode = "viewer", lectures = [], porta
   const [replyText, setReplyText] = useState("");
   const [replyPending, setReplyPending] = useState(false);
   const [compose, setCompose] = useState({ classLevel: "", subjectId: "", visibility: "parent", message: "" });
+  const [composePending, setComposePending] = useState(false);
   const [editingThread, setEditingThread] = useState(null);
   const [editingText, setEditingText] = useState("");
+  const [editPending, setEditPending] = useState(false);
   const [deletingThread, setDeletingThread] = useState(null);
+  const [deletePending, setDeletePending] = useState(false);
   const activeThreadIdRef = useRef("");
 
   const lectureOptions = useMemo(() => groupLectureOptions(lectures), [lectures]);
@@ -225,38 +225,53 @@ export default function NoteThreadsBoard({ mode = "viewer", lectures = [], porta
 
   async function submitCompose(event) {
     event.preventDefault();
-    const response = await fetch("/api/notes/threads", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ classLevel: compose.classLevel, subjectId: compose.subjectId, visibility: compose.visibility, message: compose.message }),
-    });
-    const data = await response.json();
-    if (!response.ok) throw new Error(data?.message || "Unable to add note.");
-    setCompose({ classLevel: "", subjectId: "", visibility: "parent", message: "" });
-    await loadThreads();
+    setComposePending(true);
+    try {
+      const response = await fetch("/api/notes/threads", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ classLevel: compose.classLevel, subjectId: compose.subjectId, visibility: compose.visibility, message: compose.message }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data?.message || "Unable to add note.");
+      setCompose({ classLevel: "", subjectId: "", visibility: "parent", message: "" });
+      await loadThreads();
+    } finally {
+      setComposePending(false);
+    }
   }
 
   async function saveEdit() {
-    const response = await fetch(`/api/notes/threads/${editingThread.id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message: editingText }),
-    });
-    const data = await response.json();
-    if (!response.ok) throw new Error(data?.message || "Unable to update note.");
-    setEditingThread(null);
-    setEditingText("");
-    await loadThreads();
-    if (selected?.id === editingThread.id) await openThread(selected);
+    setEditPending(true);
+    try {
+      const response = await fetch(`/api/notes/threads/${editingThread.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: editingText }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data?.message || "Unable to update note.");
+      setEditingThread(null);
+      setEditingText("");
+      await loadThreads();
+      if (selected?.id === editingThread.id) await openThread(selected);
+    } finally {
+      setEditPending(false);
+    }
   }
 
   async function deleteThread() {
-    const response = await fetch(`/api/notes/threads/${deletingThread.id}`, { method: "DELETE" });
-    const data = await response.json();
-    if (!response.ok) throw new Error(data?.message || "Unable to delete note.");
-    setDeletingThread(null);
-    if (selected?.id === deletingThread.id) setSelected(null);
-    await loadThreads();
+    setDeletePending(true);
+    try {
+      const response = await fetch(`/api/notes/threads/${deletingThread.id}`, { method: "DELETE" });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data?.message || "Unable to delete note.");
+      setDeletingThread(null);
+      if (selected?.id === deletingThread.id) setSelected(null);
+      await loadThreads();
+    } finally {
+      setDeletePending(false);
+    }
   }
 
   useEffect(() => {
@@ -304,7 +319,10 @@ export default function NoteThreadsBoard({ mode = "viewer", lectures = [], porta
           </label>
           <div className="flex items-center justify-between gap-3">
             <div className="rounded-2xl bg-[#FAF7F0] px-4 py-3 text-xs text-[#245C4F]">Select class and subject first, then write the note.</div>
-            <button className="rounded-2xl bg-[#0D5C48] px-4 py-3 text-sm font-semibold text-[#FAF7F0] hover:bg-[#063F32]">Add note</button>
+            <button type="submit" disabled={composePending} className="inline-flex items-center justify-center gap-2 rounded-2xl bg-[#0D5C48] px-4 py-3 text-sm font-semibold text-[#FAF7F0] hover:bg-[#063F32] disabled:cursor-not-allowed disabled:opacity-60">
+              {composePending ? <LeafSpinnerInline className="h-4 w-4 border-2 border-[#FAF7F0]/30 border-t-[#FAF7F0]" /> : null}
+              {composePending ? "Adding..." : "Add note"}
+            </button>
           </div>
         </form>
       ) : null}
@@ -389,7 +407,7 @@ export default function NoteThreadsBoard({ mode = "viewer", lectures = [], porta
 
       {selected ? (
         <Modal
-          title="Thread"
+          title="Notes"
           subtitle={`${selected.class_level || selected.course_title || "-"} · ${selected.subject_name || "-"}`}
           onClose={() => setSelected(null)}
           portalTargetId={portalTargetId}
@@ -443,7 +461,10 @@ export default function NoteThreadsBoard({ mode = "viewer", lectures = [], porta
           actions={
             <div className="flex items-center justify-end gap-3">
               <button type="button" onClick={() => { setEditingThread(null); setEditingText(""); }} className="rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 text-sm font-semibold text-[#0D5C48] hover:bg-[#F1EADC]">Cancel</button>
-              <button type="button" onClick={() => saveEdit().catch((err) => setError(err.message))} className="rounded-2xl bg-[linear-gradient(135deg,#0D3B2E,#0D5C48)] px-4 py-3 text-sm font-semibold text-[#FAF7F0]">Save</button>
+              <button type="button" onClick={() => saveEdit().catch((err) => setError(err.message))} disabled={editPending} className="inline-flex items-center justify-center gap-2 rounded-2xl bg-[linear-gradient(135deg,#0D3B2E,#0D5C48)] px-4 py-3 text-sm font-semibold text-[#FAF7F0] disabled:cursor-not-allowed disabled:opacity-60">
+                {editPending ? <LeafSpinnerInline className="h-4 w-4 border-2 border-[#FAF7F0]/30 border-t-[#FAF7F0]" /> : null}
+                {editPending ? "Saving..." : "Save"}
+              </button>
             </div>
           }
         >
@@ -460,7 +481,10 @@ export default function NoteThreadsBoard({ mode = "viewer", lectures = [], porta
           actions={
             <div className="flex items-center justify-end gap-3">
               <button type="button" onClick={() => setDeletingThread(null)} className="rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 text-sm font-semibold text-[#0D5C48] hover:bg-[#F1EADC]">Cancel</button>
-              <button type="button" onClick={() => deleteThread().catch((err) => setError(err.message))} className="rounded-2xl bg-rose-600 px-4 py-3 text-sm font-semibold text-white hover:bg-rose-700">Delete</button>
+              <button type="button" onClick={() => deleteThread().catch((err) => setError(err.message))} disabled={deletePending} className="inline-flex items-center justify-center gap-2 rounded-2xl bg-rose-600 px-4 py-3 text-sm font-semibold text-white hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-60">
+                {deletePending ? <LeafSpinnerInline className="h-4 w-4 border-2 border-white/30 border-t-white" /> : null}
+                {deletePending ? "Deleting..." : "Delete"}
+              </button>
             </div>
           }
         >

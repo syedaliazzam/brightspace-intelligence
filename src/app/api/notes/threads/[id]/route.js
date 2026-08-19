@@ -85,7 +85,19 @@ export async function DELETE(request, { params }) {
     const { id } = await params;
     const [row] = await canManageThread(session, id);
     if (!row?.id) return json("Thread not found.", 404);
-    await prisma.$executeRaw`DELETE FROM note_threads WHERE id = ${id}::uuid`;
+
+    await prisma.$transaction(async (transaction) => {
+      await transaction.$executeRaw`
+        DELETE FROM note_thread_messages
+        WHERE thread_id = ${id}::uuid
+      `;
+      const deleted = await transaction.$queryRaw`
+        DELETE FROM note_threads
+        WHERE id = ${id}::uuid
+        RETURNING id::text AS id
+      `;
+      if (!deleted[0]?.id) throw new Error("Note could not be deleted.");
+    });
     return json("Thread deleted.");
   } catch (error) {
     const guard = roleGuardResponse(error);
