@@ -556,7 +556,7 @@ export default function LibraryPageShell({
                 </div>
 
                 <label className="block">
-                  <span className="mb-2 block text-sm font-medium text-[#245C4F]">Description</span>
+                  <span className="mb-2 block text-sm font-medium text-[#245C4F]">Description *</span>
                   <textarea
                     value={form.description}
                     onChange={(e) => setForm((c) => ({ ...c, description: e.target.value }))}
@@ -566,7 +566,7 @@ export default function LibraryPageShell({
                 </label>
 
                 <div className="block">
-                  <span className="mb-2 block flex items-center justify-between text-sm font-medium text-[#245C4F]">
+                  <span className="mb-2 flex items-center justify-between text-sm font-medium text-[#245C4F]">
                     <span>Documents *</span>
                   </span>
                   <label className="flex cursor-pointer items-center justify-center rounded-2xl border-2 border-dashed border-[#2D8A6A]/30 bg-[#FAF7F0] px-4 py-6 transition hover:bg-white hover:border-[#2D8A6A]/50 focus-within:border-[#2D8A6A] focus-within:ring-4 focus-within:ring-[#FFF5D6]">
