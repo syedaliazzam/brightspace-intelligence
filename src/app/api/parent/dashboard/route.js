@@ -95,7 +95,7 @@ export async function GET(request) {
                AND LOWER(status) = 'active'
            )
          )
-         WHERE ls.status::text = 'verified_by_coordinator') AS attended_lectures,
+         WHERE LOWER(ls.status::text) IN ('completed_by_teacher', 'verified_by_coordinator')) AS attended_lectures,
         (SELECT COUNT(*)::int
          FROM lecture_attendance la
          INNER JOIN student_profiles sp ON sp.user_id = la.user_id
@@ -117,8 +117,15 @@ export async function GET(request) {
                 AND LOWER(status) = 'active'
             )
           )
-          LEFT JOIN lecture_attendance la ON la.lecture_id = ls.id AND la.user_id IN (SELECT sp.user_id FROM student_profiles sp WHERE sp.id = a.id)
-          WHERE ls.status::text = 'verified_by_coordinator'
+          LEFT JOIN LATERAL (
+            SELECT la.*
+            FROM lecture_attendance la
+            WHERE la.lecture_id = ls.id
+              AND la.user_id IN (SELECT sp.user_id FROM student_profiles sp WHERE sp.id = a.id)
+            ORDER BY la.updated_at DESC NULLS LAST, la.created_at DESC NULLS LAST, la.id DESC
+            LIMIT 1
+          ) la ON TRUE
+          WHERE LOWER(ls.status::text) IN ('completed_by_teacher', 'verified_by_coordinator')
         ), 0) AS attendance_percentage,
         COALESCE((
           SELECT COALESCE(fs.status::text, fv.status::text, 'not_available')

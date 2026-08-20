@@ -61,9 +61,20 @@ export async function GET(request) {
           )
         )
       )
-      LEFT JOIN lecture_attendance la ON la.lecture_id = ls.id AND la.user_id = sp.user_id
+      LEFT JOIN LATERAL (
+        SELECT la.*
+        FROM lecture_attendance la
+        WHERE la.lecture_id = ls.id
+          AND la.user_id = sp.user_id
+        ORDER BY
+          CASE WHEN LOWER(COALESCE(la.status::text, 'absent')) IN ('present', 'partial') THEN 0 ELSE 1 END,
+          la.updated_at DESC NULLS LAST,
+          la.created_at DESC NULLS LAST,
+          la.id DESC
+        LIMIT 1
+      ) la ON TRUE
       WHERE sp.id = $1::uuid
-        AND ls.status::text = 'verified_by_coordinator'
+        AND LOWER(ls.status::text) IN ('completed_by_teacher', 'verified_by_coordinator')
       `,
       childId
     );
@@ -95,11 +106,22 @@ export async function GET(request) {
           )
         )
       )
-      LEFT JOIN lecture_attendance la ON la.lecture_id = ls.id AND la.user_id = sp.user_id
+      LEFT JOIN LATERAL (
+        SELECT la.*
+        FROM lecture_attendance la
+        WHERE la.lecture_id = ls.id
+          AND la.user_id = sp.user_id
+        ORDER BY
+          CASE WHEN LOWER(COALESCE(la.status::text, 'absent')) IN ('present', 'partial') THEN 0 ELSE 1 END,
+          la.updated_at DESC NULLS LAST,
+          la.created_at DESC NULLS LAST,
+          la.id DESC
+        LIMIT 1
+      ) la ON TRUE
       INNER JOIN subjects sub ON sub.id = ls.subject_id
       INNER JOIN users su ON su.id = sp.user_id
       WHERE sp.id = $1::uuid
-        AND ls.status::text = 'verified_by_coordinator'
+        AND LOWER(ls.status::text) IN ('completed_by_teacher', 'verified_by_coordinator')
       ORDER BY ls.scheduled_start DESC
       `,
       childId

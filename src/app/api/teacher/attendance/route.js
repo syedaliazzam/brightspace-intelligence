@@ -260,33 +260,17 @@ export async function POST(request) {
     const teacherId = String(session.user.role).toLowerCase() === "admin" ? "" : await getTeacherId(session);
     const [lecture] = teacherId
       ? await prisma.$queryRaw`
-        SELECT ls.id::text AS id
+        SELECT ls.id::text AS id, ls.status::text AS status
         FROM lecture_schedules ls
         INNER JOIN teacher_profiles tp ON tp.id = ls.teacher_id
         WHERE ls.id = ${lectureId}::uuid
             AND tp.user_id = ${session.user.id}::uuid
-            AND (
-              LOWER(ls.status::text) = 'live'
-              OR LOWER(ls.status::text) = 'completed_by_teacher'
-              OR (
-                ls.scheduled_start::timestamp <= timezone('Asia/Karachi', now())
-                AND ls.scheduled_end::timestamp >= timezone('Asia/Karachi', now())
-              )
-            )
           LIMIT 1
         `
       : await prisma.$queryRaw`
-          SELECT ls.id::text AS id
+          SELECT ls.id::text AS id, ls.status::text AS status
           FROM lecture_schedules ls
           WHERE ls.id = ${lectureId}::uuid
-            AND (
-              LOWER(ls.status::text) = 'live'
-              OR LOWER(ls.status::text) = 'completed_by_teacher'
-              OR (
-                ls.scheduled_start::timestamp <= timezone('Asia/Karachi', now())
-                AND ls.scheduled_end::timestamp >= timezone('Asia/Karachi', now())
-              )
-            )
           LIMIT 1
         `;
 
@@ -306,20 +290,78 @@ export async function POST(request) {
       })
       .filter(Boolean);
 
-    await prisma.$transaction(async (tx) => {
-      await tx.$executeRaw`
-        UPDATE lecture_schedules
-        SET pending_student_attendance = ${JSON.stringify(pendingAttendance)}::jsonb,
-            updated_at = NOW()
-        WHERE id = ${lectureId}::uuid
-      `;
-      await tx.$executeRaw`
+    const lectureStatus = String(lecture.status || "").trim().toLowerCase();
+    const isAlreadyVerified = lectureStatus === "verified_by_coordinator";
+
+    const statements = [];
+
+    if (isAlreadyVerified) {
+      for (const row of pendingAttendance) {
+        statements.push(
+          prisma.$executeRaw`
+            INSERT INTO lecture_attendance (
+              id,
+              lecture_id,
+              user_id,
+              role_type,
+              source,
+              status,
+              created_at,
+              updated_at
+            )
+            VALUES (
+              gen_random_uuid(),
+              ${lectureId}::uuid,
+              ${row.studentUserId}::uuid,
+              'student',
+              'manual'::attendance_source,
+              ${row.status}::attendance_status,
+              NOW(),
+              NOW()
+            )
+            ON CONFLICT (lecture_id, user_id)
+            DO UPDATE SET
+              role_type = 'student',
+              source = 'manual'::attendance_source,
+              status = EXCLUDED.status,
+              updated_at = NOW()
+          `
+        );
+      }
+
+      statements.push(
+        prisma.$executeRaw`
+          UPDATE lecture_schedules
+          SET pending_student_attendance = NULL,
+              updated_at = NOW()
+          WHERE id = ${lectureId}::uuid
+        `
+      );
+    } else {
+      statements.push(
+        prisma.$executeRaw`
+          UPDATE lecture_schedules
+          SET pending_student_attendance = ${JSON.stringify(pendingAttendance)}::jsonb,
+              updated_at = NOW()
+          WHERE id = ${lectureId}::uuid
+        `
+      );
+    }
+
+    statements.push(
+      prisma.$executeRaw`
         INSERT INTO audit_logs (id, actor_user_id, action, entity_type, entity_id, created_at)
         VALUES (gen_random_uuid(), ${session.user.id}::uuid, 'manual_attendance_saved', 'lecture_schedules', ${lectureId}::uuid, NOW())
-      `;
-    });
+      `
+    );
 
-    return json("Attendance saved for coordinator approval.", 200, { pending_count: pendingAttendance.length });
+    await prisma.$transaction(statements);
+
+    return json(
+      isAlreadyVerified ? "Attendance updated successfully." : "Attendance saved for coordinator approval.",
+      200,
+      { pending_count: pendingAttendance.length, direct_update: isAlreadyVerified }
+    );
   } catch (error) {
     const guard = roleGuardResponse(error);
     return guard || json(error instanceof Error ? error.message : "Unable to save attendance.", 500);

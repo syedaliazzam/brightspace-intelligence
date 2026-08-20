@@ -36,9 +36,20 @@ export async function GET() {
             )
           )
         )
-        LEFT JOIN lecture_attendance la ON la.lecture_id = ls.id AND la.user_id = sp.user_id
+        LEFT JOIN LATERAL (
+          SELECT la.*
+          FROM lecture_attendance la
+          WHERE la.lecture_id = ls.id
+            AND la.user_id = sp.user_id
+          ORDER BY
+            CASE WHEN LOWER(COALESCE(la.status::text, 'absent')) IN ('present', 'partial') THEN 0 ELSE 1 END,
+            la.updated_at DESC NULLS LAST,
+            la.created_at DESC NULLS LAST,
+            la.id DESC
+          LIMIT 1
+        ) la ON TRUE
         WHERE sp.user_id = ${session.user.id}::uuid
-          AND ls.status::text = 'verified_by_coordinator'
+          AND LOWER(ls.status::text) IN ('completed_by_teacher', 'verified_by_coordinator')
       `,
       prisma.$queryRaw`
         SELECT
@@ -68,9 +79,20 @@ export async function GET() {
         INNER JOIN subjects sub ON sub.id = ls.subject_id
         INNER JOIN teacher_profiles tp ON tp.id = ls.teacher_id
         INNER JOIN users tu ON tu.id = tp.user_id
-        LEFT JOIN lecture_attendance la ON la.lecture_id = ls.id AND la.user_id = sp.user_id
+        LEFT JOIN LATERAL (
+          SELECT la.*
+          FROM lecture_attendance la
+          WHERE la.lecture_id = ls.id
+            AND la.user_id = sp.user_id
+          ORDER BY
+            CASE WHEN LOWER(COALESCE(la.status::text, 'absent')) IN ('present', 'partial') THEN 0 ELSE 1 END,
+            la.updated_at DESC NULLS LAST,
+            la.created_at DESC NULLS LAST,
+            la.id DESC
+          LIMIT 1
+        ) la ON TRUE
         WHERE sp.user_id = ${session.user.id}::uuid
-          AND ls.status::text = 'verified_by_coordinator'
+          AND LOWER(ls.status::text) IN ('completed_by_teacher', 'verified_by_coordinator')
         ORDER BY ls.scheduled_start DESC
       `
     ]);
