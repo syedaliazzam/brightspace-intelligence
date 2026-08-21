@@ -30,42 +30,63 @@ function formatDate(value) {
 }
 
 export function themedEmailShell({ eyebrow, title, intro, rows = [], bodyBlocks = [], buttonLabel, buttonUrl, footerNote }) {
+  const titleDividerWidth = Math.max(120, Math.min(String(title || "").length * 9, 260));
   const renderedRows = rows
     .map(
       ([label, value]) => `
         <tr>
-          <td style="padding:8px 12px 8px 0;color:#245C4F;vertical-align:top;width:42%;word-break:break-word;">${escapeHtml(label)}</td>
-          <td style="padding:8px 0;text-align:right;font-weight:700;color:#063F32;vertical-align:top;width:58%;word-break:break-word;overflow-wrap:anywhere;">${escapeHtml(value || "-")}</td>
+          <td style="padding:9px 14px 9px 0;color:#245C4F;vertical-align:top;width:42%;word-break:break-word;font-size:13px;line-height:1.55;font-weight:700;white-space:nowrap;">
+            ${escapeHtml(label)}
+          </td>
+          <td style="padding:9px 0;text-align:left;font-weight:400;color:#063F32;vertical-align:top;width:58%;word-break:break-word;overflow-wrap:anywhere;font-size:13px;line-height:1.55;white-space:normal;">
+            ${escapeHtml(value || "-")}
+          </td>
         </tr>
       `
     )
     .join("");
   const renderedBodyBlocks = bodyBlocks
-    .map((block) => `<div style="margin-top:18px;line-height:1.7;color:#245C4F;font-size:15px;">${block}</div>`)
+    .map((block) => `
+      <div style="margin-top:18px;padding:0;border-radius:20px;line-height:1.7;color:#245C4F;font-size:15px;">
+        ${block}
+      </div>
+    `)
     .join("");
 
   return `
-    <div style="margin:0;padding:0;background:radial-gradient(circle at top left,rgba(201,162,39,.14),transparent 28%),radial-gradient(circle at top right,rgba(45,138,106,.14),transparent 26%),linear-gradient(180deg,#FAF7F0 0%,#F7F1E3 100%);font-family:Arial,sans-serif;color:#063F32;">
-      <div style="max-width:720px;margin:0 auto;padding:32px 20px;">
-        <div style="background:linear-gradient(135deg,rgba(13,59,46,.98),rgba(13,92,72,.94));border:1px solid #2D8A6A;border-radius:28px;overflow:hidden;box-shadow:0 24px 80px rgba(13,59,46,.18);">
-          <div style="padding:28px 28px 20px;color:#FAF7F0;">
-            <p style="margin:0 0 10px;font-size:12px;letter-spacing:.18em;text-transform:uppercase;color:#E4C766;font-weight:700;">${escapeHtml(eyebrow)}</p>
-            <h1 style="margin:0;font-size:28px;line-height:1.2;color:#FAF7F0;">${escapeHtml(title)}</h1>
-            <p style="margin:14px 0 0;font-size:15px;line-height:1.7;color:#EAF6EF;">${escapeHtml(intro)}</p>
+    <div style="margin:0;padding:0;background:radial-gradient(circle at top left,rgba(201,162,39,.12),transparent 26%),radial-gradient(circle at top right,rgba(45,138,106,.12),transparent 24%),linear-gradient(180deg,#FAF7F0 0%,#F7F1E3 100%);font-family:Arial,sans-serif;color:#063F32;">
+      <div style="max-width:760px;margin:0 auto;padding:20px 10px 26px;">
+        <div style="background:linear-gradient(135deg,rgba(6,63,50,.98),rgba(13,92,72,.96));border:1px solid rgba(228,198,102,.45);border-radius:30px;overflow:hidden;box-shadow:0 24px 80px rgba(13,59,46,.18);">
+          <div style="padding:22px 18px 18px;color:#FAF7F0;background:
+            radial-gradient(circle at top right,rgba(228,198,102,.08),transparent 28%),
+            radial-gradient(circle at bottom left,rgba(101,184,145,.12),transparent 30%),
+            linear-gradient(135deg,rgba(6,63,50,.98),rgba(13,92,72,.96));">
+            <p style="margin:0 0 10px;font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:#E4C766;font-weight:800;">${escapeHtml(eyebrow)}</p>
+            <div style="height:1px;width:${titleDividerWidth}px;max-width:100%;background:linear-gradient(90deg,#E4C766,rgba(228,198,102,0));margin:0 0 14px;"></div>
+            <h1 style="margin:0;font-size:24px;line-height:1.18;color:#FAF7F0;font-weight:700;">${escapeHtml(title)}</h1>
+            <p style="margin:12px 0 0;max-width:560px;font-size:14px;line-height:1.65;color:#EAF6EF;">${escapeHtml(intro)}</p>
           </div>
-          <div style="padding:28px;background:rgba(250,247,240,.98);">
-            <div style="border:1px solid #2D8A6A;border-radius:22px;padding:18px;background:#fffaf0;overflow:hidden;">
-              <table role="presentation" cellspacing="0" cellpadding="0" style="width:100%;border-collapse:collapse;font-size:14px;table-layout:fixed;">
-                ${renderedRows}
-              </table>
-            </div>
+          <div style="padding:18px 12px 20px;background:linear-gradient(180deg,rgba(255,255,255,.98) 0%,rgba(250,247,240,.98) 100%);">
+            <table role="presentation" cellspacing="0" cellpadding="0" style="width:100%;border-collapse:separate;border-spacing:0;border:1px solid rgba(45,138,106,.16);border-radius:18px;overflow:hidden;background:linear-gradient(180deg,#ffffff 0%,#fffaf0 100%);box-shadow:0 14px 40px rgba(13,59,46,.08);">
+              <tr>
+                <td style="width:4px;background-color:#c79a3b;font-size:0;line-height:0;border-radius:0"></td>
+                <td style="padding:14px 12px 8px;vertical-align:top;">
+                  <table role="presentation" cellspacing="0" cellpadding="0" style="width:100%;border-collapse:collapse;font-size:14px;table-layout:fixed;">
+                    ${renderedRows}
+                  </table>
+                </td>
+              </tr>
+            </table>
             ${renderedBodyBlocks}
             ${buttonLabel && buttonUrl ? `
-              <div style="margin:28px 0 0;text-align:center;">
-                <a href="${escapeHtml(buttonUrl)}" style="display:inline-block;background:#0D5C48;color:#FAF7F0;text-decoration:none;padding:14px 22px;border-radius:14px;font-weight:700;font-size:14px;">${escapeHtml(buttonLabel)}</a>
+              <div style="margin:20px 0 0;text-align:center;">
+                <a href="${escapeHtml(buttonUrl)}" style="display:inline-flex;align-items:center;justify-content:center;gap:10px;background:linear-gradient(135deg,#0D5C48,#0A4A3A);color:#FAF7F0;text-decoration:none;padding:12px 20px;border-radius:999px;font-weight:700;font-size:14px;box-shadow:0 10px 30px rgba(13,92,72,.24);border:1px solid rgba(228,198,102,.35);">${escapeHtml(buttonLabel)}</a>
               </div>
             ` : ""}
             ${footerNote ? `<p style="margin:22px 0 0;font-size:12px;line-height:1.7;color:#245C4F;">${escapeHtml(footerNote)}</p>` : ""}
+          </div>
+          <div style="padding:18px 28px;background:linear-gradient(135deg,#0D5C48,#0B4E3D);color:#F7F1E3;border-top:1px solid rgba(228,198,102,.25);">
+            <div style="display:block;text-align:center;font-size:12px;line-height:1.8;opacity:.95;">Ash-Shajrah Learning Hub LMS</div>
           </div>
         </div>
       </div>
@@ -328,7 +349,7 @@ export function buildCredentialsEmailHtml({
       ["Student Temporary Password", safeStudentPassword],
     ],
     bodyBlocks: [
-      `<div style="padding:16px;border:1px solid #2D8A6A;border-radius:18px;background:#fffaf0;"><p style="margin:0 0 6px;font-size:12px;letter-spacing:.16em;text-transform:uppercase;color:#0D5C48;font-weight:700;">Important</p><p style="margin:0;line-height:1.8;color:#245C4F;font-size:15px;">You will be asked to change the temporary password after sign in.</p></div>`,
+      `<div style="padding:16px;border:1px solid #2D8A6A;border-radius:18px;background:#fffaf0;"><p style="margin:0 0 6px;font-size:12px;letter-spacing:.16em;text-transform:uppercase;color:#0D5C48;font-weight:700;">Important</p><p style="margin:0;line-height:1.8;color:#245C4F;font-size:15px;">You will be asked to change the password after sign in.</p></div>`,
     ],
     buttonLabel: "Open LMS",
     buttonUrl: safePortalUrl,
@@ -345,16 +366,23 @@ export function buildPaymentDecisionEmailHtml({
   portalUrl,
   ctaLabel = "Open LMS",
 }) {
+  const messageRows = reason
+    ? reason
+        .split("\n")
+        .map((line) => line.trim())
+        .filter(Boolean)
+        .map((line) => line.replace(/^\s*[-•]\s*/, ""))
+    : [];
+
   return themedEmailShell({
     eyebrow,
     title,
     intro,
-    rows: voucherNo ? [["Voucher No", voucherNo]] : [],
-    bodyBlocks: reason
-      ? [
-          `<div style="padding:16px;border:1px solid #2D8A6A;border-radius:18px;background:#fffaf0;"><p style="margin:0 0 6px;font-size:12px;letter-spacing:.16em;text-transform:uppercase;color:#0D5C48;font-weight:700;">Message</p><p style="margin:0;line-height:1.8;color:#245C4F;font-size:15px;">${escapeHtml(reason)}</p></div>`,
-        ]
-      : [],
+    rows: [
+      ...(voucherNo ? [["Voucher No", voucherNo]] : []),
+      ...(messageRows.length ? [["Message", messageRows.join("\n")]] : []),
+    ],
+    bodyBlocks: [],
     buttonLabel: ctaLabel,
     buttonUrl: portalUrl,
     footerNote: `If the button does not work, open this link in your browser: ${portalUrl}`,

@@ -1,6 +1,7 @@
 import crypto from "crypto";
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { sendEmail, themedEmailShell } from "@/lib/email";
 
 function json(message, status = 200, extra = {}) {
   return NextResponse.json({ message, ...extra }, { status });
@@ -43,7 +44,9 @@ export async function POST(request) {
     }
 
     const [lead] = await prisma.$queryRaw`
-      SELECT id::text AS id
+      SELECT
+        id::text AS id,
+        NULLIF(TRIM(email), '') AS email
       FROM registration_leads
       WHERE id = ${registrationId}::uuid
       LIMIT 1
@@ -125,6 +128,35 @@ export async function POST(request) {
           NOW()
         )
       `;
+    }
+
+    const recipientEmail = String(lead?.email || "").trim();
+    if (recipientEmail) {
+      try {
+        const portalUrl = `${process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL || ""}/admission-next-step/${registrationId}`;
+        const scholarshipRows = [
+          ["Dependents", dependentsCount],
+          ["School children", schoolGoingChildrenCount],
+          ["Residence type", residenceType],
+          ["Requested amount", requestedAmount],
+          ["Reason", scholarshipReason],
+        ];
+        await sendEmail({
+          to: recipientEmail,
+          subject: "Scholarship form submitted successfully",
+          html: themedEmailShell({
+            eyebrow: "Scholarship Submitted",
+            title: "Scholarship form submitted successfully",
+            intro: "Your scholarship request has been received successfully. Our admissions team will review it and continue with the next step.",
+            rows: scholarshipRows,
+            bodyBlocks: [],
+            portalUrl,
+            ctaLabel: "Open Admission Page",
+          }),
+        });
+      } catch {
+        // Email should not block successful scholarship submission.
+      }
     }
 
     return json("Scholarship submitted successfully.", 200);

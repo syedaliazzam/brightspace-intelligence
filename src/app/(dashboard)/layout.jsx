@@ -37,6 +37,44 @@ async function getStudentProfileId(userId) {
 async function getBlockedMonthlyFeeForStudent(studentId) {
   if (!studentId) return null;
 
+  const [monthlyRow] = await prisma.$queryRaw`
+    SELECT
+      fv.voucher_no,
+      item.due_date,
+      COALESCE(latest_fs.status::text, fv.status::text, 'unpaid') AS effective_status
+    FROM regular_monthly_fee_voucher_items item
+    INNER JOIN fee_vouchers fv ON fv.id = item.voucher_id
+    LEFT JOIN LATERAL (
+      SELECT fs.status, fs.created_at, fs.id
+      FROM fee_submissions fs
+      WHERE fs.voucher_id = fv.id
+      ORDER BY fs.created_at DESC NULLS LAST, fs.id DESC
+      LIMIT 1
+    ) latest_fs ON true
+    WHERE (
+      item.student_id = ${studentId}::uuid
+      OR fv.registration_id IN (
+        SELECT e.registration_id
+        FROM enrollments e
+        WHERE e.student_id = ${studentId}::uuid
+          AND e.registration_id IS NOT NULL
+      )
+    )
+    ORDER BY fv.created_at DESC NULLS LAST, item.created_at DESC, fv.voucher_no DESC NULLS LAST
+    LIMIT 1
+  `;
+  if (monthlyRow?.voucher_no) {
+    const status = String(monthlyRow.effective_status || "").toLowerCase();
+    const dueDate = monthlyRow.due_date ? new Date(monthlyRow.due_date) : null;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const isOverdue = dueDate instanceof Date && !Number.isNaN(dueDate.getTime()) && dueDate.getTime() <= today.getTime();
+    if (["unpaid", "rejected", "submitted"].includes(status) && isOverdue) {
+      return monthlyRow;
+    }
+    return null;
+  }
+
   const [voucherRow] = await prisma.$queryRaw`
     SELECT
       fv.voucher_no,
@@ -51,36 +89,19 @@ async function getBlockedMonthlyFeeForStudent(studentId) {
           AND e.registration_id IS NOT NULL
       )
     )
+      AND NOT EXISTS (
+        SELECT 1
+        FROM regular_monthly_fee_voucher_items item
+        WHERE item.voucher_id = fv.id
+      )
       AND LOWER(fv.status::text) IN ('unpaid', 'rejected', 'submitted')
       AND fv.due_date <= timezone('Asia/Karachi', now())::date
-    ORDER BY fv.due_date ASC NULLS LAST, fv.created_at DESC
+    ORDER BY fv.created_at DESC NULLS LAST, fv.voucher_no DESC NULLS LAST
     LIMIT 1
   `;
   if (voucherRow?.voucher_no) return voucherRow;
 
-  const [monthlyRow] = await prisma.$queryRaw`
-    SELECT
-      fv.voucher_no,
-      item.due_date
-    FROM regular_monthly_fee_voucher_items item
-    INNER JOIN fee_vouchers fv ON fv.id = item.voucher_id
-    LEFT JOIN fee_submissions fs ON fs.voucher_id = fv.id
-    WHERE (
-      item.student_id = ${studentId}::uuid
-      OR fv.registration_id IN (
-        SELECT e.registration_id
-        FROM enrollments e
-        WHERE e.student_id = ${studentId}::uuid
-          AND e.registration_id IS NOT NULL
-      )
-    )
-      AND COALESCE(fs.status::text, fv.status::text) IN ('unpaid', 'rejected', 'submitted')
-      AND item.due_date <= timezone('Asia/Karachi', now())::date
-    ORDER BY item.due_date ASC NULLS LAST, item.created_at DESC
-    LIMIT 1
-  `;
-
-  return monthlyRow || null;
+  return null;
 }
 
 async function getBlockedMonthlyFeeForParent(sessionUser) {

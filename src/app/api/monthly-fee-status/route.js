@@ -54,16 +54,22 @@ async function getLatestMonthlyFee(studentIds) {
       item.base_amount::float8 AS base_amount,
       item.late_fee_amount::float8 AS late_fee_amount,
       item.voucher_id::text AS voucher_id,
-      COALESCE(fs.status::text, 'not_submitted') AS payment_status,
-      COALESCE(fs.status::text, fv.status::text, 'unpaid') AS effective_status,
+      COALESCE(latest_fs.status::text, 'not_submitted') AS payment_status,
+      COALESCE(latest_fs.status::text, fv.status::text, 'unpaid') AS effective_status,
       c.title AS class_title
     FROM regular_monthly_fee_voucher_items item
     INNER JOIN fee_vouchers fv ON fv.id = item.voucher_id
-    LEFT JOIN fee_submissions fs ON fs.voucher_id = fv.id
+    LEFT JOIN LATERAL (
+      SELECT fs.status, fs.created_at, fs.id
+      FROM fee_submissions fs
+      WHERE fs.voucher_id = fv.id
+      ORDER BY fs.created_at DESC NULLS LAST, fs.id DESC
+      LIMIT 1
+    ) latest_fs ON true
     LEFT JOIN regular_monthly_fee_batches b ON b.id = item.batch_id
     LEFT JOIN courses c ON c.id = b.class_id
     WHERE item.student_id = ANY(${studentIds}::uuid[])
-    ORDER BY item.due_date DESC NULLS LAST, item.created_at DESC
+    ORDER BY fv.created_at DESC NULLS LAST, item.created_at DESC, fv.voucher_no DESC NULLS LAST
     LIMIT 1
   `;
 
@@ -82,13 +88,19 @@ async function getMonthlyFeesForStudents(studentIds) {
       item.parent_name,
       item.base_amount::float8 AS base_amount,
       item.late_fee_amount::float8 AS late_fee_amount,
-      COALESCE(fs.status::text, fv.status::text, 'unpaid') AS effective_status,
-      COALESCE(fs.status::text, 'not_submitted') AS payment_status,
+      COALESCE(latest_fs.status::text, fv.status::text, 'unpaid') AS effective_status,
+      COALESCE(latest_fs.status::text, 'not_submitted') AS payment_status,
       fv.status::text AS voucher_status,
       c.title AS class_title
     FROM regular_monthly_fee_voucher_items item
     INNER JOIN fee_vouchers fv ON fv.id = item.voucher_id
-    LEFT JOIN fee_submissions fs ON fs.voucher_id = fv.id
+    LEFT JOIN LATERAL (
+      SELECT fs.status, fs.created_at, fs.id
+      FROM fee_submissions fs
+      WHERE fs.voucher_id = fv.id
+      ORDER BY fs.created_at DESC NULLS LAST, fs.id DESC
+      LIMIT 1
+    ) latest_fs ON true
     LEFT JOIN regular_monthly_fee_batches b ON b.id = item.batch_id
     LEFT JOIN courses c ON c.id = b.class_id
     WHERE (
@@ -100,7 +112,7 @@ async function getMonthlyFeesForStudents(studentIds) {
            AND e.registration_id IS NOT NULL
       )
     )
-    ORDER BY item.student_id, item.due_date DESC NULLS LAST, item.created_at DESC
+    ORDER BY item.student_id, fv.created_at DESC NULLS LAST, item.created_at DESC, fv.voucher_no DESC NULLS LAST
   `;
 
   return rows;

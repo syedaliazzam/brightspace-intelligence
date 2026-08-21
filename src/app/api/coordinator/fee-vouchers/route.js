@@ -482,7 +482,7 @@ function buildVoucherEmailContent({
               ${availablePaymentMethods
                 .map(
                   (method) => `
-                    <div style="border:1px solid rgba(45,138,106,0.18);border-radius:16px;background:#ffffff;padding:14px 16px;margin-bottom:12px;">
+                    <div style="margin-bottom:12px;">
                       <div style="font-weight:700;color:#0D5C48;font-size:15px;margin-bottom:8px;">${method?.name || "-"}</div>
                       <table role="presentation" cellspacing="0" cellpadding="0" style="width:100%;border-collapse:collapse;font-size:14px;">
                         ${method?.bank_name ? `<tr><td style="padding:4px 0;color:#245C4F;width:36%;vertical-align:top;">Bank</td><td style="padding:4px 0;color:#063F32;">${method.bank_name}</td></tr>` : ""}

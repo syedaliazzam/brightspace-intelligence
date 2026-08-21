@@ -47,7 +47,7 @@ export async function GET(request) {
       ORDER BY item.due_date ASC, item.created_at ASC
     `;
 
-    const portalBase = process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL || "";
+    const portalBase = String(process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL || "").replace(/\/+$/, "");
     let sent = 0;
 
     for (const item of reminders) {

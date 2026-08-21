@@ -64,40 +64,46 @@ async function getItems(status) {
   const whereClause = dbStatus ? `WHERE fs."status"::text = $1` : "";
   const values = dbStatus ? [dbStatus] : [];
 
-  const rows = await prisma.$queryRawUnsafe(
-    `
-    SELECT
-      fs."id"::text AS id,
-      fs."payer_name",
-      fs."transaction_id",
-      fs."paid_amount",
-      fs."paid_at",
-      fs."proof_file_path",
-      fs."status"::text AS status,
-      fv."id"::text AS fee_voucher_id,
-      fv."voucher_no",
-      COALESCE(fv."total_amount", fv."amount") AS voucher_amount,
-      fv."status"::text AS voucher_status,
-      CASE WHEN fv.registration_id IS NULL THEN true ELSE false END AS is_monthly_voucher,
-      rl."id"::text AS registration_lead_id,
-      CASE
-        WHEN fv.registration_id IS NULL THEN COALESCE(su.full_name, '')
-        ELSE COALESCE(rl."student_name", item.student_name, '')
-      END AS student_name,
-      rl."parent_name",
-      rl."email",
-      rl."phone"
-    FROM "fee_submissions" fs
-    INNER JOIN "fee_vouchers" fv ON fv."id" = fs."voucher_id"
-    LEFT JOIN "registration_leads" rl ON rl."id" = fv."registration_id"
-    LEFT JOIN "regular_monthly_fee_voucher_items" item ON item.voucher_id = fv.id
-    LEFT JOIN "student_profiles" sp ON sp.id = item.student_id
-    LEFT JOIN "users" su ON su.id = sp.user_id
-    ${whereClause}
-    ORDER BY fs."created_at" DESC NULLS LAST, fs."paid_at" DESC NULLS LAST, fs."id" DESC
-    `,
-    ...values
-  );
+  let rows = [];
+  try {
+    rows = await prisma.$queryRawUnsafe(
+      `
+      SELECT
+        fs."id"::text AS id,
+        fs."payer_name",
+        fs."transaction_id",
+        fs."paid_amount",
+        fs."paid_at",
+        fs."proof_file_path",
+        fs."status"::text AS status,
+        fv."id"::text AS fee_voucher_id,
+        fv."voucher_no",
+        COALESCE(fv."total_amount", fv."amount") AS voucher_amount,
+        fv."status"::text AS voucher_status,
+        CASE WHEN fv.registration_id IS NULL THEN true ELSE false END AS is_monthly_voucher,
+        rl."id"::text AS registration_lead_id,
+        CASE
+          WHEN fv.registration_id IS NULL THEN COALESCE(su.full_name, '')
+          ELSE COALESCE(rl."student_name", item.student_name, '')
+        END AS student_name,
+        rl."parent_name",
+        rl."email",
+        rl."phone"
+      FROM "fee_submissions" fs
+      INNER JOIN "fee_vouchers" fv ON fv."id" = fs."voucher_id"
+      LEFT JOIN "registration_leads" rl ON rl."id" = fv."registration_id"
+      LEFT JOIN "regular_monthly_fee_voucher_items" item ON item.voucher_id = fv.id
+      LEFT JOIN "student_profiles" sp ON sp.id = item.student_id
+      LEFT JOIN "users" su ON su.id = sp.user_id
+      ${whereClause}
+      ORDER BY fs."created_at" DESC NULLS LAST, fs."paid_at" DESC NULLS LAST, fs."id" DESC
+      `,
+      ...values
+    );
+  } catch (error) {
+    console.error("Payment items query error fallback triggered:", error);
+    return [];
+  }
 
   return Promise.all(
     rows.map(async (item) => ({

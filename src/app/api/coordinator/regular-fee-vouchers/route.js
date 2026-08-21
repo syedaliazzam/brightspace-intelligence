@@ -429,7 +429,7 @@ export async function POST(request) {
       `;
     }, { maxWait: 20000, timeout: 120000 });
 
-    const portalUrlBase = process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL || "";
+    const portalUrlBase = String(process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL || "").replace(/\/+$/, "");
     for (const job of emailJobs) {
       if (!job.to) continue;
       await sendEmail({
