@@ -144,7 +144,7 @@ export async function POST(request, { params }) {
       ];
       const html = themedEmailShell({
         eyebrow: "Admission Form",
-        title: "Your registration form is ready",
+        title: "Your admission form is ready",
         intro: `Assalamualaikum ${parentName}, your admission form is ready. Please open the form link below and complete the next steps.`,
         rows: [
           ["Student", studentName],

@@ -69,7 +69,15 @@ export async function GET() {
         istd.registration_link_generated_at,
         istd.registration_link_generated_by::text AS registration_link_generated_by,
         istd.registration_lead_id::text AS registration_lead_id,
-        LOWER(COALESCE(rl.status::text, istd.status::text, '')) AS registration_status,
+        CASE
+          WHEN rl.id IS NOT NULL AND EXISTS (
+            SELECT 1
+            FROM enrollments e
+            WHERE e.registration_id = rl.id
+            LIMIT 1
+          ) THEN 'access_granted'
+          ELSE LOWER(COALESCE(rl.status::text, istd.status::text, ''))
+        END AS registration_status,
         pif.registration_code AS parent_interview_registration_code,
         pif.parent_interview_form_id,
         pif.parent_interview_status,
@@ -204,7 +212,12 @@ export async function GET() {
         ) fs ON TRUE
         WHERE (
           rl.id IS NOT NULL
-          AND fv.registration_id = rl.id
+          AND COALESCE(fv.registration_id, fv.registration_lead_id) = rl.id
+          AND NOT EXISTS (
+            SELECT 1
+            FROM regular_monthly_fee_voucher_items monthly_item
+            WHERE monthly_item.voucher_id = fv.id
+          )
         )
         ORDER BY fv.created_at DESC NULLS LAST, fv.id DESC
         LIMIT 1

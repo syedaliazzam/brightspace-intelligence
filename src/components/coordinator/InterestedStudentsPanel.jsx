@@ -130,6 +130,7 @@ export default function InterestedStudentsPanel({
   const [manualPaymentAmount, setManualPaymentAmount] = useState("");
   const [manualPaymentPreviewUrl, setManualPaymentPreviewUrl] = useState("");
   const [manualPaymentSubmitting, setManualPaymentSubmitting] = useState(false);
+  const [approvingPaymentId, setApprovingPaymentId] = useState("");
   const [credentialsEmail, setCredentialsEmail] = useState(null);
   const [refreshOnCredentialsClose, setRefreshOnCredentialsClose] = useState(false);
   const [paymentOptions, setPaymentOptions] = useState({
@@ -325,7 +326,7 @@ export default function InterestedStudentsPanel({
   const selectedLeadStage = selectedLead ? getLeadStage(selectedLead) : null;
   const selectedLeadCanSend = selectedLeadStage ? selectedLeadStage.interviewSubmitted && !selectedLeadStage.sent && !selectedLeadStage.submitted : false;
   const selectedLeadCanManualPayment = selectedLeadStage
-    ? selectedLeadStage.submitted && !selectedLead.payment_submission_id
+    ? canSubmitAdmissionPayment(selectedLead, selectedLeadStage)
     : false;
 
   function openLeadDetails(item) {
@@ -446,6 +447,49 @@ export default function InterestedStudentsPanel({
     return "pending";
   }
 
+  function canSubmitAdmissionPayment(item, stage = getLeadStage(item)) {
+    return Boolean(
+      stage?.submitted &&
+      !item?.payment_submission_id &&
+      (item?.fee_voucher_id || item?.voucher_no)
+    );
+  }
+
+  function canApproveAdmissionPayment(item, stage = getLeadStage(item)) {
+    const paymentStatus = normalizeStatusValue(item?.payment_submission_status);
+    return Boolean(
+      stage?.submitted &&
+      item?.payment_submission_id &&
+      !["verified", "rejected"].includes(paymentStatus)
+    );
+  }
+
+  function hasVisibleRowAction(item, stage = getLeadStage(item)) {
+    if (readOnlyMode) return false;
+
+    return Boolean(
+      (allowDetailsAction && showDetailsButton && !stage.sent && !stage.submitted) ||
+      (allowSendFormAction && stage.interviewSubmitted && !stage.sent && !stage.submitted) ||
+      canSubmitAdmissionPayment(item, stage) ||
+      canApproveAdmissionPayment(item, stage) ||
+      (!hideDeleteAction && showActionsColumn && !stage.interviewSubmitted && !stage.sent && !stage.submitted)
+    );
+  }
+
+  function getRowActionHint(item, stage = getLeadStage(item)) {
+    const paymentStatus = normalizeStatusValue(item?.payment_submission_status);
+
+    if (stage?.submitted) {
+      if (paymentStatus === "verified") return "Payment verified";
+      if (paymentStatus === "rejected") return "Payment rejected";
+      if (!item?.payment_submission_id && !(item?.fee_voucher_id || item?.voucher_no)) {
+        return "Voucher missing";
+      }
+    }
+
+    return "No action";
+  }
+
   function FlowStep({ active, done, icon: Icon, label }) {
     return (
       <div
@@ -522,6 +566,52 @@ export default function InterestedStudentsPanel({
       setMessage(error instanceof Error ? error.message : "Unable to approve payment.");
     } finally {
       setManualPaymentSubmitting(false);
+    }
+  }
+
+  async function approveSubmittedAdmissionPayment(item) {
+    const paymentSubmissionId = String(item?.payment_submission_id || "").trim();
+    if (!paymentSubmissionId) return;
+
+    setApprovingPaymentId(paymentSubmissionId);
+    setMessage("");
+
+    try {
+      const response = await fetch(`/api/coordinator/payments/${encodeURIComponent(paymentSubmissionId)}/verify`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "approve", rejectionReason: "" }),
+      });
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        throw new Error(data?.message || "Unable to approve payment.");
+      }
+
+      setMessage(data?.message || "Payment approved successfully.");
+      setLocalItems((current) =>
+        current.map((lead) =>
+          lead.id === item.id
+            ? {
+                ...lead,
+                payment_submission_status: "verified",
+                voucher_status: "verified",
+                registration_status: "access_granted",
+              }
+            : lead
+        )
+      );
+
+      if (data?.credentials_email) {
+        setCredentialsEmail(data.credentials_email);
+        setRefreshOnCredentialsClose(true);
+      } else if (typeof onRefresh === "function") {
+        await onRefresh();
+      }
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Unable to approve payment.");
+    } finally {
+      setApprovingPaymentId("");
     }
   }
 
@@ -672,16 +762,15 @@ export default function InterestedStudentsPanel({
         </div>
       ) : null}
       {(() => {
-        const showActionHeader = visibleItems.some((item) => {
-          if (readOnlyMode) return false;
-          const stage = getLeadStage(item);
-          return (
-            (allowDetailsAction && showDetailsButton && !stage.sent && !stage.submitted) ||
-            (allowSendFormAction && stage.interviewSubmitted && !stage.sent && !stage.submitted) ||
-            (stage.submitted && !item.payment_submission_id) ||
-            (showActionsColumn && !stage.interviewSubmitted && !stage.sent && !stage.submitted)
+        const showActionHeader =
+          !readOnlyMode &&
+          (
+            showActionsColumn ||
+            visibleItems.some((item) => {
+              const stage = getLeadStage(item);
+              return hasVisibleRowAction(item, stage);
+            })
           );
-        });
         const showParentFormSentColumn = visibleItems.some((item) => {
           if (readOnlyMode) return false;
           const stage = getLeadStage(item);
@@ -788,14 +877,7 @@ export default function InterestedStudentsPanel({
               {visibleItems.filter((item) => !hiddenRowIds.includes(item.id)).map((item, index) => {
                 const stage = getLeadStage(item);
                 if (stage.status === "archived") return null;
-                const showRowAction =
-                  !readOnlyMode &&
-                  (
-                    (allowDetailsAction && showDetailsButton && !stage.sent && !stage.submitted) ||
-                    (allowSendFormAction && stage.interviewSubmitted && !stage.sent && !stage.submitted) ||
-            (stage.submitted && !item.payment_submission_id) ||
-            (showActionsColumn && !stage.interviewSubmitted && !stage.sent && !stage.submitted)
-                  );
+                const showRowAction = hasVisibleRowAction(item, stage);
                 const canDeleteRow = !hideDeleteAction && !readOnlyMode && !stage.interviewSubmitted && !stage.sent && !stage.submitted;
 
                 return (
@@ -901,56 +983,75 @@ export default function InterestedStudentsPanel({
                         })()}
                       </td>
                     ) : null}
-                    {showRowAction ? (
+                    {showActionHeader ? (
                       <td className="px-5 py-5 pl-4 pr-4 text-right">
-                        <div className="inline-flex items-center justify-end gap-2 whitespace-nowrap">
-                          {readOnlyMode ? null : allowDetailsAction && showDetailsButton && !stage.sent && !stage.submitted ? (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                openLeadDetails(item);
-                              }}
-                              className="inline-flex w-max whitespace-nowrap rounded-full bg-[#0D5C48] px-4 py-2 text-sm font-semibold text-[#FAF7F0] transition hover:bg-[#063F32] disabled:cursor-not-allowed disabled:opacity-70"
-                              disabled={loadingId === item.id}
+                        {showRowAction ? (
+                          <div className="inline-flex items-center justify-end gap-2 whitespace-nowrap">
+                            {readOnlyMode ? null : allowDetailsAction && showDetailsButton && !stage.sent && !stage.submitted ? (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  openLeadDetails(item);
+                                }}
+                                className="inline-flex w-max whitespace-nowrap rounded-full bg-[#0D5C48] px-4 py-2 text-sm font-semibold text-[#FAF7F0] transition hover:bg-[#063F32] disabled:cursor-not-allowed disabled:opacity-70"
+                                disabled={loadingId === item.id}
+                                >
+                                  View Details
+                                </button>
+                            ) : null}
+                            {readOnlyMode ? null : allowSendFormAction && stage.interviewSubmitted && !stage.sent && !stage.submitted ? (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  openLeadSendForm(item);
+                                }}
+                                className="inline-flex w-max whitespace-nowrap rounded-full bg-[#0D5C48] px-4 py-2 text-sm font-semibold text-[#FAF7F0] transition hover:bg-[#063F32] disabled:cursor-not-allowed disabled:opacity-70"
+                                disabled={loadingId === item.id}
                               >
-                                View Details
+                                Send Form
                               </button>
-                          ) : null}
-                          {readOnlyMode ? null : allowSendFormAction && stage.interviewSubmitted && !stage.sent && !stage.submitted ? (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                openLeadSendForm(item);
-                              }}
-                              className="inline-flex w-max whitespace-nowrap rounded-full bg-[#0D5C48] px-4 py-2 text-sm font-semibold text-[#FAF7F0] transition hover:bg-[#063F32] disabled:cursor-not-allowed disabled:opacity-70"
-                              disabled={loadingId === item.id}
-                            >
-                              Send Form
-                            </button>
-                          ) : null}
-                          {readOnlyMode ? null : stage.submitted && !item.payment_submission_id ? (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                openLeadManualPayment(item);
-                              }}
-                              className="inline-flex w-max whitespace-nowrap rounded-full bg-[#0D5C48] px-4 py-2 text-sm font-semibold text-[#FAF7F0] transition hover:bg-[#063F32] disabled:cursor-not-allowed disabled:opacity-70"
-                              disabled={manualPaymentSubmitting}
-                            >
-                              Submit Payment
-                            </button>
-                          ) : null}
-                          {hideDeleteAction || readOnlyMode ? null : canDeleteRow ? (
-                            <button
-                              type="button"
-                              onClick={() => setDeleteTarget(item)}
-                              className="rounded-full border border-rose-200 bg-rose-50 px-4 py-2 text-sm font-semibold text-rose-700 transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-70"
-                              disabled={loadingId === item.id || deletingId === item.id}
-                            >
-                              {deletingId === item.id ? "Deleting..." : "Delete"}
-                            </button>
-                          ) : null}
-                        </div>
+                            ) : null}
+                            {readOnlyMode ? null : canSubmitAdmissionPayment(item, stage) ? (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  openLeadManualPayment(item);
+                                }}
+                                className="inline-flex w-max whitespace-nowrap rounded-full bg-[#0D5C48] px-4 py-2 text-sm font-semibold text-[#FAF7F0] transition hover:bg-[#063F32] disabled:cursor-not-allowed disabled:opacity-70"
+                                disabled={manualPaymentSubmitting}
+                              >
+                                Submit Payment
+                              </button>
+                            ) : null}
+                            {readOnlyMode ? null : canApproveAdmissionPayment(item, stage) ? (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  void approveSubmittedAdmissionPayment(item);
+                                }}
+                                className="inline-flex w-max items-center gap-2 whitespace-nowrap rounded-full bg-[#0D5C48] px-4 py-2 text-sm font-semibold text-[#FAF7F0] transition hover:bg-[#063F32] disabled:cursor-not-allowed disabled:opacity-70"
+                                disabled={approvingPaymentId === item.payment_submission_id}
+                              >
+                                <FileCheck2 className="h-4 w-4" />
+                                {approvingPaymentId === item.payment_submission_id ? "Approving..." : "Approve Payment"}
+                              </button>
+                            ) : null}
+                            {hideDeleteAction || readOnlyMode ? null : canDeleteRow ? (
+                              <button
+                                type="button"
+                                onClick={() => setDeleteTarget(item)}
+                                className="rounded-full border border-rose-200 bg-rose-50 px-4 py-2 text-sm font-semibold text-rose-700 transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-70"
+                                disabled={loadingId === item.id || deletingId === item.id}
+                              >
+                                {deletingId === item.id ? "Deleting..." : "Delete"}
+                              </button>
+                            ) : null}
+                          </div>
+                        ) : (
+                          <span className="text-sm font-medium text-[#7A938B]">
+                            {getRowActionHint(item, stage)}
+                          </span>
+                        )}
                       </td>
                     ) : null}
                     {showParentFormSentColumn ? (
@@ -1069,6 +1170,7 @@ export default function InterestedStudentsPanel({
         {visibleItems.filter((item) => !hiddenRowIds.includes(item.id)).map((item) => {
           const stage = getLeadStage(item);
           if (stage.status === "archived") return null;
+          const showRowAction = hasVisibleRowAction(item, stage);
                 return (
           <article
             key={item.id}
@@ -1162,7 +1264,7 @@ export default function InterestedStudentsPanel({
               />
             </dl>
 
-                {readOnlyMode ? null : allowDetailsAction || showActionsColumn ? (
+                {showRowAction ? (
                   <div className="mt-4 inline-flex items-center gap-2 whitespace-nowrap">
                 {readOnlyMode ? null : allowDetailsAction && showDetailsButton && !stage.sent && !stage.submitted ? (
                   <button
@@ -1188,7 +1290,7 @@ export default function InterestedStudentsPanel({
                     Send Form
                   </button>
                 ) : null}
-                {readOnlyMode ? null : stage.submitted && !item.payment_submission_id ? (
+                {readOnlyMode ? null : canSubmitAdmissionPayment(item, stage) ? (
                   <button
                     type="button"
                     onClick={() => {
@@ -1198,6 +1300,19 @@ export default function InterestedStudentsPanel({
                     disabled={manualPaymentSubmitting}
                   >
                     Submit Payment
+                  </button>
+                ) : null}
+                {readOnlyMode ? null : canApproveAdmissionPayment(item, stage) ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      void approveSubmittedAdmissionPayment(item);
+                    }}
+                    className="inline-flex w-max items-center gap-2 whitespace-nowrap rounded-full border border-[#2D8A6A]/20 bg-[#EAF6EF] px-4 py-2 text-sm font-semibold text-[#0D5C48] transition hover:bg-[#DFF2E7] hover:text-[#063F32] disabled:cursor-not-allowed disabled:opacity-70"
+                    disabled={approvingPaymentId === item.payment_submission_id}
+                  >
+                    <FileCheck2 className="h-4 w-4" />
+                    {approvingPaymentId === item.payment_submission_id ? "Approving..." : "Approve Payment"}
                   </button>
                 ) : null}
                 {hideDeleteAction || readOnlyMode ? null : showActionsColumn && !stage.interviewSubmitted && !stage.sent && !stage.submitted ? (

@@ -305,6 +305,10 @@ function matchesSearch(item, query) {
     .some((entry) => entry.includes(value));
 }
 
+function hasTextValue(value) {
+  return Boolean(String(value || "").trim());
+}
+
 export default function PublicEventRegistrationsPage({ portalLabel = "Coordinator portal", title = "Event registrations", description = "Review public event registrations, verify payments, and track each registration from one LMS table.", canManage = true, }) {
   const pageSize = 7;
   const normalizedPortalLabel = String(portalLabel).toLowerCase().trim();
@@ -505,6 +509,20 @@ export default function PublicEventRegistrationsPage({ portalLabel = "Coordinato
     () => summaryItems.reduce((sum, item) => (normalizeRegistrationStatus(item.status) === "verified" ? sum + Number(item.amount_due || 0) : sum), 0),
     [summaryItems]
   );
+  const showStudentNameColumn = filteredItems.some((item) =>
+    (Array.isArray(item.student_names) && item.student_names.some((name) => hasTextValue(name))) ||
+    hasTextValue(item.student_name)
+  );
+  const showParentNameColumn = filteredItems.some((item) => hasTextValue(item.parent_name));
+  const showSchoolNameColumn = filteredItems.some((item) => hasTextValue(item.school_name));
+  const showClassNameColumn = filteredItems.some((item) => hasTextValue(item.class_input));
+  const tableColumnCount =
+    8 +
+    Number(showStudentNameColumn) +
+    Number(showParentNameColumn) +
+    Number(showSchoolNameColumn) +
+    Number(showClassNameColumn) +
+    Number(showReceivedAmountColumn);
   const totalPages = Math.max(1, Math.ceil(filteredItems.length / pageSize));
   const safePage = Math.min(page, totalPages);
   const visibleItems = useMemo(() => filteredItems.slice((safePage - 1) * pageSize, (safePage - 1) * pageSize + pageSize), [filteredItems, safePage]);
@@ -635,9 +653,12 @@ export default function PublicEventRegistrationsPage({ portalLabel = "Coordinato
       if (!schoolNameValue) nextErrors.schoolName = "School name is required.";
       if (!classValue) nextErrors.className = "Class is required.";
     }
-    if (category === "alh-parents" || category === "general-parents") {
+    if (category === "alh-parents") {
       if (studentNames.length === 0) nextErrors.studentNames = "At least one student name is required.";
       if (!parentNameValue) nextErrors.parentName = "Parent name is required.";
+    }
+    if (category === "general-parents" && !parentNameValue) {
+      nextErrors.parentName = "Parent name is required.";
     }
 
     return nextErrors;
@@ -808,12 +829,12 @@ export default function PublicEventRegistrationsPage({ portalLabel = "Coordinato
               <thead className="bg-[linear-gradient(180deg,#FAF7F0_0%,#F1EADC_100%)] text-xs uppercase tracking-[0.18em] text-[#0D5C48]">
                 <tr>
                   <th className="whitespace-nowrap px-6 py-4">Registration No</th>
-                  <th className="whitespace-nowrap px-6 py-4">Event</th>
+                  <th className="w-[280px] min-w-[280px] px-6 py-4">Event</th>
                   <th className="whitespace-nowrap px-6 py-4">Event Date</th>
-                  <th className="whitespace-nowrap px-6 py-4">Student Name</th>
-                  <th className="whitespace-nowrap px-6 py-4">Parent Name</th>
-                  <th className="whitespace-nowrap px-6 py-4">School Name</th>
-                  <th className="whitespace-nowrap px-6 py-4">Class Name</th>
+                  {showStudentNameColumn ? <th className="whitespace-nowrap px-6 py-4">Student Name</th> : null}
+                  {showParentNameColumn ? <th className="whitespace-nowrap px-6 py-4">Parent Name</th> : null}
+                  {showSchoolNameColumn ? <th className="whitespace-nowrap px-6 py-4">School Name</th> : null}
+                  {showClassNameColumn ? <th className="whitespace-nowrap px-6 py-4">Class Name</th> : null}
                   <th className="whitespace-nowrap px-6 py-4">Email</th>
                   <th className="whitespace-nowrap px-6 py-4">WhatsApp</th>
                   {showReceivedAmountColumn ? <th className="whitespace-nowrap px-6 py-4">Received Amount</th> : null}
@@ -826,16 +847,18 @@ export default function PublicEventRegistrationsPage({ portalLabel = "Coordinato
                 {visibleItems.length ? visibleItems.map((item) => (
                   <tr key={item.id}>
                     <td className="px-6 py-4 font-semibold text-[#063F32]">{item.registration_no}</td>
-                    <td className="px-6 py-4 font-medium text-[#063F32]">{item.event_name}</td>
+                    <td className="w-[280px] min-w-[280px] px-6 py-4 font-medium leading-6 text-[#063F32]">{item.event_name}</td>
                     <td className="px-6 py-4 text-[#245C4F]">{formatEventDate(item.event_start_at)}</td>
-                    <td className="px-6 py-4 text-[#245C4F]">
-                      {Array.isArray(item.student_names) && item.student_names.length > 0
-                        ? item.student_names.join(", ")
-                        : item.student_name || "-"}
-                    </td>
-                    <td className="px-6 py-4 text-[#245C4F]">{item.parent_name || "-"}</td>
-                    <td className="px-6 py-4 text-[#245C4F]">{item.school_name || "-"}</td>
-                    <td className="px-6 py-4 text-[#245C4F]">{item.class_input || "-"}</td>
+                    {showStudentNameColumn ? (
+                      <td className="px-6 py-4 text-[#245C4F]">
+                        {Array.isArray(item.student_names) && item.student_names.length > 0
+                          ? item.student_names.join(", ")
+                          : item.student_name || "-"}
+                      </td>
+                    ) : null}
+                    {showParentNameColumn ? <td className="px-6 py-4 text-[#245C4F]">{item.parent_name || "-"}</td> : null}
+                    {showSchoolNameColumn ? <td className="px-6 py-4 text-[#245C4F]">{item.school_name || "-"}</td> : null}
+                    {showClassNameColumn ? <td className="px-6 py-4 text-[#245C4F]">{item.class_input || "-"}</td> : null}
                     <td className="px-6 py-4 text-[#245C4F]">{item.email || "-"}</td>
                     <td className="px-6 py-4 text-[#245C4F]">{item.whatsapp || "-"}</td>
                     {showReceivedAmountColumn ? (
@@ -892,7 +915,7 @@ export default function PublicEventRegistrationsPage({ portalLabel = "Coordinato
                   </tr>
                 )) : (
                   <tr>
-                    <td colSpan={showReceivedAmountColumn ? 10 : 9} className="px-6 py-10 text-center text-[#245C4F]">{loading ? "Loading event registrations..." : "No registrations matched the selected filters."}</td>
+                    <td colSpan={tableColumnCount} className="px-6 py-10 text-center text-[#245C4F]">{loading ? "Loading event registrations..." : "No registrations matched the selected filters."}</td>
                   </tr>
                 )}
               </tbody>
@@ -1048,48 +1071,63 @@ export default function PublicEventRegistrationsPage({ portalLabel = "Coordinato
                             <input value={createForm.parentName} onChange={(event) => setCreateForm((current) => ({ ...current, parentName: event.target.value }))} placeholder="Parent / guardian name" disabled={createSubmitting || createFormLocked} className="w-full rounded-2xl border border-[#2D8A6A]/20 bg-white px-4 py-3 text-sm text-[#063F32] outline-none focus:border-[#2D8A6A] disabled:cursor-not-allowed disabled:bg-[#F7F2E8]" />
                             {createErrors.parentName ? <p className="mt-2 text-xs font-semibold text-rose-700">{createErrors.parentName}</p> : null}
                           </label>
+                          {selectedCreateEventCategory === "alh-parents" ? (
+                            <>
+                              <div className="mt-4 flex items-center justify-between gap-3">
+                                <div>
+                                  <span className="block text-xs font-semibold uppercase tracking-[0.16em] text-[#0D5C48]">Student names *</span>
+                                  <p className="mt-1 text-xs text-[#245C4F]">Add one or more student names for parent registrations.</p>
+                                </div>
+                                <button type="button" onClick={() => setCreateForm((current) => ({ ...current, studentNames: [...(Array.isArray(current.studentNames) ? current.studentNames : []), ""] }))} disabled={createSubmitting || createFormLocked} className="rounded-full border border-[#2D8A6A]/20 bg-[#FAF7F0] px-3 py-2 text-xs font-semibold text-[#063F32] transition hover:bg-[#F1EADC] disabled:opacity-70">
+                                  Add student
+                                </button>
+                              </div>
+                              <div className="mt-4 space-y-3">
+                                {(Array.isArray(createForm.studentNames) ? createForm.studentNames : [""]).map((studentName, index) => (
+                                  <div key={index} className="flex gap-2">
+                                    <input
+                                      value={studentName}
+                                      onChange={(event) => {
+                                        const nextValue = event.target.value;
+                                        setCreateForm((current) => {
+                                          const nextStudentNames = Array.isArray(current.studentNames) ? [...current.studentNames] : [""];
+                                          nextStudentNames[index] = nextValue;
+                                          return { ...current, studentNames: nextStudentNames };
+                                        });
+                                      }}
+                                      placeholder={`Student name ${index + 1}`}
+                                      disabled={createSubmitting || createFormLocked}
+                                      className="min-w-0 flex-1 rounded-2xl border border-[#2D8A6A]/20 bg-white px-4 py-3 text-sm text-[#063F32] outline-none focus:border-[#2D8A6A] disabled:cursor-not-allowed disabled:bg-[#F7F2E8]"
+                                    />
+                                    <button
+                                      type="button"
+                                      onClick={() => setCreateForm((current) => {
+                                        const nextStudentNames = Array.isArray(current.studentNames) ? [...current.studentNames] : [""];
+                                        nextStudentNames.splice(index, 1);
+                                        return { ...current, studentNames: nextStudentNames.length ? nextStudentNames : [""] };
+                                      })}
+                                      disabled={createSubmitting || createFormLocked || (Array.isArray(createForm.studentNames) ? createForm.studentNames.length <= 1 : true)}
+                                      className="rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-3 py-2 text-xs font-semibold text-[#063F32] transition hover:bg-[#F1EADC] disabled:opacity-70"
+                                    >
+                                      Remove
+                                    </button>
+                                  </div>
+                                ))}
+                              </div>
+                              {createErrors.studentNames ? <p className="mt-2 text-xs font-semibold text-rose-700">{createErrors.studentNames}</p> : null}
+                            </>
+                          ) : null}
+                          {/* Keep the general-parents student names UI disabled for now.
                           <div className="mt-4 flex items-center justify-between gap-3">
                             <div>
                               <span className="block text-xs font-semibold uppercase tracking-[0.16em] text-[#0D5C48]">Student names *</span>
                               <p className="mt-1 text-xs text-[#245C4F]">Add one or more student names for parent registrations.</p>
                             </div>
-                            <button type="button" onClick={() => setCreateForm((current) => ({ ...current, studentNames: [...(Array.isArray(current.studentNames) ? current.studentNames : []), ""] }))} disabled={createSubmitting || createFormLocked} className="rounded-full border border-[#2D8A6A]/20 bg-[#FAF7F0] px-3 py-2 text-xs font-semibold text-[#063F32] transition hover:bg-[#F1EADC] disabled:opacity-70">
+                            <button type="button" className="rounded-full border border-[#2D8A6A]/20 bg-[#FAF7F0] px-3 py-2 text-xs font-semibold text-[#063F32] transition hover:bg-[#F1EADC] disabled:opacity-70">
                               Add student
                             </button>
                           </div>
-                          <div className="mt-4 space-y-3">
-                            {(Array.isArray(createForm.studentNames) ? createForm.studentNames : [""]).map((studentName, index) => (
-                              <div key={index} className="flex gap-2">
-                                <input
-                                  value={studentName}
-                                  onChange={(event) => {
-                                    const nextValue = event.target.value;
-                                    setCreateForm((current) => {
-                                      const nextStudentNames = Array.isArray(current.studentNames) ? [...current.studentNames] : [""];
-                                      nextStudentNames[index] = nextValue;
-                                      return { ...current, studentNames: nextStudentNames };
-                                    });
-                                  }}
-                                  placeholder={`Student name ${index + 1}`}
-                                  disabled={createSubmitting || createFormLocked}
-                                  className="min-w-0 flex-1 rounded-2xl border border-[#2D8A6A]/20 bg-white px-4 py-3 text-sm text-[#063F32] outline-none focus:border-[#2D8A6A] disabled:cursor-not-allowed disabled:bg-[#F7F2E8]"
-                                />
-                                <button
-                                  type="button"
-                                  onClick={() => setCreateForm((current) => {
-                                    const nextStudentNames = Array.isArray(current.studentNames) ? [...current.studentNames] : [""];
-                                    nextStudentNames.splice(index, 1);
-                                    return { ...current, studentNames: nextStudentNames.length ? nextStudentNames : [""] };
-                                  })}
-                                  disabled={createSubmitting || createFormLocked || (Array.isArray(createForm.studentNames) ? createForm.studentNames.length <= 1 : true)}
-                                  className="rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-3 py-2 text-xs font-semibold text-[#063F32] transition hover:bg-[#F1EADC] disabled:opacity-70"
-                                >
-                                  Remove
-                                </button>
-                              </div>
-                            ))}
-                          </div>
-                          {createErrors.studentNames ? <p className="mt-2 text-xs font-semibold text-rose-700">{createErrors.studentNames}</p> : null}
+                          */}
                         </div>
                       ) : null}
 

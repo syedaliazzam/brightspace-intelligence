@@ -65,7 +65,12 @@ export async function POST(request) {
           fv_inner.status,
           fv_inner.created_at
         FROM fee_vouchers fv_inner
-        WHERE fv_inner.registration_id = rl.id
+        WHERE COALESCE(fv_inner.registration_id, fv_inner.registration_lead_id) = rl.id
+          AND NOT EXISTS (
+            SELECT 1
+            FROM regular_monthly_fee_voucher_items monthly_item
+            WHERE monthly_item.voucher_id = fv_inner.id
+          )
         ORDER BY fv_inner.created_at DESC NULLS LAST, fv_inner.id DESC
         LIMIT 1
       ) fv ON TRUE

@@ -517,7 +517,7 @@ async function getSubmissionRecord(id, tx = prisma) {
       CASE WHEN item.voucher_id IS NOT NULL THEN true ELSE false END AS is_monthly_voucher
     FROM fee_submissions fs
     INNER JOIN fee_vouchers fv ON fv.id = fs.voucher_id
-    LEFT JOIN registration_leads rl ON rl.id = fv.registration_id
+    LEFT JOIN registration_leads rl ON rl.id = COALESCE(fv.registration_id, fv.registration_lead_id)
     LEFT JOIN interested_students istd ON istd.registration_lead_id = rl.id
     LEFT JOIN regular_monthly_fee_voucher_items item ON item.voucher_id = fv.id
     LEFT JOIN student_profiles sp ON sp.id = item.student_id
@@ -538,7 +538,7 @@ async function getVoucherRecord(id, tx = prisma) {
         fv.amount::float8 AS voucher_amount,
         fv.total_amount::float8 AS total_amount,
         fv.status::text AS voucher_status,
-        fv.registration_id::text AS registration_lead_id,
+        COALESCE(fv.registration_id, fv.registration_lead_id)::text AS registration_lead_id,
       COALESCE(NULLIF(TRIM(item.student_name), ''), NULLIF(TRIM(su.full_name), ''), 'Student') AS student_name,
       COALESCE(NULLIF(TRIM(item.parent_name), ''), NULLIF(TRIM(pu.full_name), ''), 'Parent') AS parent_name,
       COALESCE(NULLIF(TRIM(item.student_email), ''), NULLIF(TRIM(su.email), ''), NULLIF(TRIM(rl.email), ''), NULLIF(TRIM(pu.email), '')) AS email,
@@ -551,7 +551,7 @@ async function getVoucherRecord(id, tx = prisma) {
     LEFT JOIN regular_monthly_fee_voucher_items item ON item.voucher_id = fv.id
     LEFT JOIN student_profiles sp ON sp.id = item.student_id
     LEFT JOIN users su ON su.id = sp.user_id
-    LEFT JOIN registration_leads rl ON rl.id = fv.registration_id
+    LEFT JOIN registration_leads rl ON rl.id = COALESCE(fv.registration_id, fv.registration_lead_id)
     LEFT JOIN parent_profiles pp ON pp.id = (
       SELECT spp.parent_id
       FROM student_parents spp

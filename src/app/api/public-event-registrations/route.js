@@ -93,9 +93,12 @@ export async function POST(request) {
       if (!schoolName) return json("School name is required for this event category.", 400);
       if (!className) return json("Class is required for this event category.", 400);
     }
-    if (category === "alh-parents" || category === "general-parents") {
+    if (category === "alh-parents") {
       if (!parentName) return json("Parent name is required for this event category.", 400);
       if (!studentNames.length) return json("At least one student name is required for this event category.", 400);
+    }
+    if (category === "general-parents" && !parentName) {
+      return json("Parent name is required for this event category.", 400);
     }
 
     const [duplicate] = await prisma.$queryRaw`
