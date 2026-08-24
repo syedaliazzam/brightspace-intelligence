@@ -51,6 +51,34 @@ export default function MonthlyPlanSlider() {
     loadPlan();
   }, []);
 
+  const images = Array.isArray(plan?.image_urls) ? [...plan.image_urls] : [];
+  const isVideoSource = (value = "") => /^data:video\//i.test(String(value || "")) || /\.(mp4|webm|ogg|mov|m4v)(\?.*)?$/i.test(String(value || ""));
+  const buildPreviewUrl = (value) => {
+    const text = String(value || "").trim();
+    if (!text) return "";
+    if (/^https?:\/\//i.test(text) || text.startsWith("blob:") || text.startsWith("data:")) return text;
+    return `/api/file-preview?path=${encodeURIComponent(text)}`;
+  };
+  const monthName = plan?.start_date
+    ? new Date(plan.start_date).toLocaleDateString("en-US", { month: "long", year: "numeric" })
+    : "";
+
+  const scrollToIndex = useCallback((index) => {
+    const scroller = scrollerRef.current;
+    if (!scroller) return;
+
+    const card = scroller.querySelectorAll("[data-plan-card]")[index];
+    if (!card) return;
+
+    const targetLeft = card.offsetLeft - scroller.offsetLeft;
+
+    scroller.scrollTo({
+      left: Math.max(targetLeft - 2, 0),
+      behavior: "smooth",
+    });
+    setCurrentIdx(index);
+  }, []);
+
   const startAutoSlide = useCallback(() => {
     if (timerRef.current) clearInterval(timerRef.current);
 
@@ -65,7 +93,7 @@ export default function MonthlyPlanSlider() {
         isAutoScrollingRef.current = false;
       }, 900);
     }, 6500);
-  }, [plan, currentIdx]);
+  }, [plan, currentIdx, scrollToIndex]);
 
   useEffect(() => {
     if (!plan?.image_urls?.length || loading) return;
@@ -74,18 +102,6 @@ export default function MonthlyPlanSlider() {
       if (timerRef.current) clearInterval(timerRef.current);
     };
   }, [plan, loading, startAutoSlide]);
-
-  const images = Array.isArray(plan?.image_urls) ? [...plan.image_urls].reverse() : [];
-  const isVideoSource = (value = "") => /^data:video\//i.test(String(value || "")) || /\.(mp4|webm|ogg|mov|m4v)(\?.*)?$/i.test(String(value || ""));
-  const buildPreviewUrl = (value) => {
-    const text = String(value || "").trim();
-    if (!text) return "";
-    if (/^https?:\/\//i.test(text) || text.startsWith("blob:") || text.startsWith("data:")) return text;
-    return `/api/file-preview?path=${encodeURIComponent(text)}`;
-  };
-  const monthName = plan?.start_date
-    ? new Date(plan.start_date).toLocaleDateString("en-US", { month: "long", year: "numeric" })
-    : "";
 
   useEffect(() => {
     const scroller = scrollerRef.current;
@@ -144,22 +160,6 @@ export default function MonthlyPlanSlider() {
       if (scrollEndTimer) window.clearTimeout(scrollEndTimer);
     };
   }, [images.length]);
-
-  const scrollToIndex = (index) => {
-    const scroller = scrollerRef.current;
-    if (!scroller) return;
-
-    const card = scroller.querySelectorAll("[data-plan-card]")[index];
-    if (!card) return;
-
-    const targetLeft = card.offsetLeft - scroller.offsetLeft;
-
-    scroller.scrollTo({
-      left: Math.max(targetLeft - 2, 0),
-      behavior: "smooth",
-    });
-    setCurrentIdx(index);
-  };
 
   const handlePrev = () => {
     const nextIndex = currentIdx === 0 ? images.length - 1 : currentIdx - 1;

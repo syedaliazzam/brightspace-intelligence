@@ -2,7 +2,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Plus } from "lucide-react";
+import { ChevronDown, ChevronUp, Plus } from "lucide-react";
 import ClientPortal from "@/components/shared/ClientPortal";
 import { STORAGE_SAFE_UPLOAD_MAX_BYTES, formatUploadLimit } from "@/lib/uploadLimits";
 
@@ -19,6 +19,20 @@ function getPreviewSrc(item) {
   if (typeof item === "string") return item;
   if (item instanceof File) return URL.createObjectURL(item);
   return "";
+}
+
+function moveItemInArray(items, fromIndex, toIndex) {
+  if (!Array.isArray(items)) return [];
+  if (fromIndex === toIndex) return items;
+  if (fromIndex < 0 || fromIndex >= items.length) return items;
+
+  const nextIndex = Math.max(0, Math.min(items.length - 1, toIndex));
+  if (nextIndex === fromIndex) return items;
+
+  const next = [...items];
+  const [item] = next.splice(fromIndex, 1);
+  next.splice(nextIndex, 0, item);
+  return next;
 }
 
 function buildPreviewUrl(value) {
@@ -190,6 +204,7 @@ export default function PlanForMonthClient({
   };
 
   const handleEditRemoveImage = (idx) => setEditForm((p) => ({ ...p, images: p.images.filter((_, i) => i !== idx) }));
+  const handleEditMoveImage = (idx, delta) => setEditForm((p) => ({ ...p, images: moveItemInArray(p.images, idx, idx + delta) }));
 
   async function handleUpdateSubmit(e) {
     e.preventDefault();
@@ -256,6 +271,7 @@ export default function PlanForMonthClient({
   }
 
   const handleRemoveImage = (idx) => setForm((p) => ({ ...p, images: p.images.filter((_, i) => i !== idx) }));
+  const handleMoveImage = (idx, delta) => setForm((p) => ({ ...p, images: moveItemInArray(p.images, idx, idx + delta) }));
   const isVideoSource = (value = "") => {
     if (value instanceof File) {
       return String(value.type || "").toLowerCase().startsWith("video/");
@@ -416,13 +432,48 @@ export default function PlanForMonthClient({
                 {editForm.images.length > 0 && (
                   <div className="mt-3 grid grid-cols-3 gap-3">
                     {editForm.images.map((img, idx) => (
-                      <div key={idx} className="relative overflow-hidden rounded-2xl border border-[#2D8A6A]/10 bg-white shadow-sm">
-                        {isVideoSource(img) ? (
-                          <video src={buildPreviewUrl(getPreviewSrc(img))} className="h-20 w-full object-cover" muted playsInline />
-                        ) : (
-                          <img src={buildPreviewUrl(getPreviewSrc(img))} alt={`edit-preview-${idx}`} className="h-20 w-full object-cover" />
-                        )}
-                        <button type="button" onClick={() => handleEditRemoveImage(idx)} className="absolute right-2 top-2 rounded-full bg-red-500 px-2 py-1 text-xs text-white">×</button>
+                      <div key={idx} className="overflow-hidden rounded-2xl border border-[#2D8A6A]/10 bg-white shadow-sm">
+                        <div className="relative h-20 w-full overflow-hidden">
+                          {isVideoSource(img) ? (
+                            <video src={buildPreviewUrl(getPreviewSrc(img))} className="h-full w-full object-cover" muted playsInline />
+                          ) : (
+                            <img src={buildPreviewUrl(getPreviewSrc(img))} alt={`edit-preview-${idx}`} className="h-full w-full object-cover" />
+                          )}
+                          <div className="absolute left-2 top-2 rounded-full bg-white/90 px-2 py-1 text-[10px] font-semibold text-[#063F32] shadow-sm">
+                            #{idx + 1}
+                          </div>
+                        </div>
+                        <div className="flex items-center justify-between gap-2 border-t border-[#F1EADC] bg-[#FAF7F0] px-2 py-2">
+                          <div className="flex items-center gap-1">
+                            <button
+                              type="button"
+                              onClick={() => handleEditMoveImage(idx, -1)}
+                              disabled={idx === 0}
+                              className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-[#2D8A6A]/15 bg-white text-[#063F32] transition hover:bg-[#F1EADC] disabled:cursor-not-allowed disabled:opacity-40"
+                              aria-label={`Move image ${idx + 1} earlier`}
+                              title="Move earlier"
+                            >
+                              <ChevronUp className="h-4 w-4" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleEditMoveImage(idx, 1)}
+                              disabled={idx === editForm.images.length - 1}
+                              className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-[#2D8A6A]/15 bg-white text-[#063F32] transition hover:bg-[#F1EADC] disabled:cursor-not-allowed disabled:opacity-40"
+                              aria-label={`Move image ${idx + 1} later`}
+                              title="Move later"
+                            >
+                              <ChevronDown className="h-4 w-4" />
+                            </button>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleEditRemoveImage(idx)}
+                            className="inline-flex h-8 items-center justify-center rounded-full border border-rose-200 bg-white px-3 text-xs font-semibold text-rose-700 transition hover:bg-rose-50"
+                          >
+                            Remove
+                          </button>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -478,13 +529,48 @@ export default function PlanForMonthClient({
                 {form.images.length > 0 && (
                   <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                     {form.images.map((img, idx) => (
-                      <div key={idx} className="relative overflow-hidden rounded-2xl border border-[#2D8A6A]/10 bg-white shadow-sm">
-                        {isVideoSource(img) ? (
-                          <video src={getPreviewSrc(img)} className="h-24 w-full object-cover" muted playsInline />
-                        ) : (
-                          <img src={getPreviewSrc(img)} alt={`preview-${idx}`} className="h-24 w-full object-cover" />
-                        )}
-                        <button type="button" onClick={() => handleRemoveImage(idx)} className="absolute right-2 top-2 rounded-full bg-red-500 px-2 py-1 text-xs text-white">×</button>
+                      <div key={idx} className="overflow-hidden rounded-2xl border border-[#2D8A6A]/10 bg-white shadow-sm">
+                        <div className="relative h-24 w-full overflow-hidden">
+                          {isVideoSource(img) ? (
+                            <video src={getPreviewSrc(img)} className="h-full w-full object-cover" muted playsInline />
+                          ) : (
+                            <img src={getPreviewSrc(img)} alt={`preview-${idx}`} className="h-full w-full object-cover" />
+                          )}
+                          <div className="absolute left-2 top-2 rounded-full bg-white/90 px-2 py-1 text-[10px] font-semibold text-[#063F32] shadow-sm">
+                            #{idx + 1}
+                          </div>
+                        </div>
+                        <div className="flex items-center justify-between gap-2 border-t border-[#F1EADC] bg-[#FAF7F0] px-2 py-2">
+                          <div className="flex items-center gap-1">
+                            <button
+                              type="button"
+                              onClick={() => handleMoveImage(idx, -1)}
+                              disabled={idx === 0}
+                              className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-[#2D8A6A]/15 bg-white text-[#063F32] transition hover:bg-[#F1EADC] disabled:cursor-not-allowed disabled:opacity-40"
+                              aria-label={`Move image ${idx + 1} earlier`}
+                              title="Move earlier"
+                            >
+                              <ChevronUp className="h-4 w-4" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleMoveImage(idx, 1)}
+                              disabled={idx === form.images.length - 1}
+                              className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-[#2D8A6A]/15 bg-white text-[#063F32] transition hover:bg-[#F1EADC] disabled:cursor-not-allowed disabled:opacity-40"
+                              aria-label={`Move image ${idx + 1} later`}
+                              title="Move later"
+                            >
+                              <ChevronDown className="h-4 w-4" />
+                            </button>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleRemoveImage(idx)}
+                            className="inline-flex h-8 items-center justify-center rounded-full border border-rose-200 bg-white px-3 text-xs font-semibold text-rose-700 transition hover:bg-rose-50"
+                          >
+                            Remove
+                          </button>
+                        </div>
                       </div>
                     ))}
                   </div>
