@@ -32,14 +32,22 @@ function slugifyEventTitle(value) {
   return String(value || "")
     .trim()
     .toLowerCase()
-    .replace(/[^a-z0-9\s-]/g, "")
-    .replace(/\s+/g, "-")
+    .replace(/&/g, " and ")
+    .replace(/['’]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
     .replace(/-+/g, "-")
     .replace(/^-+|-+$/g, "");
 }
 
+function normalizeEventPathSegment(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  if (/^[a-z0-9-]+$/i.test(raw)) return raw.toLowerCase();
+  return slugifyEventTitle(raw);
+}
+
 function getEventSlug(item) {
-  const slug = String(
+  const slug = normalizeEventPathSegment(
     item?.slug ||
     item?.event_slug ||
     item?.public_slug ||
@@ -48,7 +56,7 @@ function getEventSlug(item) {
     item?.event_slug ||
     item?.public_slug ||
     ""
-  ).trim();
+  );
   if (slug) return slug;
   return slugifyEventTitle(item?.title || item?.name || "");
 }
