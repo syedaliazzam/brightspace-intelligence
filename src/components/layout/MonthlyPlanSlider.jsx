@@ -75,7 +75,7 @@ export default function MonthlyPlanSlider() {
     };
   }, [plan, loading, startAutoSlide]);
 
-  const images = plan?.image_urls || [];
+  const images = Array.isArray(plan?.image_urls) ? [...plan.image_urls].reverse() : [];
   const isVideoSource = (value = "") => /^data:video\//i.test(String(value || "")) || /\.(mp4|webm|ogg|mov|m4v)(\?.*)?$/i.test(String(value || ""));
   const buildPreviewUrl = (value) => {
     const text = String(value || "").trim();

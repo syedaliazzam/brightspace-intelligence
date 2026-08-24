@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronDown, Eye, RotateCcw, Search } from "lucide-react";
 import { formatEventDate, formatEventDateTime, formatMoney, formatRegistrationStatusLabel, normalizeRegistrationStatus } from "@/lib/publicEvents";
 
@@ -265,6 +265,10 @@ function getSelectedEvent(events, eventId) {
   return events.find((item) => item.id === eventId) || null;
 }
 
+function getDefaultEventFilterId(events = []) {
+  return String(events?.[0]?.id || "").trim() || "all";
+}
+
 function normalizeEventCategory(value) {
   const key = String(value || "").toLowerCase().trim().replace(/[_\s]+/g, "-");
   if (key === "ashshajrah-students" || key === "alh-students") return "alh-students";
@@ -347,6 +351,7 @@ export default function PublicEventRegistrationsPage({ portalLabel = "Coordinato
   const [openFilterSelect, setOpenFilterSelect] = useState("");
   const [page, setPage] = useState(1);
   const [filters, setFilters] = useState({ eventId: "all", status: "all", dateFrom: "", dateTo: "", search: "", sortBy: "submitted_at", sortDir: "desc" });
+  const didInitializeEventFilterRef = useRef(false);
 
   async function load() {
     setLoading(true);
@@ -436,6 +441,27 @@ export default function PublicEventRegistrationsPage({ portalLabel = "Coordinato
   useEffect(() => {
     setDraftStatuses(Object.fromEntries(items.map((item) => [item.id, normalizeRegistrationStatus(item.status)])));
   }, [items]);
+
+  useEffect(() => {
+    if (didInitializeEventFilterRef.current) return;
+    if (!events.length) return;
+
+    const defaultEventId = getDefaultEventFilterId(events);
+    if (!defaultEventId || defaultEventId === "all") return;
+
+    setFilters((current) => {
+      if (current.eventId && current.eventId !== "all") {
+        return current;
+      }
+
+      return {
+        ...current,
+        eventId: defaultEventId,
+      };
+    });
+
+    didInitializeEventFilterRef.current = true;
+  }, [events]);
 
 
 
@@ -536,7 +562,15 @@ export default function PublicEventRegistrationsPage({ portalLabel = "Coordinato
 
   function resetFilters() {
     setPage(1);
-    setFilters({ eventId: "all", status: "all", dateFrom: "", dateTo: "", search: "", sortBy: "submitted_at", sortDir: "desc" });
+    setFilters({
+      eventId: getDefaultEventFilterId(events),
+      status: "all",
+      dateFrom: "",
+      dateTo: "",
+      search: "",
+      sortBy: "submitted_at",
+      sortDir: "desc",
+    });
   }
 
   function resetCreateForm() {
