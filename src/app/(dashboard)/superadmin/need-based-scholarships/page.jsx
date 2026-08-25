@@ -7,8 +7,8 @@ export default function SuperAdminNeedBasedScholarshipsPage() {
     <NeedBasedScholarshipsPage
       portalLabel="Super Admin portal"
       title="Scholarship records"
-      description="Review Step 6 scholarship applications from the super admin portal in a read-only view."
-      allowCreateVoucher={false}
+      description="Review Step 6 scholarship applications and manage scholarship vouchers from the super admin portal."
+      allowCreateVoucher
     />
   );
 }

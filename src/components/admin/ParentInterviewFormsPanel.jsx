@@ -92,6 +92,7 @@ export default function ParentInterviewFormsPanel({
   });
   const [search, setSearch] = useState("");
   const [columnFilter, setColumnFilter] = useState("all");
+  const [verificationFilter, setVerificationFilter] = useState("verified");
   const [page, setPage] = useState(1);
   const [selectedResponse, setSelectedResponse] = useState(null);
   const [downloadingId, setDownloadingId] = useState("");
@@ -144,10 +145,6 @@ export default function ParentInterviewFormsPanel({
 
     return { pairs, version: selectedResponse?.form_version || responses.FormVersion || responses.form_version || "-" };
   }, [selectedResponse]);
-
-  useEffect(() => {
-    setPage(1);
-  }, [search, columnFilter]);
 
   function buildPdfLines(item) {
     const response = item?.responses;
@@ -335,7 +332,8 @@ export default function ParentInterviewFormsPanel({
   }, [apiUrl, initialItems]);
 
   useEffect(() => {
-    setIsMounted(true);
+    const timer = window.setTimeout(() => setIsMounted(true), 0);
+    return () => window.clearTimeout(timer);
   }, []);
 
   const filteredItems = useMemo(() => {
@@ -349,9 +347,14 @@ export default function ParentInterviewFormsPanel({
       }
       return String(response).trim().length > 0;
     });
+    const verifiedItems = submittedItems.filter((item) => {
+      const isVerified = Boolean(item.is_lms_enrolled);
+      if (verificationFilter === "verified") return isVerified;
+      return !isVerified;
+    });
 
-    if (!query) return submittedItems;
-    return submittedItems.filter((item) => {
+    if (!query) return verifiedItems;
+    return verifiedItems.filter((item) => {
       const searchableMap = {
         registration_id: item.registration_id,
         parent_name: item.parent_name,
@@ -371,7 +374,22 @@ export default function ParentInterviewFormsPanel({
 
       return searchableValue.toLowerCase().includes(query);
     });
-  }, [columnFilter, search, state.items]);
+  }, [columnFilter, search, state.items, verificationFilter]);
+
+  const submittedItemsForCounts = useMemo(
+    () => state.items.filter((item) => {
+      const response = item.responses;
+      if (response === null || response === undefined || response === "") return false;
+      if (typeof response === "object") {
+        if (Array.isArray(response)) return response.length > 0;
+        return Object.keys(response).length > 0;
+      }
+      return String(response).trim().length > 0;
+    }),
+    [state.items]
+  );
+  const verifiedCount = submittedItemsForCounts.filter((item) => Boolean(item.is_lms_enrolled)).length;
+  const notVerifiedCount = Math.max(submittedItemsForCounts.length - verifiedCount, 0);
 
   const totalPages = Math.max(1, Math.ceil(filteredItems.length / PAGE_SIZE));
   const currentPage = Math.min(page, totalPages);
@@ -396,10 +414,27 @@ export default function ParentInterviewFormsPanel({
   return (
     <section className="relative w-full max-w-full min-w-0 space-y-4 overflow-visible">
       <div className="flex w-full max-w-full min-w-0 flex-col gap-3 lg:flex-row lg:items-center">
+        <div className="relative min-w-[16rem] lg:w-[20rem]">
+          <select
+            value={verificationFilter}
+            onChange={(event) => {
+              setVerificationFilter(event.target.value);
+              setPage(1);
+            }}
+            className="h-12 w-full appearance-none rounded-2xl border border-[#2D8A6A]/15 bg-white px-4 pr-11 text-sm font-semibold text-[#063F32] outline-none shadow-sm transition focus:border-[#2D8A6A] focus:ring-4 focus:ring-[#FFF5D6]"
+          >
+            <option value="verified">Verified students ({verifiedCount})</option>
+            <option value="not_verified">Not verified students ({notVerifiedCount})</option>
+          </select>
+          <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#0D5C48]" strokeWidth={2.5} />
+        </div>
         <div className="relative min-w-[16rem] lg:w-[18rem]">
           <select
             value={columnFilter}
-            onChange={(event) => setColumnFilter(event.target.value)}
+            onChange={(event) => {
+              setColumnFilter(event.target.value);
+              setPage(1);
+            }}
             className="h-12 w-full appearance-none rounded-2xl border border-[#2D8A6A]/15 bg-white px-4 pr-11 text-sm font-semibold text-[#063F32] outline-none shadow-sm transition focus:border-[#2D8A6A] focus:ring-4 focus:ring-[#FFF5D6]"
           >
             <option value="all">All columns</option>
@@ -421,7 +456,10 @@ export default function ParentInterviewFormsPanel({
           <input
             type="search"
             value={search}
-            onChange={(event) => setSearch(event.target.value)}
+            onChange={(event) => {
+              setSearch(event.target.value);
+              setPage(1);
+            }}
             placeholder="Search selected column"
             className="min-w-0 w-full bg-transparent text-sm text-[#063F32] outline-none placeholder:text-[#7A938B]"
           />

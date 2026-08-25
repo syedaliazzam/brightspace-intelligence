@@ -99,7 +99,10 @@ export default function ParentDashboardPage() {
 
   useEffect(() => {
     if (!state.selectedChildId) return;
-    loadDashboard(state.selectedChildId).catch((error) => setState((current) => ({ ...current, error: error.message })));
+    const timer = window.setTimeout(() => {
+      loadDashboard(state.selectedChildId).catch((error) => setState((current) => ({ ...current, error: error.message })));
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [state.selectedChildId]);
 
   return (
@@ -148,8 +151,8 @@ export default function ParentDashboardPage() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-[#F1EADC]">
-                      {visibleMonthlyChildren.map((child) => (
-                        <tr key={child.student_id || child.voucher_no}>
+                      {visibleMonthlyChildren.map((child, index) => (
+                        <tr key={`${child.student_id || "child"}-${child.voucher_no || "voucher"}-${index}`}>
                           <td className="px-4 py-4 font-semibold text-[#063F32]">{child.student_name || "Not available"}</td>
                           <td className="px-4 py-4 text-[#245C4F]">{child.class_title || "Not assigned"}</td>
                           <td className="px-4 py-4 text-[#245C4F]">{child.voucher_no || "-"}</td>

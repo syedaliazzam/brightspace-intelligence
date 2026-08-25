@@ -3,7 +3,7 @@ import { auth } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 import { createSignedPaymentProofUrl } from "@/lib/supabaseStorage";
 
-const ALLOWED_ROLES = new Set(["admin", "coordinator"]);
+const ALLOWED_ROLES = new Set(["admin", "coordinator", "superadmin"]);
 
 // DB status enum se complete sync: 'pending' mapping strictly managed
 const FILTER_TO_DB_STATUS = {

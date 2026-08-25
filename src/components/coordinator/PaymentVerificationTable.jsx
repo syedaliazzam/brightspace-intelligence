@@ -43,7 +43,11 @@ function formatDate(value) {
   }).format(date);
 }
 
-export default function PaymentVerificationTable({ items, onRefresh }) {
+function formatMoney(value) {
+  return `PKR ${Number(value || 0).toLocaleString("en-PK")}`;
+}
+
+export default function PaymentVerificationTable({ items, onRefresh, canManage = true }) {
   const router = useRouter();
   const [pendingId, setPendingId] = useState("");
   const [selectedItem, setSelectedItem] = useState(null);
@@ -52,6 +56,7 @@ export default function PaymentVerificationTable({ items, onRefresh }) {
   const [rejectionReason, setRejectionReason] = useState("");
   const [rejecting, setRejecting] = useState(false);
   const [refreshOnCredentialsClose, setRefreshOnCredentialsClose] = useState(false);
+  const hasPendingRows = canManage && items.some((item) => normalizeStatus(item.status) === "pending");
 
   function refreshNow() {
     requestAnimationFrame(() => {
@@ -161,15 +166,22 @@ export default function PaymentVerificationTable({ items, onRefresh }) {
       <section className="space-y-4">
         <div className="hidden overflow-hidden rounded-[2rem] border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(250,247,240,0.98)_100%)] shadow-[0_20px_70px_-36px_rgba(13,59,46,0.18)] backdrop-blur-xl lg:block">
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-[#F1EADC]">
+            <table className={`${hasPendingRows ? "min-w-[1820px]" : "min-w-[1620px]"} divide-y divide-[#F1EADC]`}>
               <thead className="bg-[linear-gradient(180deg,#FAF7F0_0%,#F1EADC_100%)]">
                 <tr className="text-left text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]">
-                  <th className="px-6 py-4">Student</th>
-                  <th className="px-6 py-4">Voucher</th>
-                  <th className="px-6 py-4">Submitted amount</th>
-                  <th className="px-6 py-4">Transaction</th>
-                  <th className="px-6 py-4">Status</th>
-                  <th className="px-6 py-4">Actions</th>
+                  <th className="min-w-44 px-6 py-4">Student</th>
+                  <th className="min-w-44 px-6 py-4">Parent</th>
+                  <th className="min-w-52 px-6 py-4">Voucher</th>
+                  <th className="min-w-48 px-6 py-4">Admission form amount</th>
+                  <th className="min-w-36 px-6 py-4">Monthly fee</th>
+                  <th className="min-w-32 px-6 py-4">Discount</th>
+                  <th className="min-w-36 px-6 py-4">Scholarship</th>
+                  <th className="min-w-36 px-6 py-4">Total amount</th>
+                  <th className="min-w-40 px-6 py-4">Submitted amount</th>
+                  <th className="min-w-44 px-6 py-4">Submitted time</th>
+                  <th className="min-w-52 px-6 py-4">Transaction</th>
+                  <th className="min-w-32 px-6 py-4">Status</th>
+                  <th className={`${hasPendingRows ? "min-w-[360px]" : "min-w-[140px]"} px-6 py-4`}>Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#F1EADC]">
@@ -182,25 +194,25 @@ export default function PaymentVerificationTable({ items, onRefresh }) {
                   >
                     <td className="px-6 py-5">
                       <p className="font-semibold text-[#063F32]">{item.student_name}</p>
-                      <p className="mt-1 text-sm text-[#245C4F]">
-                        {item.parent_name || "Parent pending"}
-                      </p>
                     </td>
+                    <td className="px-6 py-5 text-[#245C4F]">{item.parent_name || "Parent pending"}</td>
                     <td className="px-6 py-5">
                       <p className="font-semibold text-[#063F32]">{item.voucher_no}</p>
-                      <p className="mt-1 text-sm text-[#245C4F]">
-                        Voucher amount: PKR {item.voucher_amount}
-                      </p>
                       {isMonthlyVoucher(item) ? (
                         <span className="mt-2 inline-flex rounded-full bg-[#FFF5D6] px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#8A6B00]">
                           Monthly
                         </span>
                       ) : null}
                     </td>
+                    <td className="px-6 py-5 font-semibold text-[#063F32]">{formatMoney(item.admission_fee_amount)}</td>
+                    <td className="px-6 py-5 font-semibold text-[#063F32]">{formatMoney(item.regular_fee_amount)}</td>
+                    <td className="px-6 py-5 font-semibold text-[#063F32]">{formatMoney(item.discount_amount)}</td>
+                    <td className="px-6 py-5 font-semibold text-[#063F32]">{formatMoney(item.scholarship_amount)}</td>
+                    <td className="px-6 py-5 font-semibold text-[#063F32]">{formatMoney(item.voucher_amount)}</td>
                     <td className="px-6 py-5">
-                      <p className="font-semibold text-[#063F32]">PKR {item.paid_amount}</p>
-                      <p className="mt-1 text-sm text-[#245C4F]">{formatDate(item.paid_at)}</p>
+                      <p className="font-semibold text-[#063F32]">{formatMoney(item.paid_amount)}</p>
                     </td>
+                    <td className="px-6 py-5 text-[#245C4F]">{formatDate(item.paid_at)}</td>
                     <td className="px-6 py-5">
                       <p className="font-semibold text-[#063F32]">{item.transaction_id}</p>
                       <p className="mt-1 text-sm text-[#245C4F]">
@@ -216,7 +228,7 @@ export default function PaymentVerificationTable({ items, onRefresh }) {
                       </span>
                     </td>
                     <td className="px-6 py-5">
-                      <div className="flex flex-wrap gap-2">
+                      <div className={`${normalizeStatus(item.status) === "pending" ? "w-[320px]" : "w-fit"} flex items-center gap-2 whitespace-nowrap`}>
                         <button
                           type="button"
                           onClick={() => openProofPreview(item)}
@@ -224,7 +236,7 @@ export default function PaymentVerificationTable({ items, onRefresh }) {
                         >
                           View proof
                         </button>
-                        {normalizeStatus(item.status) === "pending" ? (
+                        {canManage && normalizeStatus(item.status) === "pending" ? (
                           <>
                             <button
                               type="button"
@@ -271,9 +283,6 @@ export default function PaymentVerificationTable({ items, onRefresh }) {
                       Monthly
                     </span>
                   ) : null}
-                  <p className="mt-1 text-sm text-[#245C4F]/80">
-                    {item.parent_name || "Parent pending"}
-                  </p>
                 </div>
                 <span
                   className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${STATUS_STYLES[normalizeStatus(item.status)] || "bg-[#F1EADC] text-[#245C4F]"
@@ -284,8 +293,14 @@ export default function PaymentVerificationTable({ items, onRefresh }) {
               </div>
 
               <div className="mt-4 grid gap-2 text-sm text-[#245C4F]">
-                <p>Submitted amount: PKR {item.paid_amount}</p>
-                <p>Voucher amount: PKR {item.voucher_amount}</p>
+                <p>Parent: {item.parent_name || "Parent pending"}</p>
+                <p>Admission form amount: {formatMoney(item.admission_fee_amount)}</p>
+                <p>Monthly fee: {formatMoney(item.regular_fee_amount)}</p>
+                <p>Discount: {formatMoney(item.discount_amount)}</p>
+                <p>Scholarship: {formatMoney(item.scholarship_amount)}</p>
+                <p>Total amount: {formatMoney(item.voucher_amount)}</p>
+                <p>Submitted amount: {formatMoney(item.paid_amount)}</p>
+                <p>Submitted time: {formatDate(item.paid_at)}</p>
                 <p>Transaction: {item.transaction_id}</p>
               </div>
 
@@ -297,7 +312,7 @@ export default function PaymentVerificationTable({ items, onRefresh }) {
                 >
                   View proof
                 </button>
-                {normalizeStatus(item.status) === "pending" ? (
+                {canManage && normalizeStatus(item.status) === "pending" ? (
                   <>
                     <button
                       type="button"

@@ -46,6 +46,13 @@ export default function StudentTable({ items = [], onRefresh, classOptions = [] 
         .filter(Boolean)
         .filter((level, index, array) => array.findIndex((item) => item.toLowerCase() === level.toLowerCase()) === index)
     : [];
+  const uniqueItems = Array.from(
+    new Map(
+      (Array.isArray(items) ? items : [])
+        .filter((item) => item?.id)
+        .map((item) => [String(item.id), item])
+    ).values()
+  );
 
   function buildFormState(item) {
     const email =
@@ -140,9 +147,9 @@ export default function StudentTable({ items = [], onRefresh, classOptions = [] 
         <span className="text-right">Actions</span>
       </div>
       <div className="divide-y divide-[#F1EADC]">
-        {items.length ? (
-          items.map((item) => (
-            <div key={item.id} className="grid gap-3 px-5 py-4 lg:grid-cols-[0.9fr_1.4fr_1fr_1fr_1fr_220px] lg:items-center lg:gap-4">
+        {uniqueItems.length ? (
+          uniqueItems.map((item, index) => (
+            <div key={`${item.id}-${item.admission_no || index}`} className="grid gap-3 px-5 py-4 lg:grid-cols-[0.9fr_1.4fr_1fr_1fr_1fr_220px] lg:items-center lg:gap-4">
               <p className="text-sm font-semibold text-[#063F32]">{item.admission_no || "-"}</p>
               <div>
                 <p className="font-semibold text-[#063F32]">{item.full_name}</p>

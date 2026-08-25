@@ -7,7 +7,7 @@ import { requireRole, roleGuardResponse } from "@/lib/roleGuard";
 import { buildFeeVoucherEmailHtml, sendEmail } from "@/lib/email";
 import { feeHistoryTableExists, getLatestFeeHistoryCarryForward, insertFeeHistoryRow } from "@/lib/feeHistory";
 
-const ALLOWED_ROLES = ["admin", "coordinator"];
+const ALLOWED_ROLES = ["admin", "coordinator", "superadmin"];
 
 function json(message, status = 200, extra = {}) {
   return NextResponse.json({ message, ...extra }, { status });

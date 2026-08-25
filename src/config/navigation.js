@@ -12,6 +12,8 @@ export const dashboardNavigation = {
     { label: "Scholarship", href: "/superadmin/need-based-scholarships" },
     { label: "Fee Management", href: "/superadmin/fee-settings" },
     { label: "Payments", href: "/superadmin/payments" },
+    { label: "Discount", href: "/superadmin/discount" },
+    { label: "Fee History", href: "/superadmin/fee-history" },
     { label: "Careers Applications", href: "/superadmin/careers-applications" },
     {
       label: "User Management",
@@ -40,6 +42,8 @@ export const dashboardNavigation = {
     { label: "Admission Records", href: "/admin/registration-leads" },
     { label: "Scholarship", href: "/admin/need-based-scholarships" },
     { label: "Payments", href: "/admin/payments" },
+    { label: "Discount", href: "/admin/discount" },
+    { label: "Fee History", href: "/admin/fee-history" },
     { label: "Careers Applications", href: "/admin/careers-applications" },
     {
       label: "User Management",
@@ -70,6 +74,7 @@ export const dashboardNavigation = {
     { label: "Scholarship", href: "/coordinator/need-based-scholarships" },
     { label: "Monthly Fee Vouchers", href: "/coordinator/regular-fee-vouchers" },
     { label: "Payments", href: "/coordinator/payments" },
+    { label: "Discount", href: "/coordinator/discount" },
     { label: "Fee History", href: "/coordinator/fee-history" },
     { label: "Students", href: "/coordinator/students" },
     { label: "Parents", href: "/coordinator/parents" },
@@ -128,8 +133,3 @@ export const roleMeta = {
 export function getNavigationForRole(role) {
   return dashboardNavigation[String(role || "").toLowerCase()] || dashboardNavigation.student;
 }
-
-
-
-
-

@@ -29,6 +29,10 @@ function moneyInputValue(value) {
   return Number.isFinite(amount) ? String(amount) : "0";
 }
 
+function getFeeContactEmail(item) {
+  return item?.parent_email || item?.lead_email || item?.fee_contact_email || item?.student_email || "";
+}
+
 function computeAmounts(previousMonthDue, currentMonthFee, thisMonthPaid) {
   const previous = Number(previousMonthDue || 0);
   const current = Number(currentMonthFee || 0);
@@ -79,7 +83,7 @@ function getCurrentMonthFeeParts(row) {
   };
 }
 
-export default function CoordinatorFeeHistoryPage() {
+export default function CoordinatorFeeHistoryPage({ portalLabel = "Coordinator portal", canEdit = true }) {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -208,8 +212,9 @@ export default function CoordinatorFeeHistoryPage() {
       const voucher = data?.item || {};
       const parts = getCurrentMonthFeeParts(row);
       const previousMonthDueValue = Number(row.computedPreviousMonthDue ?? row.previous_month_due ?? 0);
-      const computedTotalAmount = previousMonthDueValue + parts.currentMonthFee;
-      const paymentSummary = computeAmounts(previousMonthDueValue, parts.currentMonthFee, row.this_month_paid);
+      const payableAmount = Number(row.total_amount || row.computedTotalAmount || (previousMonthDueValue + parts.currentMonthFee));
+      const paidAmount = Number(row.this_month_paid || 0);
+      const remainingAmount = Number(row.remaining_due ?? Math.max(0, payableAmount - paidAmount));
       const doc = new jsPDF({ unit: "pt", format: "a4" });
       const pageWidth = doc.internal.pageSize.getWidth();
       const pageHeight = doc.internal.pageSize.getHeight();
@@ -227,10 +232,10 @@ export default function CoordinatorFeeHistoryPage() {
         ["Monthly Fee", formatMoney(parts.regularFee)],
         ["Admission Fee", formatMoney(parts.admissionFee)],
         ["Discount", formatMoney(parts.discount)],
-        ["Scholarship", formatMoney(parts.scholarshipAmount)],
+        ["Scholarship Given Amount", formatMoney(parts.scholarshipAmount)],
         ["Current Month Fee", formatMoney(parts.currentMonthFee)],
-        ["This Month Paid", formatMoney(row.this_month_paid)],
-        ["Remaining Due", formatMoney(computeAmounts(row.previous_month_due, parts.currentMonthFee, row.this_month_paid).remaining)],
+        ["Paid Amount", formatMoney(paidAmount)],
+        ["Remaining Amount", formatMoney(remainingAmount)],
       ];
       const theme = {
         background: [250, 247, 240],
@@ -323,12 +328,12 @@ export default function CoordinatorFeeHistoryPage() {
         ["Monthly Fee", formatMoney(parts.regularFee)],
         ["Admission Fee", formatMoney(parts.admissionFee)],
         ["Discount", formatMoney(parts.discount)],
-        ["Scholarship", formatMoney(parts.scholarshipAmount)],
+        ["Scholarship Given Amount", formatMoney(parts.scholarshipAmount)],
         ["Previous Month Due", formatMoney(previousMonthDueValue)],
         ["Current Month Fee", formatMoney(parts.currentMonthFee)],
-        ["Total Amount", formatMoney(computedTotalAmount)],
-        ["This Month Paid", formatMoney(row.this_month_paid)],
-        ["Remaining Due", formatMoney(paymentSummary.remaining)],
+        ["Total Payable", formatMoney(payableAmount)],
+        ["Paid Amount", formatMoney(paidAmount)],
+        ["Remaining Amount", formatMoney(remainingAmount)],
       ];
       const feeSectionHeight = addSection("Fee breakdown", feeItems, y, 20);
 
@@ -355,15 +360,20 @@ export default function CoordinatorFeeHistoryPage() {
   }
 
   useEffect(() => {
-    void loadSummaries();
+    const timer = window.setTimeout(() => {
+      void loadSummaries();
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, []);
 
   useEffect(() => {
-    setPage(1);
+    const timer = window.setTimeout(() => setPage(1), 0);
+    return () => window.clearTimeout(timer);
   }, [classFilter, columnFilter, searchTerm]);
 
   useEffect(() => {
-    setHistoryPage(1);
+    const timer = window.setTimeout(() => setHistoryPage(1), 0);
+    return () => window.clearTimeout(timer);
   }, [historyColumnFilter, historySearchTerm, historyStatusFilter]);
 
   const classOptions = useMemo(() => {
@@ -375,9 +385,27 @@ export default function CoordinatorFeeHistoryPage() {
     return items.filter((item) => {
       if (classFilter !== "all" && String(item.class_level || "") !== classFilter) return false;
       if (!query) return true;
+      const searchableMap = {
+        ...item,
+        email_address: getFeeContactEmail(item),
+      };
       const fields = columnFilter === "all"
-        ? [item.student_name, item.parent_name, item.class_level, item.admission_no, item.student_email, item.parent_email, item.current_pending_dues, item.latest_month_label]
-        : [item[columnFilter]];
+        ? [
+            item.student_name,
+            item.parent_name,
+            item.class_level,
+            item.admission_no,
+            getFeeContactEmail(item),
+            item.admission_fee_amount,
+            item.monthly_fee_amount,
+            item.discount_amount,
+            item.scholarship_amount,
+            item.total_amount,
+            item.total_paid,
+            item.current_pending_dues,
+            item.latest_month_label,
+          ]
+        : [searchableMap[columnFilter]];
       return fields.some((value) => normalizeText(value).includes(query));
     });
   }, [items, classFilter, columnFilter, searchTerm]);
@@ -428,7 +456,7 @@ export default function CoordinatorFeeHistoryPage() {
       <div className="relative mx-auto max-w-7xl space-y-6 px-4 py-4 sm:px-6 lg:px-8">
         <section className="relative overflow-hidden rounded-[2rem] border border-[#2D8A6A]/15 bg-[linear-gradient(135deg,rgba(13,59,46,0.98),rgba(13,92,72,0.94))] p-6 text-[#FAF7F0] shadow-[0_24px_80px_-36px_rgba(13,59,46,0.32)] sm:p-8">
           <p className="inline-flex rounded-full border border-[#E4C766]/30 bg-[#FFF5D6]/12 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.28em] text-[#FFF5D6]">
-            Coordinator portal
+            {portalLabel}
           </p>
           <h1 className="mt-4 font-display text-3xl font-bold tracking-tight text-[#FAF7F0] sm:text-4xl">Fee History</h1>
           <p className="mt-3 text-sm leading-7 text-[#EAF6EF] sm:text-base">
@@ -469,6 +497,7 @@ export default function CoordinatorFeeHistoryPage() {
                 <option value="parent_name">Parent</option>
                 <option value="class_level">Class</option>
                 <option value="admission_no">Admission No</option>
+                <option value="email_address">Email Address</option>
                 <option value="latest_month_label">Latest month</option>
               </select>
               <ChevronDown className={`pointer-events-none absolute right-4 top-[calc(50%+14px)] h-4 w-4 -translate-y-1/2 text-[#0D5C48] transition-transform ${columnOpen ? "rotate-180" : ""}`} />
@@ -486,18 +515,23 @@ export default function CoordinatorFeeHistoryPage() {
           </div>
 
           <div className="overflow-x-auto">
-            <table className="min-w-full text-left text-sm">
+            <table className="min-w-[1780px] text-left text-sm">
               <thead className="bg-[linear-gradient(180deg,#FAF7F0_0%,#F1EADC_100%)] text-xs uppercase tracking-[0.18em] text-[#0D5C48]">
                 <tr>
                   <th className="whitespace-nowrap px-6 py-4">#</th>
                   <th className="whitespace-nowrap px-6 py-4">Student</th>
                   <th className="whitespace-nowrap px-6 py-4">Parent</th>
-                  <th className="whitespace-nowrap px-6 py-4">Email Address</th>
                   <th className="whitespace-nowrap px-6 py-4">Class</th>
+                  <th className="whitespace-nowrap px-6 py-4">Admission Fee</th>
+                  <th className="whitespace-nowrap px-6 py-4">Monthly Fee</th>
+                  <th className="whitespace-nowrap px-6 py-4">Discount</th>
+                  <th className="whitespace-nowrap px-6 py-4">Scholarship Given Amount</th>
+                  <th className="whitespace-nowrap px-6 py-4">Total Payable</th>
+                  <th className="whitespace-nowrap px-6 py-4">Paid Amount</th>
+                  <th className="whitespace-nowrap px-6 py-4">Total Pending Amount</th>
+                  <th className="whitespace-nowrap px-6 py-4">Total Paid</th>
+                  <th className="whitespace-nowrap px-6 py-4">Email Address</th>
                   <th className="whitespace-nowrap px-6 py-4">Admission No</th>
-                  <th className="whitespace-nowrap px-6 py-4">Current Pending Dues</th>
-                  <th className="whitespace-nowrap px-6 py-4">Last Paid Month</th>
-                  <th className="whitespace-nowrap px-6 py-4">Paid This Month</th>
                   <th className="whitespace-nowrap px-6 py-4 text-right">Action</th>
                 </tr>
               </thead>
@@ -511,12 +545,17 @@ export default function CoordinatorFeeHistoryPage() {
                     <td className="px-6 py-4">
                       <p className="font-semibold text-[#063F32]">{item.parent_name || "-"}</p>
                     </td>
-                    <td className="px-6 py-4 text-[#245C4F]">{item.student_email || item.parent_email || "-"}</td>
                     <td className="px-6 py-4 text-[#245C4F]">{item.class_level || "-"}</td>
-                    <td className="px-6 py-4 text-[#245C4F]">{item.admission_no || "-"}</td>
-                    <td className="px-6 py-4 font-semibold text-[#063F32]">{formatMoney(item.remaining_due ?? item.current_pending_dues)}</td>
-                    <td className="px-6 py-4 text-[#245C4F]">{item.latest_month_label || "-"}</td>
+                    <td className="px-6 py-4 font-semibold text-[#063F32]">{formatMoney(item.admission_fee_amount)}</td>
+                    <td className="px-6 py-4 font-semibold text-[#063F32]">{formatMoney(item.monthly_fee_amount)}</td>
+                    <td className="px-6 py-4 font-semibold text-[#063F32]">{formatMoney(item.discount_amount)}</td>
+                    <td className="px-6 py-4 font-semibold text-[#063F32]">{formatMoney(item.scholarship_amount)}</td>
+                    <td className="px-6 py-4 font-semibold text-[#063F32]">{formatMoney(item.total_amount)}</td>
                     <td className="px-6 py-4 text-[#245C4F]">{formatMoney(item.latest_this_month_paid)}</td>
+                    <td className="px-6 py-4 font-semibold text-[#063F32]">{formatMoney(item.remaining_due ?? item.current_pending_dues)}</td>
+                    <td className="px-6 py-4 font-semibold text-[#063F32]">{formatMoney(item.total_paid)}</td>
+                    <td className="px-6 py-4 text-[#245C4F]">{getFeeContactEmail(item) || "-"}</td>
+                    <td className="px-6 py-4 text-[#245C4F]">{item.admission_no || "-"}</td>
                     <td className="px-6 py-4 text-right">
                       <button
                         type="button"
@@ -529,7 +568,7 @@ export default function CoordinatorFeeHistoryPage() {
                   </tr>
                 )) : (
                   <tr>
-                    <td className="px-6 py-10 text-center text-[#245C4F]" colSpan={10}>{loading ? "Loading fee history..." : "No verified student records found."}</td>
+                    <td className="px-6 py-10 text-center text-[#245C4F]" colSpan={15}>{loading ? "Loading fee history..." : "No verified student records found."}</td>
                   </tr>
                 )}
               </tbody>
@@ -615,17 +654,21 @@ export default function CoordinatorFeeHistoryPage() {
                 </div>
 
                 <div className="mt-6 overflow-x-auto rounded-[1.75rem] border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(250,247,240,0.98)_100%)]">
-                  <table className="min-w-full text-left text-sm">
+                  <table className="min-w-[1900px] text-left text-sm">
                     <thead className="bg-[linear-gradient(180deg,#FAF7F0_0%,#F1EADC_100%)] text-xs uppercase tracking-[0.18em] text-[#0D5C48]">
                       <tr>
                         <th className="whitespace-nowrap px-4 py-3">Month</th>
                         <th className="whitespace-nowrap px-4 py-3">Due Date</th>
                         <th className="whitespace-nowrap px-4 py-3">Voucher No</th>
                         <th className="whitespace-nowrap px-4 py-3">Previous Month Due</th>
+                        <th className="whitespace-nowrap px-4 py-3">Monthly Fee</th>
+                        <th className="whitespace-nowrap px-4 py-3">Admission Fee</th>
+                        <th className="whitespace-nowrap px-4 py-3">Discount</th>
+                        <th className="whitespace-nowrap px-4 py-3">Scholarship Given Amount</th>
                         <th className="whitespace-nowrap px-4 py-3">Current Month Fee</th>
                         <th className="whitespace-nowrap px-4 py-3">Total Amount</th>
-                        <th className="whitespace-nowrap px-4 py-3">This Month Paid</th>
-                        <th className="whitespace-nowrap px-4 py-3">Remaining Due</th>
+                        <th className="whitespace-nowrap px-4 py-3">Paid Amount</th>
+                        <th className="whitespace-nowrap px-4 py-3">Remaining Amount</th>
                         <th className="whitespace-nowrap px-4 py-3">Payment Status</th>
                         <th className="whitespace-nowrap px-4 py-3">Payment Proof</th>
                         <th className="whitespace-nowrap px-4 py-3">Voucher PDF</th>
@@ -634,7 +677,7 @@ export default function CoordinatorFeeHistoryPage() {
                     </thead>
                     <tbody className="divide-y divide-[#F1EADC]">
                       {visibleHistoryItems.length ? visibleHistoryItems.map((row, rowIndex) => {
-                        const isEditableHistoryRow = true;
+                        const isEditableHistoryRow = canEdit;
                         const draft = drafts[row.id] || {
                           previous_month_due: moneyInputValue(row.previous_month_due),
                           discount_amount: moneyInputValue(row.discount_amount),
@@ -643,8 +686,6 @@ export default function CoordinatorFeeHistoryPage() {
                         };
                         const parts = getCurrentMonthFeeParts(row);
                         const currentMonthFeeValue = Number(parts.currentMonthFee || draft.current_month_fee || row.current_month_fee || 0);
-                        const discountVisible = parts.discount > 0;
-                        const scholarshipVisible = parts.scholarshipAmount > 0;
                         const isAdmissionRow = String(row.source_type || "").toLowerCase() === "voucher-direct" || Number(parts.admissionFee || 0) > 0;
                         const isCarryForwardRow = String(row.source_type || "").toLowerCase() === "history" && Number(row.previous_month_due || row.computedPreviousMonthDue || 0) > 0;
                         const hasAdmissionBreakdown = isAdmissionRow;
@@ -666,16 +707,21 @@ export default function CoordinatorFeeHistoryPage() {
                             ? 0
                             : (row.computedPreviousMonthDue ?? row.previous_month_due ?? draft.previous_month_due ?? 0)
                         );
+                        const displayTotalAmount = Number(
+                          isAdmissionRow
+                            ? (row.total_amount || row.current_month_fee || currentFeeParts.currentMonthFee || 0)
+                            : (row.total_amount || currentFeeParts.currentMonthFee || 0)
+                        );
+                        const displayMonthlyFee = Number(
+                          hasAdmissionBreakdown
+                            ? currentFeeParts.regularFee
+                            : (currentFeeParts.regularFee || currentFeeParts.currentMonthFee || 0)
+                        );
                         const computed = computeAmounts(previousMonthDueValue, currentFeeParts.currentMonthFee, draft.this_month_paid);
                         const rowRemainingDue = Number(
                           isAdmissionRow
-                            ? Math.max(0, Number(currentFeeParts.currentMonthFee || 0) - Number(draft.this_month_paid || row.this_month_paid || 0))
+                            ? Math.max(0, displayTotalAmount - Number(draft.this_month_paid || row.this_month_paid || 0))
                             : (row.remaining_due ?? computed.remaining ?? 0)
-                        );
-                        const displayTotalAmount = Number(
-                          isAdmissionRow
-                            ? (row.current_month_fee || currentFeeParts.currentMonthFee || row.total_amount || 0)
-                            : (row.total_amount || currentFeeParts.currentMonthFee || 0)
                         );
                         return (
                           <tr key={row.id}>
@@ -685,57 +731,11 @@ export default function CoordinatorFeeHistoryPage() {
                             <td className="px-4 py-4">
                               <span className="text-[#245C4F]">{formatMoney(previousMonthDueValue)}</span>
                             </td>
-                            <td className="px-4 py-4 align-top">
-                              <div className="min-w-[320px] space-y-2 rounded-2xl border border-[#2D8A6A]/12 bg-white px-0 py-0 shadow-[0_12px_30px_-24px_rgba(13,59,46,0.14)]">
-                                {hasAdmissionBreakdown ? (
-                                  <div className="flex flex-nowrap items-center rounded-2xl justify-between gap-1 overflow-x-auto bg-[#FAF7F0] px-2 py-2 text-[10px] text-[#245C4F]">
-                                    <div className="min-w-[50px] text-center">
-                                      <p className="text-[8px] font-semibold uppercase tracking-[0.1em] text-[#0D5C48]">Monthly</p>
-                                      <p className="mt-0.5 whitespace-nowrap font-bold text-[#063F32]">{formatMoney(currentFeeParts.regularFee)}</p>
-                                    </div>
-                                    <span className="shrink-0 font-bold text-[#245C4F]">+</span>
-                                    <div className="min-w-[50px] text-center">
-                                      <p className="text-[8px] font-semibold uppercase tracking-[0.1em] text-[#0D5C48]">Admission</p>
-                                      <p className="mt-0.5 whitespace-nowrap font-bold text-[#063F32]">{formatMoney(currentFeeParts.admissionFee)}</p>
-                                    </div>
-                                    {currentFeeParts.discount > 0 ? <>
-                                      <span className="shrink-0 font-bold text-[#245C4F]">-</span>
-                                      <div className="min-w-[50px] text-center">
-                                        <p className="text-[8px] font-semibold uppercase tracking-[0.1em] text-[#0D5C48]">Discount</p>
-                                        <p className="mt-0.5 whitespace-nowrap font-bold text-[#063F32]">{formatMoney(currentFeeParts.discount)}</p>
-                                      </div>
-                                    </> : null}
-                                    {currentFeeParts.scholarshipAmount > 0 ? <>
-                                      <span className="shrink-0 font-bold text-[#245C4F]">-</span>
-                                      <div className="min-w-[50px] text-center">
-                                        <p className="text-[8px] font-semibold uppercase tracking-[0.1em] text-[#0D5C48]">Scholarship</p>
-                                        <p className="mt-0.5 whitespace-nowrap font-bold text-[#063F32]">{formatMoney(currentFeeParts.scholarshipAmount)}</p>
-                                      </div>
-                                    </> : null}
-                                    <span className="shrink-0 font-bold text-[#245C4F]">=</span>
-                                    <div className="min-w-[50px] text-center rounded-lg bg-[#0D5C48] px-1.5 py-1 text-[#FAF7F0]">
-                                      <p className="text-[8px] font-semibold uppercase tracking-[0.1em] text-[#FFF5D6]">Total</p>
-                                      <p className="mt-0.5 whitespace-nowrap text-xs font-bold leading-none">{formatMoney(currentFeeParts.currentMonthFee)}</p>
-                                    </div>
-                                  </div>
-                                ) : hasMonthlyBreakdown ? (
-                                  <div className="rounded-xl border border-[#F1EADC] bg-[#FAF7F0] px-3 py-2">
-                                    <p className="text-[8px] font-semibold uppercase tracking-[0.1em] text-[#0D5C48]">Monthly Fee</p>
-                                    <p className="mt-1 font-bold text-[#063F32]">{formatMoney(currentFeeParts.currentMonthFee)}</p>
-                                  </div>
-                                ) : isCarryForwardRow ? (
-                                  <div className="rounded-xl border border-[#F1EADC] bg-[#FAF7F0] px-3 py-2">
-                                    <p className="text-[8px] font-semibold uppercase tracking-[0.1em] text-[#0D5C48]">Monthly Fee</p>
-                                    <p className="mt-1 font-bold text-[#063F32]">{formatMoney(currentFeeParts.currentMonthFee)}</p>
-                                  </div>
-                                ) : (
-                                  <div className="rounded-xl border border-[#F1EADC] bg-[#FAF7F0] px-3 py-2">
-                                    <p className="text-[8px] font-semibold uppercase tracking-[0.1em] text-[#0D5C48]">Current Month Fee</p>
-                                    <p className="mt-1 font-bold text-[#063F32]">{formatMoney(currentFeeParts.currentMonthFee)}</p>
-                                  </div>
-                                )}
-                              </div>
-                            </td>
+                            <td className="px-4 py-4 font-semibold text-[#063F32]">{formatMoney(displayMonthlyFee)}</td>
+                            <td className="px-4 py-4 font-semibold text-[#063F32]">{formatMoney(currentFeeParts.admissionFee)}</td>
+                            <td className="px-4 py-4 font-semibold text-[#063F32]">{formatMoney(currentFeeParts.discount)}</td>
+                            <td className="px-4 py-4 font-semibold text-[#063F32]">{formatMoney(currentFeeParts.scholarshipAmount)}</td>
+                            <td className="px-4 py-4 font-semibold text-[#063F32]">{formatMoney(currentFeeParts.currentMonthFee)}</td>
                             <td className="px-4 py-4 font-semibold text-[#063F32]">{formatMoney(displayTotalAmount)}</td>
                             <td className="px-4 py-4">{isEditableHistoryRow ? <input value={draft.this_month_paid} onChange={(event) => setDrafts((current) => ({ ...current, [row.id]: { ...draft, this_month_paid: event.target.value } }))} type="number" min="0" className="w-28 rounded-xl border border-[#2D8A6A]/20 bg-white px-3 py-2 text-sm text-[#063F32] outline-none focus:border-[#2D8A6A]" /> : <span className="text-[#245C4F]">{formatMoney(draft.this_month_paid)}</span>}</td>
                             <td className="px-4 py-4 font-semibold text-[#063F32]">{formatMoney(rowRemainingDue)}</td>
@@ -764,7 +764,7 @@ export default function CoordinatorFeeHistoryPage() {
                               )}
                             </td>
                             <td className="px-4 py-4 text-right">
-                              {true ? (
+                              {isEditableHistoryRow ? (
                                 <button
                                   type="button"
                                   onClick={() => void saveHistoryRow(row)}
@@ -781,7 +781,7 @@ export default function CoordinatorFeeHistoryPage() {
                         );
                       }) : (
                         <tr>
-                          <td className="px-4 py-8 text-center text-[#245C4F]" colSpan={13}>{historyLoading ? "Loading student fee history..." : "No fee history rows found for this student."}</td>
+                          <td className="px-4 py-8 text-center text-[#245C4F]" colSpan={16}>{historyLoading ? "Loading student fee history..." : "No fee history rows found for this student."}</td>
                         </tr>
                       )}
                     </tbody>

@@ -30,11 +30,13 @@ export default function AdminDataTable({
   const [page, setPage] = useState(1);
 
   useEffect(() => {
-    setPage(1);
+    const timer = window.setTimeout(() => setPage(1), 0);
+    return () => window.clearTimeout(timer);
   }, [rows]);
 
   useEffect(() => {
-    setPage(1);
+    const timer = window.setTimeout(() => setPage(1), 0);
+    return () => window.clearTimeout(timer);
   }, [resetKey]);
 
   const totalPages = Math.max(1, Math.ceil(rows.length / pageSize));
@@ -77,7 +79,7 @@ export default function AdminDataTable({
             <tbody className="divide-y divide-[#F1EADC]">
               {visibleRows.map((row, index) => (
                 <motion.tr
-                  key={row[keyField] || index}
+                  key={`${row[keyField] || row.id || "row"}-${index}`}
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.18, delay: index * 0.02 }}
@@ -113,7 +115,7 @@ export default function AdminDataTable({
       <div className="grid gap-4 lg:hidden">
         {visibleRows.map((row, index) => (
           <motion.article
-            key={row[keyField] || index}
+            key={`${row[keyField] || row.id || "row"}-${index}`}
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.18, delay: index * 0.02 }}

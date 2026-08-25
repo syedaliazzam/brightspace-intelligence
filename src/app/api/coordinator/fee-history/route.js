@@ -32,16 +32,17 @@ async function loadStudentSummaries() {
       COALESCE(u.full_name, '') AS student_name,
       COALESCE(u.email, '') AS student_email,
       COALESCE(u.phone, '') AS student_phone,
-      COALESCE(pu.full_name, '') AS parent_name,
-      COALESCE(pu.email, rl.email, '') AS parent_email,
-      COALESCE(pu.phone, '') AS parent_phone,
-      COALESCE(rl.email, '') AS lead_email,
+      COALESCE(NULLIF(TRIM(pu.full_name), ''), '') AS parent_name,
+      COALESCE(NULLIF(TRIM(rl.email), ''), NULLIF(TRIM(pu.email), ''), '') AS parent_email,
+      COALESCE(NULLIF(TRIM(pu.phone), ''), NULLIF(TRIM(rl.phone), ''), '') AS parent_phone,
+      COALESCE(NULLIF(TRIM(rl.email), ''), '') AS lead_email,
       COALESCE(sp.admission_no, '') AS admission_no,
       COALESCE(NULLIF(c.class_level, ''), c.title, '') AS class_level,
       COALESCE(latest.month_label, '') AS latest_month_label,
       COALESCE(latest.this_month_paid::float8, 0) AS latest_this_month_paid,
       COALESCE(latest.remaining_due::float8, 0) AS current_pending_dues,
       COALESCE(latest.remaining_due::float8, 0) AS remaining_due,
+      COALESCE(NULLIF(TRIM(rl.email), ''), NULLIF(TRIM(pu.email), ''), NULLIF(TRIM(fee_contact.parent_email), ''), '') AS fee_contact_email,
       COALESCE(latest.history_count::int, 0) AS history_count
     FROM student_profiles sp
     INNER JOIN users u ON u.id = sp.user_id
@@ -55,9 +56,24 @@ async function loadStudentSummaries() {
     ) enr ON TRUE
     LEFT JOIN courses c ON c.id = enr.course_id
     LEFT JOIN registration_leads rl ON rl.id = enr.registration_id
-    LEFT JOIN student_parents spp ON spp.student_id = sp.id AND spp.is_primary = TRUE
-    LEFT JOIN parent_profiles pp ON pp.id = spp.parent_id
+    LEFT JOIN LATERAL (
+      SELECT spp.parent_id
+      FROM student_parents spp
+      WHERE spp.student_id = sp.id
+      ORDER BY spp.is_primary DESC, spp.id DESC
+      LIMIT 1
+    ) primary_parent ON TRUE
+    LEFT JOIN parent_profiles pp ON pp.id = primary_parent.parent_id
     LEFT JOIN users pu ON pu.id = pp.user_id
+    LEFT JOIN LATERAL (
+      SELECT item.parent_email
+      FROM regular_monthly_fee_voucher_items item
+      INNER JOIN fee_vouchers fv_contact ON fv_contact.id = item.voucher_id
+      WHERE item.student_id = sp.id
+        AND NULLIF(TRIM(item.parent_email), '') IS NOT NULL
+      ORDER BY fv_contact.created_at DESC NULLS LAST, item.created_at DESC NULLS LAST, item.id DESC
+      LIMIT 1
+    ) fee_contact ON TRUE
     LEFT JOIN LATERAL (
       SELECT
         combined.month_label,
@@ -450,7 +466,7 @@ async function propagateHistory(tx, rowId) {
 
 export async function GET(request) {
   try {
-    await requireRole(["coordinator"]);
+    await requireRole(["coordinator", "admin", "superadmin"]);
 
     if (!(await feeHistoryTableExists(prisma))) {
       return json("Fee history table is not available yet. Please run the provided SQL script first.", 200, { items: [] });
@@ -476,16 +492,43 @@ export async function GET(request) {
     const itemsWithDerivedDues = await Promise.all(items.map(async (item) => {
       const studentHistory = applyCarryForwardHistoryRows(await loadStudentHistory(item.student_id));
       const latestRow = [...studentHistory].sort(compareVoucherSequence)[0] || null;
+      const admissionRow = [...studentHistory].sort((left, right) => {
+        const leftVoucher = String(left.voucher_no || "");
+        const rightVoucher = String(right.voucher_no || "");
+        const voucherCompare = leftVoucher.localeCompare(rightVoucher, undefined, { numeric: true, sensitivity: "base" });
+        if (voucherCompare !== 0) return voucherCompare;
+
+        const leftCreatedAt = new Date(left?.created_at || 0).getTime();
+        const rightCreatedAt = new Date(right?.created_at || 0).getTime();
+        return leftCreatedAt - rightCreatedAt;
+      }).find((row) =>
+        Number(row?.admission_fee_amount || 0) > 0
+        || Number(row?.discount_amount || 0) > 0
+        || Number(row?.scholarship_amount || 0) > 0
+        || (row?.registration_id && !row?.batch_id)
+      ) || null;
       const currentPendingDues = Number(latestRow?.computedRemainingDue ?? latestRow?.remaining_due ?? item.current_pending_dues ?? 0);
       const latestThisMonthPaid = Number(latestRow?.this_month_paid ?? item.latest_this_month_paid ?? 0);
       const latestMonthLabel = String(latestRow?.month_label || item.latest_month_label || "").trim();
+      const totalPaid = studentHistory.reduce((sum, row) => sum + Number(row?.this_month_paid || 0), 0);
+      const admissionFeeAmount = Number(admissionRow?.admission_fee_amount || 0);
+      const discountAmount = Number(admissionRow?.discount_amount || 0);
+      const scholarshipAmount = Number(admissionRow?.scholarship_amount || 0);
+      const monthlyFeeAmount = Number(admissionRow?.regular_fee_amount || latestRow?.regular_fee_amount || latestRow?.current_month_fee || 0);
+      const totalAmount = Number(admissionRow?.total_amount || admissionRow?.current_month_fee || latestRow?.total_amount || latestRow?.computedTotalAmount || 0);
 
       return {
         ...item,
         latest_month_label: latestMonthLabel,
         latest_this_month_paid: latestThisMonthPaid,
+        total_paid: totalPaid,
         current_pending_dues: currentPendingDues,
         remaining_due: currentPendingDues,
+        admission_fee_amount: admissionFeeAmount,
+        monthly_fee_amount: monthlyFeeAmount,
+        discount_amount: discountAmount,
+        scholarship_amount: scholarshipAmount,
+        total_amount: totalAmount,
       };
     }));
 
@@ -498,7 +541,7 @@ export async function GET(request) {
 
 export async function PATCH(request) {
   try {
-    await requireRole(["coordinator"]);
+    await requireRole(["coordinator", "superadmin"]);
 
     if (!(await feeHistoryTableExists(prisma))) {
       return json("Fee history table is not available yet. Please run the provided SQL script first.", 400);

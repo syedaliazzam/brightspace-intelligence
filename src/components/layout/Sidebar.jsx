@@ -56,6 +56,7 @@ function getIconForLabel(label) {
   if (key.includes("fee management")) return Wallet;
   if (key.includes("fee history")) return ReceiptText;
   if (key.includes("fee vouchers") || key.includes("fees")) return ReceiptText;
+  if (key.includes("discount")) return BadgePercent;
   if (key.includes("scholarship")) return BadgePercent;
   if (key.includes("payments")) return CreditCard;
   if (key.includes("educational documents")) return BookOpen;

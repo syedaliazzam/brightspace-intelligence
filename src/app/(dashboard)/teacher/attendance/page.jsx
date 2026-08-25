@@ -356,8 +356,8 @@ export default function TeacherAttendancePage() {
                   </thead>
                   <tbody className="divide-y divide-[#F1EADC]">
                     {roster.length ? (
-                      roster.map((student) => (
-                        <tr key={student.student_id} className="bg-white/70">
+                      roster.map((student, index) => (
+                        <tr key={`${student.student_id || "student"}-${index}`} className="bg-white/70">
                           <td className="px-3 py-4 font-semibold text-[#063F32]">{student.full_name}</td>
                           <td className="px-3 py-4 text-[#245C4F]">{student.username || "-"}</td>
                           <td className="px-3 py-4 text-[#245C4F]">{student.email || "-"}</td>

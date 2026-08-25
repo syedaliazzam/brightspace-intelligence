@@ -7,7 +7,7 @@ import { sendEmail, themedEmailShell } from "@/lib/email";
 import prisma from "@/lib/prisma";
 import { generateVoucherNumber } from "@/lib/voucherNumber";
 
-const ALLOWED_ROLES = new Set(["admin", "coordinator"]);
+const ALLOWED_ROLES = new Set(["admin", "coordinator", "superadmin"]);
 const ELIGIBLE_LEAD_STATUSES = new Set(["new_lead", "pending_clarification", "pending"]);
 const VALID_VOUCHER_STATUSES = new Set([
   "unpaid",

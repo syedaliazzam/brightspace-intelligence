@@ -30,11 +30,11 @@ export async function GET() {
         LOWER(
           COALESCE(
             latest_submission.status::text,
+            fv.status::text,
             CASE
               WHEN COALESCE(nbsf.voucher_created, FALSE) OR nbsf.voucher_id IS NOT NULL THEN 'voucher_created'
               ELSE nbsf.status::text
             END,
-            fv.status::text,
             'submitted'
           )
         ) AS status,
@@ -51,6 +51,12 @@ export async function GET() {
         latest_submission.id::text AS fee_submission_id,
         (latest_submission.status IS NOT NULL) AS has_fee_submission,
         LOWER(COALESCE(latest_submission.status::text, '')) AS fee_submission_status,
+        EXISTS (
+          SELECT 1
+          FROM enrollments e
+          WHERE e.registration_id = nbsf.registration_id
+          LIMIT 1
+        ) AS is_lms_enrolled,
         COALESCE(nbsf.scholarship_amount::float8, 0) AS scholarship_amount,
         nbsf.created_at,
         nbsf.updated_at,

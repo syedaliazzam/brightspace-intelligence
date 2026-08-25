@@ -7,7 +7,7 @@ import prisma from "@/lib/prisma";
 import { uploadPaymentProof } from "@/lib/supabaseStorage";
 import { recalculateStudentFeeHistory } from "@/lib/feeHistory";
 
-const ALLOWED_ROLES = new Set(["admin", "coordinator"]);
+const ALLOWED_ROLES = new Set(["admin", "coordinator", "superadmin"]);
 const TRANSACTION_OPTIONS = { maxWait: 10000, timeout: 30000 };
 
 function json(message, status = 200, extra = {}) {
