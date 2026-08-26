@@ -14,6 +14,7 @@ export async function GET(request) {
     const session = await requireRole(ALLOWED_ROLES);
     const { searchParams } = new URL(request.url);
     const portalType = (searchParams.get("portalType") || "").toLowerCase();
+    const childId = String(searchParams.get("childId") || "").trim();
     
     let role = String(session?.user?.role || "").toLowerCase();
     if (portalType.includes("teacher")) {
@@ -63,6 +64,8 @@ export async function GET(request) {
       `;
     } else if (role === 'parent') {
       values.push(session.user.id);
+      const childParamIndex = values.length + 1;
+      if (childId) values.push(childId);
       courseQuery += `
         AND id IN (
           SELECT e.course_id 
@@ -70,6 +73,8 @@ export async function GET(request) {
           JOIN student_parents p ON p.student_id = e.student_id
           JOIN parent_profiles pp ON pp.id = p.parent_id
           WHERE pp.user_id = $1::uuid
+            ${childId ? `AND e.student_id = $${childParamIndex}::uuid` : ""}
+            AND LOWER(COALESCE(e.status::text, 'active')) = 'active'
             AND e.course_id IS NOT NULL
         )
       `;
@@ -80,6 +85,8 @@ export async function GET(request) {
           JOIN student_parents p ON p.student_id = e.student_id
           JOIN parent_profiles pp ON pp.id = p.parent_id
           WHERE pp.user_id = $1::uuid
+            ${childId ? `AND e.student_id = $${childParamIndex}::uuid` : ""}
+            AND LOWER(COALESCE(e.status::text, 'active')) = 'active'
             AND e.course_id IS NOT NULL
         )
       `;

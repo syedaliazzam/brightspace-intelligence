@@ -15,11 +15,36 @@ function normalizeText(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 
+function normalizeIdList(value, fallback = []) {
+  if (Array.isArray(value)) {
+    return [...new Set(value.map((item) => normalizeText(item)).filter(Boolean))];
+  }
+  const singleValue = normalizeText(value);
+  return singleValue ? [singleValue] : fallback;
+}
+
+async function getTableColumns(tableName) {
+  const rows = await prisma.$queryRaw`
+    SELECT column_name
+    FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = ${tableName}
+  `;
+
+  return new Set(rows.map((row) => String(row.column_name || "").toLowerCase()));
+}
+
 export async function GET(request) {
   try {
     const session = await requireRole(ALLOWED_ROLES_GET);
     const { searchParams } = new URL(request.url);
     const portalType = (searchParams.get("portalType") || "").toLowerCase();
+    const childId = normalizeText(searchParams.get("childId"));
+    const columns = await getTableColumns("library_documents");
+    const hasCourseIds = columns.has("course_ids");
+    const hasSubjectIds = columns.has("subject_ids");
+    const courseIdsExpression = hasCourseIds ? "COALESCE(ld.course_ids, jsonb_build_array(ld.course_id))" : "jsonb_build_array(ld.course_id)";
+    const subjectIdsExpression = hasSubjectIds ? "COALESCE(ld.subject_ids, jsonb_build_array(ld.subject_id))" : "jsonb_build_array(ld.subject_id)";
     
     let role = String(session.user.role || "").toLowerCase();
     if (portalType.includes("teacher")) {
@@ -36,6 +61,8 @@ export async function GET(request) {
         ld.id::text AS id,
         ld.course_id::text AS course_id,
         ld.subject_id::text AS subject_id,
+        ${courseIdsExpression} AS course_ids,
+        ${subjectIdsExpression} AS subject_ids,
         ld.doc_date,
         ld.title,
         ld.description,
@@ -45,6 +72,16 @@ export async function GET(request) {
         c.title AS course_title,
         c.class_level AS class_level,
         s.name AS subject_name,
+        COALESCE((
+          SELECT STRING_AGG(DISTINCT COALESCE(NULLIF(c_multi.class_level, ''), c_multi.title), ', ' ORDER BY COALESCE(NULLIF(c_multi.class_level, ''), c_multi.title))
+          FROM courses c_multi
+          WHERE c_multi.id::text IN (SELECT jsonb_array_elements_text(${courseIdsExpression}))
+        ), COALESCE(NULLIF(c.class_level, ''), c.title)) AS course_titles,
+        COALESCE((
+          SELECT STRING_AGG(DISTINCT s_multi.name, ', ' ORDER BY s_multi.name)
+          FROM subjects s_multi
+          WHERE s_multi.id::text IN (SELECT jsonb_array_elements_text(${subjectIdsExpression}))
+        ), s.name) AS subject_names,
         COALESCE(
           (
             SELECT json_agg(json_build_object(
@@ -73,19 +110,23 @@ export async function GET(request) {
           SELECT 1 FROM teacher_assignments ta
           JOIN teacher_profiles tp ON tp.id = ta.teacher_id
           WHERE tp.user_id = $2::uuid
-            AND ta.subject_id = ld.subject_id
-            AND ta.course_id = ld.course_id
+            AND ta.course_id::text IN (SELECT jsonb_array_elements_text(${courseIdsExpression}))
+            AND ta.subject_id::text IN (SELECT jsonb_array_elements_text(${subjectIdsExpression}))
         )
       `;
     } else if (role === 'parent') {
       values.push(session.user.id);
+      const childParamIndex = values.length + 1;
+      if (childId) values.push(childId);
       queryStr += `
         AND EXISTS (
           SELECT 1 FROM enrollments e
           JOIN student_parents p ON p.student_id = e.student_id
           JOIN parent_profiles pp ON pp.id = p.parent_id
           WHERE pp.user_id = $2::uuid
-            AND e.course_id = ld.course_id
+            ${childId ? `AND e.student_id = $${childParamIndex}::uuid` : ""}
+            AND LOWER(COALESCE(e.status::text, 'active')) = 'active'
+            AND e.course_id::text IN (SELECT jsonb_array_elements_text(${courseIdsExpression}))
         )
       `;
     }
@@ -108,23 +149,30 @@ export async function POST(request) {
     
     const courseId = normalizeText(body?.courseId);
     const subjectId = normalizeText(body?.subjectId);
+    const courseIds = normalizeIdList(body?.courseIds, courseId ? [courseId] : []);
+    const subjectIds = normalizeIdList(body?.subjectIds, subjectId ? [subjectId] : []);
     const docDate = normalizeText(body?.docDate);
     const title = normalizeText(body?.title);
     const description = normalizeText(body?.description);
     const files = Array.isArray(body?.files) ? body.files : [];
 
-    if (!courseId) return json("Class/Course is required.", 400);
-    if (!subjectId) return json("Subject is required.", 400);
+    if (!courseIds.length) return json("At least one class/course is required.", 400);
+    if (!subjectIds.length) return json("At least one subject is required.", 400);
     if (!docDate) return json("Date is required.", 400);
     if (!title) return json("Title is required.", 400);
     if (!files.length) return json("At least one document file is required.", 400);
 
     const documentId = crypto.randomUUID();
+    const columns = await getTableColumns("library_documents");
+    const courseIdsColumn = columns.has("course_ids") ? Prisma.sql`, course_ids` : Prisma.empty;
+    const courseIdsValue = columns.has("course_ids") ? Prisma.sql`, ${JSON.stringify(courseIds)}::jsonb` : Prisma.empty;
+    const subjectIdsColumn = columns.has("subject_ids") ? Prisma.sql`, subject_ids` : Prisma.empty;
+    const subjectIdsValue = columns.has("subject_ids") ? Prisma.sql`, ${JSON.stringify(subjectIds)}::jsonb` : Prisma.empty;
 
     // Begin transaction equivalent
     const [result] = await prisma.$queryRaw`
-      INSERT INTO library_documents (id, course_id, subject_id, doc_date, title, description, status, created_by, created_at, updated_at)
-      VALUES (${documentId}::uuid, ${courseId}::uuid, ${subjectId}::uuid, ${new Date(docDate)}, ${title}, ${description || null}, 'active', ${session.user.id}::uuid, NOW(), NOW())
+      INSERT INTO library_documents (id, course_id, subject_id${courseIdsColumn}${subjectIdsColumn}, doc_date, title, description, status, created_by, created_at, updated_at)
+      VALUES (${documentId}::uuid, ${courseIds[0]}::uuid, ${subjectIds[0]}::uuid${courseIdsValue}${subjectIdsValue}, ${new Date(docDate)}, ${title}, ${description || null}, 'active', ${session.user.id}::uuid, NOW(), NOW())
       RETURNING id::text AS id, title, doc_date
     `;
 
@@ -161,6 +209,8 @@ export async function PATCH(request) {
     const id = normalizeText(body?.id);
     const courseId = normalizeText(body?.courseId);
     const subjectId = normalizeText(body?.subjectId);
+    const courseIds = normalizeIdList(body?.courseIds, courseId ? [courseId] : []);
+    const subjectIds = normalizeIdList(body?.subjectIds, subjectId ? [subjectId] : []);
     const docDate = normalizeText(body?.docDate);
     const title = normalizeText(body?.title);
     const description = normalizeText(body?.description);
@@ -168,22 +218,27 @@ export async function PATCH(request) {
     const existingFileIds = Array.isArray(body?.existingFileIds) ? body.existingFileIds : []; // Files to keep
 
     if (!id) return json("Document ID is required.", 400);
-    if (!courseId) return json("Class/Course is required.", 400);
-    if (!subjectId) return json("Subject is required.", 400);
+    if (!courseIds.length) return json("At least one class/course is required.", 400);
+    if (!subjectIds.length) return json("At least one subject is required.", 400);
     if (!docDate) return json("Date is required.", 400);
     if (!title) return json("Title is required.", 400);
     if (files.length === 0 && existingFileIds.length === 0) return json("At least one document file is required.", 400);
 
     // Update main document
+    const columns = await getTableColumns("library_documents");
+    const courseIdsUpdate = columns.has("course_ids") ? Prisma.sql`, course_ids = ${JSON.stringify(courseIds)}::jsonb` : Prisma.empty;
+    const subjectIdsUpdate = columns.has("subject_ids") ? Prisma.sql`, subject_ids = ${JSON.stringify(subjectIds)}::jsonb` : Prisma.empty;
     await prisma.$executeRaw`
       UPDATE library_documents
       SET
-        course_id = ${courseId}::uuid,
-        subject_id = ${subjectId}::uuid,
+        course_id = ${courseIds[0]}::uuid,
+        subject_id = ${subjectIds[0]}::uuid,
         doc_date = ${new Date(docDate)},
         title = ${title},
         description = ${description || null},
         updated_at = NOW()
+        ${courseIdsUpdate}
+        ${subjectIdsUpdate}
       WHERE id = ${id}::uuid
     `;
 

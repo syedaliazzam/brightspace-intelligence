@@ -26,6 +26,79 @@ function filterAllowedFiles(files) {
   return Array.from(files || []).filter((file) => Number(file?.size || 0) <= STORAGE_SAFE_UPLOAD_MAX_BYTES);
 }
 
+function normalizeIdList(value, fallback = []) {
+  if (Array.isArray(value)) return value.map((item) => String(item || "").trim()).filter(Boolean);
+  const singleValue = String(value || "").trim();
+  return singleValue ? [singleValue] : fallback;
+}
+
+function formatSelectedTitles(options, selectedIds) {
+  const selectedSet = new Set(selectedIds);
+  const labels = options.filter((option) => selectedSet.has(option.id)).map((option) => option.title);
+  if (!labels.length) return "None selected";
+  if (labels.length <= 2) return labels.join(", ");
+  return `${labels.slice(0, 2).join(", ")} +${labels.length - 2} more`;
+}
+
+function uniqueById(options = []) {
+  return [...new Map(options.map((option) => [option.id, option])).values()];
+}
+
+function MultiSelectChecklist({ label, options, selectedIds, onChange, required = false, disabled = false }) {
+  const selectedSet = new Set(selectedIds);
+
+  function toggle(id) {
+    if (disabled) return;
+    if (selectedSet.has(id)) {
+      onChange(selectedIds.filter((selectedId) => selectedId !== id));
+      return;
+    }
+    onChange([...selectedIds, id]);
+  }
+
+  return (
+    <div className="block">
+      <div className="mb-2 flex items-center justify-between gap-3">
+        <span className="block text-sm font-medium text-[#245C4F]">
+          {label} {required ? "*" : ""}
+        </span>
+        <span className="rounded-full bg-[#EAF6EF] px-3 py-1 text-[11px] font-semibold text-[#0D5C48]">
+          {selectedIds.length} selected
+        </span>
+      </div>
+      <div className={`rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] p-3 transition ${disabled ? "opacity-60" : "focus-within:border-[#2D8A6A] focus-within:bg-white focus-within:ring-4 focus-within:ring-[#FFF5D6]"}`}>
+        <p className="mb-3 truncate text-xs font-semibold text-[#063F32]">
+          {formatSelectedTitles(options, selectedIds)}
+        </p>
+        <div className="grid max-h-44 gap-2 overflow-y-auto pr-1 sm:grid-cols-2">
+          {options.length ? options.map((option) => (
+            <button
+              key={option.id}
+              type="button"
+              onClick={() => toggle(option.id)}
+              disabled={disabled}
+              className={`flex items-center gap-2 rounded-xl border px-3 py-2 text-left text-xs font-semibold transition ${
+                selectedSet.has(option.id)
+                  ? "border-[#0D5C48] bg-[#0D5C48] text-[#FAF7F0]"
+                  : "border-[#2D8A6A]/15 bg-white text-[#245C4F] hover:border-[#2D8A6A]/30 hover:bg-[#EAF6EF]"
+              }`}
+            >
+              <span className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border ${selectedSet.has(option.id) ? "border-[#FAF7F0] bg-[#FAF7F0]" : "border-[#2D8A6A]/30 bg-[#FAF7F0]"}`}>
+                {selectedSet.has(option.id) ? <span className="h-2 w-2 rounded-sm bg-[#0D5C48]" /> : null}
+              </span>
+              <span className="min-w-0 truncate">{option.title}</span>
+            </button>
+          )) : (
+            <p className="rounded-xl border border-dashed border-[#2D8A6A]/20 bg-white px-3 py-3 text-xs text-[#7A938B]">
+              No options available.
+            </p>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 async function uploadLibraryAsset(file) {
   const response = await fetch("/api/coordinator/library/upload-url", {
     method: "POST",
@@ -96,17 +169,24 @@ export default function LibraryPageShell({
   const [deleteTargetId, setDeleteTargetId] = useState(null);
   const [viewingItem, setViewingItem] = useState(null);
 
-  const [form, setForm] = useState({ title: "", description: "", courseId: "", subjectId: "", docDate: new Date().toISOString().split('T')[0] });
+  const [form, setForm] = useState({ title: "", description: "", courseIds: [], subjectIds: [], docDate: new Date().toISOString().split('T')[0] });
   const [selectedFiles, setSelectedFiles] = useState([]);
   const [existingFiles, setExistingFiles] = useState([]); // Array of existing file objects to keep
 
   const [submitting, setSubmitting] = useState(false);
 
+  function buildPortalQuery() {
+    const params = new URLSearchParams();
+    if (portalLabel) params.set("portalType", portalLabel);
+    const query = params.toString();
+    return query ? `?${query}` : "";
+  }
+
   async function loadData() {
     setLoading(true);
     setError("");
     try {
-      const portalQuery = portalLabel ? `?portalType=${encodeURIComponent(portalLabel)}` : '';
+      const portalQuery = buildPortalQuery();
       const [docRes, filterRes] = await Promise.all([
         fetch(`/api/coordinator/library${portalQuery}`, { cache: "no-store" }),
         fetch(`/api/coordinator/library/filters${portalQuery}`, { cache: "no-store" })
@@ -131,7 +211,7 @@ export default function LibraryPageShell({
 
   async function handleSubmit(event) {
     event.preventDefault();
-    if (!form.title || !form.courseId || !form.subjectId || !form.docDate) {
+    if (!form.title || !form.courseIds.length || !form.subjectIds.length || !form.docDate) {
       setError("All required fields must be filled.");
       return;
     }
@@ -158,8 +238,10 @@ export default function LibraryPageShell({
       const basePayload = {
         title: form.title,
         description: form.description,
-        courseId: form.courseId,
-        subjectId: form.subjectId,
+        courseId: form.courseIds[0] || "",
+        subjectId: form.subjectIds[0] || "",
+        courseIds: form.courseIds,
+        subjectIds: form.subjectIds,
         docDate: form.docDate,
       };
 
@@ -169,7 +251,7 @@ export default function LibraryPageShell({
       }
 
       const method = editingItem ? "PATCH" : "POST";
-      const portalQuery = portalLabel ? `?portalType=${encodeURIComponent(portalLabel)}` : '';
+      const portalQuery = buildPortalQuery();
       const payload = editingItem ? {
         ...basePayload,
         id: editingItem.id,
@@ -205,7 +287,7 @@ export default function LibraryPageShell({
     setSubmitting(true);
     setError("");
     try {
-      const portalQuery = portalLabel ? `?portalType=${encodeURIComponent(portalLabel)}` : '';
+      const portalQuery = buildPortalQuery();
       const response = await fetch(`/api/coordinator/library${portalQuery}`, {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
@@ -229,7 +311,7 @@ export default function LibraryPageShell({
 
   useEffect(() => {
     void loadData();
-  }, []);
+  }, [portalLabel]);
 
   useEffect(() => {
     setPage(1);
@@ -240,15 +322,22 @@ export default function LibraryPageShell({
   }, [classFilter, subjectFilter, dateFilter, subjects]);
 
   const filteredSubjects = useMemo(() => {
-    if (classFilter === 'all') return subjects;
-    return subjects.filter(s => s.course_id === classFilter);
+    if (classFilter === 'all') return uniqueById(subjects);
+    return uniqueById(subjects.filter(s => s.course_id === classFilter));
   }, [subjects, classFilter]);
+
+  const formSubjectOptions = useMemo(() => {
+    if (!form.courseIds.length) return uniqueById(subjects);
+    return uniqueById(subjects.filter((subject) => form.courseIds.includes(subject.course_id)));
+  }, [subjects, form.courseIds]);
 
   const filteredItems = useMemo(() => {
     return items.filter((item) => {
       if (item.status === 'archived') return false;
-      if (classFilter !== "all" && item.course_id !== classFilter) return false;
-      if (subjectFilter !== "all" && item.subject_id !== subjectFilter) return false;
+      const itemCourseIds = normalizeIdList(item.course_ids, item.course_id ? [item.course_id] : []);
+      const itemSubjectIds = normalizeIdList(item.subject_ids, item.subject_id ? [item.subject_id] : []);
+      if (classFilter !== "all" && !itemCourseIds.includes(classFilter)) return false;
+      if (subjectFilter !== "all" && !itemSubjectIds.includes(subjectFilter)) return false;
       if (dateFilter && item.doc_date) {
         const itemDate = new Date(item.doc_date).toISOString().split('T')[0];
         if (itemDate !== dateFilter) return false;
@@ -264,8 +353,25 @@ export default function LibraryPageShell({
     return filteredItems.slice(startIndex, startIndex + PAGE_SIZE);
   }, [filteredItems, safePage]);
 
+  const selectedClassTitle = useMemo(() => {
+    if (classFilter === "all") return "";
+    return classes.find((cls) => cls.id === classFilter)?.title || "";
+  }, [classes, classFilter]);
+
+  function getSubjectDisplay(item) {
+    const itemSubjectIds = normalizeIdList(item.subject_ids, item.subject_id ? [item.subject_id] : []);
+    const visibleSubjects = subjects.filter((subject) => {
+      if (!itemSubjectIds.includes(subject.id)) return false;
+      if (classFilter !== "all" && subject.course_id !== classFilter) return false;
+      return true;
+    });
+
+    const names = uniqueById(visibleSubjects).map((subject) => subject.title).filter(Boolean);
+    return names.length ? names.join(", ") : item.subject_names || item.subject_name || "-";
+  }
+
   function resetForm() {
-    setForm({ title: "", description: "", courseId: "", subjectId: "", docDate: new Date().toISOString().split('T')[0] });
+    setForm({ title: "", description: "", courseIds: [], subjectIds: [], docDate: new Date().toISOString().split('T')[0] });
     setSelectedFiles([]);
     setExistingFiles([]);
     setEditingItem(null);
@@ -381,8 +487,8 @@ export default function LibraryPageShell({
                   visibleItems.map((item) => (
                     <tr key={item.id}>
                       <td className="px-6 py-4 font-semibold text-[#063F32]">{item.title}</td>
-                      <td className="px-6 py-4 text-[#245C4F]">{item.class_level || item.course_title}</td>
-                      <td className="px-6 py-4 text-[#245C4F]">{item.subject_name}</td>
+                      <td className="px-6 py-4 text-[#245C4F]">{selectedClassTitle || item.course_titles || item.class_level || item.course_title}</td>
+                      <td className="px-6 py-4 text-[#245C4F]">{getSubjectDisplay(item)}</td>
                       <td className="px-6 py-4 text-[#245C4F]">{formatDate(item.doc_date)}</td>
                       <td className="px-6 py-4">
                         <div className="flex flex-wrap gap-2">
@@ -441,8 +547,8 @@ export default function LibraryPageShell({
                                   setForm({
                                     title: item.title || "",
                                     description: item.description || "",
-                                    courseId: item.course_id || "",
-                                    subjectId: item.subject_id || "",
+                                    courseIds: normalizeIdList(item.course_ids, item.course_id ? [item.course_id] : []),
+                                    subjectIds: normalizeIdList(item.subject_ids, item.subject_id ? [item.subject_id] : []),
                                     docDate: item.doc_date ? new Date(item.doc_date).toISOString().split('T')[0] : "",
                                   });
                                   setExistingFiles(item.files || []);
@@ -498,37 +604,36 @@ export default function LibraryPageShell({
 
               <form className="space-y-4" onSubmit={handleSubmit}>
 
-                <div className="grid grid-cols-2 gap-4">
-                  <label className="block">
-                    <span className="mb-2 block text-sm font-medium text-[#245C4F]">Class *</span>
-                    <select
-                      value={form.courseId}
-                      onChange={(e) => setForm((c) => ({ ...c, courseId: e.target.value, subjectId: "" }))}
-                      className="w-full appearance-none rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 text-sm text-[#063F32] outline-none transition focus:border-[#2D8A6A] focus:bg-white focus:ring-4 focus:ring-[#FFF5D6]"
-                      required
-                    >
-                      <option value="">Select a class</option>
-                      {classes.map((cls) => (
-                        <option key={cls.id} value={cls.id}>{cls.title}</option>
-                      ))}
-                    </select>
-                  </label>
+                <div className="grid gap-4 lg:grid-cols-2">
+                  <MultiSelectChecklist
+                    label="Classes"
+                    options={classes}
+                    selectedIds={form.courseIds}
+                    onChange={(nextCourseIds) => {
+                      setForm((current) => {
+                        const allowedSubjectIds = new Set(
+                          subjects
+                            .filter((subject) => !nextCourseIds.length || nextCourseIds.includes(subject.course_id))
+                            .map((subject) => subject.id)
+                        );
+                        return {
+                          ...current,
+                          courseIds: nextCourseIds,
+                          subjectIds: current.subjectIds.filter((subjectId) => allowedSubjectIds.has(subjectId)),
+                        };
+                      });
+                    }}
+                    required
+                  />
 
-                  <label className="block">
-                    <span className="mb-2 block text-sm font-medium text-[#245C4F]">Subject *</span>
-                    <select
-                      value={form.subjectId}
-                      onChange={(e) => setForm((c) => ({ ...c, subjectId: e.target.value }))}
-                      className="w-full appearance-none rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 text-sm text-[#063F32] outline-none transition focus:border-[#2D8A6A] focus:bg-white focus:ring-4 focus:ring-[#FFF5D6]"
-                      required
-                      disabled={!form.courseId}
-                    >
-                      <option value="">Select a subject</option>
-                      {subjects.filter(s => s.course_id === form.courseId).map((sub) => (
-                        <option key={sub.id} value={sub.id}>{sub.title}</option>
-                      ))}
-                    </select>
-                  </label>
+                  <MultiSelectChecklist
+                    label="Subjects"
+                    options={formSubjectOptions}
+                    selectedIds={form.subjectIds}
+                    onChange={(nextSubjectIds) => setForm((current) => ({ ...current, subjectIds: nextSubjectIds }))}
+                    required
+                    disabled={!form.courseIds.length}
+                  />
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
@@ -653,7 +758,7 @@ export default function LibraryPageShell({
                 <div>
                   <h3 className="text-2xl font-semibold text-[#063F32]">{viewingItem.title}</h3>
                   <p className="mt-1 text-sm text-[#245C4F]">
-                    {viewingItem.class_level || viewingItem.course_title} &bull; {viewingItem.subject_name} &bull; {formatDate(viewingItem.doc_date)}
+                    {viewingItem.course_titles || viewingItem.class_level || viewingItem.course_title} &bull; {viewingItem.subject_names || viewingItem.subject_name} &bull; {formatDate(viewingItem.doc_date)}
                   </p>
                 </div>
                 <button onClick={() => setShowViewModal(false)} className="rounded-full p-2 text-2xl text-[#063F32] hover:scale-120 transition">&times;</button>
