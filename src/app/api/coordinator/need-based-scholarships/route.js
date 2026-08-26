@@ -58,7 +58,7 @@ export async function GET() {
           WHERE e.registration_id = nbsf.registration_id
              OR (fv.student_id IS NOT NULL AND e.student_id = fv.student_id)
           LIMIT 1
-        ) AS is_lms_enrolled,
+        ) OR LOWER(COALESCE(rl.status::text, '')) IN ('access_granted', 'fee_verified') AS is_lms_enrolled,
         COALESCE(nbsf.scholarship_amount::float8, 0) AS scholarship_amount,
         nbsf.created_at,
         nbsf.updated_at,

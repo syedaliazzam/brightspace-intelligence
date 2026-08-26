@@ -75,9 +75,14 @@ export function NeedBasedScholarshipsPage({
   function isVerifiedScholarship(item) {
     const voucherStatus = String(item?.voucher_status || "").toLowerCase();
     const paymentStatus = String(item?.fee_submission_status || item?.status || "").toLowerCase();
-    return Boolean(item?.is_lms_enrolled)
-      && Boolean(item?.voucher_id || item?.voucher_created)
-      && (voucherStatus === "verified" || paymentStatus === "verified");
+    const leadStatus = String(item?.lead_status || "").toLowerCase();
+    const hasVerifiedAccess = Boolean(item?.is_lms_enrolled) || leadStatus === "access_granted" || leadStatus === "fee_verified";
+    return hasVerifiedAccess
+      && (
+        Boolean(item?.voucher_id || item?.voucher_created)
+        || voucherStatus === "verified"
+        || paymentStatus === "verified"
+      );
   }
 
   const filteredItems = useMemo(() => {
