@@ -32,15 +32,16 @@ export async function GET() {
             latest_submission.status::text,
             fv.status::text,
             CASE
-              WHEN COALESCE(nbsf.voucher_created, FALSE) OR nbsf.voucher_id IS NOT NULL THEN 'voucher_created'
+              WHEN COALESCE(nbsf.voucher_created, FALSE) OR nbsf.voucher_id IS NOT NULL OR fv.id IS NOT NULL THEN 'voucher_created'
               ELSE nbsf.status::text
             END,
             'submitted'
           )
         ) AS status,
-        (COALESCE(nbsf.voucher_created, FALSE) OR nbsf.voucher_id IS NOT NULL) AS voucher_created,
-        nbsf.voucher_id::text AS voucher_id,
+        (COALESCE(nbsf.voucher_created, FALSE) OR nbsf.voucher_id IS NOT NULL OR fv.id IS NOT NULL) AS voucher_created,
+        fv.id::text AS voucher_id,
         fv.voucher_no,
+        LOWER(COALESCE(fv.status::text, '')) AS voucher_status,
         fv.amount::float8 AS voucher_amount,
         fv.total_amount::float8 AS voucher_total_amount,
         fv.regular_fee_amount::float8 AS regular_fee_amount,
@@ -55,6 +56,7 @@ export async function GET() {
           SELECT 1
           FROM enrollments e
           WHERE e.registration_id = nbsf.registration_id
+             OR (fv.student_id IS NOT NULL AND e.student_id = fv.student_id)
           LIMIT 1
         ) AS is_lms_enrolled,
         COALESCE(nbsf.scholarship_amount::float8, 0) AS scholarship_amount,
@@ -68,7 +70,23 @@ export async function GET() {
         LOWER(COALESCE(rl.status::text, 'new_lead')) AS lead_status
       FROM need_based_scholarship_forms nbsf
       INNER JOIN registration_leads rl ON rl.id = nbsf.registration_id
-      LEFT JOIN fee_vouchers fv ON fv.id = nbsf.voucher_id
+      LEFT JOIN LATERAL (
+        SELECT fv_inner.*
+        FROM fee_vouchers fv_inner
+        WHERE fv_inner.id = nbsf.voucher_id
+           OR (
+             nbsf.voucher_id IS NULL
+             AND fv_inner.registration_id = nbsf.registration_id
+             AND COALESCE(fv_inner.scholarship_amount, 0) > 0
+           )
+        ORDER BY
+          CASE WHEN fv_inner.id = nbsf.voucher_id THEN 0 ELSE 1 END,
+          CASE WHEN LOWER(fv_inner.status::text) = 'verified' THEN 0 ELSE 1 END,
+          fv_inner.updated_at DESC NULLS LAST,
+          fv_inner.created_at DESC NULLS LAST,
+          fv_inner.id DESC
+        LIMIT 1
+      ) fv ON TRUE
       LEFT JOIN LATERAL (
         SELECT fs.id, fs.status
         FROM fee_submissions fs

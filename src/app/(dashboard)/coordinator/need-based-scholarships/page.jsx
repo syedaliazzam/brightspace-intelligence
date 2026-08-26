@@ -19,10 +19,11 @@ function formatMoney(value) {
 
 function formatScholarshipStatus(item) {
   const status = String(item?.status || "").toLowerCase();
+  const voucherStatus = String(item?.voucher_status || "").toLowerCase();
   const hasVoucher = Boolean(item?.voucher_id) || Boolean(item?.voucher_created);
   const hasFeeSubmission = Boolean(item?.has_fee_submission);
 
-  if (status === "verified") return "Verified";
+  if (status === "verified" || voucherStatus === "verified") return "Verified";
   if (status === "voucher_created") return "Voucher Created";
   if (status === "rejected") return "Rejected";
   if (hasFeeSubmission && (status === "pending" || status === "submitted")) return "Submitted";
@@ -72,9 +73,11 @@ export function NeedBasedScholarshipsPage({
   }, []);
 
   function isVerifiedScholarship(item) {
+    const voucherStatus = String(item?.voucher_status || "").toLowerCase();
+    const paymentStatus = String(item?.fee_submission_status || item?.status || "").toLowerCase();
     return Boolean(item?.is_lms_enrolled)
       && Boolean(item?.voucher_id || item?.voucher_created)
-      && String(item?.fee_submission_status || item?.status || "").toLowerCase() === "verified";
+      && (voucherStatus === "verified" || paymentStatus === "verified");
   }
 
   const filteredItems = useMemo(() => {
