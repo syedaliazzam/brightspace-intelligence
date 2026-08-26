@@ -358,6 +358,18 @@ export default function LibraryPageShell({
     return classes.find((cls) => cls.id === classFilter)?.title || "";
   }, [classes, classFilter]);
 
+  function getClassDisplay(item) {
+    if (selectedClassTitle) return selectedClassTitle;
+
+    const itemCourseIds = normalizeIdList(item.course_ids, item.course_id ? [item.course_id] : []);
+    const classNames = classes
+      .filter((cls) => itemCourseIds.includes(cls.id))
+      .map((cls) => cls.title)
+      .filter(Boolean);
+
+    return classNames.length ? classNames.join(", ") : item.course_titles || item.class_level || item.course_title || "-";
+  }
+
   function getSubjectDisplay(item) {
     const itemSubjectIds = normalizeIdList(item.subject_ids, item.subject_id ? [item.subject_id] : []);
     const visibleSubjects = subjects.filter((subject) => {
@@ -487,7 +499,7 @@ export default function LibraryPageShell({
                   visibleItems.map((item) => (
                     <tr key={item.id}>
                       <td className="px-6 py-4 font-semibold text-[#063F32]">{item.title}</td>
-                      <td className="px-6 py-4 text-[#245C4F]">{selectedClassTitle || item.course_titles || item.class_level || item.course_title}</td>
+                      <td className="px-6 py-4 text-[#245C4F]">{getClassDisplay(item)}</td>
                       <td className="px-6 py-4 text-[#245C4F]">{getSubjectDisplay(item)}</td>
                       <td className="px-6 py-4 text-[#245C4F]">{formatDate(item.doc_date)}</td>
                       <td className="px-6 py-4">

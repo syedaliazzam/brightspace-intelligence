@@ -110,6 +110,7 @@ export async function GET(request) {
           SELECT 1 FROM teacher_assignments ta
           JOIN teacher_profiles tp ON tp.id = ta.teacher_id
           WHERE tp.user_id = $2::uuid
+            AND ta.status::text = 'active'
             AND ta.course_id::text IN (SELECT jsonb_array_elements_text(${courseIdsExpression}))
             AND ta.subject_id::text IN (SELECT jsonb_array_elements_text(${subjectIdsExpression}))
         )
@@ -122,10 +123,12 @@ export async function GET(request) {
         AND EXISTS (
           SELECT 1 FROM enrollments e
           JOIN student_parents p ON p.student_id = e.student_id
+          JOIN student_profiles sp ON sp.id = e.student_id
           JOIN parent_profiles pp ON pp.id = p.parent_id
           WHERE pp.user_id = $2::uuid
             ${childId ? `AND e.student_id = $${childParamIndex}::uuid` : ""}
             AND LOWER(COALESCE(e.status::text, 'active')) = 'active'
+            AND LOWER(COALESCE(sp.status::text, 'active')) = 'active'
             AND e.course_id::text IN (SELECT jsonb_array_elements_text(${courseIdsExpression}))
         )
       `;

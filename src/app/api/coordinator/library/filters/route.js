@@ -50,6 +50,7 @@ export async function GET(request) {
           SELECT ta.course_id FROM teacher_assignments ta
           JOIN teacher_profiles tp ON tp.id = ta.teacher_id
           WHERE tp.user_id = $1::uuid 
+            AND ta.status::text = 'active'
             AND ta.course_id IS NOT NULL 
         )
       `;
@@ -58,6 +59,7 @@ export async function GET(request) {
           SELECT 1 FROM teacher_assignments ta
           JOIN teacher_profiles tp ON tp.id = ta.teacher_id
           WHERE tp.user_id = $1::uuid
+            AND ta.status::text = 'active'
             AND ta.subject_id = s.id
             AND ta.course_id = cs.course_id
         )
@@ -71,10 +73,12 @@ export async function GET(request) {
           SELECT e.course_id 
           FROM enrollments e
           JOIN student_parents p ON p.student_id = e.student_id
+          JOIN student_profiles sp ON sp.id = e.student_id
           JOIN parent_profiles pp ON pp.id = p.parent_id
           WHERE pp.user_id = $1::uuid
             ${childId ? `AND e.student_id = $${childParamIndex}::uuid` : ""}
             AND LOWER(COALESCE(e.status::text, 'active')) = 'active'
+            AND LOWER(COALESCE(sp.status::text, 'active')) = 'active'
             AND e.course_id IS NOT NULL
         )
       `;
@@ -83,10 +87,12 @@ export async function GET(request) {
           SELECT e.course_id 
           FROM enrollments e
           JOIN student_parents p ON p.student_id = e.student_id
+          JOIN student_profiles sp ON sp.id = e.student_id
           JOIN parent_profiles pp ON pp.id = p.parent_id
           WHERE pp.user_id = $1::uuid
             ${childId ? `AND e.student_id = $${childParamIndex}::uuid` : ""}
             AND LOWER(COALESCE(e.status::text, 'active')) = 'active'
+            AND LOWER(COALESCE(sp.status::text, 'active')) = 'active'
             AND e.course_id IS NOT NULL
         )
       `;
