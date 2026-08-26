@@ -54,6 +54,17 @@ export function NeedBasedScholarshipsPage({
   const [manualProofFile, setManualProofFile] = useState(null);
   const [manualApproving, setManualApproving] = useState(false);
   const [manualApproveError, setManualApproveError] = useState("");
+  const [voucherUpdateTarget, setVoucherUpdateTarget] = useState(null);
+  const [voucherUpdateForm, setVoucherUpdateForm] = useState({
+    regularFeeAmount: "",
+    admissionFeeAmount: "",
+    discountAmount: "",
+    scholarshipAmount: "",
+    totalPayable: "",
+    paidAmount: "",
+  });
+  const [voucherUpdating, setVoucherUpdating] = useState(false);
+  const [voucherUpdateError, setVoucherUpdateError] = useState("");
 
   async function load() {
     setLoading(true);
@@ -169,6 +180,71 @@ export function NeedBasedScholarshipsPage({
       && status !== "verified"
       && status !== "rejected";
   };
+
+  const canShowVoucherUpdate = (item) => {
+    return allowCreateVoucher && isVerifiedScholarship(item) && !item?.scholarship_form_voucher_id;
+  };
+
+  function openVoucherUpdate(item) {
+    const regularFeeAmount = Number(item?.regular_fee_amount || 0);
+    const admissionFeeAmount = Number(item?.admission_fee_amount || 0);
+    const discountAmount = Number(item?.discount_amount || 0);
+    const scholarshipAmount = Number(item?.voucher_scholarship_amount || item?.scholarship_amount || item?.requested_amount || 0);
+    const totalPayable = Number(item?.voucher_total_amount || item?.voucher_amount || Math.max(regularFeeAmount + admissionFeeAmount - discountAmount - scholarshipAmount, 0));
+    setVoucherUpdateTarget(item);
+    setVoucherUpdateForm({
+      regularFeeAmount: String(regularFeeAmount),
+      admissionFeeAmount: String(admissionFeeAmount),
+      discountAmount: String(discountAmount),
+      scholarshipAmount: String(scholarshipAmount),
+      totalPayable: String(totalPayable),
+      paidAmount: String(Number(item?.paid_amount || item?.voucher_amount || totalPayable || 0)),
+    });
+    setVoucherUpdateError("");
+  }
+
+  function updateVoucherAmountField(name, value) {
+    setVoucherUpdateForm((current) => {
+      const next = { ...current, [name]: value };
+      if (name !== "totalPayable") {
+        const regularFeeAmount = Number(next.regularFeeAmount || 0);
+        const admissionFeeAmount = Number(next.admissionFeeAmount || 0);
+        const discountAmount = Number(next.discountAmount || 0);
+        const scholarshipAmount = Number(next.scholarshipAmount || 0);
+        next.totalPayable = String(Math.max(regularFeeAmount + admissionFeeAmount - discountAmount - scholarshipAmount, 0));
+      }
+      return next;
+    });
+  }
+
+  async function updateScholarshipVoucher() {
+    if (!voucherUpdateTarget?.id) return;
+
+    setVoucherUpdating(true);
+    setVoucherUpdateError("");
+
+    try {
+      const response = await fetch("/api/coordinator/need-based-scholarships/update-voucher", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          scholarshipFormId: voucherUpdateTarget.id,
+          ...voucherUpdateForm,
+        }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(data?.message || "Unable to update scholarship voucher.");
+      }
+
+      setVoucherUpdateTarget(null);
+      await load();
+    } catch (error) {
+      setVoucherUpdateError(error instanceof Error ? error.message : "Unable to update scholarship voucher.");
+    } finally {
+      setVoucherUpdating(false);
+    }
+  }
 
   async function approveScholarshipPayment() {
     if (!paymentApproveTarget?.id || !(manualProofFile instanceof File)) {
@@ -306,7 +382,15 @@ export function NeedBasedScholarshipsPage({
                       <div className="flex items-center gap-2">
                         <button type="button" onClick={() => setSelectedItem(item)} className="rounded-xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-3 py-2 text-xs font-semibold text-[#063F32] transition hover:bg-[#F1EADC]">View details</button>
                         {allowCreateVoucher ? (
-                          item.voucher_created ? (
+                          canShowVoucherUpdate(item) ? (
+                            <button
+                              type="button"
+                              onClick={() => openVoucherUpdate(item)}
+                              className="rounded-xl bg-[#C9A227] px-3 py-2 text-xs font-semibold text-[#063F32] transition hover:bg-[#E4C766]"
+                            >
+                              Update Voucher
+                            </button>
+                          ) : item.voucher_created ? (
                             canShowPaymentApprove(item) ? (
                               <button
                                 type="button"
@@ -495,6 +579,97 @@ export function NeedBasedScholarshipsPage({
                   className="rounded-xl bg-[#0D5C48] px-4 py-2 text-sm font-semibold text-[#FAF7F0] transition hover:bg-[#063F32] disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {manualApproving ? "Approving..." : "Approve payment"}
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+        {voucherUpdateTarget ? (
+          <div className="fixed inset-0 z-[9999] flex items-start justify-center overflow-hidden bg-[#063F32]/45 px-4 py-8 pt-24 backdrop-blur-sm sm:px-6">
+            <div className="relative flex max-h-[calc(100vh-7rem)] w-full max-w-3xl flex-col overflow-hidden rounded-[2rem] border border-[#2D8A6A]/15 bg-[#FAF7F0] shadow-[0_24px_80px_-36px_rgba(13,59,46,0.24)]">
+              <div className="flex items-start justify-between gap-4 border-b border-[#2D8A6A]/12 px-6 py-5">
+                <div>
+                  <p className="text-sm font-semibold uppercase tracking-[0.24em] text-[#C9A227]">Scholarship voucher recovery</p>
+                  <h2 className="mt-2 text-2xl font-semibold text-[#063F32]">Update Voucher</h2>
+                  <p className="mt-1 text-sm text-[#245C4F]">
+                    Link this scholarship form to the existing admission voucher without sending email or credentials.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setVoucherUpdateTarget(null)}
+                  className="rounded-xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-3 py-2 text-sm font-semibold text-[#063F32] transition hover:bg-[#F1EADC]"
+                >
+                  Close
+                </button>
+              </div>
+
+              <div className="flex-1 space-y-5 overflow-y-auto p-6">
+                <div className="overflow-hidden rounded-2xl border border-[#2D8A6A]/15 bg-white">
+                  <table className="w-full border-collapse text-sm text-[#245C4F]">
+                    <tbody>
+                      {[
+                        ["Student", voucherUpdateTarget.student_name || "-"],
+                        ["Parent", voucherUpdateTarget.parent_name || "-"],
+                        ["Class", voucherUpdateTarget.class_level || "-"],
+                        ["Voucher no", voucherUpdateTarget.voucher_no || "Existing admission voucher"],
+                        ["Scholarship requested", formatMoney(voucherUpdateTarget.requested_amount)],
+                      ].map(([label, value]) => (
+                        <tr key={label} className="border-b border-[#F1EADC] last:border-b-0">
+                          <td className="w-[38%] px-4 py-3 text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]">{label}</td>
+                          <td className="px-4 py-3 text-[#245C4F]">{value}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className="grid gap-4 sm:grid-cols-2">
+                  {[
+                    ["regularFeeAmount", "Monthly fee"],
+                    ["admissionFeeAmount", "Admission fee"],
+                    ["discountAmount", "Discount"],
+                    ["scholarshipAmount", "Scholarship given"],
+                    ["totalPayable", "Total payable"],
+                    ["paidAmount", "Paid amount"],
+                  ].map(([name, label]) => (
+                    <label key={name} className="block">
+                      <span className="mb-2 block text-sm font-medium text-[#063F32]">{label}</span>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={voucherUpdateForm[name]}
+                        onChange={(event) => updateVoucherAmountField(name, event.target.value)}
+                        className="w-full rounded-2xl border border-[#2D8A6A]/20 bg-white px-4 py-3 text-sm text-[#063F32] outline-none transition focus:border-[#2D8A6A] focus:ring-4 focus:ring-[#FFF5D6]"
+                      />
+                    </label>
+                  ))}
+                </div>
+
+                {voucherUpdateError ? (
+                  <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                    {voucherUpdateError}
+                  </div>
+                ) : null}
+              </div>
+
+              <div className="flex items-center justify-end gap-3 border-t border-[#2D8A6A]/12 px-6 py-5">
+                <button
+                  type="button"
+                  onClick={() => setVoucherUpdateTarget(null)}
+                  className="rounded-xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-2 text-sm font-semibold text-[#063F32] transition hover:bg-[#F1EADC]"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void updateScholarshipVoucher()}
+                  disabled={voucherUpdating}
+                  className="rounded-xl bg-[#0D5C48] px-4 py-2 text-sm font-semibold text-[#FAF7F0] transition hover:bg-[#063F32] disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {voucherUpdating ? "Updating..." : "Update Voucher"}
                 </button>
               </div>
             </div>

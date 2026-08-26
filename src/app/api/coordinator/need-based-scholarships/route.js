@@ -39,6 +39,7 @@ export async function GET() {
           )
         ) AS status,
         (COALESCE(nbsf.voucher_created, FALSE) OR nbsf.voucher_id IS NOT NULL OR fv.id IS NOT NULL) AS voucher_created,
+        nbsf.voucher_id::text AS scholarship_form_voucher_id,
         fv.id::text AS voucher_id,
         fv.voucher_no,
         LOWER(COALESCE(fv.status::text, '')) AS voucher_status,
@@ -52,6 +53,7 @@ export async function GET() {
         latest_submission.id::text AS fee_submission_id,
         (latest_submission.status IS NOT NULL) AS has_fee_submission,
         LOWER(COALESCE(latest_submission.status::text, '')) AS fee_submission_status,
+        latest_submission.paid_amount::float8 AS paid_amount,
         EXISTS (
           SELECT 1
           FROM enrollments e
@@ -110,9 +112,9 @@ export async function GET() {
         LIMIT 1
       ) fv ON TRUE
       LEFT JOIN LATERAL (
-        SELECT fs.id, fs.status
+        SELECT fs.id, fs.status, fs.paid_amount
         FROM fee_submissions fs
-        WHERE fs.voucher_id = nbsf.voucher_id
+        WHERE fs.voucher_id = fv.id
         ORDER BY fs.created_at DESC NULLS LAST, fs.id DESC
         LIMIT 1
       ) latest_submission ON TRUE

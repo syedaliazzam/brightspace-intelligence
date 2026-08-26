@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { ChevronDown, Search } from "lucide-react";
 import { jsPDF } from "jspdf";
-import ClientPortal from "@/components/shared/ClientPortal";
 import PaginationControls from "@/components/teacher/PaginationControls";
 import { applyCarryForwardHistoryRows, computeFeeHistoryAmounts } from "@/lib/feeHistory";
 
@@ -581,8 +580,7 @@ export default function CoordinatorFeeHistoryPage({ portalLabel = "Coordinator p
         </section>
 
         {selectedStudent ? (
-          <ClientPortal targetId="coordinator-page-portal-root">
-            <div className="absolute inset-x-0 top-0 z-[9999] isolate min-h-full overflow-visible bg-[#063F32]/45 px-4 py-10">
+            <div className="absolute inset-x-0 top-0 z-[9999] isolate min-h-[100dvh] overflow-visible bg-[#063F32]/45 px-4 py-10">
               <div className="mx-auto max-w-7xl rounded-[2rem] border border-[#2D8A6A]/15 bg-[#FAF7F0] p-6 shadow-[0_24px_80px_-36px_rgba(13,59,46,0.24)]">
                 <div className="flex flex-wrap items-start justify-between gap-4">
                   <div>
@@ -793,7 +791,6 @@ export default function CoordinatorFeeHistoryPage({ portalLabel = "Coordinator p
                 ) : null}
               </div>
             </div>
-          </ClientPortal>
         ) : null}
       </div>
     </div>

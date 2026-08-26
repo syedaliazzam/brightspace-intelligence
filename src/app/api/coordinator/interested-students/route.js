@@ -97,6 +97,7 @@ export async function GET() {
         fv_info.payment_submission_id,
         fv_info.payment_submission_status,
         fv_info.proof_file_path,
+        COALESCE(scholarship_info.has_scholarship_form, FALSE) AS has_scholarship_form,
         istd.created_at,
         istd.updated_at
       FROM interested_students istd
@@ -221,7 +222,14 @@ export async function GET() {
         )
         ORDER BY fv.created_at DESC NULLS LAST, fv.id DESC
         LIMIT 1
-      ) fv_info ON TRUE      WHERE COALESCE(LOWER(istd.status::text), '') <> 'archived'
+      ) fv_info ON TRUE
+      LEFT JOIN LATERAL (
+        SELECT TRUE AS has_scholarship_form
+        FROM need_based_scholarship_forms nbsf
+        WHERE nbsf.registration_id = rl.id
+        LIMIT 1
+      ) scholarship_info ON TRUE
+      WHERE COALESCE(LOWER(istd.status::text), '') <> 'archived'
         AND COALESCE(LOWER(istd.admission_form_status::text), '') <> 'failed'
       ORDER BY istd.created_at DESC NULLS LAST, istd.id DESC
     `;

@@ -450,6 +450,7 @@ export default function InterestedStudentsPanel({
   function canSubmitAdmissionPayment(item, stage = getLeadStage(item)) {
     return Boolean(
       stage?.submitted &&
+      !item?.has_scholarship_form &&
       !item?.payment_submission_id &&
       (item?.fee_voucher_id || item?.voucher_no)
     );
@@ -459,6 +460,7 @@ export default function InterestedStudentsPanel({
     const paymentStatus = normalizeStatusValue(item?.payment_submission_status);
     return Boolean(
       stage?.submitted &&
+      !item?.has_scholarship_form &&
       item?.payment_submission_id &&
       !["verified", "rejected"].includes(paymentStatus)
     );
