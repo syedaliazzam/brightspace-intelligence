@@ -10,6 +10,8 @@ export default function TeacherLibraryPage() {
       portalLabel="Teacher portal"
       title="Library"
       description="View educational resources, videos, and documents."
+      cacheNamespace="teacher"
+      showTableFilePreviews={false}
     />
   );
 }

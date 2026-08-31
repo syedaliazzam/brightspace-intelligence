@@ -7,6 +7,30 @@ import PaginationControls from "@/components/teacher/PaginationControls";
 import { STORAGE_SAFE_UPLOAD_MAX_BYTES, formatUploadLimit } from "@/lib/uploadLimits";
 
 const PAGE_SIZE = 7;
+const LIBRARY_CACHE_TTL_MS = 60 * 1000;
+const pendingLibraryRequests = new Map();
+
+function readLibraryCache(key) {
+  if (!key || typeof window === "undefined") return null;
+  try {
+    const raw = window.sessionStorage.getItem(key);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed?.cachedAt || Date.now() - parsed.cachedAt >= LIBRARY_CACHE_TTL_MS) return null;
+    return parsed.data;
+  } catch {
+    return null;
+  }
+}
+
+function writeLibraryCache(key, data) {
+  if (!key || typeof window === "undefined") return;
+  try {
+    window.sessionStorage.setItem(key, JSON.stringify({ data, cachedAt: Date.now() }));
+  } catch {
+    // Keep library usable if browser storage is unavailable.
+  }
+}
 
 function formatDate(value) {
   if (!value) return "-";
@@ -145,6 +169,8 @@ export default function LibraryPageShell({
   portalLabel = "Coordinator portal",
   title = "Library",
   description = "Manage educational resources, videos, and documents.",
+  cacheNamespace = "",
+  showTableFilePreviews = true,
 }) {
   const [items, setItems] = useState([]);
   const [classes, setClasses] = useState([]);
@@ -187,20 +213,46 @@ export default function LibraryPageShell({
     setError("");
     try {
       const portalQuery = buildPortalQuery();
-      const [docRes, filterRes] = await Promise.all([
-        fetch(`/api/coordinator/library${portalQuery}`, { cache: "no-store" }),
-        fetch(`/api/coordinator/library/filters${portalQuery}`, { cache: "no-store" })
-      ]);
+      const cacheKey = cacheNamespace ? `${cacheNamespace}:library:${portalQuery}` : "";
+      const cached = readLibraryCache(cacheKey);
 
-      const docData = await docRes.json().catch(() => ({}));
-      const filterData = await filterRes.json().catch(() => ({}));
+      if (cached) {
+        setItems(Array.isArray(cached.items) ? cached.items : []);
+        setClasses(Array.isArray(cached.classes) ? cached.classes : []);
+        setSubjects(Array.isArray(cached.subjects) ? cached.subjects : []);
+        setLoading(false);
+        return;
+      }
 
-      if (!docRes.ok) throw new Error(docData?.message || "Unable to load library documents.");
-      if (!filterRes.ok) throw new Error(filterData?.message || "Unable to load filters.");
+      let request = cacheKey ? pendingLibraryRequests.get(cacheKey) : null;
+      if (!request) {
+        request = Promise.all([
+          fetch(`/api/coordinator/library${portalQuery}`, { cache: "no-store" }),
+          fetch(`/api/coordinator/library/filters${portalQuery}`, { cache: "no-store" })
+        ])
+          .then(async ([docRes, filterRes]) => {
+            const docData = await docRes.json().catch(() => ({}));
+            const filterData = await filterRes.json().catch(() => ({}));
+            if (!docRes.ok) throw new Error(docData?.message || "Unable to load library documents.");
+            if (!filterRes.ok) throw new Error(filterData?.message || "Unable to load filters.");
+            return { docData, filterData };
+          })
+          .finally(() => {
+            if (cacheKey) pendingLibraryRequests.delete(cacheKey);
+          });
+        if (cacheKey) pendingLibraryRequests.set(cacheKey, request);
+      }
 
-      setItems(Array.isArray(docData.items) ? docData.items : []);
-      setClasses(Array.isArray(filterData.classes) ? filterData.classes : []);
-      setSubjects(Array.isArray(filterData.subjects) ? filterData.subjects : []);
+      const { docData, filterData } = await request;
+      const nextData = {
+        items: Array.isArray(docData.items) ? docData.items : [],
+        classes: Array.isArray(filterData.classes) ? filterData.classes : [],
+        subjects: Array.isArray(filterData.subjects) ? filterData.subjects : [],
+      };
+      writeLibraryCache(cacheKey, nextData);
+      setItems(nextData.items);
+      setClasses(nextData.classes);
+      setSubjects(nextData.subjects);
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : "Unable to load library data.");
       setItems([]);
@@ -310,15 +362,21 @@ export default function LibraryPageShell({
   }
 
   useEffect(() => {
-    void loadData();
+    const timer = window.setTimeout(() => {
+      void loadData();
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [portalLabel]);
 
   useEffect(() => {
-    setPage(1);
-    if (classFilter !== 'all' && subjectFilter !== 'all') {
-      const validSubject = subjects.find(s => s.course_id === classFilter && s.id === subjectFilter);
-      if (!validSubject) setSubjectFilter('all');
-    }
+    const timer = window.setTimeout(() => {
+      setPage(1);
+      if (classFilter !== 'all' && subjectFilter !== 'all') {
+        const validSubject = subjects.find(s => s.course_id === classFilter && s.id === subjectFilter);
+        if (!validSubject) setSubjectFilter('all');
+      }
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [classFilter, subjectFilter, dateFilter, subjects]);
 
   const filteredSubjects = useMemo(() => {
@@ -504,35 +562,51 @@ export default function LibraryPageShell({
                       <td className="px-6 py-4 text-[#245C4F]">{formatDate(item.doc_date)}</td>
                       <td className="px-6 py-4">
                         <div className="flex flex-wrap gap-2">
-                          {(item.files || []).slice(0, 3).map((f, i) => (
-                            <a
-                              key={f.id}
-                              href={buildPreviewUrl(f.file_url)}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              title={f.original_name || 'View file'}
-                              className="h-10 w-10 rounded-xl border border-[#2D8A6A]/20 bg-gray-50 flex items-center justify-center overflow-hidden transition-opacity hover:opacity-80"
-                            >
-                              {f.file_type === 'image' ? (
-                                // eslint-disable-next-line @next/next/no-img-element
-                                <img src={buildPreviewUrl(f.file_url)} alt="preview" className="h-full w-full object-cover" />
-                              ) : f.file_type === 'video' ? (
-                                <video src={buildPreviewUrl(f.file_url)} className="h-full w-full object-cover pointer-events-none" muted playsInline />
-                              ) : f.file_type === 'pdf' ? (
-                                <div className="relative h-full w-full overflow-hidden">
-                                  <iframe
-                                    src={`${buildPreviewUrl(f.file_url)}#toolbar=0&navpanes=0&scrollbar=0&page=1&view=FitH`}
-                                    className="absolute top-0 left-0 pointer-events-none"
-                                    style={{ width: '200%', height: '200%', transform: 'scale(0.5)', transformOrigin: 'top left' }}
-                                    tabIndex={-1}
-                                    title="preview"
-                                  />
-                                </div>
-                              ) : (
-                                getFileIcon(f.file_type)
-                              )}
-                            </a>
-                          ))}
+                          {(item.files || []).slice(0, 3).map((f, i) => {
+                            const content = showTableFilePreviews && f.file_type === 'image' ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img src={buildPreviewUrl(f.file_url)} alt="preview" className="h-full w-full object-cover" />
+                            ) : showTableFilePreviews && f.file_type === 'video' ? (
+                              <video src={buildPreviewUrl(f.file_url)} className="h-full w-full object-cover pointer-events-none" muted playsInline />
+                            ) : showTableFilePreviews && f.file_type === 'pdf' ? (
+                              <div className="relative h-full w-full overflow-hidden">
+                                <iframe
+                                  src={`${buildPreviewUrl(f.file_url)}#toolbar=0&navpanes=0&scrollbar=0&page=1&view=FitH`}
+                                  className="absolute top-0 left-0 pointer-events-none"
+                                  style={{ width: '200%', height: '200%', transform: 'scale(0.5)', transformOrigin: 'top left' }}
+                                  tabIndex={-1}
+                                  title="preview"
+                                />
+                              </div>
+                            ) : (
+                              getFileIcon(f.file_type)
+                            );
+
+                            return showTableFilePreviews ? (
+                              <a
+                                key={f.id}
+                                href={buildPreviewUrl(f.file_url)}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                title={f.original_name || 'View file'}
+                                className="h-10 w-10 rounded-xl border border-[#2D8A6A]/20 bg-gray-50 flex items-center justify-center overflow-hidden transition-opacity hover:opacity-80"
+                              >
+                                {content}
+                              </a>
+                            ) : (
+                              <a
+                                key={f.id}
+                                href={buildPreviewUrl(f.file_url)}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                title={f.original_name || 'File'}
+                                aria-label={`Open ${f.original_name || 'file'} in a new tab`}
+                                className="h-10 w-10 rounded-xl border border-[#2D8A6A]/20 bg-gray-50 flex items-center justify-center overflow-hidden transition-opacity hover:opacity-80"
+                              >
+                                {content}
+                              </a>
+                            );
+                          })}
                           {(item.files || []).length > 3 && (
                             <div className="h-10 w-10 rounded-xl border border-[#2D8A6A]/20 bg-gray-100 flex items-center justify-center text-xs font-semibold text-[#063F32]">
                               +{(item.files || []).length - 3}

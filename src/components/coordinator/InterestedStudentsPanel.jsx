@@ -617,7 +617,8 @@ export default function InterestedStudentsPanel({
     }
   }
 
-  async function sendAdmissionForm(item) {    if (!item?.id) return;
+  async function sendAdmissionForm(item) {
+    if (!item?.id) return;
 
     setLoadingId(item.id);
     setMessage("");
@@ -1826,6 +1827,8 @@ export default function InterestedStudentsPanel({
     </>
   );
 }
+
+
 
 
 

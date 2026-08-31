@@ -29,7 +29,10 @@ export default function ChildSwitcher({ childrenList = [], value = "", onChange 
         <select
           value={value || ""}
           onChange={(event) => {
-            onChange?.(event.target.value);
+            const nextValue = event.target.value;
+            if (String(nextValue || "") !== String(value || "")) {
+              onChange?.(nextValue);
+            }
             setOpen(false);
           }}
           onMouseDown={() => setOpen((current) => !current)}

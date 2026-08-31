@@ -21,6 +21,13 @@ function getPreviewSrc(item) {
   return "";
 }
 
+function getMediaKey(item, idx) {
+  if (item instanceof File) {
+    return `${item.name || "file"}-${item.size || 0}-${item.lastModified || 0}-${idx}`;
+  }
+  return `${String(item || "").trim() || "media"}-${idx}`;
+}
+
 function moveItemInArray(items, fromIndex, toIndex) {
   if (!Array.isArray(items)) return [];
   if (fromIndex === toIndex) return items;
@@ -42,7 +49,114 @@ function buildPreviewUrl(value) {
   return `/api/file-preview?path=${encodeURIComponent(text)}`;
 }
 
+function getMonthlyPlanFileLimitMessage(file, maxBytes = STORAGE_SAFE_UPLOAD_MAX_BYTES) {
+  const isVideo = String(file?.type || "").toLowerCase().startsWith("video/");
+  const label = isVideo ? "video" : "image";
+  return `The selected ${label} is too large. Please use a file smaller than ${formatUploadLimit(maxBytes)}.`;
+}
+
+function getOversizedMonthlyPlanFile(files = [], maxBytes = STORAGE_SAFE_UPLOAD_MAX_BYTES) {
+  return (Array.isArray(files) ? files : []).find((file) => file instanceof File && file.size > maxBytes) || null;
+}
+
+function isVideoSourceValue(value = "") {
+  if (value instanceof File) {
+    const mime = String(value.type || "").toLowerCase();
+    if (mime.startsWith("video/")) return true;
+    return /\.(mp4|webm|ogg|mov|m4v)(\?.*)?$/i.test(String(value.name || ""));
+  }
+  return /^data:video\//i.test(String(value || "")) || /\.(mp4|webm|ogg|mov|m4v)(\?.*)?$/i.test(String(value || ""));
+}
+
+function MonthlyPlanMediaTile({ item, index, total, onMoveUp, onMoveDown, onRemove }) {
+  const previewSrc = useMemo(() => {
+    if (!item) return "";
+    if (item instanceof File) return URL.createObjectURL(item);
+    return buildPreviewUrl(item);
+  }, [item]);
+
+  useEffect(() => {
+    return () => {
+      if (String(previewSrc || "").startsWith("blob:")) {
+        try {
+          URL.revokeObjectURL(previewSrc);
+        } catch {}
+      }
+    };
+  }, [previewSrc]);
+
+  const video = isVideoSourceValue(item);
+
+  return (
+    <div className="overflow-hidden rounded-2xl border border-[#2D8A6A]/10 bg-white shadow-sm">
+      <div className="relative h-28 w-full overflow-hidden bg-[#0D3B2E]">
+        {previewSrc ? (
+          video ? (
+            <video
+              src={previewSrc}
+              className="h-full w-full object-cover"
+              muted
+              playsInline
+              controls
+              preload="metadata"
+            />
+          ) : (
+            <img src={previewSrc} alt={`edit-preview-${index}`} className="h-full w-full object-cover" />
+          )
+        ) : (
+          <div className="flex h-full w-full items-center justify-center text-xs font-semibold text-[#FAF7F0]">
+            Loading preview...
+          </div>
+        )}
+        {video ? (
+          <div className="absolute bottom-2 left-2 rounded-full bg-black/70 px-2 py-1 text-[10px] font-semibold text-white shadow-sm">
+            Video
+          </div>
+        ) : null}
+        <div className="absolute left-2 top-2 rounded-full bg-white/90 px-2 py-1 text-[10px] font-semibold text-[#063F32] shadow-sm">
+          #{index + 1}
+        </div>
+      </div>
+      <div className="flex items-center justify-between gap-2 border-t border-[#F1EADC] bg-[#FAF7F0] px-2 py-2">
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={() => onMoveUp(index)}
+            disabled={index === 0}
+            className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-[#2D8A6A]/15 bg-white text-[#063F32] transition hover:bg-[#F1EADC] disabled:cursor-not-allowed disabled:opacity-40"
+            aria-label={`Move media ${index + 1} earlier`}
+            title="Move earlier"
+          >
+            <ChevronUp className="h-4 w-4" />
+          </button>
+          <button
+            type="button"
+            onClick={() => onMoveDown(index)}
+            disabled={index === total - 1}
+            className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-[#2D8A6A]/15 bg-white text-[#063F32] transition hover:bg-[#F1EADC] disabled:cursor-not-allowed disabled:opacity-40"
+            aria-label={`Move media ${index + 1} later`}
+            title="Move later"
+          >
+            <ChevronDown className="h-4 w-4" />
+          </button>
+        </div>
+        <button
+          type="button"
+          onClick={() => onRemove(index)}
+          className="inline-flex h-8 items-center justify-center rounded-full border border-rose-200 bg-white px-3 text-xs font-semibold text-rose-700 transition hover:bg-rose-50"
+        >
+          Remove
+        </button>
+      </div>
+    </div>
+  );
+}
+
 async function uploadMonthlyPlanAsset(file) {
+  if (file instanceof File && file.size > STORAGE_SAFE_UPLOAD_MAX_BYTES) {
+    throw new Error(getMonthlyPlanFileLimitMessage(file, STORAGE_SAFE_UPLOAD_MAX_BYTES));
+  }
+
   const signedResponse = await fetch("/api/monthly-plans/upload-url", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -66,7 +180,20 @@ async function uploadMonthlyPlanAsset(file) {
 
   if (!uploadResponse.ok) {
     const text = await uploadResponse.text().catch(() => "");
-    throw new Error(text || "Unable to upload file.");
+    if (
+      uploadResponse.status === 413 ||
+      /EntityTooLarge|Payload too large|object exceeded the maximum allowed size/i.test(text)
+    ) {
+      throw new Error(getMonthlyPlanFileLimitMessage(file, STORAGE_SAFE_UPLOAD_MAX_BYTES));
+    }
+
+    let parsedMessage = "";
+    try {
+      const parsed = JSON.parse(text);
+      parsedMessage = String(parsed?.message || parsed?.error || "").trim();
+    } catch {}
+
+    throw new Error(parsedMessage || text || "Unable to upload file.");
   }
 
   return signedData.path;
@@ -201,6 +328,7 @@ export default function PlanForMonthClient({
     if (allowedFiles.length) {
       setEditForm((p) => ({ ...p, images: [...p.images, ...allowedFiles] }));
     }
+    e.target.value = "";
   };
 
   const handleEditRemoveImage = (idx) => setEditForm((p) => ({ ...p, images: p.images.filter((_, i) => i !== idx) }));
@@ -213,18 +341,9 @@ export default function PlanForMonthClient({
       setMessage("Please fill all fields");
       return;
     }
-    const oversized = editForm.images.find((item) => {
-      if (!(item instanceof File)) return false;
-      const isVideo = String(item.type || "").toLowerCase().startsWith("video/");
-      const maxBytes = isVideo ? MAX_VIDEO_BYTES : MAX_IMAGE_BYTES;
-      return item.size > maxBytes;
-    });
+    const oversized = getOversizedMonthlyPlanFile(editForm.images, MAX_VIDEO_BYTES);
     if (oversized) {
-      setMessage(
-        String(oversized.type || "").toLowerCase().startsWith("video/")
-          ? `The selected video is too large. Please use a file smaller than ${formatUploadLimit(MAX_VIDEO_BYTES)}.`
-          : `The selected image is too large. Please use a file smaller than ${formatUploadLimit(MAX_IMAGE_BYTES)}.`
-      );
+      setMessage(getMonthlyPlanFileLimitMessage(oversized, MAX_VIDEO_BYTES));
       return;
     }
     setSaving(true);
@@ -272,12 +391,7 @@ export default function PlanForMonthClient({
 
   const handleRemoveImage = (idx) => setForm((p) => ({ ...p, images: p.images.filter((_, i) => i !== idx) }));
   const handleMoveImage = (idx, delta) => setForm((p) => ({ ...p, images: moveItemInArray(p.images, idx, idx + delta) }));
-  const isVideoSource = (value = "") => {
-    if (value instanceof File) {
-      return String(value.type || "").toLowerCase().startsWith("video/");
-    }
-    return /^data:video\//i.test(String(value || "")) || /\.(mp4|webm|ogg|mov|m4v)(\?.*)?$/i.test(String(value || ""));
-  };
+  const isVideoSource = isVideoSourceValue;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -285,6 +399,11 @@ export default function PlanForMonthClient({
     setSuccessMessage("");
     if (!form.name || !form.startDate || !form.endDate) {
       setMessage("Please fill all fields");
+      return;
+    }
+    const oversized = getOversizedMonthlyPlanFile(form.images, MAX_VIDEO_BYTES);
+    if (oversized) {
+      setMessage(getMonthlyPlanFileLimitMessage(oversized, MAX_VIDEO_BYTES));
       return;
     }
 
@@ -422,59 +541,25 @@ export default function PlanForMonthClient({
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-[#245C4F]">Images</label>
+                <label className="block text-sm font-semibold text-[#245C4F]">Upload Images or Videos</label>
                 <p className="mt-1 text-xs text-[#245C4F]">Maximum file size: {formatUploadLimit(MAX_VIDEO_BYTES)} per image or video.</p>
                 <label className="mt-2 flex cursor-pointer items-center justify-between rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 text-sm font-medium text-[#063F32]">
-                  <span>{editForm.images.length > 0 ? `${editForm.images.length} image(s)` : "Choose images"}</span>
+                  <span>{editForm.images.length > 0 ? `${editForm.images.length} file(s) selected` : "Choose files"}</span>
                   <span className="rounded-full bg-[#EAF6EF] px-3 py-1 text-xs font-semibold text-[#0D5C48]">Browse</span>
                   <input type="file" multiple accept="image/*,video/*" className="hidden" onChange={handleEditImageChange} />
                 </label>
                 {editForm.images.length > 0 && (
                   <div className="mt-3 grid grid-cols-3 gap-3">
                     {editForm.images.map((img, idx) => (
-                      <div key={idx} className="overflow-hidden rounded-2xl border border-[#2D8A6A]/10 bg-white shadow-sm">
-                        <div className="relative h-20 w-full overflow-hidden">
-                          {isVideoSource(img) ? (
-                            <video src={buildPreviewUrl(getPreviewSrc(img))} className="h-full w-full object-cover" muted playsInline />
-                          ) : (
-                            <img src={buildPreviewUrl(getPreviewSrc(img))} alt={`edit-preview-${idx}`} className="h-full w-full object-cover" />
-                          )}
-                          <div className="absolute left-2 top-2 rounded-full bg-white/90 px-2 py-1 text-[10px] font-semibold text-[#063F32] shadow-sm">
-                            #{idx + 1}
-                          </div>
-                        </div>
-                        <div className="flex items-center justify-between gap-2 border-t border-[#F1EADC] bg-[#FAF7F0] px-2 py-2">
-                          <div className="flex items-center gap-1">
-                            <button
-                              type="button"
-                              onClick={() => handleEditMoveImage(idx, -1)}
-                              disabled={idx === 0}
-                              className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-[#2D8A6A]/15 bg-white text-[#063F32] transition hover:bg-[#F1EADC] disabled:cursor-not-allowed disabled:opacity-40"
-                              aria-label={`Move image ${idx + 1} earlier`}
-                              title="Move earlier"
-                            >
-                              <ChevronUp className="h-4 w-4" />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleEditMoveImage(idx, 1)}
-                              disabled={idx === editForm.images.length - 1}
-                              className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-[#2D8A6A]/15 bg-white text-[#063F32] transition hover:bg-[#F1EADC] disabled:cursor-not-allowed disabled:opacity-40"
-                              aria-label={`Move image ${idx + 1} later`}
-                              title="Move later"
-                            >
-                              <ChevronDown className="h-4 w-4" />
-                            </button>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => handleEditRemoveImage(idx)}
-                            className="inline-flex h-8 items-center justify-center rounded-full border border-rose-200 bg-white px-3 text-xs font-semibold text-rose-700 transition hover:bg-rose-50"
-                          >
-                            Remove
-                          </button>
-                        </div>
-                      </div>
+                      <MonthlyPlanMediaTile
+                        key={getMediaKey(img, idx)}
+                        item={img}
+                        index={idx}
+                        total={editForm.images.length}
+                        onMoveUp={(mediaIdx) => handleEditMoveImage(mediaIdx, -1)}
+                        onMoveDown={(mediaIdx) => handleEditMoveImage(mediaIdx, 1)}
+                        onRemove={handleEditRemoveImage}
+                      />
                     ))}
                   </div>
                 )}
@@ -529,13 +614,25 @@ export default function PlanForMonthClient({
                 {form.images.length > 0 && (
                   <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                     {form.images.map((img, idx) => (
-                      <div key={idx} className="overflow-hidden rounded-2xl border border-[#2D8A6A]/10 bg-white shadow-sm">
+                      <div key={getMediaKey(img, idx)} className="overflow-hidden rounded-2xl border border-[#2D8A6A]/10 bg-white shadow-sm">
                         <div className="relative h-24 w-full overflow-hidden">
                           {isVideoSource(img) ? (
-                            <video src={getPreviewSrc(img)} className="h-full w-full object-cover" muted playsInline />
+                            <video
+                              src={getPreviewSrc(img)}
+                              className="h-full w-full bg-black object-cover"
+                              muted
+                              playsInline
+                              controls
+                              preload="metadata"
+                            />
                           ) : (
                             <img src={getPreviewSrc(img)} alt={`preview-${idx}`} className="h-full w-full object-cover" />
                           )}
+                          {isVideoSource(img) ? (
+                            <div className="absolute bottom-2 left-2 rounded-full bg-black/70 px-2 py-1 text-[10px] font-semibold text-white shadow-sm">
+                              Video
+                            </div>
+                          ) : null}
                           <div className="absolute left-2 top-2 rounded-full bg-white/90 px-2 py-1 text-[10px] font-semibold text-[#063F32] shadow-sm">
                             #{idx + 1}
                           </div>

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { ChevronDown } from "lucide-react";
 import AssignedStudentsTable from "@/components/teacher/AssignedStudentsTable";
+import { loadTeacherPortalJsonCached } from "@/lib/teacherPortalClient";
 
 export default function TeacherStudentsPage() {
   const [state, setState] = useState({ items: [], subject: "", search: "", error: "" });
@@ -35,10 +36,9 @@ export default function TeacherStudentsPage() {
   const filteredCount = visibleItems.length;
 
   useEffect(() => {
-    fetch("/api/teacher/students", { cache: "no-store" }).then((response) => response.json().then((data) => {
-      if (!response.ok) throw new Error(data?.message || "Unable to load students.");
+    loadTeacherPortalJsonCached("/api/teacher/students").then((data) => {
       setState((current) => ({ ...current, items: data.items || [], error: "" }));
-    })).catch((error) => setState((current) => ({ ...current, error: error.message })));
+    }).catch((error) => setState((current) => ({ ...current, error: error.message })));
   }, []);
   return (
     <div className="min-h-screen border-0 space-y-6 bg-[#FAF7F0]">

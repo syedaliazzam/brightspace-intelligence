@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import ChildSwitcher from "@/components/parent/ChildSwitcher";
+import { getInitialSelectedChildId, loadParentChildrenCached, loadParentPortalJsonCached } from "@/lib/parentChildrenClient";
 
 function formatDate(value) {
   if (!value) return "";
@@ -27,18 +28,15 @@ export default function ParentProfilePage() {
   const [state, setState] = useState({ profile: null, children: [], selectedChildId: "", error: "" });
 
   async function load() {
-    const [profileResponse, childrenResponse] = await Promise.all([
-      fetch("/api/parent/profile", { cache: "no-store" }),
-      fetch("/api/parent/children", { cache: "no-store" }),
+    const [profileResponse, children] = await Promise.all([
+      loadParentPortalJsonCached("/api/parent/profile", { force: true, ttlMs: 5 * 60 * 1000 }),
+      loadParentChildrenCached({ force: true }),
     ]);
-    const profileData = await profileResponse.json();
-    const childrenData = await childrenResponse.json();
-    if (!profileResponse.ok || !childrenResponse.ok) throw new Error(profileData?.message || childrenData?.message || "Unable to load profile.");
-    const children = Array.isArray(childrenData.children) ? childrenData.children : [];
+    const profileData = profileResponse;
     setState({
       profile: profileData.profile || null,
       children,
-      selectedChildId: children.length === 1 ? String(children[0]?.id || "") : "",
+      selectedChildId: getInitialSelectedChildId(children),
       error: "",
     });
   }

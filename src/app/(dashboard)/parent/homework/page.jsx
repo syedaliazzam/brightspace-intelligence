@@ -3,19 +3,17 @@
 import { useEffect, useState } from "react";
 import ChildSwitcher from "@/components/parent/ChildSwitcher";
 import HomeworkList from "@/components/parent/HomeworkList";
+import { getInitialSelectedChildId, loadParentChildrenCached, loadParentPortalJsonCached } from "@/lib/parentChildrenClient";
 
 export default function ParentHomeworkPage() {
   const [state, setState] = useState({ children: [], selectedChildId: "", items: [], error: "", loading: true });
 
   async function loadChildren() {
-    const childrenResponse = await fetch("/api/parent/children", { cache: "no-store" });
-    const childrenData = await childrenResponse.json();
-    if (!childrenResponse.ok) throw new Error(childrenData?.message || "Unable to load children.");
-    const children = Array.isArray(childrenData.children) ? childrenData.children : [];
+    const children = await loadParentChildrenCached({ force: true });
     setState((current) => ({
       ...current,
       children,
-      selectedChildId: children.length === 1 ? String(children[0]?.id || "") : "",
+      selectedChildId: getInitialSelectedChildId(children, current.selectedChildId),
       loading: false,
       error: "",
     }));
@@ -27,19 +25,23 @@ export default function ParentHomeworkPage() {
       return;
     }
     const query = childId ? `?childId=${encodeURIComponent(childId)}` : "";
-    const homeworkResponse = await fetch(`/api/parent/homework${query}`, { cache: "no-store" });
-    const homeworkData = await homeworkResponse.json();
-    if (!homeworkResponse.ok) throw new Error(homeworkData?.message || "Unable to load homework.");
+    const homeworkData = await loadParentPortalJsonCached(`/api/parent/homework${query}`);
     setState((current) => ({ ...current, items: homeworkData.items || [], error: "" }));
   }
 
   useEffect(() => {
-    loadChildren().catch((error) => setState((current) => ({ ...current, loading: false, error: error.message })));
+    const timer = window.setTimeout(() => {
+      loadChildren().catch((error) => setState((current) => ({ ...current, loading: false, error: error.message })));
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, []);
 
   useEffect(() => {
     if (!state.selectedChildId) return;
-    load(state.selectedChildId).catch((error) => setState((current) => ({ ...current, error: error.message })));
+    const timer = window.setTimeout(() => {
+      load(state.selectedChildId).catch((error) => setState((current) => ({ ...current, error: error.message })));
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [state.selectedChildId]);
 
   return (
@@ -65,7 +67,6 @@ export default function ParentHomeworkPage() {
         value={state.selectedChildId}
         onChange={(id) => {
           setState((current) => ({ ...current, selectedChildId: id }));
-          load(id).catch((error) => setState((current) => ({ ...current, error: error.message })));
         }}
       />
       {state.error ? <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 px-6 text-sm text-rose-700">{state.error}</div> : null}

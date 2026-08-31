@@ -1,6 +1,18 @@
 "use client";
 
+import { useEffect, useState } from "react";
+import PaginationControls from "@/components/teacher/PaginationControls";
+
 export default function AttendanceSummary({ summary = {}, items = [] }) {
+  const [page, setPage] = useState(1);
+  const pageSize = 7;
+  const totalPages = Math.max(1, Math.ceil((items?.length || 0) / pageSize));
+  const visibleItems = items.slice((page - 1) * pageSize, page * pageSize);
+
+  useEffect(() => {
+    setPage((current) => Math.min(current, totalPages));
+  }, [totalPages]);
+
   return (
     <section className="rounded-[2rem] border border-[#2D8A6A]/18 bg-[linear-gradient(135deg,rgba(13,59,46,0.95)_0%,rgba(13,92,72,0.92)_100%)] p-5 text-[#FAF7F0] shadow-[0_20px_70px_-36px_rgba(13,59,46,0.22)] backdrop-blur-xl">
       <p className="mt-3 text-4xl font-semibold text-[#FFF5D6]">{summary.total_conducted ? `${summary.attendance_percentage || 0}%` : "0%"}</p>
@@ -23,7 +35,8 @@ export default function AttendanceSummary({ summary = {}, items = [] }) {
       </div>
 
       <div className="mt-5 overflow-hidden rounded-[1.5rem] border border-[#65B891]/22">
-        <div className="overflow-x-auto">
+        <div className="flex min-h-[28rem] flex-col">
+        <div className="flex-1 overflow-x-auto">
           <table className="min-w-full border-collapse text-left text-sm text-[#F1EADC]">
             <thead className="bg-[rgba(255,255,255,0.08)] text-xs uppercase tracking-[0.16em] text-[#E4C766]">
               <tr>
@@ -35,8 +48,8 @@ export default function AttendanceSummary({ summary = {}, items = [] }) {
               </tr>
             </thead>
             <tbody>
-              {items.length ? (
-                items.map((item) => (
+              {visibleItems.length ? (
+                visibleItems.map((item) => (
                   <tr key={item.id} className="border-t border-white/10 bg-[rgba(255,255,255,0.04)] transition hover:bg-[rgba(255,255,255,0.07)]">
                     <td className="px-4 py-3 font-semibold text-[#FFF5D6]">{item.title || "-"}</td>
                     <td className="px-4 py-3">{item.subject_name || "-"}</td>
@@ -58,6 +71,16 @@ export default function AttendanceSummary({ summary = {}, items = [] }) {
               )}
             </tbody>
           </table>
+        </div>
+        {items.length > pageSize ? (
+          <PaginationControls
+            page={page}
+            pageSize={pageSize}
+            totalItems={items.length}
+            tone="dark"
+            onPageChange={(nextPage) => setPage(Math.min(Math.max(1, nextPage), totalPages))}
+          />
+        ) : null}
         </div>
       </div>
     </section>

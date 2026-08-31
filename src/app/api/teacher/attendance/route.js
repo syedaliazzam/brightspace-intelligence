@@ -60,13 +60,13 @@ function baseLectureConditions(teacherId, classLevel, subjectId) {
   return { conditions, values };
 }
 
-function baseSubjectConditions(teacherId, classLevel) {
+function baseAssignmentConditions(teacherId, classLevel) {
   const conditions = [];
   const values = [];
 
   if (teacherId) {
     values.push(teacherId);
-    conditions.push(`tp.id = $${values.length}::uuid`);
+    conditions.push(`ta.teacher_id = $${values.length}::uuid`);
   }
 
   if (classLevel) {
@@ -81,50 +81,58 @@ export async function GET(request) {
   try {
     const session = await requireRole(ALLOWED_ROLES);
     const teacherId = await getTeacherId(session);
-    await ensurePendingAttendanceColumn();
     const { searchParams } = new URL(request.url);
     const classLevel = String(searchParams.get("classLevel") || "").trim();
     const subjectId = String(searchParams.get("subjectId") || "").trim();
     const lectureId = String(searchParams.get("lectureId") || "").trim();
+    const scope = String(searchParams.get("scope") || "").trim().toLowerCase();
     const { conditions, values } = baseLectureConditions(teacherId, classLevel, subjectId);
-    const { conditions: subjectConditions, values: subjectValues } = baseSubjectConditions(teacherId, classLevel);
+    const { conditions: subjectConditions, values: subjectValues } = baseAssignmentConditions(teacherId, classLevel);
     const whereClause = conditions.length ? `WHERE ${conditions.join(" AND ")}` : "";
     const subjectWhereClause = subjectConditions.length ? `WHERE ${subjectConditions.join(" AND ")}` : "";
+    const subjectStatusPrefix = subjectWhereClause ? "AND" : "WHERE";
+    const classStatusPrefix = teacherId ? "AND" : "WHERE";
+    const shouldLoadClasses = !scope;
+    const shouldLoadSubjects = !scope || scope === "subjects";
     const shouldLoadLectures = Boolean(classLevel && subjectId);
 
     const [classes, subjects, lectures] = await Promise.all([
-      prisma.$queryRawUnsafe(
-        `
-        SELECT DISTINCT
-          c.class_level,
-          c.title AS course_title
-        FROM lecture_schedules ls
-        INNER JOIN enrollments e ON e.id = ls.enrollment_id
-        INNER JOIN courses c ON c.id = e.course_id
-        ${teacherId ? "WHERE ls.teacher_id = $1::uuid" : ""}
-        ORDER BY c.class_level ASC, c.title ASC
-        `,
-        ...(teacherId ? [teacherId] : [])
-      ),
-      prisma.$queryRawUnsafe(
-        `
-        SELECT DISTINCT
-          sub.id::text AS id,
-          sub.name,
-          c.class_level
-        FROM teacher_assignments ta
-        INNER JOIN teacher_profiles tp ON tp.id = ta.teacher_id
-        INNER JOIN courses c ON c.id = ta.course_id
-        INNER JOIN subjects sub ON sub.id = ta.subject_id
-        ${subjectWhereClause}
-          AND ta.student_id IS NULL
-          AND ta.status = 'active'::user_status
-          AND COALESCE(sub.status, 'active'::user_status) = 'active'::user_status
-        ORDER BY sub.name ASC
-        `,
-        ...subjectValues
-      ),
-      shouldLoadLectures
+      shouldLoadClasses
+        ? prisma.$queryRawUnsafe(
+            `
+            SELECT DISTINCT
+              c.class_level,
+              c.title AS course_title
+            FROM teacher_assignments ta
+            INNER JOIN courses c ON c.id = ta.course_id
+            ${teacherId ? "WHERE ta.teacher_id = $1::uuid" : ""}
+              ${classStatusPrefix} ta.student_id IS NULL
+              AND ta.status = 'active'::user_status
+            ORDER BY c.class_level ASC, c.title ASC
+            `,
+            ...(teacherId ? [teacherId] : [])
+          )
+        : Promise.resolve([]),
+      shouldLoadSubjects
+        ? prisma.$queryRawUnsafe(
+            `
+            SELECT DISTINCT
+              sub.id::text AS id,
+              sub.name,
+              c.class_level
+            FROM teacher_assignments ta
+            INNER JOIN courses c ON c.id = ta.course_id
+            INNER JOIN subjects sub ON sub.id = ta.subject_id
+            ${subjectWhereClause}
+              ${subjectStatusPrefix} ta.student_id IS NULL
+              AND ta.status = 'active'::user_status
+              AND COALESCE(sub.status, 'active'::user_status) = 'active'::user_status
+            ORDER BY sub.name ASC
+            `,
+            ...subjectValues
+          )
+        : Promise.resolve([]),
+      shouldLoadLectures && (!scope || scope === "lectures")
         ? prisma.$queryRawUnsafe(
             `
             SELECT

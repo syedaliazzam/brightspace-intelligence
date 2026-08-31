@@ -3,19 +3,17 @@
 import { useEffect, useState } from "react";
 import ChildSwitcher from "@/components/parent/ChildSwitcher";
 import FeeStatusPanel from "@/components/parent/FeeStatusPanel";
+import { getInitialSelectedChildId, loadParentChildrenCached, loadParentPortalJsonCached } from "@/lib/parentChildrenClient";
 
 export default function ParentFeesPage() {
   const [state, setState] = useState({ children: [], selectedChildId: "", items: [], error: "", loading: true });
 
   async function loadChildren() {
-    const childrenResponse = await fetch("/api/parent/children", { cache: "no-store" });
-    const childrenData = await childrenResponse.json();
-    if (!childrenResponse.ok) throw new Error(childrenData?.message || "Unable to load children.");
-    const children = Array.isArray(childrenData.children) ? childrenData.children : [];
+    const children = await loadParentChildrenCached({ force: true });
     setState((current) => ({
       ...current,
       children,
-      selectedChildId: children.length === 1 ? String(children[0]?.id || "") : "",
+      selectedChildId: getInitialSelectedChildId(children, current.selectedChildId),
       loading: false,
       error: "",
     }));
@@ -27,19 +25,23 @@ export default function ParentFeesPage() {
       return;
     }
     const query = `?childId=${encodeURIComponent(childId)}`;
-    const feesResponse = await fetch(`/api/parent/fees${query}`, { cache: "no-store" });
-    const feesData = await feesResponse.json();
-    if (!feesResponse.ok) throw new Error(feesData?.message || "Unable to load fee records.");
+    const feesData = await loadParentPortalJsonCached(`/api/parent/fees${query}`);
     setState((current) => ({ ...current, items: feesData.items || [], error: "" }));
   }
 
   useEffect(() => {
-    loadChildren().catch((error) => setState((current) => ({ ...current, loading: false, error: error.message })));
+    const timer = window.setTimeout(() => {
+      loadChildren().catch((error) => setState((current) => ({ ...current, loading: false, error: error.message })));
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, []);
 
   useEffect(() => {
     if (!state.selectedChildId) return;
-    load(state.selectedChildId).catch((error) => setState((current) => ({ ...current, error: error.message })));
+    const timer = window.setTimeout(() => {
+      load(state.selectedChildId).catch((error) => setState((current) => ({ ...current, error: error.message })));
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [state.selectedChildId]);
 
   return (
@@ -65,7 +67,6 @@ export default function ParentFeesPage() {
         value={state.selectedChildId}
         onChange={(id) => {
           setState((current) => ({ ...current, selectedChildId: id }));
-          load(id).catch((error) => setState((current) => ({ ...current, error: error.message })));
         }}
       />
       {state.error ? <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">{state.error}</div> : null}

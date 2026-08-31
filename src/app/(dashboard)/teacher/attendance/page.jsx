@@ -3,12 +3,26 @@
 import { useEffect, useMemo, useState } from "react";
 import { ChevronDown } from "lucide-react";
 import { LeafSpinnerInline, OpenBookLoader } from "@/components/shared/AshShajrahLoaders";
+import { loadTeacherPortalJsonCached } from "@/lib/teacherPortalClient";
 
 const STATUS_OPTIONS = [
   { label: "Present", value: "present" },
   { label: "Absent", value: "absent" },
   { label: "Leave", value: "leave" },
 ];
+
+function normalizeOptionText(value) {
+  return String(value || "").trim().toLowerCase().replace(/[\s_-]+/g, "");
+}
+
+function getClassOptionLabel(item) {
+  const classLevel = String(item?.class_level || "").trim();
+  const courseTitle = String(item?.course_title || "").trim();
+  if (!courseTitle || normalizeOptionText(courseTitle) === normalizeOptionText(classLevel)) {
+    return classLevel || courseTitle || "Class";
+  }
+  return `${classLevel} - ${courseTitle}`;
+}
 
 export default function TeacherAttendancePage() {
   const MIN_LOADING_MS = 700;
@@ -45,9 +59,34 @@ export default function TeacherAttendancePage() {
     return response.json();
   }
 
+  function warmLectureOptions(classLevel, subjects = []) {
+    const selectedClass = String(classLevel || "").trim();
+    if (!selectedClass || typeof window === "undefined") return;
+
+    const classSubjects = subjects.filter(
+      (item) => String(item.class_level || "").trim().toLowerCase() === selectedClass.toLowerCase()
+    );
+    window.setTimeout(() => {
+      classSubjects.forEach((subject) => {
+        if (!subject?.id) return;
+        const params = new URLSearchParams({
+          classLevel: selectedClass,
+          subjectId: String(subject.id),
+          scope: "lectures",
+        });
+        loadTeacherPortalJsonCached(`/api/teacher/attendance?${params.toString()}`).catch(() => {});
+      });
+    }, 0);
+  }
+
   async function load(nextFilters = state.filters, options = {}) {
     const showLoader = Boolean(options.showLoader);
     const keepSelection = Boolean(options.keepSelection);
+    const scope = String(options.scope || "").trim();
+    const replaceClasses = !scope;
+    const replaceSubjects = !scope || scope === "subjects";
+    const replaceLectures = !scope || scope === "lectures";
+    const replaceStudents = !scope || scope === "students";
     const nextClassLevel = String(nextFilters.classLevel || "");
     const nextSubjectId = String(nextFilters.subjectId || "");
     const nextLectureId = String(nextFilters.lectureId || "");
@@ -67,36 +106,36 @@ export default function TeacherAttendancePage() {
       if (nextFilters.classLevel) params.set("classLevel", nextFilters.classLevel);
       if (nextFilters.subjectId) params.set("subjectId", nextFilters.subjectId);
       if (nextFilters.lectureId) params.set("lectureId", nextFilters.lectureId);
-      const response = await fetch(`/api/teacher/attendance?${params.toString()}`, { cache: "no-store" });
-      const data = await readJson(response);
-      if (!response.ok) throw new Error(data?.message || "Unable to load attendance.");
+      if (scope) params.set("scope", scope);
+      const data = await loadTeacherPortalJsonCached(`/api/teacher/attendance?${params.toString()}`, options);
       const elapsed = Date.now() - startedAt;
       if (showLoader && elapsed < MIN_LOADING_MS) {
         await new Promise((resolve) => window.setTimeout(resolve, MIN_LOADING_MS - elapsed));
       }
       setState((current) => ({
         ...current,
-        classes: Array.isArray(data.classes) ? data.classes : [],
-        subjects: Array.isArray(data.subjects) ? data.subjects : [],
-        lectures: Array.isArray(data.lectures) ? data.lectures : [],
+        classes: replaceClasses && Array.isArray(data.classes) ? data.classes : current.classes,
+        subjects: replaceSubjects && Array.isArray(data.subjects) ? data.subjects : current.subjects,
+        lectures: replaceLectures && Array.isArray(data.lectures) ? data.lectures : current.lectures,
         selectedLecture: data.selectedLecture || (keepSelection ? current.selectedLecture : null),
-        students: Array.isArray(data.students) ? data.students : [],
+        students: replaceStudents && Array.isArray(data.students) ? data.students : current.students,
         filters: nextFilters,
         loading: false,
         error: "",
       }));
+      if (nextClassLevel && !nextSubjectId && !nextLectureId) {
+        warmLectureOptions(nextClassLevel, Array.isArray(data.subjects) ? data.subjects : []);
+      }
       if (nextClassLevel) {
-        const matchedClass = (Array.isArray(data.classes) ? data.classes : []).find(
+        const matchedClass = (Array.isArray(data.classes) ? data.classes : state.classes).find(
           (item) => String(item.class_level) === nextClassLevel
         );
         if (matchedClass) {
-          setSelectedClassLabel(
-            `${matchedClass.class_level}${matchedClass.course_title ? ` - ${matchedClass.course_title}` : ""}`
-          );
+          setSelectedClassLabel(getClassOptionLabel(matchedClass));
         }
       }
       if (nextSubjectId) {
-        const matchedSubject = (Array.isArray(data.subjects) ? data.subjects : []).find(
+        const matchedSubject = (Array.isArray(data.subjects) ? data.subjects : state.subjects).find(
           (item) => String(item.id) === nextSubjectId
         );
         if (matchedSubject) {
@@ -160,7 +199,7 @@ export default function TeacherAttendancePage() {
       });
       const data = await readJson(response);
       if (!response.ok) throw new Error(data?.message || "Unable to save attendance.");
-      await load(state.filters);
+      await load(state.filters, { force: true });
     } catch (error) {
       setState((current) => ({ ...current, error: error instanceof Error ? error.message : String(error) }));
     } finally {
@@ -201,8 +240,16 @@ export default function TeacherAttendancePage() {
                     setSelectedSubjectLabel("");
                     setSelectedLectureId("");
                     setSelectedLectureLabel("");
-                    setState((current) => ({ ...current, selectedLecture: null, students: [] }));
-                    load({ classLevel: nextClassLevel, subjectId: "", lectureId: "" });
+                    setState((current) => ({
+                      ...current,
+                      filters: { classLevel: nextClassLevel, subjectId: "", lectureId: "" },
+                      lectures: [],
+                      selectedLecture: null,
+                      students: [],
+                      error: "",
+                    }));
+                    warmLectureOptions(nextClassLevel, state.subjects);
+                    load({ classLevel: nextClassLevel, subjectId: "", lectureId: "" }, { scope: "subjects", force: true });
                   }}
                   onFocus={() => setClassOpen(true)}
                   onBlur={() => setClassOpen(false)}
@@ -216,8 +263,7 @@ export default function TeacherAttendancePage() {
                   ) : null}
                   {state.classes.map((item) => (
                     <option key={item.class_level} value={item.class_level}>
-                      {item.class_level}
-                      {item.course_title ? ` - ${item.course_title}` : ""}
+                      {getClassOptionLabel(item)}
                     </option>
                   ))}
                 </select>
@@ -240,7 +286,7 @@ export default function TeacherAttendancePage() {
                     setSelectedLectureId("");
                     setSelectedLectureLabel("");
                     setState((current) => ({ ...current, selectedLecture: null, students: [] }));
-                    load({ classLevel: selectedClassLevel, subjectId: nextSubjectId, lectureId: "" });
+                    load({ classLevel: selectedClassLevel, subjectId: nextSubjectId, lectureId: "" }, { scope: "lectures" });
                   }}
                   onFocus={() => setSubjectOpen(true)}
                   onBlur={() => setSubjectOpen(false)}
@@ -281,7 +327,7 @@ export default function TeacherAttendancePage() {
                         subjectId: selectedSubjectId,
                         lectureId: nextLectureId,
                       },
-                      { showLoader: true, keepSelection: true }
+                      { showLoader: true, keepSelection: true, scope: "students" }
                     );
                   }}
                   onFocus={() => setLectureOpen(true)}

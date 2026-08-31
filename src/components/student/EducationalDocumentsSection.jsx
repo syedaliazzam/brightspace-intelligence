@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Download, FileText, BookOpen, List, Calendar } from "lucide-react";
+import { loadStudentPortalJsonCached } from "@/lib/studentPortalClient";
+import PaginationControls from "@/components/teacher/PaginationControls";
 
 function getDocumentIcon(documentType) {
   const icons = {
@@ -56,14 +58,18 @@ export default function EducationalDocumentsSection({ studentClassLevel }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [previewItem, setPreviewItem] = useState(null);
+  const [page, setPage] = useState(1);
+  const pageSize = 4;
+  const totalPages = Math.max(1, Math.ceil((documents?.length || 0) / pageSize));
+  const visibleDocuments = useMemo(() => documents.slice((page - 1) * pageSize, page * pageSize), [documents, page]);
   const groupedDocs = useMemo(() => {
-    return documents.reduce((acc, doc) => {
+    return visibleDocuments.reduce((acc, doc) => {
       const type = doc.document_type || "other";
       if (!acc[type]) acc[type] = [];
       acc[type].push(doc);
       return acc;
     }, {});
-  }, [documents]);
+  }, [visibleDocuments]);
   const previewUrl = useMemo(() => {
     if (!previewItem?.file_url) return "";
     return buildPreviewUrl(previewItem.file_url);
@@ -73,10 +79,7 @@ export default function EducationalDocumentsSection({ studentClassLevel }) {
     async function loadDocuments() {
       try {
         setLoading(true);
-        const response = await fetch("/api/coordinator/educational-documents", { cache: "no-store" });
-        const data = await response.json();
-
-        if (!response.ok) throw new Error(data?.message || "Unable to load documents.");
+        const data = await loadStudentPortalJsonCached(`/api/coordinator/educational-documents?classLevel=${encodeURIComponent(studentClassLevel)}`);
 
         const items = Array.isArray(data.items) ? data.items : [];
 
@@ -102,6 +105,10 @@ export default function EducationalDocumentsSection({ studentClassLevel }) {
     }
   }, [studentClassLevel]);
 
+  useEffect(() => {
+    setPage((current) => Math.min(current, totalPages));
+  }, [totalPages]);
+
   if (loading) {
     return (
       <section className="rounded-[2rem] border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(250,247,240,0.98)_100%)] p-6 shadow-[0_20px_70px_-36px_rgba(13,59,46,0.18)]">
@@ -125,21 +132,21 @@ export default function EducationalDocumentsSection({ studentClassLevel }) {
   }
 
   return (
-    <section className="rounded-[2rem] border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(250,247,240,0.98)_100%)] p-6 shadow-[0_20px_70px_-36px_rgba(13,59,46,0.18)]">
+    <section className="rounded-[2rem] border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(250,247,240,0.98)_100%)] px-6 pb-4 pt-6 shadow-[0_20px_70px_-36px_rgba(13,59,46,0.18)]">
       <h2 className="text-lg font-semibold text-[#063F32]">📚 Learning Resources</h2>
       <p className="mt-1 text-sm text-[#245C4F]">Your class materials and guides</p>
 
-      <div className="mt-6 space-y-4">
+      <div className="mt-5 space-y-3">
         {Object.entries(groupedDocs).map(([docType, docs]) => (
           <div key={docType}>
-            <div className="flex items-center gap-2 mb-3">
+            <div className="mb-2 flex items-center gap-2">
               <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#EAF6EF] text-[#0D5C48]">
                 {getDocumentIcon(docType)}
               </div>
               <h3 className="text-sm font-semibold text-[#063F32]">{getDocumentTypeLabel(docType)}</h3>
             </div>
 
-            <div className="space-y-2 ml-10">
+            <div className="ml-10 space-y-2 pb-3">
               {docs.map((doc) => (
                 <button
                   key={doc.id}
@@ -190,6 +197,15 @@ export default function EducationalDocumentsSection({ studentClassLevel }) {
           </div>
         ))}
       </div>
+
+      {documents.length > pageSize ? (
+        <PaginationControls
+          page={page}
+          pageSize={pageSize}
+          totalItems={documents.length}
+          onPageChange={(nextPage) => setPage(Math.min(Math.max(1, nextPage), totalPages))}
+        />
+      ) : null}
 
       {previewItem ? (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-[#063F32]/60 px-4 py-8" onClick={() => setPreviewItem(null)}>

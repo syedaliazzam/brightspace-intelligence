@@ -3,26 +3,27 @@
 import { useEffect, useState } from "react";
 import TeacherNotesPanel from "@/components/teacher/TeacherNotesPanel";
 import { useDashboardSession } from "@/components/layout/DashboardSessionContext";
+import { loadTeacherPortalJsonCached } from "@/lib/teacherPortalClient";
 
 export default function TeacherNotesPage() {
   const [state, setState] = useState({ classes: [], notes: [], error: "" });
   const session = useDashboardSession();
   const status = session ? "authenticated" : "unauthenticated";
 
-  async function load() {
-    const [classesResponse, notesResponse] = await Promise.all([
-      fetch("/api/teacher/lectures", { cache: "no-store" }),
-      fetch("/api/teacher/notes", { cache: "no-store" }),
+  async function load(options = {}) {
+    const [classesData, notesData] = await Promise.all([
+      loadTeacherPortalJsonCached("/api/teacher/lectures", options),
+      loadTeacherPortalJsonCached("/api/teacher/notes", options),
     ]);
-    const classesData = await classesResponse.json();
-    const notesData = await notesResponse.json();
-    if (!classesResponse.ok || !notesResponse.ok) throw new Error(classesData?.message || notesData?.message || "Unable to load notes.");
     setState({ classes: classesData.items || [], notes: notesData.items || [], error: "" });
   }
 
   useEffect(() => {
     if (status !== "authenticated") return;
-    load().catch((error) => setState((current) => ({ ...current, error: error.message })));
+    const timer = window.setTimeout(() => {
+      load().catch((error) => setState((current) => ({ ...current, error: error.message })));
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [status]);
 
   return (
@@ -40,7 +41,7 @@ export default function TeacherNotesPage() {
           </div>
         </section>
         {state.error ? <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">{state.error}</div> : null}
-        <TeacherNotesPanel lectures={state.classes} items={state.notes} portalTargetId="teacher-page-portal-root" onSaved={() => load()} enabled={status === "authenticated"} />
+        <TeacherNotesPanel lectures={state.classes} items={state.notes} portalTargetId="teacher-page-portal-root" onSaved={() => load({ force: true })} enabled={status === "authenticated"} />
       </div>
     </div>
   );

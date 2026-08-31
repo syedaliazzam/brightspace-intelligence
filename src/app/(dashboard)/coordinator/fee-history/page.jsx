@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+
 import { ChevronDown, Search } from "lucide-react";
 import { jsPDF } from "jspdf";
 import PaginationControls from "@/components/teacher/PaginationControls";
@@ -580,8 +581,8 @@ export default function CoordinatorFeeHistoryPage({ portalLabel = "Coordinator p
         </section>
 
         {selectedStudent ? (
-            <div className="absolute inset-x-0 top-0 z-[9999] isolate min-h-[100dvh] overflow-visible bg-[#063F32]/45 px-4 py-10">
-              <div className="mx-auto max-w-7xl rounded-[2rem] border border-[#2D8A6A]/15 bg-[#FAF7F0] p-6 shadow-[0_24px_80px_-36px_rgba(13,59,46,0.24)]">
+            <div className="fixed inset-0 z-[10000] flex min-h-screen items-start justify-center overflow-y-auto bg-[#063F32]/45 px-4 py-8 backdrop-blur-sm sm:py-10">
+              <div className="w-full max-w-7xl min-w-0 overflow-hidden rounded-[2rem] border border-[#2D8A6A]/15 bg-[#FAF7F0] p-6 shadow-[0_24px_80px_-36px_rgba(13,59,46,0.24)]">
                 <div className="flex flex-wrap items-start justify-between gap-4">
                   <div>
                     <p className="text-sm font-semibold uppercase tracking-[0.24em] text-[#C9A227]">Fee Details</p>
@@ -796,7 +797,6 @@ export default function CoordinatorFeeHistoryPage({ portalLabel = "Coordinator p
     </div>
   );
 }
-
 
 
 

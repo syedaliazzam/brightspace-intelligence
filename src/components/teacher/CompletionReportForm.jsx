@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { LeafSpinnerInline } from "@/components/shared/AshShajrahLoaders";
+import { loadTeacherPortalJsonCached } from "@/lib/teacherPortalClient";
 
 export default function CompletionReportForm({ lecture, onSaved }) {
   const [form, setForm] = useState({ topicCovered: "", summary: "", homeworkGiven: "", studentPerformance: "" });
@@ -25,9 +26,7 @@ export default function CompletionReportForm({ lecture, onSaved }) {
       }
 
       try {
-        const response = await fetch(`/api/teacher/lectures/${lecture.id}`, { cache: "no-store" });
-        const data = await response.json();
-        if (!response.ok) return;
+        const data = await loadTeacherPortalJsonCached(`/api/teacher/lectures/${lecture.id}`);
         if (active && data?.item) {
           setForm({
             topicCovered: data.item.topic_covered || "",

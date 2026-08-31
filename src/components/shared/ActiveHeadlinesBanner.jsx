@@ -5,7 +5,7 @@ export default function ActiveHeadlinesBanner({ items = [] }) {
   const featured = items[0];
   const secondary = items.slice(1, 4);
   return (
-    <section className="relative overflow-hidden rounded-2xl border border-[#2D8A6A]/15 bg-white/90 px-4 py-3 shadow-[0_12px_36px_-24px_rgba(13,59,46,0.24)] backdrop-blur-md">
+    <section className="relative overflow-hidden rounded-[2rem] border border-[#2D8A6A]/15 bg-white/90 px-4 py-3 shadow-[0_12px_36px_-24px_rgba(13,59,46,0.24)] backdrop-blur-md">
       <div className="pointer-events-none absolute inset-y-0 left-0 w-1 bg-gradient-to-b from-[#C9A227] via-[#2D8A6A] to-[#C9A227]" />
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div className="min-w-0 flex-1">

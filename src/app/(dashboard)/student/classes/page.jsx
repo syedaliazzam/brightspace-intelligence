@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import StudentClassTable from "@/components/student/StudentClassTable";
 import SubjectFilter from "@/components/student/SubjectFilter";
 import StatusFilter from "@/components/student/StatusFilter";
+import { loadStudentPortalJsonCached } from "@/lib/studentPortalClient";
 
 const ranges = [
   ["all", "All Lectures"],
@@ -19,12 +20,15 @@ export default function StudentClassesPage() {
   async function load(next = state) {
     const params = new URLSearchParams({ range: next.range || "all", subjectId: next.subjectId || "", status: next.status || "" });
     setState((current) => ({ ...current, loading: true }));
-    const response = await fetch(`/api/student/lectures?${params.toString()}`, { cache: "no-store" });
-    const data = await response.json();
-    if (!response.ok) throw new Error(data?.message || "Unable to load lectures.");
+    const data = await loadStudentPortalJsonCached(`/api/student/lectures?${params.toString()}`);
     setState((current) => ({ ...current, items: data.items || [], subjects: data.subjects || [], loading: false, error: "" }));
   }
-  useEffect(() => { load().catch((error) => setState((current) => ({ ...current, loading: false, error: error.message }))); }, []);
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      load().catch((error) => setState((current) => ({ ...current, loading: false, error: error.message })));
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, []);
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap gap-3">

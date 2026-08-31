@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireRole, roleGuardResponse } from "@/lib/roleGuard";
 import prisma from "@/lib/prisma";
-import { getActiveHeadlines } from "@/lib/headlines";
 
 const ALLOWED_ROLES = ["parent", "admin"];
 
@@ -58,8 +57,7 @@ export async function GET(request) {
     const selectedChildId = childId || children[0]?.id || "";
     const scope = childScopeSql(session, selectedChildId);
 
-    const [stats, headlines] = await Promise.all([
-      prisma.$queryRawUnsafe(
+    const stats = await prisma.$queryRawUnsafe(
       `
       WITH allowed_students AS (
         SELECT sp.id, u.full_name
@@ -96,11 +94,31 @@ export async function GET(request) {
            )
          )
          WHERE LOWER(ls.status::text) IN ('completed_by_teacher', 'verified_by_coordinator')) AS attended_lectures,
-        (SELECT COUNT(*)::int
-         FROM lecture_attendance la
-         INNER JOIN student_profiles sp ON sp.user_id = la.user_id
-         INNER JOIN allowed_students a ON a.id = sp.id
-         WHERE LOWER(la.status::text) IN ('present', 'partial')) AS present_lectures,
+        (SELECT COUNT(*) FILTER (WHERE COALESCE(la.status::text, 'absent') IN ('present', 'partial'))::int
+          FROM lecture_schedules ls
+          INNER JOIN enrollments e ON e.id = ls.enrollment_id
+          INNER JOIN course_subjects cs ON cs.course_id = e.course_id AND cs.subject_id = ls.subject_id
+          INNER JOIN allowed_students a ON (
+            a.id = e.student_id
+            OR e.course_id IN (
+              SELECT course_id FROM enrollments
+              WHERE student_id = a.id
+                AND LOWER(status) = 'active'
+            )
+          )
+          LEFT JOIN LATERAL (
+            SELECT la.*
+            FROM lecture_attendance la
+            WHERE la.lecture_id = ls.id
+              AND la.user_id IN (SELECT sp.user_id FROM student_profiles sp WHERE sp.id = a.id)
+            ORDER BY
+              CASE WHEN LOWER(COALESCE(la.status::text, 'absent')) IN ('present', 'partial') THEN 0 ELSE 1 END,
+              la.updated_at DESC NULLS LAST,
+              la.created_at DESC NULLS LAST,
+              la.id DESC
+            LIMIT 1
+          ) la ON TRUE
+          WHERE LOWER(ls.status::text) IN ('completed_by_teacher', 'verified_by_coordinator')) AS present_lectures,
         (SELECT COUNT(*)::int FROM homework h INNER JOIN allowed_students a ON a.id = h.student_id WHERE COALESCE(h.status::text, 'pending') = 'pending') AS pending_homework,
         COALESCE((SELECT ROUND(
           (COUNT(*) FILTER (WHERE COALESCE(la.status::text, 'absent') IN ('present', 'partial'))::numeric
@@ -122,7 +140,11 @@ export async function GET(request) {
             FROM lecture_attendance la
             WHERE la.lecture_id = ls.id
               AND la.user_id IN (SELECT sp.user_id FROM student_profiles sp WHERE sp.id = a.id)
-            ORDER BY la.updated_at DESC NULLS LAST, la.created_at DESC NULLS LAST, la.id DESC
+            ORDER BY
+              CASE WHEN LOWER(COALESCE(la.status::text, 'absent')) IN ('present', 'partial') THEN 0 ELSE 1 END,
+              la.updated_at DESC NULLS LAST,
+              la.created_at DESC NULLS LAST,
+              la.id DESC
             LIMIT 1
           ) la ON TRUE
           WHERE LOWER(ls.status::text) IN ('completed_by_teacher', 'verified_by_coordinator')
@@ -152,9 +174,7 @@ export async function GET(request) {
         ), 'not_available') AS fee_status
       `,
       ...scope.values
-      ),
-      getActiveHeadlines(),
-    ]);
+    );
 
     const upcoming = await prisma.$queryRawUnsafe(
       `
@@ -200,7 +220,6 @@ export async function GET(request) {
     return json("Parent dashboard fetched.", 200, {
       children,
       selectedChildId,
-      headlines,
       stats: {
         ...(stats?.[0] || {}),
         total_children: children.length,

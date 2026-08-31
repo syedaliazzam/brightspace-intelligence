@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import InternalEventsPage from "@/components/internal-events/InternalEventsPage";
 import { auth, roleToDashboard } from "@/lib/auth";
 
-const ALLOWED_ROLES = new Set(["coordinator"]);
+const ALLOWED_ROLES = new Set(["teacher"]);
 
 export default async function TeacherInternalEventsPage() {
   const session = await auth();

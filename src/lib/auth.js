@@ -29,12 +29,6 @@ function normalizeIdentifier(value) {
   return trimmed.replace(/\s+/g, "").replace(/[-()]/g, "");
 }
 
-function toAuthError(code) {
-  const error = new Error(code);
-  error.code = code;
-  return error;
-}
-
 async function getUserRoleNames(userId) {
   const normalizedUserId = clean(userId);
   if (!normalizedUserId) {
@@ -109,11 +103,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         const password = typeof credentials?.password === "string" ? credentials.password : "";
 
         if (!rawIdentifier) {
-          throw toAuthError("missing_identifier");
+          return null;
         }
 
         if (!password.trim()) {
-          throw toAuthError("missing_password");
+          return null;
         }
 
         const isEmail = rawIdentifier.includes("@");

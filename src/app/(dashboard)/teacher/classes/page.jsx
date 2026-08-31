@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import TeacherClassTable from "@/components/teacher/TeacherClassTable";
 import ClassActionModal from "@/components/teacher/ClassActionModal";
+import { loadTeacherPortalJsonCached } from "@/lib/teacherPortalClient";
 
 const FILTERS = [
   { label: "All lectures", value: "" },
@@ -18,15 +19,19 @@ const FILTERS = [
 export default function TeacherClassesPage() {
   const [state, setState] = useState({ items: [], selected: null, status: "", error: "" });
 
-  async function load(status = state.status) {
+  async function load(status = state.status, options = {}) {
     const query = status ? `?status=${encodeURIComponent(status)}` : "";
-    const response = await fetch(`/api/teacher/lectures${query}`, { cache: "no-store" });
-    const data = await response.json();
-    if (!response.ok) throw new Error(data?.message || "Unable to load lectures.");
+    const data = await loadTeacherPortalJsonCached(`/api/teacher/lectures${query}`, options);
     setState((current) => ({ ...current, items: data.items || [], status, error: "" }));
   }
 
-  useEffect(() => { load().catch((error) => setState((current) => ({ ...current, error: error.message }))); }, []);
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      load().catch((error) => setState((current) => ({ ...current, error: error.message })));
+    }, 0);
+    return () => window.clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <div className="min-h-screen rounded-[2rem] border-0 space-y-6 bg-[#FAF7F0]">
@@ -45,7 +50,7 @@ export default function TeacherClassesPage() {
       <div className="flex flex-wrap gap-2">{FILTERS.map((item) => <button key={item.value || "all"} onClick={() => load(item.value).catch((error) => setState((current) => ({ ...current, error: error.message })))} className={`rounded-2xl px-4 py-2 text-sm font-semibold transition ${state.status === item.value ? "bg-[linear-gradient(135deg,#C9A227,#E4C766)] text-[#063F32] shadow-[0_10px_28px_-18px_rgba(13,59,46,0.45)]" : "border border-[#2D8A6A]/20 bg-[#FAF7F0] text-[#063F32] hover:bg-[#F1EADC]"}`}>{item.label}</button>)}</div>
       {state.error ? <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">{state.error}</div> : null}
       <TeacherClassTable items={state.items} onOpen={(item) => setState((current) => ({ ...current, selected: item }))} />
-      <ClassActionModal lecture={state.selected} open={Boolean(state.selected)} onClose={() => setState((current) => ({ ...current, selected: null }))} onChanged={() => load()} />
+      <ClassActionModal lecture={state.selected} open={Boolean(state.selected)} onClose={() => setState((current) => ({ ...current, selected: null }))} onChanged={() => load(state.status, { force: true })} />
       </div>
     </div>
   );

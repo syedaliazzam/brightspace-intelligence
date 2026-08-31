@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { OpenBookLoader } from "@/components/shared/AshShajrahLoaders";
+import { loadStudentPortalJsonCached } from "@/lib/studentPortalClient";
 
 function formatDate(value) {
   if (!value) return "";
@@ -43,9 +44,7 @@ export default function StudentProfilePage() {
 
   useEffect(() => {
     async function load() {
-      const response = await fetch("/api/student/profile", { cache: "no-store" });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data?.message || "Unable to load profile.");
+      const data = await loadStudentPortalJsonCached("/api/student/profile", { ttlMs: 5 * 60 * 1000 });
       setState({ profile: data.profile || null, error: "", loading: false });
     }
 

@@ -10,6 +10,8 @@ export default function ParentLibraryPage() {
       portalLabel="Parent portal"
       title="Library"
       description="View educational resources, videos, and documents."
+      cacheNamespace="parent"
+      showTableFilePreviews={false}
     />
   );
 }

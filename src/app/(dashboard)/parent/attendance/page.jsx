@@ -3,19 +3,17 @@
 import { useEffect, useState } from "react";
 import ChildSwitcher from "@/components/parent/ChildSwitcher";
 import AttendanceSummary from "@/components/parent/AttendanceSummary";
+import { getInitialSelectedChildId, loadParentChildrenCached, loadParentPortalJsonCached } from "@/lib/parentChildrenClient";
 
 export default function ParentAttendancePage() {
   const [state, setState] = useState({ children: [], selectedChildId: "", items: [], summary: {}, error: "", loading: true });
 
   async function loadChildren() {
-    const childrenResponse = await fetch("/api/parent/children", { cache: "no-store" });
-    const childrenData = await childrenResponse.json();
-    if (!childrenResponse.ok) throw new Error(childrenData?.message || "Unable to load children.");
-    const children = Array.isArray(childrenData.children) ? childrenData.children : [];
+    const children = await loadParentChildrenCached({ force: true });
     setState((current) => ({
       ...current,
       children,
-      selectedChildId: children.length === 1 ? String(children[0]?.id || "") : "",
+      selectedChildId: getInitialSelectedChildId(children, current.selectedChildId),
       loading: false,
       error: "",
     }));
@@ -27,19 +25,23 @@ export default function ParentAttendancePage() {
       return;
     }
     const query = childId ? `?childId=${encodeURIComponent(childId)}` : "";
-    const attendanceResponse = await fetch(`/api/parent/attendance${query}`, { cache: "no-store" });
-    const attendanceData = await attendanceResponse.json();
-    if (!attendanceResponse.ok) throw new Error(attendanceData?.message || "Unable to load attendance.");
+    const attendanceData = await loadParentPortalJsonCached(`/api/parent/attendance${query}`);
     setState((current) => ({ ...current, items: attendanceData.items || [], summary: attendanceData.summary || {}, error: "" }));
   }
 
   useEffect(() => {
-    loadChildren().catch((error) => setState((current) => ({ ...current, loading: false, error: error.message })));
+    const timer = window.setTimeout(() => {
+      loadChildren().catch((error) => setState((current) => ({ ...current, loading: false, error: error.message })));
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, []);
 
   useEffect(() => {
     if (!state.selectedChildId) return;
-    load(state.selectedChildId).catch((error) => setState((current) => ({ ...current, error: error.message })));
+    const timer = window.setTimeout(() => {
+      load(state.selectedChildId).catch((error) => setState((current) => ({ ...current, error: error.message })));
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [state.selectedChildId]);
 
   return (
@@ -58,7 +60,6 @@ export default function ParentAttendancePage() {
         value={state.selectedChildId}
         onChange={(id) => {
           setState((current) => ({ ...current, selectedChildId: id }));
-          load(id).catch((error) => setState((current) => ({ ...current, error: error.message })));
         }}
       />
       {state.error ? <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">{state.error}</div> : null}

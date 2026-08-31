@@ -13,6 +13,7 @@ import { OpenBookLoader } from "@/components/shared/AshShajrahLoaders";
 import StudentPortalTickerWrapper from "@/components/layout/StudentPortalTickerWrapper";
 import MonthlyPlanSlider from "@/components/layout/MonthlyPlanSlider";
 import EducationalDocumentsSection from "@/components/student/EducationalDocumentsSection";
+import { loadStudentPortalJsonCached } from "@/lib/studentPortalClient";
 
 function getTodayDate() {
   return "";
@@ -48,73 +49,57 @@ export default function StudentDashboardPage() {
     filters: { date: "", range: "today", subjectId: "", status: "" },
   });
 
-  async function loadDashboard() {
-    const response = await fetch("/api/student/dashboard", { cache: "no-store" });
-    const data = await response.json();
-    if (!response.ok) throw new Error(data?.message || "Unable to load dashboard.");
+  async function loadDashboard({ force = false } = {}) {
+    const data = await loadStudentPortalJsonCached("/api/student/dashboard", { force });
     setState((current) => ({ ...current, stats: data.stats || {}, headlines: Array.isArray(data.headlines) ? data.headlines : [], error: "" }));
   }
 
-  async function loadMonthlyFee() {
-    const response = await fetch("/api/monthly-fee-status", { cache: "no-store" });
-    const data = await response.json();
-    if (!response.ok) throw new Error(data?.message || "Unable to load monthly fee status.");
+  async function loadMonthlyFee({ force = false } = {}) {
+    const data = await loadStudentPortalJsonCached("/api/monthly-fee-status", { force });
     setState((current) => ({ ...current, monthlyFee: data.available ? data : null }));
   }
 
-  async function loadHomework() {
-    const response = await fetch("/api/student/homework", { cache: "no-store" });
-    const data = await response.json();
-    if (!response.ok) throw new Error(data?.message || "Unable to load homework.");
+  async function loadHomework({ force = false } = {}) {
+    const data = await loadStudentPortalJsonCached("/api/student/homework", { force });
     setState((current) => ({ ...current, homework: data.items || [] }));
   }
 
-  async function loadAttendance() {
-    const response = await fetch("/api/student/attendance", { cache: "no-store" });
-    const data = await response.json();
-    if (!response.ok) throw new Error(data?.message || "Unable to load attendance.");
+  async function loadAttendance({ force = false } = {}) {
+    const data = await loadStudentPortalJsonCached("/api/student/attendance", { force });
     setState((current) => ({ ...current, attendance: { summary: data.summary || {}, items: data.items || [] } }));
   }
 
-  async function loadProfile() {
-    const response = await fetch("/api/student/profile", { cache: "no-store" });
-    const data = await response.json();
-    if (!response.ok) throw new Error(data?.message || "Unable to load profile.");
+  async function loadProfile({ force = false } = {}) {
+    const data = await loadStudentPortalJsonCached("/api/student/profile", { force, ttlMs: 5 * 60 * 1000 });
     setState((current) => ({ ...current, profile: data.profile || null }));
-  }
-
-  async function loadLectures(filters = state.filters) {
-    const safe = { ...filters, date: filters.date || getTodayDate() };
-    const params = new URLSearchParams(safe);
-    setState((current) => ({ ...current, loading: true }));
-    const response = await fetch(`/api/student/calendar-lectures?${params.toString()}`, { cache: "no-store" });
-    const data = await response.json();
-    if (!response.ok) throw new Error(data?.message || "Unable to load lectures.");
-    setState((current) => ({ ...current, filters: { ...current.filters, date: safe.date }, lectures: data.items || [], subjects: data.subjects || [], markedDates: data.markedDates || [], loading: false, error: "" }));
   }
 
   function updateFilters(filters) {
     setState((current) => ({ ...current, filters }));
-    loadLectures(filters).catch((error) => setState((current) => ({ ...current, loading: false, error: error.message })));
   }
 
   useEffect(() => {
     async function initialize() {
-      try { await loadDashboard(); } catch (error) { setState((current) => ({ ...current, error: error instanceof Error ? error.message : String(error) })); }
-      try { await loadHomework(); } catch (error) { setState((current) => ({ ...current, error: error instanceof Error ? error.message : String(error) })); }
-      try { await loadAttendance(); } catch (error) { setState((current) => ({ ...current, error: error instanceof Error ? error.message : String(error) })); }
-      try { await loadProfile(); } catch (error) { setState((current) => ({ ...current, error: error instanceof Error ? error.message : String(error) })); }
-      try { await loadMonthlyFee(); } catch (error) { setState((current) => ({ ...current, error: error instanceof Error ? error.message : String(error) })); }
-      try {
-        const initialDate = getTodayDate();
-        setState((current) => ({ ...current, filters: { ...current.filters, date: initialDate } }));
-        await loadLectures({ date: initialDate, range: "today", subjectId: "", status: "" });
-      } catch (error) {
+      const initialDate = getTodayDate();
+      setState((current) => ({ ...current, filters: { ...current.filters, date: initialDate } }));
+
+      const results = await Promise.allSettled([
+        loadDashboard(),
+        loadHomework(),
+        loadAttendance(),
+        loadProfile(),
+        loadMonthlyFee(),
+      ]);
+
+      const failed = results.find((result) => result.status === "rejected");
+      if (failed) {
+        const error = failed.reason;
         setState((current) => ({ ...current, loading: false, error: error instanceof Error ? error.message : String(error) }));
+      } else {
+        setState((current) => ({ ...current, loading: false }));
       }
     }
     initialize();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const profile = state.profile || {};
@@ -168,7 +153,7 @@ export default function StudentDashboardPage() {
               <h2 className="mt-2 font-body text-2xl font-semibold tracking-tight text-[#063F32]">Plan your study week</h2>
             </div>
             {state.loading ? <OpenBookLoader title="Loading lectures" subtitle="Preparing your calendar..." /> : null}
-            <LMSCalendar apiUrl="/api/student/calendar-lectures" filters={state.filters} onDateSelect={(date) => updateFilters({ ...state.filters, date, range: "selected_date" })} />
+            <LMSCalendar apiUrl="/api/student/calendar-lectures" filters={state.filters} onDateSelect={(date) => updateFilters({ ...state.filters, date, range: "selected_date" })} cacheNamespace="student" />
           </motion.section>
 
           <motion.section id="homework" className="scroll-mt-28 rounded-[2rem] border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(250,247,240,0.98)_100%)] p-4 px-6 shadow-[0_20px_70px_-36px_rgba(13,59,46,0.18)] backdrop-blur-xl">
@@ -176,7 +161,7 @@ export default function StudentDashboardPage() {
               <p className="text-[11px] font-bold uppercase tracking-[0.22em] text-[#0D5C48]">Homework</p>
               <h2 className="mt-2 font-body text-2xl font-semibold tracking-tight text-[#063F32]">Assigned work</h2>
             </div>
-            <HomeworkList items={state.homework} onRefresh={() => loadHomework().catch((error) => setState((current) => ({ ...current, error: error.message })))} />
+            <HomeworkList items={state.homework} onRefresh={() => loadHomework({ force: true }).catch((error) => setState((current) => ({ ...current, error: error.message })))} />
           </motion.section>
 
           <motion.section id="attendance" className="scroll-mt-28 rounded-[2rem] border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(250,247,240,0.98)_100%)] p-4 px-6 shadow-[0_20px_70px_-36px_rgba(13,59,46,0.18)] backdrop-blur-xl">

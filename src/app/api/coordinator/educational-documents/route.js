@@ -16,21 +16,44 @@ function normalizeText(value) {
 
 export async function GET(request) {
   try {
-    const items = await prisma.$queryRaw`
-      SELECT
-        id::text AS id,
-        title,
-        document_type,
-        class_level,
-        file_url,
-        created_by::text AS created_by,
-        created_at,
-        updated_at,
-        is_active
-      FROM educational_documents
-      WHERE is_active = true
-      ORDER BY created_at DESC
-    `;
+    const { searchParams } = new URL(request.url);
+    const classLevel = normalizeText(searchParams.get("classLevel"));
+    const items = classLevel
+      ? await prisma.$queryRaw`
+        SELECT
+          id::text AS id,
+          title,
+          document_type,
+          class_level,
+          file_url,
+          created_by::text AS created_by,
+          created_at,
+          updated_at,
+          is_active
+        FROM educational_documents
+        WHERE is_active = true
+          AND (
+            class_level IS NULL
+            OR TRIM(class_level) = ''
+            OR LOWER(REGEXP_REPLACE(class_level, '[\\s_-]+', '', 'g')) = LOWER(REGEXP_REPLACE(${classLevel}, '[\\s_-]+', '', 'g'))
+          )
+        ORDER BY created_at DESC
+      `
+      : await prisma.$queryRaw`
+        SELECT
+          id::text AS id,
+          title,
+          document_type,
+          class_level,
+          file_url,
+          created_by::text AS created_by,
+          created_at,
+          updated_at,
+          is_active
+        FROM educational_documents
+        WHERE is_active = true
+        ORDER BY created_at DESC
+      `;
     return json("Educational documents fetched.", 200, { items });
   } catch (error) {
     return json(error instanceof Error ? error.message : "Unable to load educational documents.", 500);

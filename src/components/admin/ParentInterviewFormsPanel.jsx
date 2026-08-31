@@ -536,8 +536,8 @@ export default function ParentInterviewFormsPanel({
 
       {isMounted && selectedResponse
         ? createPortal(
-            <div className="absolute inset-0 z-[999] flex items-center justify-center bg-[rgba(13,59,46,0.10)] px-4 py-6 backdrop-blur-sm">
-              <section className="w-full max-w-4xl rounded-[1.75rem] border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(250,247,240,0.99)_100%)] p-5 shadow-[0_16px_50px_-36px_rgba(13,59,46,0.18)]">
+            <div className="fixed inset-0 z-[9999] flex items-start justify-center overflow-y-auto bg-[rgba(13,59,46,0.45)] px-4 py-8 backdrop-blur-sm sm:py-10">
+              <section className="my-auto w-full max-w-4xl rounded-[1.75rem] border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(250,247,240,0.99)_100%)] p-5 shadow-[0_16px_50px_-36px_rgba(13,59,46,0.18)]">
             <div className="flex items-start justify-between gap-3">
               <div>
                 <p className="text-sm font-semibold uppercase tracking-[0.18em] text-[#C9A227]">

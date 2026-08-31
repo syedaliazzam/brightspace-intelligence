@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import ChildSwitcher from "@/components/parent/ChildSwitcher";
 import LMSCalendar from "@/components/calendar/LMSCalendar";
+import { getInitialSelectedChildId, loadParentChildrenCached } from "@/lib/parentChildrenClient";
 
 function todayDate() {
   const date = new Date();
@@ -25,15 +26,12 @@ export default function ParentClassesPage() {
   });
 
   useEffect(() => {
-    fetch("/api/parent/children", { cache: "no-store" })
-      .then((response) => response.json().then((data) => ({ response, data })))
-      .then(({ response, data }) => {
-        if (!response.ok) throw new Error(data?.message || "Unable to load children.");
-        const children = Array.isArray(data.children) ? data.children : [];
+    loadParentChildrenCached({ force: true })
+      .then((children) => {
         setState((current) => ({
           ...current,
           children,
-          selectedChildId: children.length === 1 ? String(children[0]?.id || "") : "",
+          selectedChildId: getInitialSelectedChildId(children, current.selectedChildId),
           error: "",
         }));
       })
@@ -75,6 +73,7 @@ export default function ParentClassesPage() {
           extraParams={{ childId: state.selectedChildId }}
           onDateSelect={(date) => setState((current) => ({ ...current, filters: { ...current.filters, date, range: "selected_date" } }))}
           popupMode="page"
+          cacheNamespace="parent"
         />
       )}
       </div>

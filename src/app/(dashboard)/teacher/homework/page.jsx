@@ -4,22 +4,17 @@ import { useEffect, useMemo, useState } from "react";
 import { ChevronDown } from "lucide-react";
 import HomeworkForm from "@/components/teacher/HomeworkForm";
 import HomeworkTable from "@/components/teacher/HomeworkTable";
+import { loadTeacherPortalJsonCached } from "@/lib/teacherPortalClient";
 
 export default function TeacherHomeworkPage() {
   const [state, setState] = useState({ lectures: [], items: [], selected: null, error: "" });
   const [lectureOpen, setLectureOpen] = useState(false);
 
-  async function load() {
-    const [classesResponse, homeworkResponse] = await Promise.all([
-      fetch("/api/teacher/lectures", { cache: "no-store" }),
-      fetch("/api/teacher/homework", { cache: "no-store" }),
+  async function load(options = {}) {
+    const [classesData, homeworkData] = await Promise.all([
+      loadTeacherPortalJsonCached("/api/teacher/lectures", options),
+      loadTeacherPortalJsonCached("/api/teacher/homework", options),
     ]);
-
-    const classesData = await classesResponse.json();
-    const homeworkData = await homeworkResponse.json();
-    if (!classesResponse.ok || !homeworkResponse.ok) {
-      throw new Error(classesData?.message || homeworkData?.message || "Unable to load homework.");
-    }
 
     setState((current) => ({
       ...current,
@@ -62,7 +57,7 @@ export default function TeacherHomeworkPage() {
           initialValue={editingItem}
           onSaved={() => {
             setState((current) => ({ ...current, selected: null }));
-            load();
+            load({ force: true });
           }}
         />
 
@@ -71,7 +66,7 @@ export default function TeacherHomeworkPage() {
           onEdit={async () => {
             setState((current) => ({ ...current, selected: null }));
             try {
-              await load();
+              await load({ force: true });
             } catch (error) {
               setState((current) => ({ ...current, error: error.message }));
             }

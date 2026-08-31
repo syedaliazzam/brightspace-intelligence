@@ -5,24 +5,24 @@ import ChildSwitcher from "@/components/parent/ChildSwitcher";
 import ClassTimeline from "@/components/parent/ClassTimeline";
 import HomeworkList from "@/components/parent/HomeworkList";
 import TeacherNotesList from "@/components/parent/TeacherNotesList";
+import { loadParentChildrenCached, loadParentPortalJsonCached } from "@/lib/parentChildrenClient";
 
 export default function ParentTimelinePage() {
   const [state, setState] = useState({ children: [], selectedChildId: "", items: [], notes: [], homeworks: [], error: "" });
 
   async function load(childId = state.selectedChildId) {
-    const query = childId ? `?childId=${encodeURIComponent(childId)}` : "";
-    const [childrenResponse, timelineResponse] = await Promise.all([
-      fetch("/api/parent/children", { cache: "no-store" }),
-      fetch(`/api/parent/timeline${query}`, { cache: "no-store" }),
-    ]);
-    const childrenData = await childrenResponse.json();
-    const timelineData = await timelineResponse.json();
-    if (!childrenResponse.ok || !timelineResponse.ok) throw new Error(childrenData?.message || timelineData?.message || "Unable to load timeline.");
-    setState({ children: childrenData.children || [], selectedChildId: childId || childrenData.children?.[0]?.id || "", items: timelineData.items || [], notes: timelineData.notes || [], homeworks: timelineData.homeworks || [], error: "" });
+    const children = await loadParentChildrenCached({ force: true });
+    const selectedChildId = childId || children?.[0]?.id || "";
+    const query = selectedChildId ? `?childId=${encodeURIComponent(selectedChildId)}` : "";
+    const timelineData = await loadParentPortalJsonCached(`/api/parent/timeline${query}`);
+    setState({ children, selectedChildId, items: timelineData.items || [], notes: timelineData.notes || [], homeworks: timelineData.homeworks || [], error: "" });
   }
 
   useEffect(() => {
-    load().catch((error) => setState((current) => ({ ...current, error: error.message })));
+    const timer = window.setTimeout(() => {
+      load().catch((error) => setState((current) => ({ ...current, error: error.message })));
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, []);
 
   return (

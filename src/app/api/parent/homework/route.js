@@ -9,22 +9,9 @@ function json(message, status = 200, extra = {}) {
   return NextResponse.json({ message, ...extra }, { status });
 }
 
-async function ensureHomeworkAttachmentColumns() {
-  await prisma.$executeRaw`
-    ALTER TABLE homework
-    ADD COLUMN IF NOT EXISTS homework_attachment_buckets jsonb,
-    ADD COLUMN IF NOT EXISTS homework_attachment_paths jsonb,
-    ADD COLUMN IF NOT EXISTS homework_attachment_names jsonb,
-    ADD COLUMN IF NOT EXISTS submission_attachment_buckets jsonb,
-    ADD COLUMN IF NOT EXISTS submission_attachment_paths jsonb,
-    ADD COLUMN IF NOT EXISTS submission_attachment_names jsonb
-  `;
-}
-
 export async function GET(request) {
   try {
     const session = await requireRole(ALLOWED_ROLES);
-    await ensureHomeworkAttachmentColumns();
     const { searchParams } = new URL(request.url);
     const childId = String(searchParams.get("childId") || "").trim();
     const isAdmin = String(session.user.role).toLowerCase() === "admin";

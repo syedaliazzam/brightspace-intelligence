@@ -440,8 +440,8 @@ export default function PublicEventsManagementPage({
         </section>
 
         {selected ? (
-          <div className="absolute inset-0 z-20 flex items-center justify-center rounded-[2rem] bg-[#063F32]/35 px-4 py-6 backdrop-blur-sm">
-            <div className="w-full max-w-3xl overflow-hidden rounded-[2rem] border border-[#2D8A6A]/15 bg-[#FAF7F0] shadow-[0_24px_80px_-36px_rgba(13,59,46,0.24)]">
+          <div className="absolute inset-0 z-20 flex items-center justify-center overflow-x-hidden overflow-y-auto bg-[#063F32]/45 px-4 py-8 backdrop-blur-sm">
+            <div className="w-full min-w-0 max-w-3xl overflow-hidden rounded-[2rem] border border-[#2D8A6A]/15 bg-[#FAF7F0] shadow-[0_24px_80px_-36px_rgba(13,59,46,0.24)]">
               <div className="flex items-start justify-between gap-4 border-b border-[#F1EADC] px-6 py-4">
                 <div>
                   <p className="text-sm font-semibold uppercase tracking-[0.24em] text-[#C9A227]">Public event details</p>
@@ -449,7 +449,7 @@ export default function PublicEventsManagementPage({
                 </div>
                 <button type="button" onClick={() => setSelected(null)} className="rounded-xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-3 py-2 text-sm font-semibold text-[#063F32] transition hover:bg-[#F1EADC]">Close</button>
               </div>
-              <div className="max-h-[58vh] space-y-4 overflow-y-auto p-5 text-sm text-[#245C4F] sm:p-6">
+              <div className="max-h-[calc(100vh-8rem)] space-y-4 overflow-y-auto p-5 text-sm text-[#245C4F] sm:p-6">
                 {selected.image_url ? (
                   <div className="overflow-hidden rounded-[1.5rem] border border-[#2D8A6A]/10 bg-white">
                     <img src={selected.image_url} alt={selected.title} className="h-32 w-full object-cover sm:h-36" />
@@ -770,8 +770,8 @@ export default function PublicEventsManagementPage({
               </div>
             ) : null}
             {descriptionItem ? (
-              <div className="absolute inset-4 z-20 flex items-center justify-center rounded-[1.75rem] bg-[#063F32]/35 px-4 py-6 backdrop-blur-sm">
-                <div className="w-full max-w-2xl overflow-hidden rounded-[2rem] border border-[#2D8A6A]/15 bg-[#FAF7F0] shadow-[0_24px_80px_-36px_rgba(13,59,46,0.24)]">
+              <div className="absolute inset-0 z-20 flex items-center justify-center overflow-x-hidden overflow-y-auto bg-[#063F32]/45 px-4 py-8 backdrop-blur-sm">
+                <div className="w-full min-w-0 max-w-2xl overflow-hidden rounded-[2rem] border border-[#2D8A6A]/15 bg-[#FAF7F0] shadow-[0_24px_80px_-36px_rgba(13,59,46,0.24)]">
                   <div className="flex items-start justify-between gap-4 border-b border-[#F1EADC] px-6 py-4">
                     <div>
                       <p className="text-sm font-semibold uppercase tracking-[0.24em] text-[#C9A227]">Event description</p>
@@ -779,7 +779,7 @@ export default function PublicEventsManagementPage({
                     </div>
                     <button type="button" onClick={() => setDescriptionItem(null)} className="rounded-xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-3 py-2 text-sm font-semibold text-[#063F32] transition hover:bg-[#F1EADC]">Close</button>
                   </div>
-                  <div className="p-6 text-sm text-[#245C4F]">
+                  <div className="max-h-[calc(100vh-10rem)] overflow-y-auto p-6 text-sm text-[#245C4F]">
                     <p className="whitespace-pre-line">{descriptionItem.description || "-"}</p>
                   </div>
                 </div>

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import TeacherClassTable from "@/components/teacher/TeacherClassTable";
 import ClassActionModal from "@/components/teacher/ClassActionModal";
+import { loadTeacherPortalJsonCached } from "@/lib/teacherPortalClient";
 
 const FILTERS = [
   { label: "All lectures", value: "" },
@@ -28,15 +29,19 @@ export default function TeacherClassesPage() {
     return response.json();
   }
 
-  async function load(status = state.status) {
+  async function load(status = state.status, options = {}) {
     const query = status ? `?status=${encodeURIComponent(status)}` : "";
-    const response = await fetch(`/api/teacher/lectures${query}`, { cache: "no-store" });
-    const data = await readJson(response);
-    if (!response.ok) throw new Error(data?.message || "Unable to load classes.");
+    const data = await loadTeacherPortalJsonCached(`/api/teacher/lectures${query}`, options);
     setState((current) => ({ ...current, items: data.items || [], status, error: "" }));
   }
 
-  useEffect(() => { load().catch((error) => setState((current) => ({ ...current, error: error.message }))); }, []);
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      load().catch((error) => setState((current) => ({ ...current, error: error.message })));
+    }, 0);
+    return () => window.clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <div className="min-h-screen border-0 space-y-6 bg-[#FAF7F0]">
@@ -66,7 +71,7 @@ export default function TeacherClassesPage() {
         </div>
         {state.error ? <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">{state.error}</div> : null}
         <TeacherClassTable items={state.items} onOpen={(item) => setState((current) => ({ ...current, selected: item }))} />
-        <ClassActionModal lecture={state.selected} open={Boolean(state.selected)} onClose={() => setState((current) => ({ ...current, selected: null }))} onChanged={() => load()} />
+        <ClassActionModal lecture={state.selected} open={Boolean(state.selected)} onClose={() => setState((current) => ({ ...current, selected: null }))} onChanged={() => load(state.status, { force: true })} />
       </div>
     </div>
   );

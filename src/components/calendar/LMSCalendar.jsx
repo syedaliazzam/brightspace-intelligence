@@ -8,6 +8,30 @@ import interactionPlugin from "@fullcalendar/interaction";
 import { getLectureDisplayStatus, getLectureEventDetailLink, getLecturePrimaryLink } from "@/lib/lectureStatus";
 
 const APP_TIMEZONE = "Asia/Karachi";
+const CALENDAR_CACHE_TTL_MS = 60 * 1000;
+const pendingCalendarRequests = new Map();
+
+function readCalendarCache(key) {
+  if (!key || typeof window === "undefined") return null;
+  try {
+    const raw = window.sessionStorage.getItem(key);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed?.cachedAt || Date.now() - parsed.cachedAt >= CALENDAR_CACHE_TTL_MS) return null;
+    return parsed.data;
+  } catch {
+    return null;
+  }
+}
+
+function writeCalendarCache(key, data) {
+  if (!key || typeof window === "undefined") return;
+  try {
+    window.sessionStorage.setItem(key, JSON.stringify({ data, cachedAt: Date.now() }));
+  } catch {
+    // Ignore storage failures; the calendar can still fetch normally.
+  }
+}
 
 function isJsonResponse(response) {
   const contentType = response.headers.get("content-type") || "";
@@ -65,7 +89,7 @@ function getLectureClassLabel(lecture) {
   );
 }
 
-export default function LMSCalendar({ apiUrl, filters = {}, extraParams = {}, onDateSelect, onEventClick, popupMode = "screen" }) {
+export default function LMSCalendar({ apiUrl, filters = {}, extraParams = {}, onDateSelect, onEventClick, popupMode = "screen", cacheNamespace = "" }) {
   const calendarRef = useRef(null);
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -101,12 +125,62 @@ export default function LMSCalendar({ apiUrl, filters = {}, extraParams = {}, on
     if (view !== "dayGridMonth") {
       const hasEventOnActiveDate = events.some((event) => String(event.start || "").slice(0, 10) === activeDate);
       const targetDate = hasEventOnActiveDate ? activeDate : firstEventDate || activeDate;
-      if (targetDate) api.gotoDate?.(targetDate);
+      if (targetDate) {
+        const timer = window.setTimeout(() => {
+          calendarRef.current?.getApi?.()?.gotoDate?.(targetDate);
+        }, 0);
+        return () => window.clearTimeout(timer);
+      }
     }
   }, [activeDate, events, firstEventDate, view]);
 
   useEffect(() => {
     let ignore = false;
+    function setCalendarEvents(rows) {
+      setEvents(
+        rows.map((lecture) => {
+          const displayStatus = lecture.display_status || getLectureDisplayStatus(lecture);
+          const { start: activeStartValue, end: activeEndValue } = pickActiveTime(lecture);
+          const startDate = parseDate(activeStartValue);
+          const endDate = parseDate(activeEndValue);
+          const startText = startDate ? new Date(startDate).toLocaleTimeString("en-PK", { timeZone: APP_TIMEZONE, hour: "2-digit", minute: "2-digit" }) : "";
+          const endText = endDate ? new Date(endDate).toLocaleTimeString("en-PK", { timeZone: APP_TIMEZONE, hour: "2-digit", minute: "2-digit" }) : "";
+          const palette = displayStatus === "live" ? ["#2563eb", "#1d4ed8"] : ["#75797D", "#666A6E"];
+          const classLevel = getLectureClassLabel(lecture);
+          return {
+            id: lecture.id,
+            title: `${startText}${endText ? ` - ${endText}` : ""}${lecture.subject_name ? ` ${lecture.subject_name}` : ""}`,
+            start: startDate,
+            end: endDate,
+            backgroundColor: palette[0],
+            borderColor: palette[1],
+            textColor: displayStatus === "live" ? "#ffffff" : "#063F32",
+            extendedProps: {
+              lecture_id: lecture.id,
+              title: lecture.title,
+              subject_name: lecture.subject_name,
+              class_level: classLevel,
+              class_name: lecture.class_name || lecture.className || "",
+              course_title: lecture.course_title || lecture.courseTitle || "",
+              grade_level: lecture.grade_level || lecture.gradeLevel || "",
+              teacher_name: lecture.teacher_name,
+              scheduled_start: activeStartValue,
+              scheduled_end: activeEndValue,
+              display_status: displayStatus,
+              status: lecture.status,
+              google_meet_link: lecture.google_meet_link,
+              recording_drive_url: lecture.recording_drive_url,
+              primary_link: getLecturePrimaryLink(lecture),
+              event_detail_link: getLectureEventDetailLink(lecture),
+              description: lecture.description,
+              rescheduled_start: lecture.rescheduled_start || lecture.rescheduledStartTime || lecture.rescheduled_scheduled_start,
+              rescheduled_end: lecture.rescheduled_end || lecture.rescheduledEndTime || lecture.rescheduled_scheduled_end,
+            },
+          };
+        })
+      );
+    }
+
     async function load() {
       if (!apiUrl) {
         setLoading(false);
@@ -115,53 +189,35 @@ export default function LMSCalendar({ apiUrl, filters = {}, extraParams = {}, on
       setLoading(true);
       setError("");
       try {
-        const response = await fetch(`${apiUrl}?${query}`, { cache: "no-store" });
-        const payload = isJsonResponse(response) ? await response.json() : { message: await response.text() };
-        if (!response.ok) throw new Error(payload?.message || "Unable to load lectures.");
+        const cacheKey = cacheNamespace ? `${cacheNamespace}:calendar:${apiUrl}?${query}` : "";
+        const cachedRows = readCalendarCache(cacheKey);
+        if (cachedRows) {
+          if (!ignore) {
+            setCalendarEvents(cachedRows);
+            setLoading(false);
+          }
+          return;
+        }
+
+        let request = cacheKey ? pendingCalendarRequests.get(cacheKey) : null;
+        if (!request) {
+          request = fetch(`${apiUrl}?${query}`, { cache: "no-store" })
+            .then(async (response) => {
+              const payload = isJsonResponse(response) ? await response.json() : { message: await response.text() };
+              if (!response.ok) throw new Error(payload?.message || "Unable to load lectures.");
+              return payload;
+            })
+            .finally(() => {
+              if (cacheKey) pendingCalendarRequests.delete(cacheKey);
+            });
+          if (cacheKey) pendingCalendarRequests.set(cacheKey, request);
+        }
+
+        const payload = await request;
         if (ignore) return;
         const rows = Array.isArray(payload?.items) ? payload.items : [];
-        setEvents(
-          rows.map((lecture) => {
-            const displayStatus = lecture.display_status || getLectureDisplayStatus(lecture);
-            const { start: activeStartValue, end: activeEndValue } = pickActiveTime(lecture);
-            const startDate = parseDate(activeStartValue);
-            const endDate = parseDate(activeEndValue);
-            const startText = startDate ? new Date(startDate).toLocaleTimeString("en-PK", { timeZone: APP_TIMEZONE, hour: "2-digit", minute: "2-digit" }) : "";
-            const endText = endDate ? new Date(endDate).toLocaleTimeString("en-PK", { timeZone: APP_TIMEZONE, hour: "2-digit", minute: "2-digit" }) : "";
-            const palette = displayStatus === "live" ? ["#2563eb", "#1d4ed8"] : ["#75797D", "#666A6E"];
-            const classLevel = getLectureClassLabel(lecture);
-            return {
-              id: lecture.id,
-              title: `${startText}${endText ? ` - ${endText}` : ""}${lecture.subject_name ? ` ${lecture.subject_name}` : ""}`,
-              start: startDate,
-              end: endDate,
-              backgroundColor: palette[0],
-              borderColor: palette[1],
-              textColor: displayStatus === "live" ? "#ffffff" : "#063F32",
-              extendedProps: {
-                lecture_id: lecture.id,
-                title: lecture.title,
-                subject_name: lecture.subject_name,
-                class_level: classLevel,
-                class_name: lecture.class_name || lecture.className || "",
-                course_title: lecture.course_title || lecture.courseTitle || "",
-                grade_level: lecture.grade_level || lecture.gradeLevel || "",
-                teacher_name: lecture.teacher_name,
-                scheduled_start: activeStartValue,
-                scheduled_end: activeEndValue,
-                display_status: displayStatus,
-                status: lecture.status,
-                google_meet_link: lecture.google_meet_link,
-                recording_drive_url: lecture.recording_drive_url,
-                primary_link: getLecturePrimaryLink(lecture),
-                event_detail_link: getLectureEventDetailLink(lecture),
-                description: lecture.description,
-                rescheduled_start: lecture.rescheduled_start || lecture.rescheduledStartTime || lecture.rescheduled_scheduled_start,
-                rescheduled_end: lecture.rescheduled_end || lecture.rescheduledEndTime || lecture.rescheduled_scheduled_end,
-              },
-            };
-          })
-        );
+        writeCalendarCache(cacheKey, rows);
+        setCalendarEvents(rows);
       } catch (fetchError) {
         if (!ignore) setError(fetchError instanceof Error ? fetchError.message : "Unable to load lectures.");
       } finally {
@@ -172,7 +228,7 @@ export default function LMSCalendar({ apiUrl, filters = {}, extraParams = {}, on
     return () => {
       ignore = true;
     };
-  }, [apiUrl, query]);
+  }, [apiUrl, cacheNamespace, query]);
 
   function handleEventClick(info) {
     const lecture = info.event.extendedProps || null;
@@ -255,7 +311,7 @@ export default function LMSCalendar({ apiUrl, filters = {}, extraParams = {}, on
         <div
           className={
             popupMode === "page"
-              ? "absolute inset-0 z-[9999] rounded-[2rem] flex items-center justify-center bg-[#063F32]/45 px-4 pt-16 backdrop-blur-sm"
+              ? "absolute inset-0 z-[9999] rounded-[1.6rem] flex items-center justify-center bg-[#063F32]/45 px-4 pt-16 backdrop-blur-sm"
               : "fixed inset-0 z-[9999] rounded-[2rem] flex items-center justify-center bg-[#063F32]/45 px-4 pt-16 backdrop-blur-sm"
           }
         >

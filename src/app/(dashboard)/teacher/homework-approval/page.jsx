@@ -2,19 +2,21 @@
 
 import { useEffect, useState } from "react";
 import HomeworkApprovalTable from "@/components/teacher/HomeworkApprovalTable";
+import { loadTeacherPortalJsonCached } from "@/lib/teacherPortalClient";
 
 export default function TeacherHomeworkApprovalPage() {
   const [state, setState] = useState({ items: [], error: "" });
 
-  async function load() {
-    const response = await fetch("/api/teacher/homework/submissions", { cache: "no-store" });
-    const data = await response.json();
-    if (!response.ok) throw new Error(data?.message || "Unable to load homework submissions.");
+  async function load(options = {}) {
+    const data = await loadTeacherPortalJsonCached("/api/teacher/homework/submissions", options);
     setState((current) => ({ ...current, items: data.items || [], error: "" }));
   }
 
   useEffect(() => {
-    load().catch((error) => setState((current) => ({ ...current, error: error.message })));
+    const timer = window.setTimeout(() => {
+      load().catch((error) => setState((current) => ({ ...current, error: error.message })));
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, []);
 
   return (
@@ -34,7 +36,7 @@ export default function TeacherHomeworkApprovalPage() {
 
         <HomeworkApprovalTable
           items={state.items}
-          onRefresh={() => load().catch((error) => setState((current) => ({ ...current, error: error.message })))}
+          onRefresh={() => load({ force: true }).catch((error) => setState((current) => ({ ...current, error: error.message })))}
         />
       </div>
     </div>

@@ -60,29 +60,7 @@ export async function GET() {
           WHERE e.registration_id = nbsf.registration_id
              OR (fv.student_id IS NOT NULL AND e.student_id = fv.student_id)
           LIMIT 1
-        )
-        OR EXISTS (
-          SELECT 1
-          FROM student_profiles sp_live
-          INNER JOIN users u_live ON u_live.id = sp_live.user_id
-          LEFT JOIN enrollments e_live ON e_live.student_id = sp_live.id
-          WHERE COALESCE(sp_live.status, 'active'::user_status) = 'active'::user_status
-            AND COALESCE(u_live.status, 'active'::user_status) = 'active'::user_status
-            AND (
-              e_live.registration_id = nbsf.registration_id
-              OR LOWER(NULLIF(TRIM(u_live.full_name), '')) = LOWER(NULLIF(TRIM(rl.student_name), ''))
-              OR (
-                NULLIF(TRIM(rl.email), '') IS NOT NULL
-                AND LOWER(NULLIF(TRIM(u_live.email), '')) = LOWER(NULLIF(TRIM(rl.email), ''))
-              )
-              OR (
-                NULLIF(TRIM(rl.phone), '') IS NOT NULL
-                AND REGEXP_REPLACE(COALESCE(u_live.phone, ''), '\\D', '', 'g') = REGEXP_REPLACE(COALESCE(rl.phone, ''), '\\D', '', 'g')
-              )
-            )
-          LIMIT 1
-        )
-        OR LOWER(COALESCE(rl.status::text, '')) IN ('access_granted', 'fee_verified') AS is_lms_enrolled,
+        ) AS is_lms_enrolled,
         COALESCE(nbsf.scholarship_amount::float8, 0) AS scholarship_amount,
         nbsf.created_at,
         nbsf.updated_at,

@@ -6,6 +6,7 @@ import dayGridPlugin from "@fullcalendar/daygrid";
 import timeGridPlugin from "@fullcalendar/timegrid";
 import interactionPlugin from "@fullcalendar/interaction";
 import { X } from "lucide-react";
+import { loadParentPortalJsonCached } from "@/lib/parentChildrenClient";
 
 const FILTER_OPTIONS = [
   { id: "all", label: "All Events" },
@@ -150,12 +151,12 @@ export default function ParentEventsCalendarPage() {
 
       try {
         const [publicResult, internalResult] = await Promise.allSettled([
-          fetch("/api/public-events", { cache: "no-store" }),
-          fetch("/api/internal-events", { cache: "no-store" }),
+          loadParentPortalJsonCached("/api/public-events"),
+          loadParentPortalJsonCached("/api/internal-events"),
         ]);
 
-        const publicData = publicResult.status === "fulfilled" ? await publicResult.value.json().catch(() => ({ items: [] })) : { items: [] };
-        const internalData = internalResult.status === "fulfilled" ? await internalResult.value.json().catch(() => ({ items: [] })) : { items: [] };
+        const publicData = publicResult.status === "fulfilled" ? publicResult.value : { items: [] };
+        const internalData = internalResult.status === "fulfilled" ? internalResult.value : { items: [] };
 
         if (!active) return;
 

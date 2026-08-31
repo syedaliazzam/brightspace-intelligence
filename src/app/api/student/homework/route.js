@@ -7,19 +7,9 @@ function json(message, status = 200, extra = {}) {
   return NextResponse.json({ message, ...extra }, { status });
 }
 
-async function ensureHomeworkAttachmentColumns() {
-  await prisma.$executeRaw`
-    ALTER TABLE homework
-    ADD COLUMN IF NOT EXISTS homework_attachment_buckets jsonb,
-    ADD COLUMN IF NOT EXISTS homework_attachment_paths jsonb,
-    ADD COLUMN IF NOT EXISTS homework_attachment_names jsonb
-  `;
-}
-
 export async function GET() {
   try {
     const session = await requireRole(["student"]);
-    await ensureHomeworkAttachmentColumns();
     const items = await prisma.$queryRaw`
       SELECT
         h.id::text AS id,

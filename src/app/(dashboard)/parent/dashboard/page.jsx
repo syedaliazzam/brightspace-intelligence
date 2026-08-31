@@ -7,6 +7,7 @@ import ActiveHeadlinesBanner from "@/components/shared/ActiveHeadlinesBanner";
 import UpcomingPublicEventsTicker from "@/components/layout/UpcomingPublicEventsTicker";
 import MonthlyPlanSlider from "@/components/layout/MonthlyPlanSlider";
 import EducationalDocumentsSection from "@/components/parent/EducationalDocumentsSection";
+import { getInitialSelectedChildId, loadParentChildrenCached, loadParentPortalJsonCached } from "@/lib/parentChildrenClient";
 
 export default function ParentDashboardPage() {
   const [showAllMonthlyChildren, setShowAllMonthlyChildren] = useState(false);
@@ -21,27 +22,18 @@ export default function ParentDashboardPage() {
   });
 
   async function loadChildren() {
-    const response = await fetch("/api/parent/children", { cache: "no-store" });
-    const data = await response.json();
-    if (!response.ok) {
-      throw new Error(data?.message || "Unable to load children.");
-    }
-    const children = Array.isArray(data.children) ? data.children : [];
+    const children = await loadParentChildrenCached({ force: true });
     setState((current) => ({
       ...current,
       children,
-      selectedChildId: children.length === 1 ? String(children[0]?.id || "") : "",
+      selectedChildId: getInitialSelectedChildId(children, current.selectedChildId),
       loading: false,
       error: "",
     }));
   }
 
   async function loadHeadlines() {
-    const response = await fetch("/api/headlines/active", { cache: "no-store" });
-    const data = await response.json();
-    if (!response.ok) {
-      throw new Error(data?.message || "Unable to load headlines.");
-    }
+    const data = await loadParentPortalJsonCached("/api/headlines/active");
     setState((current) => ({
       ...current,
       headlines: Array.isArray(data.headlines) ? data.headlines : [],
@@ -54,26 +46,27 @@ export default function ParentDashboardPage() {
       return;
     }
 
-    const response = await fetch(`/api/parent/dashboard?childId=${encodeURIComponent(childId)}`, { cache: "no-store" });
-    const data = await response.json();
-    if (!response.ok) {
-      throw new Error(data?.message || "Unable to load dashboard.");
-    }
+    const [data, attendanceData] = await Promise.all([
+      loadParentPortalJsonCached(`/api/parent/dashboard?childId=${encodeURIComponent(childId)}`, { force: true }),
+      loadParentPortalJsonCached(`/api/parent/attendance?childId=${encodeURIComponent(childId)}`, { force: true }),
+    ]);
+    const attendanceSummary = attendanceData?.summary || {};
 
     setState((current) => ({
       ...current,
       headlines: Array.isArray(data.headlines) ? data.headlines : current.headlines,
-      stats: data.stats || {},
+      stats: {
+        ...(data.stats || {}),
+        attended_lectures: attendanceSummary.total_conducted ?? data.stats?.attended_lectures,
+        present_lectures: attendanceSummary.attended_classes ?? data.stats?.present_lectures,
+        attendance_percentage: attendanceSummary.attendance_percentage ?? data.stats?.attendance_percentage,
+      },
       error: "",
     }));
   }
 
   async function loadMonthlyFee() {
-    const response = await fetch("/api/monthly-fee-status", { cache: "no-store" });
-    const data = await response.json();
-    if (!response.ok) {
-      throw new Error(data?.message || "Unable to load monthly fee status.");
-    }
+    const data = await loadParentPortalJsonCached("/api/monthly-fee-status");
     setState((current) => ({ ...current, monthlyFee: data.available ? data : null }));
   }
 
@@ -218,7 +211,6 @@ export default function ParentDashboardPage() {
           value={state.selectedChildId}
           onChange={(id) => {
             setState((current) => ({ ...current, selectedChildId: id }));
-            loadDashboard(id).catch((error) => setState((current) => ({ ...current, error: error.message })));
           }}
         />
 

@@ -1,18 +1,16 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { loadTeacherPortalJsonCached } from "@/lib/teacherPortalClient";
 
 export default function TeacherProfilePage() {
   const [state, setState] = useState({ profile: null, error: "" });
 
   useEffect(() => {
-    fetch("/api/teacher/profile", { cache: "no-store" })
-      .then((response) =>
-        response.json().then((data) => {
-          if (!response.ok) throw new Error(data?.message || "Unable to load profile.");
-          setState({ profile: data.profile || null, error: "" });
-        })
-      )
+    loadTeacherPortalJsonCached("/api/teacher/profile")
+      .then((data) => {
+        setState({ profile: data.profile || null, error: "" });
+      })
       .catch((error) => setState((current) => ({ ...current, error: error.message })));
   }, []);
 

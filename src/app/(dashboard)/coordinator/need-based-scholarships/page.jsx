@@ -83,9 +83,35 @@ export function NeedBasedScholarshipsPage({
     return () => window.clearTimeout(timer);
   }, []);
 
-  function isVerifiedScholarship(item) {
+  function isScholarshipRecordVerified(item) {
+    const scholarshipStatus = String(item?.status || "").toLowerCase();
+    const voucherStatus = String(item?.voucher_status || "").toLowerCase();
+    return scholarshipStatus === "verified" || voucherStatus === "verified";
+  }
+
+  function isLiveStudent(item) {
     const leadStatus = String(item?.lead_status || "").toLowerCase();
     return Boolean(item?.is_lms_enrolled) || leadStatus === "access_granted" || leadStatus === "fee_verified";
+  }
+
+  function getScholarshipGivenAmount(item) {
+    return Number(item?.voucher_scholarship_amount ?? item?.scholarship_amount ?? 0);
+  }
+
+  function hasScholarshipGiven(item) {
+    return getScholarshipGivenAmount(item) > 0;
+  }
+
+  function isVerifiedScholarship(item) {
+    return isLiveStudent(item) && hasScholarshipGiven(item);
+  }
+
+  function isHiddenLiveStudentWithoutScholarship(item) {
+    return isLiveStudent(item) && !hasScholarshipGiven(item);
+  }
+
+  function isNotVerifiedScholarship(item) {
+    return !isScholarshipRecordVerified(item) && !isHiddenLiveStudentWithoutScholarship(item);
   }
 
   const filteredItems = useMemo(() => {
@@ -96,7 +122,7 @@ export function NeedBasedScholarshipsPage({
     return items.filter((item) => {
       const isVerified = isVerifiedScholarship(item);
       if (normalizedVerificationFilter === "verified" && !isVerified) return false;
-      if (normalizedVerificationFilter === "not_verified" && isVerified) return false;
+      if (normalizedVerificationFilter === "not_verified" && !isNotVerifiedScholarship(item)) return false;
 
       const searchableMap = {
         all: [
@@ -140,7 +166,8 @@ export function NeedBasedScholarshipsPage({
   const paginatedItems = filteredItems.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   const verifiedCount = useMemo(() => items.filter((item) => isVerifiedScholarship(item)).length, [items]);
-  const notVerifiedCount = Math.max(items.length - verifiedCount, 0);
+  const notVerifiedCount = useMemo(() => items.filter((item) => isNotVerifiedScholarship(item)).length, [items]);
+  const visibleCount = verifiedCount + notVerifiedCount;
 
   const columnOptions = [
     { label: "All columns", value: "all" },
@@ -182,7 +209,7 @@ export function NeedBasedScholarshipsPage({
   };
 
   const canShowVoucherUpdate = (item) => {
-    return allowCreateVoucher && isVerifiedScholarship(item) && !item?.scholarship_form_voucher_id;
+    return allowCreateVoucher && isScholarshipRecordVerified(item) && !item?.scholarship_form_voucher_id;
   };
 
   function openVoucherUpdate(item) {
@@ -282,8 +309,8 @@ export function NeedBasedScholarshipsPage({
   }
 
   const detailsPopupWrapperClassName = allowCreateVoucher
-    ? "absolute inset-x-0 top-0 z-[9999] flex items-start justify-center px-4 pb-10 pt-10 sm:px-6 lg:-mx-10 lg:px-4"
-    : "absolute inset-x-0 top-0 z-[9999] mx-auto flex min-h-full w-full max-w-7xl items-start justify-center px-4 pb-10 pt-10 sm:px-6 lg:px-8";
+    ? "absolute inset-0 z-[9999] isolate overflow-x-hidden overflow-y-auto bg-[#063F32]/45 px-4 py-10 backdrop-blur-sm sm:px-6 lg:px-8"
+    : "absolute inset-0 z-[9999] isolate overflow-x-hidden overflow-y-auto bg-[#063F32]/45 px-4 py-10 backdrop-blur-sm sm:px-6 lg:px-8";
 
   return (
     <div className="min-h-screen bg-[#FAF7F0]">
@@ -339,7 +366,7 @@ export function NeedBasedScholarshipsPage({
               className="w-full rounded-2xl border border-[#2D8A6A]/20 bg-white px-4 py-3 text-sm text-[#063F32] outline-none transition focus:border-[#2D8A6A] focus:ring-4 focus:ring-[#FFF5D6]"
             />
             <div className="shrink-0 rounded-2xl px-4 py-3 text-sm font-semibold text-[#245C4F]">
-              Showing {filteredItems.length} of {items.length}
+              Showing {filteredItems.length} of {visibleCount}
             </div>
           </div>
           <div className="overflow-x-auto">
@@ -438,9 +465,9 @@ export function NeedBasedScholarshipsPage({
         </section>
 
         {selectedItem ? (
-          <div className={`${detailsPopupWrapperClassName} min-h-full`}>
-            <div className="absolute inset-0 -bottom-24 bg-[#063F32]/45 backdrop-blur-sm" />
-            <div className="relative max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded-[2rem] border border-[#2D8A6A]/15 bg-[#FAF7F0] p-6 shadow-[0_24px_80px_-36px_rgba(13,59,46,0.24)] sm:p-8">
+          <div className={detailsPopupWrapperClassName}>
+            <div className="relative mx-auto w-full min-w-0 max-w-4xl overflow-hidden rounded-[2rem] border border-[#2D8A6A]/15 bg-[#FAF7F0] shadow-[0_24px_80px_-36px_rgba(13,59,46,0.24)]">
+            <div className="max-h-[calc(100vh-5rem)] overflow-y-auto p-6 sm:p-8">
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <p className="text-sm font-semibold uppercase tracking-[0.24em] text-[#C9A227]">Scholarship</p>
@@ -475,6 +502,7 @@ export function NeedBasedScholarshipsPage({
                     ))}
                   </tbody>
                 </table>
+              </div>
               </div>
             </div>
           </div>

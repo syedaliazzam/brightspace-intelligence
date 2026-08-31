@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { LeafSpinnerInline } from "@/components/shared/AshShajrahLoaders";
 import ClientPortal from "@/components/shared/ClientPortal";
+import PaginationControls from "@/components/teacher/PaginationControls";
 
 function formatDate(value) {
   if (!value) return "Not available";
@@ -26,6 +27,11 @@ export default function HomeworkList({ items = [], onRefresh }) {
   const [filePreviews, setFilePreviews] = useState([]);
   const [modalError, setModalError] = useState("");
   const [pending, setPending] = useState(false);
+  const [page, setPage] = useState(1);
+  const pageSize = 7;
+
+  const totalPages = Math.max(1, Math.ceil((items?.length || 0) / pageSize));
+  const visibleItems = items.slice((page - 1) * pageSize, page * pageSize);
 
   function syncFilePreviews(nextFiles) {
     setFilePreviews((currentPreviews) => {
@@ -48,6 +54,10 @@ export default function HomeworkList({ items = [], onRefresh }) {
       setModalError("");
     }
   }, [activeItem]);
+
+  useEffect(() => {
+    setPage((current) => Math.min(current, totalPages));
+  }, [totalPages]);
 
   useEffect(() => {
     return () => {
@@ -90,22 +100,23 @@ export default function HomeworkList({ items = [], onRefresh }) {
   return (
     <>
       <div className="overflow-hidden rounded-[2rem] border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(250,247,240,0.98)_100%)] shadow-[0_20px_70px_-36px_rgba(13,59,46,0.18)] backdrop-blur-xl">
-        <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-[#F1EADC] text-left text-sm">
+        <div className="flex min-h-[34rem] flex-col">
+        <div className="flex-1 overflow-x-auto">
+        <table className="min-w-[1200px] table-fixed divide-y divide-[#F1EADC] text-left text-sm">
           <thead className="bg-[linear-gradient(180deg,#FAF7F0_0%,#F1EADC_100%)]">
             <tr className="text-xs font-semibold uppercase tracking-[0.12em] text-[#0D5C48]">
-              <th className="px-6 py-4">Title</th>
-              <th className="px-6 py-4">Description</th>
-              <th className="px-6 py-4">Document</th>
-              <th className="px-6 py-4">Subject</th>
-              <th className="px-6 py-4">Teacher</th>
-              <th className="px-6 py-4">Due Date</th>
-              <th className="px-6 py-4">Status</th>
-              <th className="px-6 py-4">Action</th>
+              <th className="w-[16%] px-6 py-4">Title</th>
+              <th className="w-[24%] px-6 py-4">Description</th>
+              <th className="w-[18%] px-6 py-4">Document</th>
+              <th className="w-[12%] px-6 py-4">Subject</th>
+              <th className="w-[12%] px-6 py-4">Teacher</th>
+              <th className="w-[18%] px-6 py-4">Due Date</th>
+              <th className="w-[4%] px-6 py-4">Status</th>
+              <th className="w-[4%] px-6 py-4">Action</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-[#F1EADC] bg-transparent">
-              {items.map((item) => (
+              {visibleItems.map((item) => (
                 <tr key={item.id} className="align-top">
                   <td className="px-6 py-4 font-semibold text-[#063F32]">
                     {item.title || "Homework"}
@@ -132,7 +143,7 @@ export default function HomeworkList({ items = [], onRefresh }) {
                   </td>
                   <td className="px-6 py-4 text-[#245C4F]">{item.subject_name || "Not available"}</td>
                   <td className="px-6 py-4 text-[#245C4F]">{item.teacher_name || "Not available"}</td>
-                  <td className="px-6 py-4 text-[#245C4F]">{formatDate(item.due_date || item.created_at)}</td>
+                  <td className="whitespace-nowrap px-6 py-4 text-[#245C4F]">{formatDate(item.due_date || item.created_at)}</td>
                 <td className="px-6 py-4">
                   <span className="inline-flex rounded-full bg-[#FFF5D6] px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-[#8A6B00]">
                     {item.status || "pending"}
@@ -162,6 +173,15 @@ export default function HomeworkList({ items = [], onRefresh }) {
             ) : null}
           </tbody>
         </table>
+        </div>
+        {items.length > pageSize ? (
+          <PaginationControls
+            page={page}
+            pageSize={pageSize}
+            totalItems={items.length}
+            onPageChange={(nextPage) => setPage(Math.min(Math.max(1, nextPage), totalPages))}
+          />
+        ) : null}
         </div>
       </div>
 
