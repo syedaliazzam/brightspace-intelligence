@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { usePathname } from "next/navigation";
 import { ChevronDown } from "lucide-react";
 import AdminDashboardCards from "@/components/admin/AdminDashboardCards";
@@ -99,7 +99,7 @@ export default function AdminAuditLogsPage() {
 
   const load = useCallback(async (options = {}) => {
     const force = options.force === true;
-    const cacheKey = getCacheKey(filters);
+    const cacheKey = getCacheKey({ search: "", action: "", entityType: "" });
 
     setState((current) => ({ ...current, loading: true, error: "" }));
 
@@ -121,9 +121,6 @@ export default function AdminAuditLogsPage() {
 
     try {
       const params = new URLSearchParams();
-      if (filters.search) params.set("search", filters.search);
-      if (filters.action) params.set("action", filters.action);
-      if (filters.entityType) params.set("entityType", filters.entityType);
 
       const response = await fetch(`/api/admin/audit-logs?${params.toString()}`, {
         cache: "no-store",
@@ -156,7 +153,7 @@ export default function AdminAuditLogsPage() {
         summary: { total: 0, recent: 0 },
       });
     }
-  }, [filters]);
+  }, []);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -165,6 +162,28 @@ export default function AdminAuditLogsPage() {
 
     return () => window.clearTimeout(timer);
   }, [load]);
+
+  const filteredItems = useMemo(() => {
+    const searchTerm = String(filters.search || "").trim().toLowerCase();
+    const selectedAction = String(filters.action || "").trim().toLowerCase();
+    const selectedEntityType = String(filters.entityType || "").trim().toLowerCase();
+
+    return (state.items || []).filter((item) => {
+      if (selectedAction && String(item.action || "").toLowerCase() !== selectedAction) return false;
+      if (selectedEntityType && String(item.entity_type || "").toLowerCase() !== selectedEntityType) return false;
+      if (!searchTerm) return true;
+
+      const haystack = [
+        item.action,
+        item.entity_type,
+        item.actor_name,
+        item.actor_email,
+        item.description,
+        item.created_at,
+      ].map((value) => String(value || "").toLowerCase()).join(" ");
+      return haystack.includes(searchTerm);
+    });
+  }, [filters.search, filters.action, filters.entityType, state.items]);
 
   return (
     <div className="min-h-screen bg-[#FAF7F0] text-[#063F32]">
@@ -215,7 +234,6 @@ export default function AdminAuditLogsPage() {
             className="grid gap-3 lg:grid-cols-[minmax(0,1.2fr)_220px_220px_auto]"
             onSubmit={(event) => {
               event.preventDefault();
-              load();
             }}
           >
             <label className="block">
@@ -247,7 +265,6 @@ export default function AdminAuditLogsPage() {
                   onFocus={() => setActionOpen(true)}
                   onBlur={() => closeSelectState(setActionOpen)}
                   onChange={(event) => {
-                    setState((current) => ({ ...current, loading: true }));
                     setFilters((current) => ({
                       ...current,
                       action: event.target.value,
@@ -281,7 +298,6 @@ export default function AdminAuditLogsPage() {
                   onFocus={() => setEntityOpen(true)}
                   onBlur={() => closeSelectState(setEntityOpen)}
                   onChange={(event) => {
-                    setState((current) => ({ ...current, loading: true }));
                     setFilters((current) => ({
                       ...current,
                       entityType: event.target.value,
@@ -345,7 +361,7 @@ export default function AdminAuditLogsPage() {
                 render: (row) => formatDate(row.created_at),
               },
             ]}
-            rows={state.loading ? [] : state.items}
+            rows={state.loading ? [] : filteredItems}
             emptyMessage={
               state.loading
                 ? "Loading audit logs..."

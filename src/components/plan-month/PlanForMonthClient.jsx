@@ -2,9 +2,38 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { ChevronDown, ChevronUp, Plus } from "lucide-react";
+import { ChevronDown, ChevronUp, FileImage, FileVideo, Plus } from "lucide-react";
 import ClientPortal from "@/components/shared/ClientPortal";
 import { STORAGE_SAFE_UPLOAD_MAX_BYTES, formatUploadLimit } from "@/lib/uploadLimits";
+
+const MONTHLY_PLANS_CACHE_KEY = "monthly-plans:list:v1";
+const MONTHLY_PLANS_CACHE_TTL_MS = 60 * 1000;
+
+function readMonthlyPlansCache() {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.sessionStorage.getItem(MONTHLY_PLANS_CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed?.cachedAt || Date.now() - parsed.cachedAt >= MONTHLY_PLANS_CACHE_TTL_MS) {
+      window.sessionStorage.removeItem(MONTHLY_PLANS_CACHE_KEY);
+      return null;
+    }
+    return parsed.items;
+  } catch {
+    window.sessionStorage.removeItem(MONTHLY_PLANS_CACHE_KEY);
+    return null;
+  }
+}
+
+function writeMonthlyPlansCache(items) {
+  if (typeof window === "undefined") return;
+  try {
+    window.sessionStorage.setItem(MONTHLY_PLANS_CACHE_KEY, JSON.stringify({ items, cachedAt: Date.now() }));
+  } catch {
+    // The page can still load normally when session storage is unavailable.
+  }
+}
 
 function formatDate(d) {
   try {
@@ -14,15 +43,12 @@ function formatDate(d) {
   }
 }
 
-function getPreviewSrc(item) {
-  if (!item) return "";
-  if (typeof item === "string") return item;
-  if (item instanceof File) return URL.createObjectURL(item);
-  return "";
+function isFileLike(value) {
+  return typeof File !== "undefined" && value instanceof File;
 }
 
 function getMediaKey(item, idx) {
-  if (item instanceof File) {
+  if (isFileLike(item)) {
     return `${item.name || "file"}-${item.size || 0}-${item.lastModified || 0}-${idx}`;
   }
   return `${String(item || "").trim() || "media"}-${idx}`;
@@ -56,11 +82,11 @@ function getMonthlyPlanFileLimitMessage(file, maxBytes = STORAGE_SAFE_UPLOAD_MAX
 }
 
 function getOversizedMonthlyPlanFile(files = [], maxBytes = STORAGE_SAFE_UPLOAD_MAX_BYTES) {
-  return (Array.isArray(files) ? files : []).find((file) => file instanceof File && file.size > maxBytes) || null;
+  return (Array.isArray(files) ? files : []).find((file) => isFileLike(file) && file.size > maxBytes) || null;
 }
 
 function isVideoSourceValue(value = "") {
-  if (value instanceof File) {
+  if (isFileLike(value)) {
     const mime = String(value.type || "").toLowerCase();
     if (mime.startsWith("video/")) return true;
     return /\.(mp4|webm|ogg|mov|m4v)(\?.*)?$/i.test(String(value.name || ""));
@@ -68,10 +94,25 @@ function isVideoSourceValue(value = "") {
   return /^data:video\//i.test(String(value || "")) || /\.(mp4|webm|ogg|mov|m4v)(\?.*)?$/i.test(String(value || ""));
 }
 
+function MonthlyPlanLightMediaTile({ item, index }) {
+  const video = isVideoSourceValue(item);
+  const Icon = video ? FileVideo : FileImage;
+
+  return (
+    <span className="relative flex h-10 w-10 items-center justify-center rounded-xl border border-[#2D8A6A]/20 bg-[#FAF7F0] text-[#0D5C48] transition hover:bg-[#F1EADC]">
+      <Icon className={video ? "h-4 w-4 text-[#8A5CF6]" : "h-4 w-4 text-[#2D8A6A]"} />
+      <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-[#0D5C48] px-1 text-[9px] font-bold text-[#FFF5D6]">
+        {index + 1}
+      </span>
+    </span>
+  );
+}
+
 function MonthlyPlanMediaTile({ item, index, total, onMoveUp, onMoveDown, onRemove }) {
+  const [previewFailed, setPreviewFailed] = useState(false);
   const previewSrc = useMemo(() => {
     if (!item) return "";
-    if (item instanceof File) return URL.createObjectURL(item);
+    if (isFileLike(item)) return URL.createObjectURL(item);
     return buildPreviewUrl(item);
   }, [item]);
 
@@ -86,26 +127,35 @@ function MonthlyPlanMediaTile({ item, index, total, onMoveUp, onMoveDown, onRemo
   }, [previewSrc]);
 
   const video = isVideoSourceValue(item);
+  const Icon = video ? FileVideo : FileImage;
+  const label = isFileLike(item) ? item.name : String(item || "").split("/").pop();
 
   return (
     <div className="overflow-hidden rounded-2xl border border-[#2D8A6A]/10 bg-white shadow-sm">
       <div className="relative h-28 w-full overflow-hidden bg-[#0D3B2E]">
-        {previewSrc ? (
-          video ? (
-            <video
-              src={previewSrc}
-              className="h-full w-full object-cover"
-              muted
-              playsInline
-              controls
-              preload="metadata"
-            />
-          ) : (
-            <img src={previewSrc} alt={`edit-preview-${index}`} className="h-full w-full object-cover" />
-          )
+        {previewSrc && !previewFailed && !video ? (
+          <img
+            src={previewSrc}
+            alt={`preview-${index}`}
+            loading="lazy"
+            decoding="async"
+            className="h-full w-full object-cover"
+            onError={() => setPreviewFailed(true)}
+          />
+        ) : previewSrc && !previewFailed && video ? (
+          <video
+            src={previewSrc}
+            className="h-full w-full object-cover"
+            muted
+            playsInline
+            controls
+            preload="metadata"
+            onError={() => setPreviewFailed(true)}
+          />
         ) : (
-          <div className="flex h-full w-full items-center justify-center text-xs font-semibold text-[#FAF7F0]">
-            Loading preview...
+          <div className="flex h-full w-full flex-col items-center justify-center gap-2 bg-[#FAF7F0] text-xs font-semibold text-[#0D5C48]">
+            <Icon className={video ? "h-8 w-8 text-[#8A5CF6]" : "h-8 w-8 text-[#2D8A6A]"} />
+            <span>{video ? "Video selected" : "Image selected"}</span>
           </div>
         )}
         {video ? (
@@ -117,6 +167,11 @@ function MonthlyPlanMediaTile({ item, index, total, onMoveUp, onMoveDown, onRemo
           #{index + 1}
         </div>
       </div>
+      {label ? (
+        <div className="truncate border-t border-[#F1EADC] bg-white px-3 py-2 text-[11px] font-medium text-[#245C4F]" title={label}>
+          {label}
+        </div>
+      ) : null}
       <div className="flex items-center justify-between gap-2 border-t border-[#F1EADC] bg-[#FAF7F0] px-2 py-2">
         <div className="flex items-center gap-1">
           <button
@@ -153,7 +208,7 @@ function MonthlyPlanMediaTile({ item, index, total, onMoveUp, onMoveDown, onRemo
 }
 
 async function uploadMonthlyPlanAsset(file) {
-  if (file instanceof File && file.size > STORAGE_SAFE_UPLOAD_MAX_BYTES) {
+  if (isFileLike(file) && file.size > STORAGE_SAFE_UPLOAD_MAX_BYTES) {
     throw new Error(getMonthlyPlanFileLimitMessage(file, STORAGE_SAFE_UPLOAD_MAX_BYTES));
   }
 
@@ -206,6 +261,7 @@ export default function PlanForMonthClient({
   description = "Create and manage monthly plans; upload images and share with students and admins.",
   createButtonLabel = "Add Monthly Plan",
   showHeader = true,
+  showTableMediaPreviews = true,
 }) {
   const MAX_IMAGE_BYTES = STORAGE_SAFE_UPLOAD_MAX_BYTES;
   const MAX_VIDEO_BYTES = STORAGE_SAFE_UPLOAD_MAX_BYTES;
@@ -238,11 +294,18 @@ export default function PlanForMonthClient({
     let active = true;
     async function load() {
       try {
+        const cachedItems = readMonthlyPlansCache();
+        if (Array.isArray(cachedItems)) {
+          setPlans(cachedItems);
+          return;
+        }
         const res = await fetch("/api/monthly-plans", { cache: "no-store" });
         if (!res.ok) throw new Error("Unable to load plans");
         const data = await res.json();
         if (!active) return;
-        setPlans(Array.isArray(data?.items) ? data.items : []);
+        const nextItems = Array.isArray(data?.items) ? data.items : [];
+        writeMonthlyPlansCache(nextItems);
+        setPlans(nextItems);
       } catch (err) {
         console.error(err);
       }
@@ -348,8 +411,8 @@ export default function PlanForMonthClient({
     }
     setSaving(true);
     try {
-      const existingUrls = editForm.images.filter((item) => !(item instanceof File));
-      const newFiles = editForm.images.filter((item) => item instanceof File);
+      const existingUrls = editForm.images.filter((item) => !isFileLike(item));
+      const newFiles = editForm.images.filter((item) => isFileLike(item));
       const uploadedUrls = [];
 
       for (const file of newFiles) {
@@ -381,7 +444,9 @@ export default function PlanForMonthClient({
       setSuccessMessage("Plan updated successfully!");
       const d = await fetch("/api/monthly-plans", { cache: "no-store" });
       const newData = await d.json();
-      setPlans(Array.isArray(newData?.items) ? newData.items : []);
+      const nextItems = Array.isArray(newData?.items) ? newData.items : [];
+      writeMonthlyPlansCache(nextItems);
+      setPlans(nextItems);
     } catch (err) {
       setMessage("Error: " + (err?.message || String(err)));
     } finally {
@@ -425,8 +490,8 @@ export default function PlanForMonthClient({
 
     setSaving(true);
     try {
-      const existingUrls = form.images.filter((item) => !(item instanceof File));
-      const newFiles = form.images.filter((item) => item instanceof File);
+      const existingUrls = form.images.filter((item) => !isFileLike(item));
+      const newFiles = form.images.filter((item) => isFileLike(item));
       const uploadedUrls = [];
       for (const file of newFiles) {
         uploadedUrls.push(await uploadMonthlyPlanAsset(file));
@@ -449,7 +514,9 @@ export default function PlanForMonthClient({
         setShowCreateModal(false);
         const d = await fetch("/api/monthly-plans", { cache: "no-store" });
         const newData = await d.json();
-        setPlans(Array.isArray(newData?.items) ? newData.items : []);
+        const nextItems = Array.isArray(newData?.items) ? newData.items : [];
+        writeMonthlyPlansCache(nextItems);
+        setPlans(nextItems);
       } else if (createResponse.status === 403) {
         setMessage("Forbidden: you do not have permission to create plans.");
       } else {
@@ -614,61 +681,15 @@ export default function PlanForMonthClient({
                 {form.images.length > 0 && (
                   <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                     {form.images.map((img, idx) => (
-                      <div key={getMediaKey(img, idx)} className="overflow-hidden rounded-2xl border border-[#2D8A6A]/10 bg-white shadow-sm">
-                        <div className="relative h-24 w-full overflow-hidden">
-                          {isVideoSource(img) ? (
-                            <video
-                              src={getPreviewSrc(img)}
-                              className="h-full w-full bg-black object-cover"
-                              muted
-                              playsInline
-                              controls
-                              preload="metadata"
-                            />
-                          ) : (
-                            <img src={getPreviewSrc(img)} alt={`preview-${idx}`} className="h-full w-full object-cover" />
-                          )}
-                          {isVideoSource(img) ? (
-                            <div className="absolute bottom-2 left-2 rounded-full bg-black/70 px-2 py-1 text-[10px] font-semibold text-white shadow-sm">
-                              Video
-                            </div>
-                          ) : null}
-                          <div className="absolute left-2 top-2 rounded-full bg-white/90 px-2 py-1 text-[10px] font-semibold text-[#063F32] shadow-sm">
-                            #{idx + 1}
-                          </div>
-                        </div>
-                        <div className="flex items-center justify-between gap-2 border-t border-[#F1EADC] bg-[#FAF7F0] px-2 py-2">
-                          <div className="flex items-center gap-1">
-                            <button
-                              type="button"
-                              onClick={() => handleMoveImage(idx, -1)}
-                              disabled={idx === 0}
-                              className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-[#2D8A6A]/15 bg-white text-[#063F32] transition hover:bg-[#F1EADC] disabled:cursor-not-allowed disabled:opacity-40"
-                              aria-label={`Move image ${idx + 1} earlier`}
-                              title="Move earlier"
-                            >
-                              <ChevronUp className="h-4 w-4" />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleMoveImage(idx, 1)}
-                              disabled={idx === form.images.length - 1}
-                              className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-[#2D8A6A]/15 bg-white text-[#063F32] transition hover:bg-[#F1EADC] disabled:cursor-not-allowed disabled:opacity-40"
-                              aria-label={`Move image ${idx + 1} later`}
-                              title="Move later"
-                            >
-                              <ChevronDown className="h-4 w-4" />
-                            </button>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveImage(idx)}
-                            className="inline-flex h-8 items-center justify-center rounded-full border border-rose-200 bg-white px-3 text-xs font-semibold text-rose-700 transition hover:bg-rose-50"
-                          >
-                            Remove
-                          </button>
-                        </div>
-                      </div>
+                      <MonthlyPlanMediaTile
+                        key={getMediaKey(img, idx)}
+                        item={img}
+                        index={idx}
+                        total={form.images.length}
+                        onMoveUp={(mediaIdx) => handleMoveImage(mediaIdx, -1)}
+                        onMoveDown={(mediaIdx) => handleMoveImage(mediaIdx, 1)}
+                        onRemove={handleRemoveImage}
+                      />
                     ))}
                   </div>
                 )}
@@ -724,15 +745,18 @@ export default function PlanForMonthClient({
                     <div className="flex flex-wrap gap-2">
                       {(Array.isArray(row.image_urls) ? row.image_urls : []).map((img, i) => (
                           <button key={i} onClick={() => setPreviewImage(img)} className="inline-block hover:opacity-80 transition">
-                            {isVideoSource(img) ? (
+                            {!showTableMediaPreviews ? (
+                              <MonthlyPlanLightMediaTile item={img} index={i} />
+                            ) : isVideoSource(img) ? (
                               <video
                                 src={buildPreviewUrl(img)}
                                 className="h-10 w-10 rounded object-cover cursor-pointer"
                                 muted
                                 playsInline
+                                preload="none"
                               />
                             ) : (
-                              <img src={buildPreviewUrl(img)} alt={`img-${i}`} className="h-10 w-10 rounded object-cover cursor-pointer" />
+                              <img src={buildPreviewUrl(img)} alt={`img-${i}`} loading="lazy" decoding="async" className="h-10 w-10 rounded object-cover cursor-pointer" />
                             )}
                           </button>
                         ))}

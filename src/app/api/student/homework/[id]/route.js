@@ -9,6 +9,19 @@ function json(message, status = 200, extra = {}) {
   return NextResponse.json({ message, ...extra }, { status });
 }
 
+function normalizeAttachments(value) {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((item) => ({
+      bucket: typeof item?.bucket === "string" ? item.bucket : null,
+      storedPath: typeof item?.path === "string" ? item.path : typeof item?.storedPath === "string" ? item.storedPath : null,
+      name: typeof item?.name === "string" ? item.name : null,
+      type: typeof item?.type === "string" ? item.type : "",
+      size: Number(item?.size || 0),
+    }))
+    .filter((item) => item.storedPath);
+}
+
 export async function PATCH(request, { params }) {
   try {
     const session = await requireRole(ALLOWED_ROLES);
@@ -16,6 +29,7 @@ export async function PATCH(request, { params }) {
     const contentType = request.headers.get("content-type") || "";
     let note = "";
     let files = [];
+    let directUploads = [];
 
     if (contentType.includes("multipart/form-data")) {
       const formData = await request.formData();
@@ -24,6 +38,7 @@ export async function PATCH(request, { params }) {
     } else {
       const body = await request.json().catch(() => ({}));
       note = typeof body?.note === "string" ? body.note.trim() : "";
+      directUploads = normalizeAttachments(body?.attachments);
     }
 
     if (!note) {
@@ -43,7 +58,7 @@ export async function PATCH(request, { params }) {
       return json("Homework not found.", 404);
     }
 
-    const uploads = files.length ? await uploadHomeworkSubmissions({ homeworkId: id, files }) : [];
+    const uploads = directUploads.length ? directUploads : files.length ? await uploadHomeworkSubmissions({ homeworkId: id, files }) : [];
     const upload = uploads[0] || null;
 
     await prisma.$executeRaw`
@@ -53,7 +68,7 @@ export async function PATCH(request, { params }) {
         submission_note = ${note}::text,
         submission_attachment_bucket = ${(upload?.bucket || null)}::text,
         submission_attachment_path = ${(upload?.storedPath || null)}::text,
-        submission_attachment_name = ${(files[0]?.name || null)}::text,
+        submission_attachment_name = ${(upload?.name || files[0]?.name || null)}::text,
         submission_attachment_buckets = ${JSON.stringify(uploads.map((item) => item.bucket || null))}::jsonb,
         submission_attachment_paths = ${JSON.stringify(uploads.map((item) => item.storedPath || null))}::jsonb,
         submission_attachment_names = ${JSON.stringify(uploads.map((item) => item.name || null))}::jsonb,
@@ -74,7 +89,7 @@ export async function PATCH(request, { params }) {
         jsonb_build_object(
           'note', ${note}::text,
           'attachment_path', ${(upload?.storedPath || null)}::text,
-          'attachment_name', ${(files[0]?.name || null)}::text,
+          'attachment_name', ${(upload?.name || files[0]?.name || null)}::text,
           'attachment_paths', ${JSON.stringify(uploads.map((item) => item.storedPath || null))}::jsonb
         )
       )

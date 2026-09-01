@@ -10,6 +10,7 @@ export default function SuperAdminLibraryPage() {
       portalLabel="Super Admin portal"
       title="Library"
       description="Manage educational resources, videos, and documents."
+      cacheNamespace="superadmin-library"
     />
   );
 }

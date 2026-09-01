@@ -4,6 +4,35 @@ import { useEffect, useState, useRef, useCallback } from "react";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
 import ClientPortal from "@/components/shared/ClientPortal";
 
+const MONTHLY_PLANS_CACHE_KEY = "monthly-plans:list:v1";
+const MONTHLY_PLANS_CACHE_TTL_MS = 60 * 1000;
+
+function readMonthlyPlansCache() {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.sessionStorage.getItem(MONTHLY_PLANS_CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed?.cachedAt || Date.now() - parsed.cachedAt >= MONTHLY_PLANS_CACHE_TTL_MS) {
+      window.sessionStorage.removeItem(MONTHLY_PLANS_CACHE_KEY);
+      return null;
+    }
+    return parsed.items;
+  } catch {
+    window.sessionStorage.removeItem(MONTHLY_PLANS_CACHE_KEY);
+    return null;
+  }
+}
+
+function writeMonthlyPlansCache(items) {
+  if (typeof window === "undefined") return;
+  try {
+    window.sessionStorage.setItem(MONTHLY_PLANS_CACHE_KEY, JSON.stringify({ items, cachedAt: Date.now() }));
+  } catch {
+    // Ignore storage failures; the slider can still fetch normally.
+  }
+}
+
 export default function MonthlyPlanSlider() {
   const [plan, setPlan] = useState(null);
   const [currentIdx, setCurrentIdx] = useState(0);
@@ -17,15 +46,22 @@ export default function MonthlyPlanSlider() {
   useEffect(() => {
     async function loadPlan() {
       try {
-        const res = await fetch("/api/monthly-plans", { cache: "no-store" });
-        const data = await res.json();
+        const cachedItems = readMonthlyPlansCache();
+        let items = Array.isArray(cachedItems) ? cachedItems : null;
+
+        if (!items) {
+          const res = await fetch("/api/monthly-plans", { cache: "no-store" });
+          const data = await res.json();
+          items = Array.isArray(data.items) ? data.items : [];
+          writeMonthlyPlansCache(items);
+        }
 
         // Filter to only show plan for current month (between start and end date)
         const now = new Date();
         const currentMonth = now.getMonth();
         const currentYear = now.getFullYear();
 
-        const currentMonthPlan = data.items?.find((item) => {
+        const currentMonthPlan = items.find((item) => {
           const startDate = new Date(item.start_date);
           const endDate = new Date(item.end_date);
 
@@ -209,6 +245,7 @@ export default function MonthlyPlanSlider() {
                       className="max-h-full max-w-full h-auto w-auto object-contain transition-transform duration-500 group-hover/card:scale-[1.02]"
                       controls
                       playsInline
+                      preload="metadata"
                       onPlay={() => {
                         isVideoPlayingRef.current = true;
                       }}
@@ -224,6 +261,8 @@ export default function MonthlyPlanSlider() {
                     <img
                       src={buildPreviewUrl(img)}
                       alt={`plan-image-${idx}`}
+                      loading="lazy"
+                      decoding="async"
                       className="max-h-full max-w-full h-auto w-auto object-contain transition-transform duration-500 group-hover/card:scale-[1.02]"
                     />
                   )}
@@ -293,7 +332,7 @@ export default function MonthlyPlanSlider() {
                     }}
                   />
                 ) : (
-                  <img src={buildPreviewUrl(previewImage)} alt="preview" className="w-full h-auto max-h-[75vh] object-contain" />
+                  <img src={buildPreviewUrl(previewImage)} alt="preview" loading="eager" decoding="async" className="w-full h-auto max-h-[75vh] object-contain" />
                 )}
               </div>
             </div>

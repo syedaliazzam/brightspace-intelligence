@@ -1,7 +1,5 @@
 import { redirect } from "next/navigation";
-import RegistrationLeadFilters from "@/components/coordinator/RegistrationLeadFilters";
-import RegistrationLeadsPanel from "@/components/coordinator/RegistrationLeadsPanel";
-import ShowMoreSectionServer from "@/components/coordinator/ShowMoreSectionServer";
+import AdminRegistrationLeadsClient from "@/components/admin/AdminRegistrationLeadsClient";
 import { auth, roleToDashboard } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 import { createSignedAdmissionDocumentUrl } from "@/lib/supabaseStorage";
@@ -145,9 +143,7 @@ export default async function AdminRegistrationLeadsPage({ searchParams }) {
   const search = normalizeSearch(resolvedParams?.search);
   const statusParam = normalizeSearch(resolvedParams?.status).toLowerCase();
   const status = statusParam === "all" ? "" : statusParam || "new_lead";
-  const page = Number(resolvedParams?.page || 1) || 1;
-  const hrefBase = isSuperAdmin ? "/superadmin/registration-leads" : "/admin/registration-leads";
-  const leads = await getLeads(status, search);
+  const leads = await getLeads("", "");
   const leadsWithDocuments = await Promise.all(
     leads.map(async (lead) => ({
       ...lead,
@@ -187,19 +183,11 @@ export default async function AdminRegistrationLeadsPage({ searchParams }) {
           </div>
         </section>
 
-          <RegistrationLeadFilters initialSearch={search} initialStatus={status} canSync={false} />
-          <ShowMoreSectionServer
-            items={leadsWithDocuments}
-            page={page}
-            pageSize={7}
-            renderItems={(visibleItems) => (
-              <RegistrationLeadsPanel
-                leads={visibleItems}
-                portalTargetId="admin-page-portal-root"
-              />
-            )}
-            emptyMessage="No admission records match the current filters."
-            hrefBase={hrefBase}
+          <AdminRegistrationLeadsClient
+            leads={leadsWithDocuments}
+            initialSearch={search}
+            initialStatus={status || "all"}
+            portalTargetId="admin-page-portal-root"
           />
       </div>
     </div>

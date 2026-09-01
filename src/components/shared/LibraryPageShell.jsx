@@ -171,6 +171,7 @@ export default function LibraryPageShell({
   description = "Manage educational resources, videos, and documents.",
   cacheNamespace = "",
   showTableFilePreviews = true,
+  portalTargetId = "coordinator-page-portal-root",
 }) {
   const [items, setItems] = useState([]);
   const [classes, setClasses] = useState([]);
@@ -456,7 +457,7 @@ export default function LibraryPageShell({
   }
 
   return (
-    <div className="min-h-screen bg-[#FAF7F0]">
+    <div id={portalTargetId} className="relative min-h-screen bg-[#FAF7F0]">
       <div className="relative mx-auto max-w-7xl space-y-6 px-4 py-4 sm:px-6 lg:px-8">
         <section className="relative overflow-hidden rounded-[2rem] border border-[#2D8A6A]/15 bg-[linear-gradient(135deg,rgba(13,59,46,0.98),rgba(13,92,72,0.94))] p-6 text-[#FAF7F0] shadow-[0_24px_80px_-36px_rgba(13,59,46,0.32)] sm:p-8">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
@@ -563,18 +564,20 @@ export default function LibraryPageShell({
                       <td className="px-6 py-4">
                         <div className="flex flex-wrap gap-2">
                           {(item.files || []).slice(0, 3).map((f, i) => {
+                            const previewUrl = buildPreviewUrl(f.file_url);
                             const content = showTableFilePreviews && f.file_type === 'image' ? (
                               // eslint-disable-next-line @next/next/no-img-element
-                              <img src={buildPreviewUrl(f.file_url)} alt="preview" className="h-full w-full object-cover" />
+                              <img src={previewUrl} alt="preview" loading="lazy" decoding="async" className="h-full w-full object-cover" />
                             ) : showTableFilePreviews && f.file_type === 'video' ? (
-                              <video src={buildPreviewUrl(f.file_url)} className="h-full w-full object-cover pointer-events-none" muted playsInline />
+                              <video src={previewUrl} className="h-full w-full object-cover pointer-events-none" muted playsInline preload="none" />
                             ) : showTableFilePreviews && f.file_type === 'pdf' ? (
                               <div className="relative h-full w-full overflow-hidden">
                                 <iframe
-                                  src={`${buildPreviewUrl(f.file_url)}#toolbar=0&navpanes=0&scrollbar=0&page=1&view=FitH`}
+                                  src={`${previewUrl}#toolbar=0&navpanes=0&scrollbar=0&page=1&view=FitH`}
                                   className="absolute top-0 left-0 pointer-events-none"
                                   style={{ width: '200%', height: '200%', transform: 'scale(0.5)', transformOrigin: 'top left' }}
                                   tabIndex={-1}
+                                  loading="lazy"
                                   title="preview"
                                 />
                               </div>
@@ -585,7 +588,7 @@ export default function LibraryPageShell({
                             return showTableFilePreviews ? (
                               <a
                                 key={f.id}
-                                href={buildPreviewUrl(f.file_url)}
+                                href={previewUrl}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 title={f.original_name || 'View file'}
@@ -596,7 +599,7 @@ export default function LibraryPageShell({
                             ) : (
                               <a
                                 key={f.id}
-                                href={buildPreviewUrl(f.file_url)}
+                                href={previewUrl}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 title={f.original_name || 'File'}
@@ -678,7 +681,7 @@ export default function LibraryPageShell({
       </div>
 
       {showAddModal && allowManage ? (
-        <ClientPortal targetId="coordinator-page-portal-root">
+        <ClientPortal targetId={portalTargetId}>
           <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-[#063F32]/45 px-4 py-8">
             <div className="w-full max-w-xl max-h-[85vh] overflow-y-auto rounded-[2rem] border border-[#2D8A6A]/15 bg-[#FAF7F0] p-5 shadow-[0_24px_80px_-36px_rgba(13,59,46,0.24)] sm:p-6">
               <div className="mb-6">
@@ -837,7 +840,7 @@ export default function LibraryPageShell({
       ) : null}
 
       {showViewModal && viewingItem ? (
-        <ClientPortal targetId="coordinator-page-portal-root">
+        <ClientPortal targetId={portalTargetId}>
           <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-[#063F32]/45 px-4 py-8">
             <div className="w-full max-w-2xl max-h-[85vh] overflow-y-auto rounded-[2rem] border border-[#2D8A6A]/15 bg-[#FAF7F0] p-5 shadow-[0_24px_80px_-36px_rgba(13,59,46,0.24)] sm:p-6">
               <div className="mb-6 flex justify-between items-start">
@@ -863,11 +866,11 @@ export default function LibraryPageShell({
                     <div className="h-40 w-full bg-gray-100 rounded-lg mb-3 flex items-center justify-center overflow-hidden">
                       {file.file_type === 'image' ? (
                         // eslint-disable-next-line @next/next/no-img-element
-                        <img src={buildPreviewUrl(file.file_url)} alt="preview" className="h-full w-full object-cover" />
+                        <img src={buildPreviewUrl(file.file_url)} alt="preview" loading="lazy" decoding="async" className="h-full w-full object-cover" />
                       ) : file.file_type === 'video' ? (
-                        <video src={buildPreviewUrl(file.file_url)} className="h-full w-full object-cover" muted playsInline controls />
+                        <video src={buildPreviewUrl(file.file_url)} className="h-full w-full object-cover" muted playsInline controls preload="metadata" />
                       ) : file.file_type === 'pdf' ? (
-                        <iframe src={buildPreviewUrl(file.file_url)} className="h-full w-full" title={file.original_name || 'PDF Preview'} />
+                        <iframe src={buildPreviewUrl(file.file_url)} className="h-full w-full" loading="lazy" title={file.original_name || 'PDF Preview'} />
                       ) : (
                         <File className="text-gray-500" size={32} />
                       )}
@@ -889,7 +892,7 @@ export default function LibraryPageShell({
       ) : null}
 
       {allowManage && showDeleteModal ? (
-        <ClientPortal targetId="coordinator-page-portal-root">
+        <ClientPortal targetId={portalTargetId}>
           <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-[#063F32]/45 px-4 py-8">
             <div className="w-full max-w-sm max-h-[80vh] overflow-y-auto rounded-[2rem] border border-[#2D8A6A]/15 bg-[#FAF7F0] p-5 shadow-[0_24px_80px_-36px_rgba(13,59,46,0.24)]">
               <h3 className="text-lg font-semibold text-[#063F32]">Archive Document</h3>

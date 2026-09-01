@@ -5,6 +5,9 @@ import { usePathname } from "next/navigation";
 import AdminDataTable from "@/components/admin/AdminDataTable";
 import { LeafSpinnerInline } from "@/components/shared/AshShajrahLoaders";
 
+const CACHE_KEY = "admin-headlines:v1";
+const CACHE_TTL = 60 * 1000;
+
 function emptyForm() {
   return {
     headline: "",
@@ -94,6 +97,31 @@ function HeadlineForm({ form, onChange, onSubmit, onCancel, submitting, submitLa
   );
 }
 
+function readCache() {
+  if (typeof window === "undefined") return null;
+
+  const cached = window.sessionStorage.getItem(CACHE_KEY);
+  if (!cached) return null;
+
+  try {
+    const parsed = JSON.parse(cached);
+    if (Date.now() - parsed.timestamp > CACHE_TTL) {
+      window.sessionStorage.removeItem(CACHE_KEY);
+      return null;
+    }
+
+    return parsed.payload;
+  } catch {
+    window.sessionStorage.removeItem(CACHE_KEY);
+    return null;
+  }
+}
+
+function writeCache(payload) {
+  if (typeof window === "undefined") return;
+  window.sessionStorage.setItem(CACHE_KEY, JSON.stringify({ timestamp: Date.now(), payload }));
+}
+
 export default function AdminHeadlinesPage() {
   const pathname = usePathname() || "";
   const isAdminReadonlyPortal = pathname.startsWith("/admin") && !pathname.startsWith("/superadmin");
@@ -108,9 +136,20 @@ export default function AdminHeadlinesPage() {
   const [deletingItem, setDeletingItem] = useState(null);
   const [submitting, setSubmitting] = useState(false);
 
-  async function load() {
+  async function load(options = {}) {
+    const force = options.force === true;
     setLoading(true);
     setError("");
+
+    if (!force) {
+      const cached = readCache();
+      if (cached) {
+        setItems(Array.isArray(cached.items) ? cached.items : []);
+        setAvailable(cached.available !== false);
+        setLoading(false);
+        return;
+      }
+    }
 
     try {
       const response = await fetch("/api/admin/headlines", { cache: "no-store" });
@@ -120,8 +159,13 @@ export default function AdminHeadlinesPage() {
         throw new Error(data?.message || "Unable to load headlines.");
       }
 
-      setItems(Array.isArray(data.items) ? data.items : []);
-      setAvailable(data.available !== false);
+      const payload = {
+        items: Array.isArray(data.items) ? data.items : [],
+        available: data.available !== false,
+      };
+      writeCache(payload);
+      setItems(payload.items);
+      setAvailable(payload.available);
     } catch (loadError) {
       setItems([]);
       setAvailable(false);
@@ -157,7 +201,7 @@ export default function AdminHeadlinesPage() {
       }
 
       setCreateForm(emptyForm());
-      await load();
+      await load({ force: true });
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : "Unable to save headline.");
     } finally {
@@ -184,7 +228,7 @@ export default function AdminHeadlinesPage() {
 
       setEditingId("");
       setEditForm(emptyForm());
-      await load();
+      await load({ force: true });
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : "Unable to save headline.");
     } finally {
@@ -213,7 +257,7 @@ export default function AdminHeadlinesPage() {
       }
 
       setDeletingItem(null);
-      await load();
+      await load({ force: true });
     } catch (deleteError) {
       setError(deleteError instanceof Error ? deleteError.message : "Unable to delete headline.");
     } finally {

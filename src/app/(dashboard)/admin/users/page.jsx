@@ -409,48 +409,18 @@ export default function AdminUsersPage() {
 
   const loadTable = useCallback(async (options = {}) => {
     const requestId = ++loadTableRequestRef.current;
-    const force = options.force === true || view === "parents";
-    const cacheKey = getCacheKey(filters);
+    const force = options.force === true;
+    const baseFilters = { ...DEFAULT_FILTERS, role: rolePreset };
+    const cacheKey = getCacheKey(baseFilters);
     const allStaffItems = allStaffItemsRef.current;
     setState((current) => ({ ...current, loading: true, error: "" }));
 
     if (isStaffView && !force && Array.isArray(allStaffItems) && allStaffItems.length) {
-      const searchTerm = String(filters.search || "").trim().toLowerCase();
-      const selectedRole = String(filters.role || "").toLowerCase();
-      const selectedStatus = String(filters.status || "").toLowerCase();
-
-      let items = allStaffItems;
-
-      if (selectedRole) {
-        items = items.filter((item) =>
-          getRoleValues(item).some((role) => String(role || "").toLowerCase() === selectedRole)
-        );
-      }
-
-      if (selectedStatus) {
-        items = items.filter((item) => String(item.status || "").toLowerCase() === selectedStatus);
-      }
-
-      if (searchTerm) {
-        items = items.filter((item) => {
-          const haystack = [
-            item.name,
-            item.full_name,
-            item.username,
-            item.email,
-            item.phone,
-          ]
-            .map((value) => String(value || "").toLowerCase())
-            .join(" ");
-          return haystack.includes(searchTerm);
-        });
-      }
-
       setState((current) => ({
         ...current,
         loading: false,
         error: "",
-        items,
+        items: allStaffItems,
       }));
       return;
     }
@@ -471,30 +441,25 @@ export default function AdminUsersPage() {
 
     try {
       const params = new URLSearchParams();
-      if (filters.search) params.set("search", filters.search);
-      if (filters.role) params.set("role", filters.role);
-      if (filters.status) params.set("status", filters.status);
-      if (filters.classLevel) params.set("class_level", filters.classLevel);
+      if (baseFilters.role) params.set("role", baseFilters.role);
 
       let items = [];
       let data = { items: [] };
 
       if (isStaffView) {
         const rolesToLoad =
-          filters.role === "superadmin"
+          baseFilters.role === "superadmin"
             ? ["superadmin"]
-            : filters.role === "admin"
+            : baseFilters.role === "admin"
               ? ["admin"]
-            : filters.role === "coordinator" || filters.role === "teacher"
-              ? [filters.role]
+            : baseFilters.role === "coordinator" || baseFilters.role === "teacher"
+              ? [baseFilters.role]
               : ["superadmin", "admin", "coordinator", "teacher"];
 
         const responses = await Promise.all(
           rolesToLoad.map((roleValue) => {
             const roleParams = new URLSearchParams();
             roleParams.set("role", roleValue);
-            if (filters.status) roleParams.set("status", filters.status);
-            if (filters.classLevel) roleParams.set("class_level", filters.classLevel);
             return fetch(`/api/admin/users?${roleParams.toString()}`, { cache: "no-store" });
           })
         );
@@ -551,7 +516,7 @@ export default function AdminUsersPage() {
         allStaffItems: [],
       }));
     }
-  }, [filters, isStaffView, view]);
+  }, [isStaffView, rolePreset, view]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -685,13 +650,33 @@ export default function AdminUsersPage() {
   }, [state.overviewItems, state.summary, isStaffView, state.items.length, view]);
 
   const displayedItems = useMemo(() => {
-    if (!isStaffView) {
-      return state.items;
-    }
-
     const searchTerm = String(filters.search || "").trim().toLowerCase();
     const selectedRole = String(filters.role || "").toLowerCase();
     const selectedStatus = String(filters.status || "").toLowerCase();
+    const selectedClassLevel = String(filters.classLevel || "").toLowerCase();
+
+    if (!isStaffView) {
+      return (state.items || []).filter((item) => {
+        if (selectedStatus && String(item.status || "").toLowerCase() !== selectedStatus) return false;
+        if (selectedClassLevel && String(item.class_level || "").toLowerCase() !== selectedClassLevel) return false;
+        if (!searchTerm) return true;
+
+        const haystack = [
+          item.name,
+          item.full_name,
+          item.username,
+          item.email,
+          item.phone,
+          item.parent_name,
+          item.student_names,
+          item.class_level,
+          item.admission_no,
+          item.relation,
+          item.status,
+        ].map((value) => String(value || "").toLowerCase()).join(" ");
+        return haystack.includes(searchTerm);
+      });
+    }
 
     let items = Array.isArray(state.allStaffItems) ? state.allStaffItems : [];
 
@@ -719,7 +704,7 @@ export default function AdminUsersPage() {
     }
 
     return expandStaffRowsByRole(items, selectedRole);
-  }, [filters.role, filters.search, filters.status, isStaffView, state.allStaffItems, state.items]);
+  }, [filters.classLevel, filters.role, filters.search, filters.status, isStaffView, state.allStaffItems, state.items]);
 
   const classOptions = useMemo(() => {
     if (view !== "students") {
@@ -739,7 +724,6 @@ export default function AdminUsersPage() {
 
   async function submitSearch(event) {
     event.preventDefault();
-    await loadTable();
   }
 
   async function resetPassword(record) {
@@ -1453,7 +1437,7 @@ export default function AdminUsersPage() {
       ) : null}
 
       {resetModal.open && resetModal.record ? (
-        <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-[#063F32]/45 px-4 pt-10 pb-10 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-[#063F32]/45 px-4 pt-10 pb-10 backdrop-blur-sm">
           <div className="w-full max-w-lg rounded-[2rem] border border-[#2D8A6A]/18 bg-[#FAF7F0] shadow-[0_30px_90px_-40px_rgba(13,59,46,0.28)]">
             <div className="flex items-center justify-between border-b border-[#2D8A6A]/15 px-6 py-5">
               <div>

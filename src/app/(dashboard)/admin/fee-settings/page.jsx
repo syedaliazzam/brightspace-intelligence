@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { usePathname } from "next/navigation";
 import { ChevronDown } from "lucide-react";
 import AdminDashboardCards from "@/components/admin/AdminDashboardCards";
@@ -84,6 +84,34 @@ const tableRowClass =
 const actionButtonClass =
   "rounded-xl border border-[#2D8A6A]/18 bg-[linear-gradient(180deg,rgba(255,255,255,0.94)_0%,rgba(250,247,240,0.98)_100%)] px-3 py-2 text-xs font-semibold text-[#063F32] transition hover:border-[#C9A227]/35 hover:bg-[#FFF5D6]";
 
+const CACHE_KEY = "admin-fee-settings:v1";
+const CACHE_TTL = 60 * 1000;
+
+function readCache() {
+  if (typeof window === "undefined") return null;
+
+  const cached = window.sessionStorage.getItem(CACHE_KEY);
+  if (!cached) return null;
+
+  try {
+    const parsed = JSON.parse(cached);
+    if (Date.now() - parsed.timestamp > CACHE_TTL) {
+      window.sessionStorage.removeItem(CACHE_KEY);
+      return null;
+    }
+
+    return parsed.payload;
+  } catch {
+    window.sessionStorage.removeItem(CACHE_KEY);
+    return null;
+  }
+}
+
+function writeCache(payload) {
+  if (typeof window === "undefined") return;
+  window.sessionStorage.setItem(CACHE_KEY, JSON.stringify({ timestamp: Date.now(), payload }));
+}
+
 export default function AdminFeeSettingsPage() {
   const pathname = usePathname() || "";
   const isSuperAdminPortal = pathname.startsWith("/superadmin");
@@ -161,9 +189,47 @@ export default function AdminFeeSettingsPage() {
   const otherDiscountAmount = otherAmountBase * (otherDiscountPercent / 100);
   const otherFinalAmount = Math.max(otherAmountBase - otherDiscountAmount, 0);
 
-  async function loadAll() {
+  const applyLoadedPayload = useCallback((payload) => {
+    setFinance(
+      payload.finance || {
+        totalSettings: 0,
+        voucherCreated: 0,
+        vouchersSubmitted: 0,
+        paymentsVerified: 0,
+      }
+    );
+    setSettings(payload.settings || []);
+    setDrafts(
+      (payload.settings || []).reduce((accumulator, item) => {
+        accumulator[item.id] = {
+          value: item.value || "",
+          description: item.description || "",
+          status: item.status || "active",
+        };
+        return accumulator;
+      }, {})
+    );
+    setRegularFees(payload.regularFees || []);
+    setOtherFees(payload.otherFees || []);
+    setPaymentMethods(payload.paymentMethods || []);
+    setDiscounts(payload.discounts || []);
+    setCoordinatorMaxDiscountPercent(Number(payload.coordinatorMaxDiscountPercent || 20));
+    setClassLevels(payload.classLevels || []);
+  }, []);
+
+  const loadAll = useCallback(async (options = {}) => {
+    const force = options.force === true;
     setLoading(true);
     setError("");
+
+    if (!force) {
+      const cached = readCache();
+      if (cached) {
+        applyLoadedPayload(cached);
+        setLoading(false);
+        return;
+      }
+    }
 
     try {
       const [feeSettingsRes, regularRes, otherRes, paymentRes, classLevelsRes, publicOptionsRes] = await Promise.all([
@@ -189,14 +255,6 @@ export default function AdminFeeSettingsPage() {
       if (!otherRes.ok) throw new Error(otherData?.message || "Unable to load other fees.");
       if (!paymentRes.ok) throw new Error(paymentData?.message || "Unable to load payment methods.");
 
-      setFinance(
-        feeSettingsData.finance || {
-          totalSettings: 0,
-          voucherCreated: 0,
-          vouchersSubmitted: 0,
-          paymentsVerified: 0,
-        }
-      );
       const allowedSettingKeys = new Set([
         "coordinator_max_discount_percent",
         "payment_support_email",
@@ -206,29 +264,29 @@ export default function AdminFeeSettingsPage() {
       const nextSettings = (feeSettingsData.settings || []).filter((item) =>
         allowedSettingKeys.has(item.key)
       );
-      setSettings(nextSettings);
-      setDrafts(
-        nextSettings.reduce((accumulator, item) => {
-          accumulator[item.id] = {
-            value: item.value || "",
-            description: item.description || "",
-            status: item.status || "active",
-          };
-          return accumulator;
-        }, {})
-      );
-      setRegularFees(regularData.items || []);
-      setOtherFees(otherData.items || []);
-      setPaymentMethods(paymentData.items || []);
-      setDiscounts(Array.isArray(publicOptionsData?.discounts) ? publicOptionsData.discounts : []);
-      setCoordinatorMaxDiscountPercent(Number(publicOptionsData?.coordinatorMaxDiscountPercent || 20));
-      setClassLevels((classLevelsData.items || []).filter((item) => item.class_level));
+      const payload = {
+        finance: feeSettingsData.finance || {
+          totalSettings: 0,
+          voucherCreated: 0,
+          vouchersSubmitted: 0,
+          paymentsVerified: 0,
+        },
+        settings: nextSettings,
+        regularFees: regularData.items || [],
+        otherFees: otherData.items || [],
+        paymentMethods: paymentData.items || [],
+        discounts: Array.isArray(publicOptionsData?.discounts) ? publicOptionsData.discounts : [],
+        coordinatorMaxDiscountPercent: Number(publicOptionsData?.coordinatorMaxDiscountPercent || 20),
+        classLevels: (classLevelsData.items || []).filter((item) => item.class_level),
+      };
+      writeCache(payload);
+      applyLoadedPayload(payload);
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : "Unable to load fee management data.");
     } finally {
       setLoading(false);
     }
-  }
+  }, [applyLoadedPayload]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -236,7 +294,7 @@ export default function AdminFeeSettingsPage() {
     }, 0);
 
     return () => window.clearTimeout(timer);
-  }, []);
+  }, [loadAll]);
 
   function updateForm(section, name, value) {
     setForms((current) => ({
@@ -368,7 +426,7 @@ export default function AdminFeeSettingsPage() {
         setOtherBaseAmount("");
       }
       setEditing((current) => ({ ...current, [section]: "" }));
-      await loadAll();
+      await loadAll({ force: true });
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : "Unable to save record.");
     } finally {
@@ -395,7 +453,7 @@ export default function AdminFeeSettingsPage() {
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data?.message || "Unable to delete other fee.");
-      await loadAll();
+      await loadAll({ force: true });
     } catch (deleteError) {
       setError(deleteError instanceof Error ? deleteError.message : "Unable to delete other fee.");
     } finally {
@@ -422,7 +480,7 @@ export default function AdminFeeSettingsPage() {
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data?.message || "Unable to delete payment method.");
-      await loadAll();
+      await loadAll({ force: true });
     } catch (deleteError) {
       setError(deleteError instanceof Error ? deleteError.message : "Unable to delete payment method.");
     } finally {
@@ -446,7 +504,7 @@ export default function AdminFeeSettingsPage() {
       const data = await response.json();
       if (!response.ok) throw new Error(data?.message || "Unable to update setting.");
       setEditing((current) => ({ ...current, setting: "" }));
-      await loadAll();
+      await loadAll({ force: true });
     } catch (settingError) {
       setError(settingError instanceof Error ? settingError.message : "Unable to update setting.");
     }

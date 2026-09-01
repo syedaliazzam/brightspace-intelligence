@@ -7,6 +7,7 @@ export default function SuperAdminPaymentsPage({ searchParams }) {
       portalLabel="Super Admin portal"
       canManage
       hrefBasePath="/superadmin/payments"
+      clientSideFilters
     />
   );
 }

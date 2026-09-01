@@ -7,6 +7,7 @@ export default function AdminPaymentsPage({ searchParams }) {
       portalLabel="Admin portal"
       canManage={false}
       hrefBasePath="/admin/payments"
+      clientSideFilters
     />
   );
 }

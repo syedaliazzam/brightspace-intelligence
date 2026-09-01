@@ -6,6 +6,40 @@ import { ChevronDown } from "lucide-react";
 import AdminDashboardCards from "@/components/admin/AdminDashboardCards";
 import LMSCalendar from "@/components/calendar/LMSCalendar";
 
+const CACHE_TTL = 60 * 1000;
+
+function getCacheKey(filters) {
+  const params = new URLSearchParams();
+  if (filters.search) params.set("search", filters.search);
+  if (filters.status) params.set("status", filters.status);
+  return `admin-lectures:${params.toString()}`;
+}
+
+function readCache(key) {
+  if (typeof window === "undefined") return null;
+
+  const cached = window.sessionStorage.getItem(key);
+  if (!cached) return null;
+
+  try {
+    const parsed = JSON.parse(cached);
+    if (Date.now() - parsed.timestamp > CACHE_TTL) {
+      window.sessionStorage.removeItem(key);
+      return null;
+    }
+
+    return parsed.payload;
+  } catch {
+    window.sessionStorage.removeItem(key);
+    return null;
+  }
+}
+
+function writeCache(key, payload) {
+  if (typeof window === "undefined") return;
+  window.sessionStorage.setItem(key, JSON.stringify({ timestamp: Date.now(), payload }));
+}
+
 export default function AdminLecturesPage() {
   const pathname = usePathname() || "";
   const isSuperAdminPortal = pathname.startsWith("/superadmin");
@@ -23,11 +57,21 @@ export default function AdminLecturesPage() {
   });
 
   const load = useCallback(async () => {
+    const cacheKey = getCacheKey({ search: "", status: "" });
     setState((current) => ({ ...current, loading: true, error: "" }));
+
+    const cached = readCache(cacheKey);
+    if (cached) {
+      setState({
+        loading: false,
+        error: "",
+        items: Array.isArray(cached?.items) ? cached.items : [],
+      });
+      return;
+    }
+
     try {
       const params = new URLSearchParams();
-      if (filters.search) params.set("search", filters.search);
-      if (filters.status) params.set("status", filters.status);
 
       const response = await fetch(`/api/admin/lectures?${params.toString()}`, {
         cache: "no-store",
@@ -38,10 +82,12 @@ export default function AdminLecturesPage() {
         throw new Error(data?.message || "Unable to load lecture records.");
       }
 
+      const payload = { items: Array.isArray(data?.items) ? data.items : [] };
+      writeCache(cacheKey, payload);
       setState({
         loading: false,
         error: "",
-        items: Array.isArray(data?.items) ? data.items : [],
+        items: payload.items,
       });
     } catch (error) {
       setState({
@@ -50,14 +96,39 @@ export default function AdminLecturesPage() {
         items: [],
       });
     }
-  }, [filters.search, filters.status]);
+  }, []);
 
   useEffect(() => {
-    void load();
+    const timer = window.setTimeout(() => {
+      void load();
+    }, 0);
+
+    return () => window.clearTimeout(timer);
   }, [load]);
 
+  const filteredLectureItems = useMemo(() => {
+    const searchTerm = String(filters.search || "").trim().toLowerCase();
+    const selectedStatus = String(filters.status || "").trim().toLowerCase();
+    return (state.items || []).filter((item) => {
+      const itemStatus = String(item.display_status || item.status || "").toLowerCase();
+      if (selectedStatus && itemStatus !== selectedStatus) return false;
+      if (!searchTerm) return true;
+
+      const haystack = [
+        item.title,
+        item.teacher_name,
+        item.subject_name,
+        item.class_level,
+        item.course_title,
+        item.status,
+        item.display_status,
+      ].map((value) => String(value || "").toLowerCase()).join(" ");
+      return haystack.includes(searchTerm);
+    });
+  }, [filters.search, filters.status, state.items]);
+
   const summary = useMemo(() => {
-    const items = state.items || [];
+    const items = filteredLectureItems;
     return {
       total: items.length,
       live: items.filter((item) => String(item.display_status || item.status || "").toLowerCase() === "live").length,
@@ -66,7 +137,7 @@ export default function AdminLecturesPage() {
         ["verified_by_coordinator", "completed_by_teacher"].includes(String(item.display_status || item.status || "").toLowerCase())
       ).length,
     };
-  }, [state.items]);
+  }, [filteredLectureItems]);
 
   return (
     <div className="min-h-screen bg-[#FAF7F0] text-[#063F32]">
@@ -146,10 +217,11 @@ export default function AdminLecturesPage() {
 
         <LMSCalendar
           apiUrl="/api/admin/lectures"
-          filters={{ date: filters.date, status: filters.status }}
-          extraParams={{ search: filters.search }}
+          filters={{ date: filters.date }}
+          items={filteredLectureItems}
           onDateSelect={(date) => setFilters((current) => ({ ...current, date }))}
           popupMode="page"
+          cacheNamespace="admin-lectures"
         />
       </div>
     </div>

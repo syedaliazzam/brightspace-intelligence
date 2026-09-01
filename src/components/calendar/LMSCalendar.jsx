@@ -89,7 +89,7 @@ function getLectureClassLabel(lecture) {
   );
 }
 
-export default function LMSCalendar({ apiUrl, filters = {}, extraParams = {}, onDateSelect, onEventClick, popupMode = "screen", cacheNamespace = "" }) {
+export default function LMSCalendar({ apiUrl, filters = {}, extraParams = {}, onDateSelect, onEventClick, popupMode = "screen", cacheNamespace = "", items = null }) {
   const calendarRef = useRef(null);
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -100,6 +100,7 @@ export default function LMSCalendar({ apiUrl, filters = {}, extraParams = {}, on
   const [copiedMeetLink, setCopiedMeetLink] = useState("");
   const activeDate = filters.date || formatLocalDate(new Date());
   const firstEventDate = events[0]?.start ? String(events[0].start).slice(0, 10) : "";
+  const externalRows = Array.isArray(items) ? items : null;
 
   const query = useMemo(() => {
     const params = new URLSearchParams({
@@ -182,6 +183,13 @@ export default function LMSCalendar({ apiUrl, filters = {}, extraParams = {}, on
     }
 
     async function load() {
+      if (externalRows) {
+        setCalendarEvents(externalRows);
+        setLoading(false);
+        setError("");
+        return;
+      }
+
       if (!apiUrl) {
         setLoading(false);
         return;
@@ -228,7 +236,7 @@ export default function LMSCalendar({ apiUrl, filters = {}, extraParams = {}, on
     return () => {
       ignore = true;
     };
-  }, [apiUrl, cacheNamespace, query]);
+  }, [apiUrl, cacheNamespace, externalRows, query]);
 
   function handleEventClick(info) {
     const lecture = info.event.extendedProps || null;

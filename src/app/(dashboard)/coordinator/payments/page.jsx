@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import PaymentVerificationTable from "@/components/coordinator/PaymentVerificationTable";
+import PaymentsQueueClient from "@/components/coordinator/PaymentsQueueClient";
 import PaymentsStudentFilterSelect, { PaymentsStatusFilterSelect } from "@/components/coordinator/PaymentsStudentFilterSelect";
 import ShowMoreSectionServer from "@/components/coordinator/ShowMoreSectionServer";
 import { auth, roleToDashboard } from "@/lib/auth";
@@ -183,6 +184,7 @@ export default async function CoordinatorPaymentsPage({
   portalLabel = "Coordinator portal",
   canManage = true,
   hrefBasePath = "/coordinator/payments",
+  clientSideFilters = false,
 }) {
   const session = await auth();
   const role = String(session?.user?.role || "").toLowerCase();
@@ -197,6 +199,37 @@ export default async function CoordinatorPaymentsPage({
   const studentFilter = normalizeStatus(resolvedParams?.studentFilter) || "verified";
   const safeStudentFilter = studentFilter === "not_verified" ? "not_verified" : "verified";
   const page = Number(resolvedParams?.page || 1) || 1;
+
+  if (clientSideFilters) {
+    const items = await getItems("");
+
+    return (
+      <div className="min-h-screen bg-[#FAF7F0] px-4 py-6 sm:px-6 lg:px-8">
+        <div className="mx-auto w-full max-w-7xl space-y-6">
+        <section className="relative overflow-hidden rounded-[2rem] border border-[#2D8A6A]/15 bg-[linear-gradient(135deg,rgba(13,59,46,0.98),rgba(13,92,72,0.94))] p-6 text-[#FAF7F0] shadow-[0_24px_80px_-36px_rgba(13,59,46,0.32)] sm:p-8">
+          <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(135deg,rgba(13,59,46,0.98),rgba(13,92,72,0.94))]" />
+          <div className="relative">
+            <p className="inline-flex rounded-full border border-[#E4C766]/30 bg-[#FFF5D6]/12 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.28em] text-[#FFF5D6]">
+              {portalLabel}
+            </p>
+            <h1 className="mt-4 font-display text-3xl font-bold tracking-tight text-[#FAF7F0] sm:text-4xl">Payment verification queue</h1>
+            <p className="mt-3 text-sm leading-7 text-[#FAF7F0] sm:text-base">
+              Review submitted proof files, approve verified payments, or reject incomplete submissions.
+            </p>
+          </div>
+        </section>
+
+        <PaymentsQueueClient
+          items={items}
+          initialStatus={safeStatus}
+          initialStudentFilter={safeStudentFilter}
+          canManage={canManage}
+        />
+        </div>
+      </div>
+    );
+  }
+
   const [counts, items] = await Promise.all([getFilteredCounts(safeStudentFilter), getItems(safeStatus)]);
   const studentFilteredItems = items.filter((item) => {
     const isVerified = Boolean(item.is_lms_enrolled);

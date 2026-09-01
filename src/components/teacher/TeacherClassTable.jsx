@@ -25,7 +25,7 @@ export default function TeacherClassTable({ items = [], onOpen }) {
       <div className="overflow-x-auto rounded-[2rem]">
         <table className="min-w-full divide-y rounded-[2rem] divide-[#F1EADC] text-left text-sm">
           <thead className="bg-[linear-gradient(180deg,#FAF7F0_0%,#F1EADC_100%)] text-xs uppercase tracking-[0.18em] text-[#0D5C48]">
-            <tr><th className="px-6 py-4">Class</th><th className="px-6 py-4">Student</th><th className="px-6 py-4">Subject</th><th className="px-6 py-4">Schedule</th><th className="px-6 py-4">Meet</th><th className="px-6 py-4">Status</th><th className="px-6 py-4">Actions</th></tr>
+            <tr><th className="px-6 py-4">Title</th><th className="px-6 py-4">Student</th><th className="px-6 py-4">Subject</th><th className="px-6 py-4">Schedule</th><th className="px-6 py-4">Meet</th><th className="px-6 py-4">Status</th><th className="px-6 py-4">Actions</th></tr>
           </thead>
           <tbody className="divide-y divide-[#F1EADC]">
             {visibleItems.length ? visibleItems.map((item) => (

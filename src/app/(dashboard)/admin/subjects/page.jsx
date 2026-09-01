@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { usePathname } from "next/navigation";
 import { ChevronDown } from "lucide-react";
 import AdminDashboardCards from "@/components/admin/AdminDashboardCards";
@@ -87,7 +87,7 @@ export default function AdminSubjectsPage() {
 
   const load = useCallback(async (options = {}) => {
     const force = options.force === true;
-    const cacheKey = getCacheKey(filters);
+    const cacheKey = getCacheKey({ search: "", status: "", courseId: "" });
 
     setState((current) => ({ ...current, loading: true, error: "" }));
 
@@ -108,9 +108,6 @@ export default function AdminSubjectsPage() {
 
     try {
       const params = new URLSearchParams();
-      if (filters.search) params.set("search", filters.search);
-      if (filters.status) params.set("status", filters.status);
-      if (filters.courseId) params.set("courseId", filters.courseId);
 
       const response = await fetch(`/api/admin/subjects?${params.toString()}`, {
         cache: "no-store",
@@ -140,7 +137,7 @@ export default function AdminSubjectsPage() {
         summary: { total: 0, active: 0, inactive: 0 },
       });
     }
-  }, [filters]);
+  }, []);
 
   const handleDelete = useCallback(async () => {
     if (!deleteTarget?.id) return;
@@ -178,6 +175,26 @@ export default function AdminSubjectsPage() {
 
     return () => window.clearTimeout(timer);
   }, [load]);
+
+  const filteredItems = useMemo(() => {
+    const searchTerm = String(filters.search || "").trim().toLowerCase();
+    const selectedStatus = String(filters.status || "").trim().toLowerCase();
+    const selectedCourseId = String(filters.courseId || "").trim();
+
+    return (state.items || []).filter((item) => {
+      if (selectedStatus && String(item.status || "").toLowerCase() !== selectedStatus) return false;
+      if (selectedCourseId && !(Array.isArray(item.course_ids) && item.course_ids.includes(selectedCourseId))) return false;
+      if (!searchTerm) return true;
+
+      const haystack = [
+        item.name,
+        item.description,
+        item.status,
+        item.class_level,
+      ].map((value) => String(value || "").toLowerCase()).join(" ");
+      return haystack.includes(searchTerm);
+    });
+  }, [filters.search, filters.status, filters.courseId, state.items]);
 
   return (
     <div className="min-h-screen bg-[#FAF7F0] text-[#063F32]">
@@ -244,7 +261,6 @@ export default function AdminSubjectsPage() {
           className="grid gap-3 lg:grid-cols-[minmax(0,1.2fr)_220px_220px_auto]"
           onSubmit={(event) => {
             event.preventDefault();
-            load();
           }}
         >
           <label className="block">
@@ -362,7 +378,7 @@ export default function AdminSubjectsPage() {
         loading={state.loading}
         loadingTitle="Loading subjects"
         loadingSubtitle="Preparing the subject table..."
-        rows={state.loading ? [] : state.items}
+        rows={state.loading ? [] : filteredItems}
         emptyMessage={
           state.loading
             ? "Loading subjects..."

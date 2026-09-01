@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { usePathname } from "next/navigation";
 import { ChevronDown } from "lucide-react";
 import AdminDashboardCards from "@/components/admin/AdminDashboardCards";
@@ -102,7 +102,7 @@ export default function AdminCoursesPage() {
 
   const load = useCallback(async (options = {}) => {
     const force = options.force === true;
-    const cacheKey = getCacheKey(filters);
+    const cacheKey = getCacheKey({ search: "", status: "", subjectId: "" });
 
     setState((current) => ({ ...current, loading: true, error: "" }));
 
@@ -123,9 +123,6 @@ export default function AdminCoursesPage() {
 
     try {
       const params = new URLSearchParams();
-      if (filters.search) params.set("search", filters.search);
-      if (filters.status) params.set("status", filters.status);
-      if (filters.subjectId) params.set("subjectId", filters.subjectId);
 
       const response = await fetch(`/api/admin/courses?${params.toString()}`, {
         cache: "no-store",
@@ -155,7 +152,7 @@ export default function AdminCoursesPage() {
         summary: { total: 0, active: 0, draft: 0 },
       });
     }
-  }, [filters]);
+  }, []);
 
   const handleDelete = useCallback(async () => {
     if (!deleteTarget?.id) return;
@@ -193,6 +190,29 @@ export default function AdminCoursesPage() {
 
     return () => window.clearTimeout(timer);
   }, [load]);
+
+  const filteredItems = useMemo(() => {
+    const searchTerm = String(filters.search || "").trim().toLowerCase();
+    const selectedStatus = String(filters.status || "").trim().toLowerCase();
+    const selectedSubject = state.subjects.find((subject) => String(subject.id || "") === String(filters.subjectId || ""));
+    const selectedSubjectName = String(selectedSubject?.name || "").trim().toLowerCase();
+
+    return (state.items || []).filter((item) => {
+      if (selectedStatus && String(item.status || "").toLowerCase() !== selectedStatus) return false;
+      if (selectedSubjectName && !String(item.assigned_subjects || item.subject_name || "").toLowerCase().includes(selectedSubjectName)) return false;
+      if (!searchTerm) return true;
+
+      const haystack = [
+        item.name,
+        item.description,
+        item.class_mode,
+        item.assigned_subjects,
+        item.subject_name,
+        item.status,
+      ].map((value) => String(value || "").toLowerCase()).join(" ");
+      return haystack.includes(searchTerm);
+    });
+  }, [filters.search, filters.status, filters.subjectId, state.items, state.subjects]);
 
   return (
     <div className="min-h-screen bg-[#FAF7F0] text-[#063F32]">
@@ -259,7 +279,6 @@ export default function AdminCoursesPage() {
           className="grid gap-3 lg:grid-cols-[minmax(0,1.2fr)_220px_220px_auto]"
           onSubmit={(event) => {
             event.preventDefault();
-            load();
           }}
         >
           <label className="block">
@@ -387,7 +406,7 @@ export default function AdminCoursesPage() {
             render: (row) => formatDate(row.created_at),
           },
         ]}
-        rows={state.loading ? [] : state.items}
+        rows={state.loading ? [] : filteredItems}
         emptyMessage={
           state.loading
             ? "Loading classes..."

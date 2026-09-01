@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { signOut } from "next-auth/react";
 import { useEffect, useMemo, useState } from "react";
+import { clearStudentPortalCache } from "@/lib/studentPortalClient";
 
 const NAV_ITEMS = [
   { id: "dashboard", label: "Dashboard" },
@@ -71,6 +72,11 @@ export default function StudentPortalNavbar({ profile = {} }) {
     scrollToSection(id);
   }
 
+  function handleLogout() {
+    clearStudentPortalCache();
+    signOut({ callbackUrl: "/login" });
+  }
+
   const shell = "border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.92)_0%,rgba(250,247,240,0.96)_100%)] backdrop-blur-xl";
   const activePill = "bg-[linear-gradient(135deg,#C9A227,#E4C766)] text-[#063F32] shadow-[0_10px_24px_-14px_rgba(201,162,39,0.6)]";
   const inactivePill = "bg-[#FAF7F0] text-[#245C4F] hover:bg-[#F1EADC]";
@@ -113,7 +119,7 @@ export default function StudentPortalNavbar({ profile = {} }) {
               </div>
               <button
                 type="button"
-                onClick={() => signOut({ callbackUrl: "/login" })}
+                onClick={handleLogout}
                 className="rounded-full border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-2 text-sm font-semibold text-[#0D5C48] transition hover:bg-[#0D5C48] hover:text-white"
               >
                 Logout
@@ -154,7 +160,7 @@ export default function StudentPortalNavbar({ profile = {} }) {
                 })}
                 <button
                   type="button"
-                  onClick={() => signOut({ callbackUrl: "/login" })}
+                  onClick={handleLogout}
                   className="mt-2 rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 text-left text-sm font-semibold text-[#0D5C48] transition hover:border-[#C9A227]/40 hover:bg-[#FFF5D6]"
                 >
                   Logout

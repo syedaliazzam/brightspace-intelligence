@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { LeafSpinnerInline } from "@/components/shared/AshShajrahLoaders";
 import ClientPortal from "@/components/shared/ClientPortal";
 import PaginationControls from "@/components/teacher/PaginationControls";
+import { STORAGE_SAFE_UPLOAD_MAX_BYTES, formatUploadLimit } from "@/lib/uploadLimits";
 
 function formatDate(value) {
   if (!value) return "Not available";
@@ -19,6 +20,58 @@ function getHomeworkAttachmentUrls(item) {
   return item?.homework_attachment_url ? [item.homework_attachment_url] : [];
 }
 
+async function readResponsePayload(response) {
+  const contentType = response.headers.get("content-type") || "";
+  if (contentType.includes("application/json")) {
+    return response.json().catch(() => ({}));
+  }
+  const text = await response.text().catch(() => "");
+  return { message: text || "Request failed." };
+}
+
+async function uploadHomeworkFile(homeworkId, file) {
+  if (file.size > STORAGE_SAFE_UPLOAD_MAX_BYTES) {
+    throw new Error(`The selected file is too large. Please upload a file smaller than ${formatUploadLimit()}.`);
+  }
+
+  const signedResponse = await fetch("/api/student/homework/upload-url", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      homeworkId,
+      fileName: file.name || "homework",
+      contentType: file.type || "application/octet-stream",
+      fileSize: file.size || 0,
+    }),
+  });
+  const signedData = await readResponsePayload(signedResponse);
+  if (!signedResponse.ok) {
+    throw new Error(signedData?.message || signedData?.error || "Unable to prepare homework upload.");
+  }
+
+  const uploadResponse = await fetch(signedData.signedUrl, {
+    method: "PUT",
+    headers: {
+      "Content-Type": file.type || "application/octet-stream",
+    },
+    body: file,
+  });
+
+  if (!uploadResponse.ok) {
+    const errorText = await uploadResponse.text().catch(() => "");
+    throw new Error(errorText || "Unable to upload homework file.");
+  }
+
+  return {
+    path: signedData.path,
+    storedPath: signedData.path,
+    bucket: signedData.bucket,
+    name: file.name || "homework",
+    type: file.type || "",
+    size: file.size || 0,
+  };
+}
+
 export default function HomeworkList({ items = [], onRefresh }) {
   const [submittingId, setSubmittingId] = useState("");
   const [activeItem, setActiveItem] = useState(null);
@@ -31,7 +84,8 @@ export default function HomeworkList({ items = [], onRefresh }) {
   const pageSize = 7;
 
   const totalPages = Math.max(1, Math.ceil((items?.length || 0) / pageSize));
-  const visibleItems = items.slice((page - 1) * pageSize, page * pageSize);
+  const safePage = Math.min(page, totalPages);
+  const visibleItems = items.slice((safePage - 1) * pageSize, safePage * pageSize);
 
   function syncFilePreviews(nextFiles) {
     setFilePreviews((currentPreviews) => {
@@ -46,18 +100,21 @@ export default function HomeworkList({ items = [], onRefresh }) {
     });
   }
 
-  useEffect(() => {
-    if (activeItem) {
-      setNote("");
-      setFiles([]);
-      setFilePreviews([]);
-      setModalError("");
-    }
-  }, [activeItem]);
+  function openSubmitModal(item) {
+    setActiveItem(item);
+    setNote("");
+    setFiles([]);
+    syncFilePreviews([]);
+    setModalError("");
+  }
 
-  useEffect(() => {
-    setPage((current) => Math.min(current, totalPages));
-  }, [totalPages]);
+  function closeSubmitModal() {
+    setActiveItem(null);
+    setNote("");
+    setFiles([]);
+    syncFilePreviews([]);
+    setModalError("");
+  }
 
   useEffect(() => {
     return () => {
@@ -77,19 +134,22 @@ export default function HomeworkList({ items = [], onRefresh }) {
     setPending(true);
     setSubmittingId(activeItem.id);
     try {
-      const formData = new FormData();
-      formData.append("note", note);
-      files.forEach((selectedFile) => formData.append("file", selectedFile));
+      const attachments = [];
+      for (const selectedFile of files) {
+        // Upload directly to Supabase so the homework API only receives small JSON metadata.
+        attachments.push(await uploadHomeworkFile(activeItem.id, selectedFile));
+      }
       const response = await fetch(`/api/student/homework/${activeItem.id}`, {
         method: "PATCH",
-        body: formData,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ note, attachments }),
       });
-      const data = await response.json();
+      const data = await readResponsePayload(response);
       if (!response.ok) throw new Error(data?.message || "Unable to submit homework.");
       onRefresh?.();
       setSubmittingId("");
       setPending(false);
-      setActiveItem(null);
+      closeSubmitModal();
     } catch (error) {
       setModalError(error instanceof Error ? error.message : "Unable to submit homework.");
       setSubmittingId("");
@@ -153,7 +213,7 @@ export default function HomeworkList({ items = [], onRefresh }) {
                   <button
                     type="button"
                     disabled={item.status === "submitted" || submittingId === item.id}
-                    onClick={() => setActiveItem(item)}
+                    onClick={() => openSubmitModal(item)}
                     className="rounded-xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-3 py-2 text-xs font-semibold text-[#0D5C48] transition hover:bg-[#F1EADC] disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     {item.status === "submitted" ? "Submitted" : submittingId === item.id ? (
@@ -176,7 +236,7 @@ export default function HomeworkList({ items = [], onRefresh }) {
         </div>
         {items.length > pageSize ? (
           <PaginationControls
-            page={page}
+            page={safePage}
             pageSize={pageSize}
             totalItems={items.length}
             onPageChange={(nextPage) => setPage(Math.min(Math.max(1, nextPage), totalPages))}
@@ -197,7 +257,7 @@ export default function HomeworkList({ items = [], onRefresh }) {
                 </div>
                 <button
                   type="button"
-                  onClick={() => setActiveItem(null)}
+                  onClick={closeSubmitModal}
                   className="rounded-xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-2 text-sm font-semibold text-[#0D5C48] hover:bg-[#F1EADC]"
                 >
                   Close
@@ -264,6 +324,13 @@ export default function HomeworkList({ items = [], onRefresh }) {
                     onChange={(event) => {
                       const selectedFiles = Array.from(event.target.files || []).filter((selected) => selected.size > 0);
                       if (!selectedFiles.length) return;
+                      const oversizedFile = selectedFiles.find((selected) => selected.size > STORAGE_SAFE_UPLOAD_MAX_BYTES);
+                      if (oversizedFile) {
+                        setModalError(`The selected file is too large. Please upload a file smaller than ${formatUploadLimit()}.`);
+                        event.target.value = "";
+                        return;
+                      }
+                      setModalError("");
                       setFiles((currentFiles) => {
                         const nextFiles = [...currentFiles, ...selectedFiles];
                         syncFilePreviews(nextFiles);
@@ -323,7 +390,7 @@ export default function HomeworkList({ items = [], onRefresh }) {
                 <div className="flex items-center justify-end gap-3">
                   <button
                     type="button"
-                    onClick={() => setActiveItem(null)}
+                    onClick={closeSubmitModal}
                     className="rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 text-sm font-semibold text-[#0D5C48] hover:bg-[#F1EADC]"
                   >
                     Cancel

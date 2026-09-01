@@ -107,7 +107,7 @@ export default function AdminDashboardPage() {
             .then((payload) => writeNamedCache("admin-courses:", payload)),
           fetch("/api/admin/fee-settings", { cache: "no-store" })
             .then((result) => result.json())
-            .then((payload) => writeNamedCache("admin-fee-settings", payload)),
+            .then((payload) => writeNamedCache("admin-fee-settings:v1", payload)),
           fetch("/api/admin/audit-logs", { cache: "no-store" })
             .then((result) => result.json())
             .then((payload) => writeNamedCache("admin-audit-logs:", payload)),

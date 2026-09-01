@@ -14,6 +14,34 @@ const FILTER_OPTIONS = [
   { id: "class-schedulers", label: "Class Schedulers" },
 ];
 
+const CACHE_KEY = "admin-all-events-calendar:v1";
+const CACHE_TTL = 60 * 1000;
+
+function readCache() {
+  if (typeof window === "undefined") return null;
+
+  const cached = window.sessionStorage.getItem(CACHE_KEY);
+  if (!cached) return null;
+
+  try {
+    const parsed = JSON.parse(cached);
+    if (Date.now() - parsed.timestamp > CACHE_TTL) {
+      window.sessionStorage.removeItem(CACHE_KEY);
+      return null;
+    }
+
+    return parsed.payload;
+  } catch {
+    window.sessionStorage.removeItem(CACHE_KEY);
+    return null;
+  }
+}
+
+function writeCache(payload) {
+  if (typeof window === "undefined") return;
+  window.sessionStorage.setItem(CACHE_KEY, JSON.stringify({ timestamp: Date.now(), payload }));
+}
+
 function parseDateTime(value) {
   if (!value) return null;
   const raw = String(value).trim();
@@ -251,6 +279,18 @@ export default function AdminUnifiedCalendarPage() {
     let active = true;
 
     async function load() {
+      const cached = readCache();
+      if (cached) {
+        setState({
+          loading: false,
+          error: "",
+          classEvents: Array.isArray(cached.classEvents) ? cached.classEvents : [],
+          publicEvents: Array.isArray(cached.publicEvents) ? cached.publicEvents : [],
+          internalEvents: Array.isArray(cached.internalEvents) ? cached.internalEvents : [],
+        });
+        return;
+      }
+
       setState((current) => ({ ...current, loading: true, error: "" }));
 
       try {
@@ -266,12 +306,17 @@ export default function AdminUnifiedCalendarPage() {
 
         if (!active) return;
 
-        setState({
-          loading: false,
-          error: "",
+        const payload = {
           classEvents: Array.isArray(lectureData?.items) ? mapClassSchedulerEvents(lectureData.items) : [],
           publicEvents: Array.isArray(publicData?.items) ? mapPublicEvents(publicData.items) : [],
           internalEvents: Array.isArray(internalData?.items) ? mapInternalEvents(internalData.items) : [],
+        };
+
+        writeCache(payload);
+        setState({
+          loading: false,
+          error: "",
+          ...payload,
         });
       } catch (error) {
         if (!active) return;

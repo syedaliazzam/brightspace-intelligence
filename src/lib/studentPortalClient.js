@@ -66,3 +66,20 @@ export async function loadStudentPortalJsonCached(url, { force = false, ttlMs = 
   pendingResponses.set(key, request);
   return request;
 }
+
+export function clearStudentPortalCache() {
+  responseCache.clear();
+  pendingResponses.clear();
+
+  if (typeof window === "undefined") return;
+
+  try {
+    Object.keys(window.sessionStorage).forEach((key) => {
+      if (key.startsWith(STORAGE_PREFIX)) {
+        window.sessionStorage.removeItem(key);
+      }
+    });
+  } catch {
+    // Logout should continue even if storage is unavailable.
+  }
+}

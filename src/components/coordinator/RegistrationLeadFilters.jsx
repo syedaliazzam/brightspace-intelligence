@@ -19,6 +19,7 @@ export default function RegistrationLeadFilters({
   initialStatus,
   canSync,
   onFilterChange,
+  clientSide = false,
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -35,8 +36,11 @@ export default function RegistrationLeadFilters({
   });
 
   useEffect(() => {
-    setSearch(initialSearch);
-    setStatus(initialStatus);
+    const timer = window.setTimeout(() => {
+      setSearch(initialSearch);
+      setStatus(initialStatus);
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [initialSearch, initialStatus]);
 
   useEffect(() => {
@@ -56,6 +60,11 @@ export default function RegistrationLeadFilters({
   }
 
   function applyFilters(nextSearch, nextStatus) {
+    if (clientSide) {
+      onFilterChange?.({ search: nextSearch, status: String(nextStatus || "").trim() || "all" });
+      return;
+    }
+
     const params = new URLSearchParams(searchParams.toString());
     const normalizedStatus = String(nextStatus || "").trim();
     const hasPage = params.has("page");
