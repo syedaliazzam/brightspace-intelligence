@@ -42,12 +42,64 @@ function computeAmounts(previousMonthDue, currentMonthFee, thisMonthPaid) {
   return { total, remaining };
 }
 
+function computeEditableFeeAmounts(draft = {}) {
+  const previousMonthDue = Number(draft.previous_month_due || 0);
+  const regularFee = Number(draft.regular_fee_amount || 0);
+  const admissionFee = Number(draft.admission_fee_amount || 0);
+  const discount = Number(draft.discount_amount || 0);
+  const scholarshipAmount = Number(draft.scholarship_amount || 0);
+  const paidAmount = Number(draft.this_month_paid || 0);
+  const discountPercent = Number(draft.discount_percent || 0);
+  const calculatedCurrentMonthFee = Math.max(0, regularFee + admissionFee - discount - scholarshipAmount);
+  const currentMonthFee = Number(draft.current_month_fee ?? calculatedCurrentMonthFee);
+  const calculatedTotalAmount = previousMonthDue + currentMonthFee;
+  const totalAmount = Number(draft.total_amount ?? calculatedTotalAmount);
+  const calculatedRemainingDue = Math.max(0, totalAmount - paidAmount);
+  const remainingDue = Number(draft.remaining_due ?? calculatedRemainingDue);
+
+  return {
+    previousMonthDue,
+    regularFee,
+    admissionFee,
+    discount,
+    discountPercent,
+    scholarshipAmount,
+    paidAmount,
+    currentMonthFee,
+    totalAmount,
+    remainingDue,
+  };
+}
+
+function buildFeeEditDraft(row) {
+  const parts = getCurrentMonthFeeParts(row);
+  const previousMonthDue = Number(row.computedPreviousMonthDue ?? row.previous_month_due ?? 0);
+  const currentMonthFee = Number(row.current_month_fee || parts.currentMonthFee || 0);
+  const regularFee = Number(parts.regularFee || (!parts.admissionFee ? currentMonthFee : 0));
+
+  return {
+    previous_month_due: moneyInputValue(previousMonthDue),
+    regular_fee_amount: moneyInputValue(regularFee),
+    admission_fee_amount: moneyInputValue(parts.admissionFee),
+    discount_percent: moneyInputValue(row.discount_percent),
+    discount_amount: moneyInputValue(parts.discount),
+    scholarship_amount: moneyInputValue(parts.scholarshipAmount),
+    current_month_fee: moneyInputValue(currentMonthFee),
+    total_amount: moneyInputValue(row.total_amount ?? row.computedTotalAmount ?? previousMonthDue + currentMonthFee),
+    this_month_paid: moneyInputValue(row.this_month_paid),
+    remaining_due: moneyInputValue(row.remaining_due ?? row.computedRemainingDue ?? Math.max(0, previousMonthDue + currentMonthFee - Number(row.this_month_paid || 0))),
+  };
+}
+
 function buildCarryForwardHistoryRows(historyItems, drafts = {}) {
   const rows = applyCarryForwardHistoryRows(historyItems);
 
   return rows.map((row) => {
     const draft = drafts[row.id] || {};
-    const currentMonthFee = Number(draft.current_month_fee ?? row.current_month_fee ?? 0);
+    const editableAmounts = draft.regular_fee_amount !== undefined
+      ? computeEditableFeeAmounts(draft)
+      : null;
+    const currentMonthFee = Number(editableAmounts?.currentMonthFee ?? draft.current_month_fee ?? row.current_month_fee ?? 0);
     const thisMonthPaid = Number(draft.this_month_paid ?? row.this_month_paid ?? 0);
     const previousMonthDue = Number(row.computedPreviousMonthDue ?? row.previous_month_due ?? 0);
     const computed = computeFeeHistoryAmounts({ previousMonthDue, currentMonthFee, thisMonthPaid });
@@ -107,6 +159,8 @@ export default function CoordinatorFeeHistoryPage({ portalLabel = "Coordinator p
   const [historyColumnOpen, setHistoryColumnOpen] = useState(false);
   const [historyStatusOpen, setHistoryStatusOpen] = useState(false);
   const [drafts, setDrafts] = useState({});
+  const [feeEditTarget, setFeeEditTarget] = useState(null);
+  const [feeEditDraft, setFeeEditDraft] = useState(null);
   const [savingRowId, setSavingRowId] = useState("");
   const [voucherPdfLoadingId, setVoucherPdfLoadingId] = useState("");
 
@@ -126,18 +180,27 @@ export default function CoordinatorFeeHistoryPage({ portalLabel = "Coordinator p
     }
   }
 
-  async function openStudentHistory(item) {
+  async function openStudentHistory(item, options = {}) {
     if (!item?.student_id) return;
+    const {
+      clearMessage = true,
+      clearRows = true,
+      resetControls = true,
+    } = options;
     setSelectedStudent(item);
     setHistoryLoading(true);
     setHistoryError("");
-    setHistoryMessage("");
-    setHistoryItems([]);
-    setDrafts({});
-    setHistoryPage(1);
-    setHistoryColumnFilter("all");
-    setHistorySearchTerm("");
-    setHistoryStatusFilter("all");
+    if (clearMessage) setHistoryMessage("");
+    if (clearRows) {
+      setHistoryItems([]);
+      setDrafts({});
+    }
+    if (resetControls) {
+      setHistoryPage(1);
+      setHistoryColumnFilter("all");
+      setHistorySearchTerm("");
+      setHistoryStatusFilter("all");
+    }
     try {
       const response = await fetch(`/api/coordinator/fee-history?studentId=${encodeURIComponent(item.student_id)}`, { cache: "no-store" });
       const data = await response.json().catch(() => ({}));
@@ -147,7 +210,11 @@ export default function CoordinatorFeeHistoryPage({ portalLabel = "Coordinator p
       setHistoryItems(nextItems);
       setDrafts(Object.fromEntries(carryForwardRows.map((row) => [row.id, {
         previous_month_due: moneyInputValue(row.computedPreviousMonthDue ?? row.previous_month_due),
+        regular_fee_amount: moneyInputValue(getCurrentMonthFeeParts(row).regularFee || row.current_month_fee),
+        admission_fee_amount: moneyInputValue(getCurrentMonthFeeParts(row).admissionFee),
+        discount_percent: moneyInputValue(row.discount_percent),
         discount_amount: moneyInputValue(row.discount_amount),
+        scholarship_amount: moneyInputValue(getCurrentMonthFeeParts(row).scholarshipAmount),
         current_month_fee: moneyInputValue(row.current_month_fee),
         this_month_paid: moneyInputValue(row.this_month_paid),
       }])));
@@ -160,9 +227,84 @@ export default function CoordinatorFeeHistoryPage({ portalLabel = "Coordinator p
     }
   }
 
-  async function saveHistoryRow(row) {
+  function openFeeEdit(row) {
     if (!row?.id) return;
-    const draft = drafts[row.id] || {};
+    setFeeEditTarget(row);
+    setFeeEditDraft(buildFeeEditDraft(row));
+    setHistoryError("");
+    setHistoryMessage("");
+  }
+
+  function closeFeeEdit() {
+    setFeeEditTarget(null);
+    setFeeEditDraft(null);
+  }
+
+  function updateFeeEditDraft(key, value) {
+    setFeeEditDraft((current) => {
+      const next = {
+        ...(current || {}),
+        [key]: value,
+      };
+
+      if (["previous_month_due", "regular_fee_amount", "admission_fee_amount", "discount_amount", "scholarship_amount", "this_month_paid"].includes(key)) {
+        if (key === "regular_fee_amount" && Number(next.discount_percent || 0) > 0) {
+          next.discount_amount = moneyInputValue((Number(value || 0) * Number(next.discount_percent || 0)) / 100);
+        }
+
+        if (key === "discount_amount" && Number(next.regular_fee_amount || 0) > 0) {
+          next.discount_percent = moneyInputValue((Number(value || 0) / Number(next.regular_fee_amount || 0)) * 100);
+        }
+
+        const previousMonthDueValue = Number(next.previous_month_due || 0);
+        const currentMonthFeeValue = Math.max(
+          0,
+          Number(next.regular_fee_amount || 0)
+          + Number(next.admission_fee_amount || 0)
+          - Number(next.discount_amount || 0)
+          - Number(next.scholarship_amount || 0)
+        );
+        const totalAmountValue = previousMonthDueValue + currentMonthFeeValue;
+        const remainingDueValue = Math.max(0, totalAmountValue - Number(next.this_month_paid || 0));
+
+        next.current_month_fee = moneyInputValue(currentMonthFeeValue);
+        next.total_amount = moneyInputValue(totalAmountValue);
+        next.remaining_due = moneyInputValue(remainingDueValue);
+      }
+
+      if (["current_month_fee", "total_amount", "this_month_paid"].includes(key)) {
+        const totalAmountValue = key === "current_month_fee"
+          ? Number(next.previous_month_due || 0) + Number(value || 0)
+          : Number(next.total_amount || 0);
+        next.total_amount = moneyInputValue(totalAmountValue);
+        next.remaining_due = moneyInputValue(Math.max(0, totalAmountValue - Number(next.this_month_paid || 0)));
+      }
+
+      if (key === "discount_percent") {
+        const discountAmountValue = (Number(next.regular_fee_amount || 0) * Number(value || 0)) / 100;
+        const currentMonthFeeValue = Math.max(
+          0,
+          Number(next.regular_fee_amount || 0)
+          + Number(next.admission_fee_amount || 0)
+          - discountAmountValue
+          - Number(next.scholarship_amount || 0)
+        );
+        const totalAmountValue = Number(next.previous_month_due || 0) + currentMonthFeeValue;
+
+        next.discount_amount = moneyInputValue(discountAmountValue);
+        next.current_month_fee = moneyInputValue(currentMonthFeeValue);
+        next.total_amount = moneyInputValue(totalAmountValue);
+        next.remaining_due = moneyInputValue(Math.max(0, totalAmountValue - Number(next.this_month_paid || 0)));
+      }
+
+      return next;
+    });
+  }
+
+  async function saveHistoryRow(row, overrideDraft = null) {
+    if (!row?.id) return;
+    const draft = overrideDraft || drafts[row.id] || {};
+    const computedDraft = computeEditableFeeAmounts(draft);
     setSavingRowId(row.id);
     setHistoryMessage("");
     setHistoryError("");
@@ -179,16 +321,27 @@ export default function CoordinatorFeeHistoryPage({ portalLabel = "Coordinator p
           registrationId: row.registration_id,
           monthLabel: row.month_label,
           dueDate: row.due_date,
-          previousMonthDue: draft.previous_month_due,
-          discountAmount: draft.discount_amount,
-          currentMonthFee: draft.current_month_fee,
-          thisMonthPaid: draft.this_month_paid,
+          previousMonthDue: computedDraft.previousMonthDue,
+          monthlyFeeAmount: computedDraft.regularFee,
+          admissionFeeAmount: computedDraft.admissionFee,
+          discountPercent: computedDraft.discountPercent,
+          discountAmount: computedDraft.discount,
+          scholarshipAmount: computedDraft.scholarshipAmount,
+          currentMonthFee: computedDraft.currentMonthFee,
+          totalAmount: computedDraft.totalAmount,
+          remainingDue: computedDraft.remainingDue,
+          thisMonthPaid: computedDraft.paidAmount,
         }),
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data?.message || "Unable to update fee history row.");
+      closeFeeEdit();
       if (selectedStudent?.student_id) {
-        await openStudentHistory(selectedStudent);
+        await openStudentHistory(selectedStudent, {
+          clearMessage: false,
+          clearRows: false,
+          resetControls: false,
+        });
       }
       setHistoryMessage(data?.message || "Fee history updated.");
       window.setTimeout(() => setHistoryMessage(""), 3000);
@@ -450,6 +603,7 @@ export default function CoordinatorFeeHistoryPage({ portalLabel = "Coordinator p
     const startIndex = (safeHistoryPage - 1) * PAGE_SIZE;
     return filteredHistoryItems.slice(startIndex, startIndex + PAGE_SIZE);
   }, [filteredHistoryItems, safeHistoryPage]);
+  const feeEditComputed = feeEditDraft ? computeEditableFeeAmounts(feeEditDraft) : null;
 
   return (
     <div className="min-h-screen bg-[#FAF7F0]">
@@ -675,11 +829,15 @@ export default function CoordinatorFeeHistoryPage({ portalLabel = "Coordinator p
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-[#F1EADC]">
-                      {visibleHistoryItems.length ? visibleHistoryItems.map((row, rowIndex) => {
+                      {visibleHistoryItems.length ? visibleHistoryItems.map((row) => {
                         const isEditableHistoryRow = canEdit;
                         const draft = drafts[row.id] || {
                           previous_month_due: moneyInputValue(row.previous_month_due),
+                          regular_fee_amount: moneyInputValue(row.regular_fee_amount),
+                          admission_fee_amount: moneyInputValue(row.admission_fee_amount),
+                          discount_percent: moneyInputValue(row.discount_percent),
                           discount_amount: moneyInputValue(row.discount_amount),
+                          scholarship_amount: moneyInputValue(row.scholarship_amount),
                           current_month_fee: moneyInputValue(row.current_month_fee),
                           this_month_paid: moneyInputValue(row.this_month_paid),
                         };
@@ -736,7 +894,7 @@ export default function CoordinatorFeeHistoryPage({ portalLabel = "Coordinator p
                             <td className="px-4 py-4 font-semibold text-[#063F32]">{formatMoney(currentFeeParts.scholarshipAmount)}</td>
                             <td className="px-4 py-4 font-semibold text-[#063F32]">{formatMoney(currentFeeParts.currentMonthFee)}</td>
                             <td className="px-4 py-4 font-semibold text-[#063F32]">{formatMoney(displayTotalAmount)}</td>
-                            <td className="px-4 py-4">{isEditableHistoryRow ? <input value={draft.this_month_paid} onChange={(event) => setDrafts((current) => ({ ...current, [row.id]: { ...draft, this_month_paid: event.target.value } }))} type="number" min="0" className="w-28 rounded-xl border border-[#2D8A6A]/20 bg-white px-3 py-2 text-sm text-[#063F32] outline-none focus:border-[#2D8A6A]" /> : <span className="text-[#245C4F]">{formatMoney(draft.this_month_paid)}</span>}</td>
+                            <td className="px-4 py-4 font-semibold text-[#063F32]">{formatMoney(draft.this_month_paid)}</td>
                             <td className="px-4 py-4 font-semibold text-[#063F32]">{formatMoney(rowRemainingDue)}</td>
                             <td className="px-4 py-4 text-[#245C4F]">{String(row.payment_status || "-").replace(/_/g, " ")}</td>
                             <td className="px-4 py-4 text-[#245C4F]">
@@ -766,11 +924,11 @@ export default function CoordinatorFeeHistoryPage({ portalLabel = "Coordinator p
                               {isEditableHistoryRow ? (
                                 <button
                                   type="button"
-                                  onClick={() => void saveHistoryRow(row)}
+                                  onClick={() => openFeeEdit(row)}
                                   disabled={savingRowId === row.id}
                                   className="whitespace-nowrap rounded-xl bg-[#0D5C48] px-3 py-2 text-xs font-semibold text-[#FAF7F0] transition hover:bg-[#063F32] disabled:opacity-60"
                                 >
-                                  {savingRowId === row.id ? "Saving..." : "Save"}
+                                  {savingRowId === row.id ? "Saving..." : "Edit"}
                                 </button>
                               ) : (
                                 <span className="whitespace-nowrap text-xs font-medium text-[#245C4F]">Read only</span>
@@ -789,6 +947,91 @@ export default function CoordinatorFeeHistoryPage({ portalLabel = "Coordinator p
 
                 {filteredHistoryItems.length > PAGE_SIZE ? (
                   <PaginationControls page={safeHistoryPage} pageSize={PAGE_SIZE} totalItems={filteredHistoryItems.length} onPageChange={setHistoryPage} />
+                ) : null}
+
+                {feeEditTarget && feeEditDraft && feeEditComputed ? (
+                  <div className="fixed inset-0 z-[10001] flex items-start justify-center overflow-y-auto bg-[#063F32]/55 px-4 py-10 backdrop-blur-sm">
+                    <div className="w-full max-w-3xl rounded-[2rem] border border-[#2D8A6A]/15 bg-[#FAF7F0] p-5 shadow-[0_24px_80px_-36px_rgba(13,59,46,0.32)] sm:p-6">
+                      <div className="flex flex-wrap items-start justify-between gap-4">
+                        <div>
+                          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[#C9A227]">Edit fee row</p>
+                          <h3 className="mt-2 text-2xl font-semibold text-[#063F32]">{feeEditTarget.voucher_no || feeEditTarget.month_label || "Fee history row"}</h3>
+                          <p className="mt-1 text-sm text-[#245C4F]">
+                            Update values, review recalculated totals, then confirm update.
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={closeFeeEdit}
+                          className="rounded-xl border border-[#2D8A6A]/20 bg-white px-3 py-2 text-sm font-semibold text-[#063F32] transition hover:bg-[#F1EADC]"
+                        >
+                          Close
+                        </button>
+                      </div>
+
+                      <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                        {[
+                          ["previous_month_due", "Previous Month Due"],
+                          ["regular_fee_amount", "Monthly Fee"],
+                          ["admission_fee_amount", "Admission Fee"],
+                          ["discount_percent", "Discount Percent"],
+                          ["discount_amount", "Discount"],
+                          ["scholarship_amount", "Scholarship Given Amount"],
+                          ["current_month_fee", "Current Month Fee"],
+                          ["total_amount", "Total Amount"],
+                          ["this_month_paid", "Paid Amount"],
+                          ["remaining_due", "Remaining Amount"],
+                        ].map(([key, label]) => (
+                          <label key={key} className="block">
+                            <span className="mb-2 block text-sm font-semibold text-[#245C4F]">{label}</span>
+                            <input
+                              type="number"
+                              min="0"
+                              value={feeEditDraft[key]}
+                              onChange={(event) => updateFeeEditDraft(key, event.target.value)}
+                              className="w-full rounded-2xl border border-[#2D8A6A]/20 bg-white px-4 py-3 text-sm font-semibold text-[#063F32] outline-none transition focus:border-[#2D8A6A] focus:ring-4 focus:ring-[#FFF5D6]"
+                            />
+                          </label>
+                        ))}
+                      </div>
+
+                      <div className="mt-6 rounded-[1.5rem] border border-[#2D8A6A]/15 bg-white p-4">
+                        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#0D5C48]">Updated values</p>
+                        <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                          <div className="rounded-2xl bg-[#FAF7F0] p-4">
+                            <p className="text-xs font-semibold text-[#245C4F]">Current Month Fee</p>
+                            <p className="mt-1 text-lg font-bold text-[#063F32]">{formatMoney(feeEditComputed.currentMonthFee)}</p>
+                          </div>
+                          <div className="rounded-2xl bg-[#FAF7F0] p-4">
+                            <p className="text-xs font-semibold text-[#245C4F]">Total Amount</p>
+                            <p className="mt-1 text-lg font-bold text-[#063F32]">{formatMoney(feeEditComputed.totalAmount)}</p>
+                          </div>
+                          <div className="rounded-2xl bg-[#FAF7F0] p-4">
+                            <p className="text-xs font-semibold text-[#245C4F]">Remaining Amount</p>
+                            <p className="mt-1 text-lg font-bold text-[#063F32]">{formatMoney(feeEditComputed.remainingDue)}</p>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="mt-6 flex flex-wrap justify-end gap-3">
+                        <button
+                          type="button"
+                          onClick={closeFeeEdit}
+                          className="rounded-2xl border border-[#2D8A6A]/20 bg-white px-5 py-3 text-sm font-semibold text-[#063F32] transition hover:bg-[#F1EADC]"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => void saveHistoryRow(feeEditTarget, feeEditDraft)}
+                          disabled={savingRowId === feeEditTarget.id}
+                          className="rounded-2xl bg-[#0D5C48] px-5 py-3 text-sm font-semibold text-[#FAF7F0] transition hover:bg-[#063F32] disabled:opacity-60"
+                        >
+                          {savingRowId === feeEditTarget.id ? "Updating..." : "Confirm Update"}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
                 ) : null}
               </div>
             </div>
