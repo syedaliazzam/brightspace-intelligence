@@ -67,7 +67,6 @@ export default function AdminLecturesPage() {
         error: "",
         items: Array.isArray(cached?.items) ? cached.items : [],
       });
-      return;
     }
 
     try {

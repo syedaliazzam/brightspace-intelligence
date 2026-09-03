@@ -288,7 +288,6 @@ export default function AdminUnifiedCalendarPage() {
           publicEvents: Array.isArray(cached.publicEvents) ? cached.publicEvents : [],
           internalEvents: Array.isArray(cached.internalEvents) ? cached.internalEvents : [],
         });
-        return;
       }
 
       setState((current) => ({ ...current, loading: true, error: "" }));
