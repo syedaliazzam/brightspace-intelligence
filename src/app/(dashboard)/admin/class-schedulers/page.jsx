@@ -87,6 +87,10 @@ function buildClassSchedulerEvents(item) {
   const occurrenceDates = Array.isArray(item?.occurrence_dates)
     ? item.occurrence_dates.map(parseDateOnly).filter(Boolean)
     : [];
+  const occurrenceDetails =
+    item?.occurrence_details && typeof item.occurrence_details === "object"
+      ? item.occurrence_details
+      : {};
   const recordingByDate =
     item?.recording_by_date && typeof item.recording_by_date === "object"
       ? item.recording_by_date
@@ -100,6 +104,18 @@ function buildClassSchedulerEvents(item) {
 
   const makeEvent = (date, suffix = "") => {
     const occurrenceDateKey = date ? toCalendarDate(date).slice(0, 10) : "";
+    const occurrence = occurrenceDetails?.[occurrenceDateKey] || {};
+    const occurrenceStart = occurrence?.scheduled_start
+      ? toCalendarDate(parseDateTime(occurrence.scheduled_start))
+      : date
+        ? formatLocalCalendarDate(date, startTimeParts[0] || 0, startTimeParts[1] || 0)
+        : "";
+    const occurrenceEnd = occurrence?.scheduled_end
+      ? toCalendarDate(parseDateTime(occurrence.scheduled_end))
+      : date
+        ? formatLocalCalendarDate(date, endTimeParts[0] || 0, endTimeParts[1] || 0)
+        : "";
+    const eventId = occurrence?.id || item?.id;
     const occurrenceRecordingLink = String(recordingByDate?.[occurrenceDateKey] || "").trim();
     const fallbackRecordingLink =
       occurrenceDateKey && recordingDateKey && occurrenceDateKey === recordingDateKey
@@ -109,10 +125,10 @@ function buildClassSchedulerEvents(item) {
     const canShowRecording = Boolean(resolvedRecordingLink);
 
     return ({
-    id: `class-${item.id}${suffix}`,
+    id: `class-${eventId}${suffix}`,
     title: item?.title || item?.subject_name || "Class scheduler",
-    start: date ? formatLocalCalendarDate(date, startTimeParts[0] || 0, startTimeParts[1] || 0) : "",
-    end: date ? formatLocalCalendarDate(date, endTimeParts[0] || 0, endTimeParts[1] || 0) : "",
+    start: occurrenceStart,
+    end: occurrenceEnd,
     backgroundColor: "#10B981",
     borderColor: "#059669",
     textColor: "#FFFFFF",
@@ -124,7 +140,7 @@ function buildClassSchedulerEvents(item) {
       recordingLink: canShowRecording ? resolvedRecordingLink : item?.event_detail_link?.href || "",
       recordingKind: canShowRecording ? "recording" : item?.event_detail_link?.kind || "",
       recordingLabel: canShowRecording ? "View Recording" : item?.event_detail_link?.label || "",
-      eventId: item?.id,
+      eventId,
       eventType: "class-schedulers",
     },
   });
@@ -162,7 +178,7 @@ function mapClassSchedulerEvents(items = []) {
     ...event,
     extendedProps: {
       ...event.extendedProps,
-      syncEndpoint: `/api/coordinator/lecture-schedules/${item.id}/meet-attendance-sync`,
+      syncEndpoint: `/api/coordinator/lecture-schedules/${event.extendedProps?.eventId || item.id}/meet-attendance-sync`,
     },
   })));
 }

@@ -350,6 +350,7 @@ export async function GET(request) {
           TO_CHAR(MIN(ls.scheduled_start), 'HH24:MI') AS start_time,
           TO_CHAR(MAX(ls.scheduled_end), 'HH24:MI') AS end_time,
           ARRAY_AGG(DISTINCT TO_CHAR(ls.scheduled_start, 'YYYY-MM-DD') ORDER BY TO_CHAR(ls.scheduled_start, 'YYYY-MM-DD')) AS occurrence_dates,
+          occurrence_map.occurrence_details,
           COUNT(*)::int AS occurrence_count,
           COUNT(*) FILTER (WHERE ls.status::text = 'completed_by_teacher')::int AS completed_count,
           COUNT(*) FILTER (WHERE ls.status::text = 'verified_by_coordinator')::int AS verified_count,
@@ -431,6 +432,42 @@ export async function GET(request) {
         INNER JOIN users tu ON tu.id = tp.user_id
         INNER JOIN subjects sub ON sub.id = ls.subject_id
         LEFT JOIN LATERAL (
+          SELECT jsonb_object_agg(
+            occurrence_date,
+            jsonb_build_object(
+              'id', id,
+              'scheduled_start', scheduled_start,
+              'scheduled_end', scheduled_end,
+              'start_time', start_time,
+              'end_time', end_time
+            )
+            ORDER BY scheduled_start ASC, id ASC
+          ) AS occurrence_details
+          FROM (
+            SELECT DISTINCT ON (TO_CHAR(lsd.scheduled_start, 'YYYY-MM-DD'))
+              TO_CHAR(lsd.scheduled_start, 'YYYY-MM-DD') AS occurrence_date,
+              lsd.id::text AS id,
+              lsd.scheduled_start::text AS scheduled_start,
+              lsd.scheduled_end::text AS scheduled_end,
+              TO_CHAR(lsd.scheduled_start, 'HH24:MI') AS start_time,
+              TO_CHAR(lsd.scheduled_end, 'HH24:MI') AS end_time
+            FROM lecture_schedules lsd
+            INNER JOIN enrollments ed ON ed.id = lsd.enrollment_id
+            WHERE
+              lsd.google_calendar_event_id IS NOT DISTINCT FROM ls.google_calendar_event_id
+              AND lsd.google_meet_link IS NOT DISTINCT FROM ls.google_meet_link
+              AND lsd.meet_link_source IS NOT DISTINCT FROM ls.meet_link_source
+              AND lsd.google_meet_space_id IS NOT DISTINCT FROM ls.google_meet_space_id
+              AND lsd.teacher_id = ls.teacher_id
+              AND lsd.subject_id = ls.subject_id
+              AND lsd.title = ls.title
+              AND lsd.description = ls.description
+              AND lsd.rescheduled_from_id IS NOT DISTINCT FROM ls.rescheduled_from_id
+              AND ed.course_id = e.course_id
+            ORDER BY TO_CHAR(lsd.scheduled_start, 'YYYY-MM-DD'), lsd.scheduled_start ASC, lsd.id ASC
+          ) occurrence_rows
+        ) occurrence_map ON TRUE
+        LEFT JOIN LATERAL (
           SELECT
             latest_recording.recording_drive_url,
             latest_recording.recording_date,
@@ -498,6 +535,7 @@ export async function GET(request) {
           rec.recording_drive_url,
           rec.recording_date,
           rec.recording_by_date,
+          occurrence_map.occurrence_details,
           ls.teacher_id,
           ls.subject_id,
           ls.title,

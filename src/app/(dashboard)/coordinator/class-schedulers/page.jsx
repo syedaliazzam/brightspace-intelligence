@@ -81,6 +81,10 @@ function expandClassSchedulerEvent(item) {
   const occurrenceDates = Array.isArray(item?.occurrence_dates)
     ? item.occurrence_dates.map(parseDateOnly).filter(Boolean)
     : [];
+  const occurrenceDetails =
+    item?.occurrence_details && typeof item.occurrence_details === "object"
+      ? item.occurrence_details
+      : {};
   const weekdaySet = getWeekdaySet(item?.days_active);
   const recordingDateKey = String(item?.recording_date || item?.recorded_at || "").slice(0, 10);
   const recordingByDate =
@@ -106,12 +110,18 @@ function expandClassSchedulerEvent(item) {
 
   if (occurrenceDates.length) {
     return occurrenceDates.map((date) => {
-      const occurrenceStart = formatLocalCalendarDate(date, startTimeParts[0] || 0, startTimeParts[1] || 0);
-      const occurrenceEnd = formatLocalCalendarDate(date, endTimeParts[0] || 0, endTimeParts[1] || 0);
       const occurrenceDateKey = toCalendarDate(date).slice(0, 10);
+      const occurrence = occurrenceDetails?.[occurrenceDateKey] || {};
+      const occurrenceStart = occurrence?.scheduled_start
+        ? toCalendarDate(parseDateTime(occurrence.scheduled_start))
+        : formatLocalCalendarDate(date, startTimeParts[0] || 0, startTimeParts[1] || 0);
+      const occurrenceEnd = occurrence?.scheduled_end
+        ? toCalendarDate(parseDateTime(occurrence.scheduled_end))
+        : formatLocalCalendarDate(date, endTimeParts[0] || 0, endTimeParts[1] || 0);
       const recordingProps = resolveRecordingProps(occurrenceDateKey);
+      const eventId = occurrence?.id || item?.id;
       return {
-        id: `class-${item.id}-${occurrenceDateKey}`,
+        id: `class-${eventId}-${occurrenceDateKey}`,
         title: item?.title || item?.subject_name || "Class scheduler",
         start: occurrenceStart,
         end: occurrenceEnd,
@@ -124,7 +134,7 @@ function expandClassSchedulerEvent(item) {
           subtitle: item?.subject_name || item?.class_level || item?.course_title || "Class schedule",
           meetLink: item?.google_meet_link || "",
           ...recordingProps,
-          eventId: item?.id,
+          eventId,
           eventType: "class-schedulers",
         },
       };
@@ -138,12 +148,18 @@ function expandClassSchedulerEvent(item) {
   while (cursor <= endDate) {
     const weekday = cursor.toLocaleDateString("en-US", { weekday: "short" }).toLowerCase();
     if (weekdaySet.has(weekday)) {
-      const occurrenceStart = formatLocalCalendarDate(cursor, startTimeParts[0] || 0, startTimeParts[1] || 0);
-      const occurrenceEnd = formatLocalCalendarDate(cursor, endTimeParts[0] || 0, endTimeParts[1] || 0);
       const occurrenceDateKey = toCalendarDate(cursor).slice(0, 10);
+      const occurrence = occurrenceDetails?.[occurrenceDateKey] || {};
+      const occurrenceStart = occurrence?.scheduled_start
+        ? toCalendarDate(parseDateTime(occurrence.scheduled_start))
+        : formatLocalCalendarDate(cursor, startTimeParts[0] || 0, startTimeParts[1] || 0);
+      const occurrenceEnd = occurrence?.scheduled_end
+        ? toCalendarDate(parseDateTime(occurrence.scheduled_end))
+        : formatLocalCalendarDate(cursor, endTimeParts[0] || 0, endTimeParts[1] || 0);
       const recordingProps = resolveRecordingProps(occurrenceDateKey);
+      const eventId = occurrence?.id || item?.id;
       events.push({
-        id: `class-${item.id}-${occurrenceDateKey}`,
+        id: `class-${eventId}-${occurrenceDateKey}`,
         title: item?.title || item?.subject_name || "Class scheduler",
         start: occurrenceStart,
         end: occurrenceEnd,
@@ -156,7 +172,7 @@ function expandClassSchedulerEvent(item) {
           subtitle: item?.subject_name || item?.class_level || item?.course_title || "Class schedule",
           meetLink: item?.google_meet_link || "",
           ...recordingProps,
-          eventId: item?.id,
+          eventId,
           eventType: "class-schedulers",
         },
       });
@@ -191,7 +207,7 @@ function mapClassSchedulerEvents(items = []) {
     ...event,
     extendedProps: {
       ...event.extendedProps,
-      syncEndpoint: `/api/coordinator/lecture-schedules/${item.id}/meet-attendance-sync`,
+      syncEndpoint: `/api/coordinator/lecture-schedules/${event.extendedProps?.eventId || item.id}/meet-attendance-sync`,
     },
   })));
 }
