@@ -210,6 +210,20 @@ export async function PATCH(request, context) {
           WHERE id = ${id}::uuid
         `;
 
+        if (lecture.google_calendar_event_id) {
+          await tx.$executeRaw`
+            UPDATE lecture_schedules
+            SET title = ${title || lecture.title},
+                description = ${description || lecture.description || null},
+                google_meet_link = ${resolvedMeetLink},
+                meet_link_source = ${resolvedMeetSource},
+                google_meet_space_id = COALESCE(${calendarData.meetSpaceId || extractMeetCodeFromLink(manualMeetLink) || null}, google_meet_space_id),
+                updated_at = NOW()
+            WHERE google_calendar_event_id = ${lecture.google_calendar_event_id}
+              AND id <> ${id}::uuid
+          `;
+        }
+
         await createAuditLog(
           {
             actorUserId: session.user.id,

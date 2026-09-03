@@ -204,7 +204,6 @@ export default function LMSCalendar({ apiUrl, filters = {}, extraParams = {}, on
             setCalendarEvents(cachedRows);
             setLoading(false);
           }
-          return;
         }
 
         let request = cacheKey ? pendingCalendarRequests.get(cacheKey) : null;
