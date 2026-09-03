@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ChevronDown, Copy, FileVideo, Link as LinkIcon, Plus, RefreshCw } from "lucide-react";
+import { ChevronDown, Copy, FileVideo, Link as LinkIcon, Pencil, Plus, RefreshCw } from "lucide-react";
+import { normalizeVisibleRoles } from "@/lib/internalEventsVisibility";
 
 const APP_TIMEZONE = "Asia/Karachi";
 
@@ -11,6 +12,14 @@ const VISIBILITY_ROLE_OPTIONS = [
   { value: "parent", label: "Parents" },
   { value: "superadmin", label: "Super Admin" },
 ];
+
+const INTERNAL_EVENT_STATUS_OPTIONS = [
+  { value: "scheduled", label: "Scheduled" },
+  { value: "completed", label: "Completed" },
+  { value: "cancelled", label: "Cancelled" },
+];
+
+const INTERNAL_EVENT_EDIT_STATUSES = new Set(INTERNAL_EVENT_STATUS_OPTIONS.map((option) => option.value));
 
 function toggleRoleSelection(currentRoles = [], role) {
   if (!role) return currentRoles;
@@ -110,14 +119,26 @@ export default function InternalEventsPage({
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   const [attendeeOpen, setAttendeeOpen] = useState(false);
+  const [editAttendeeOpen, setEditAttendeeOpen] = useState(false);
   const [search, setSearch] = useState("");
   const [visibleToRoles, setVisibleToRoles] = useState([]);
+  const [editingItem, setEditingItem] = useState(null);
+  const [editVisibleToRoles, setEditVisibleToRoles] = useState([]);
+  const [editSaving, setEditSaving] = useState(false);
   const [form, setForm] = useState({
     title: "",
     description: "",
     attendeeUserId: "",
     scheduledStart: "",
     scheduledEnd: "",
+  });
+  const [editForm, setEditForm] = useState({
+    title: "",
+    description: "",
+    attendeeUserId: "",
+    scheduledStart: "",
+    scheduledEnd: "",
+    status: "scheduled",
   });
 
   const load = useCallback(async () => {
@@ -199,6 +220,65 @@ export default function InternalEventsPage({
       setError(submitError instanceof Error ? submitError.message : "Unable to create event.");
     } finally {
       setCreating(false);
+    }
+  }
+
+  function openEditModal(item) {
+    setError("");
+    setEditingItem(item);
+    setEditVisibleToRoles(normalizeVisibleRoles(item.visible_to_roles || []));
+    setEditAttendeeOpen(false);
+    setEditForm({
+      title: item.title || "",
+      description: item.description || "",
+      attendeeUserId: item.attendee_user_id || "",
+      scheduledStart: toPakistanDateTimeInput(item.scheduled_start),
+      scheduledEnd: toPakistanDateTimeInput(item.scheduled_end),
+      status: INTERNAL_EVENT_EDIT_STATUSES.has(String(item.status || "").toLowerCase())
+        ? String(item.status || "").toLowerCase()
+        : "scheduled",
+    });
+  }
+
+  function closeEditModal() {
+    setEditingItem(null);
+    setEditVisibleToRoles([]);
+    setEditSaving(false);
+    setEditForm({
+      title: "",
+      description: "",
+      attendeeUserId: "",
+      scheduledStart: "",
+      scheduledEnd: "",
+      status: "scheduled",
+    });
+  }
+
+  async function handleEditSubmit(event) {
+    event.preventDefault();
+    if (!editingItem?.id || editSaving) return;
+
+    setEditSaving(true);
+    setError("");
+    try {
+      const response = await fetch("/api/internal-events", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: editingItem.id,
+          ...editForm,
+          visibleToRoles: editVisibleToRoles,
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data?.message || "Unable to update event.");
+      setMessage(data?.message || "Internal event updated successfully.");
+      closeEditModal();
+      await load();
+    } catch (submitError) {
+      setError(submitError instanceof Error ? submitError.message : "Unable to update event.");
+    } finally {
+      setEditSaving(false);
     }
   }
 
@@ -384,6 +464,7 @@ export default function InternalEventsPage({
                   <th className="px-5 py-3 font-semibold">Start time</th>
                   <th className="px-5 py-3 font-semibold">End time</th>
                   <th className="px-5 py-3 font-semibold">Status</th>
+                  {canCreate ? <th className="px-5 py-3 font-semibold">Actions</th> : null}
                 </tr>
               </thead>
               <tbody>
@@ -403,11 +484,23 @@ export default function InternalEventsPage({
                           {eventStatus(item)}
                         </span>
                       </td>
+                      {canCreate ? (
+                        <td className="px-5 py-4">
+                          <button
+                            type="button"
+                            onClick={() => openEditModal(item)}
+                            className="inline-flex items-center gap-2 rounded-full border border-[#2D8A6A]/20 bg-white px-4 py-2 text-xs font-semibold text-[#063F32] transition hover:bg-[#F1EADC]"
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                            Edit
+                          </button>
+                        </td>
+                      ) : null}
                     </tr>
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={6} className="px-5 py-8 text-center text-[#245C4F]">
+                    <td colSpan={canCreate ? 7 : 6} className="px-5 py-8 text-center text-[#245C4F]">
                       {loading ? "Loading events..." : "No internal events available."}
                     </td>
                   </tr>
@@ -416,6 +509,160 @@ export default function InternalEventsPage({
             </table>
           </div>
         </section>
+
+        {canCreate && editingItem ? (
+          <div className="fixed inset-0 z-[10000] flex items-center justify-center overflow-y-auto bg-[#063F32]/45 px-4 py-6 backdrop-blur-sm">
+            <div className="w-full max-w-4xl max-h-[calc(100vh-48px)] overflow-y-auto rounded-[2rem] border border-[#2D8A6A]/15 bg-[#FAF7F0] shadow-[0_24px_80px_-36px_rgba(13,59,46,0.24)]">
+              <div className="flex items-start justify-between gap-4 border-b border-[#F1EADC] px-6 py-4">
+                <div>
+                  <p className="text-sm font-semibold uppercase tracking-[0.24em] text-[#C9A227]">Internal event</p>
+                  <h2 className="mt-2 text-2xl font-semibold text-[#063F32]">Edit event record</h2>
+                </div>
+                <button type="button" onClick={closeEditModal} className="rounded-xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-3 py-2 text-sm font-semibold text-[#063F32] transition hover:bg-[#F1EADC]">
+                  Close
+                </button>
+              </div>
+              <form onSubmit={handleEditSubmit} className="grid gap-4 p-6 text-sm text-[#245C4F] lg:grid-cols-2">
+                <label className="block">
+                  <span className="mb-2 block text-sm font-semibold text-[#245C4F]">Event title</span>
+                  <input
+                    value={editForm.title}
+                    onChange={(event) => setEditForm((current) => ({ ...current, title: event.target.value }))}
+                    disabled={editSaving}
+                    className="w-full rounded-2xl border border-[#2D8A6A]/20 bg-white px-4 py-3 text-sm outline-none focus:border-[#2D8A6A] focus:ring-2 focus:ring-[#2D8A6A]/20 disabled:cursor-not-allowed disabled:bg-[#F7F2E8]"
+                    required
+                  />
+                </label>
+                <label className="block">
+                  <span className="mb-2 block text-sm font-semibold text-[#245C4F]">Attendee</span>
+                  <div className="relative">
+                    <select
+                      value={editForm.attendeeUserId}
+                      onMouseDown={() => setEditAttendeeOpen((current) => !current)}
+                      onChange={(event) => {
+                        setEditAttendeeOpen(false);
+                        setEditForm((current) => ({ ...current, attendeeUserId: event.target.value }));
+                      }}
+                      disabled={editSaving}
+                      className="w-full appearance-none rounded-2xl border border-[#2D8A6A]/20 bg-white px-4 py-3 pr-11 text-sm outline-none focus:border-[#2D8A6A] focus:ring-2 focus:ring-[#2D8A6A]/20 disabled:cursor-not-allowed disabled:bg-[#F7F2E8]"
+                      required
+                    >
+                      <option value="">Select attendee</option>
+                      {attendees.map((attendee) => (
+                        <option key={attendee.id} value={attendee.id}>
+                          {attendee.full_name} - {roleLabel(attendee.role_name)}
+                        </option>
+                      ))}
+                    </select>
+                    <ChevronDown className={`pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#0D5C48] transition ${editAttendeeOpen ? "rotate-180" : ""}`} />
+                  </div>
+                </label>
+                <label className="block">
+                  <span className="mb-2 block text-sm font-semibold text-[#245C4F]">Start time</span>
+                  <input
+                    type="datetime-local"
+                    value={editForm.scheduledStart}
+                    onChange={(event) => setEditForm((current) => ({ ...current, scheduledStart: event.target.value }))}
+                    disabled={editSaving}
+                    className="w-full rounded-2xl border border-[#2D8A6A]/20 bg-white px-4 py-3 text-sm outline-none focus:border-[#2D8A6A] focus:ring-2 focus:ring-[#2D8A6A]/20 disabled:cursor-not-allowed disabled:bg-[#F7F2E8]"
+                    required
+                  />
+                </label>
+                <label className="block">
+                  <span className="mb-2 block text-sm font-semibold text-[#245C4F]">End time</span>
+                  <input
+                    type="datetime-local"
+                    value={editForm.scheduledEnd}
+                    onChange={(event) => setEditForm((current) => ({ ...current, scheduledEnd: event.target.value }))}
+                    disabled={editSaving}
+                    className="w-full rounded-2xl border border-[#2D8A6A]/20 bg-white px-4 py-3 text-sm outline-none focus:border-[#2D8A6A] focus:ring-2 focus:ring-[#2D8A6A]/20 disabled:cursor-not-allowed disabled:bg-[#F7F2E8]"
+                    required
+                  />
+                </label>
+                <label className="block">
+                  <span className="mb-2 block text-sm font-semibold text-[#245C4F]">Status</span>
+                  <div className="relative">
+                    <select
+                      value={editForm.status}
+                      onChange={(event) => setEditForm((current) => ({ ...current, status: event.target.value }))}
+                      disabled={editSaving}
+                      className="w-full appearance-none rounded-2xl border border-[#2D8A6A]/20 bg-white px-4 py-3 pr-11 text-sm outline-none focus:border-[#2D8A6A] focus:ring-2 focus:ring-[#2D8A6A]/20 disabled:cursor-not-allowed disabled:bg-[#F7F2E8]"
+                    >
+                      {INTERNAL_EVENT_STATUS_OPTIONS.map((option) => (
+                        <option key={option.value} value={option.value}>{option.label}</option>
+                      ))}
+                    </select>
+                    <ChevronDown className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#0D5C48]" />
+                  </div>
+                </label>
+                <label className="block lg:col-span-2">
+                  <span className="mb-2 block text-sm font-semibold text-[#245C4F]">Description</span>
+                  <textarea
+                    value={editForm.description}
+                    onChange={(event) => setEditForm((current) => ({ ...current, description: event.target.value }))}
+                    rows={3}
+                    disabled={editSaving}
+                    className="w-full rounded-2xl border border-[#2D8A6A]/20 bg-white px-4 py-3 text-sm outline-none focus:border-[#2D8A6A] focus:ring-2 focus:ring-[#2D8A6A]/20 disabled:cursor-not-allowed disabled:bg-[#F7F2E8]"
+                  />
+                </label>
+                <fieldset className="block lg:col-span-2">
+                  <legend className="mb-2 block text-sm font-semibold text-[#245C4F]">Visible to portals</legend>
+                  <div className="rounded-2xl border border-[#2D8A6A]/20 bg-white p-3">
+                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+                      {VISIBILITY_ROLE_OPTIONS.map((option) => {
+                        const checked = editVisibleToRoles.includes(option.value);
+                        const inputId = `edit-visibility-role-${option.value}`;
+
+                        return (
+                          <label
+                            key={option.value}
+                            htmlFor={inputId}
+                            className={`flex cursor-pointer items-center gap-3 rounded-xl border px-3 py-2 text-sm transition ${
+                              checked
+                                ? "border-[#2D8A6A] bg-[#EAF6EF]"
+                                : "border-[#2D8A6A]/10 bg-[#FAF7F0]"
+                            }`}
+                          >
+                            <input
+                              id={inputId}
+                              type="checkbox"
+                              value={option.value}
+                              checked={checked}
+                              disabled={editSaving}
+                              onChange={() => {
+                                setEditVisibleToRoles((currentRoles) => toggleRoleSelection(currentRoles, option.value));
+                              }}
+                              className="h-4 w-4 rounded border-[#2D8A6A] text-[#0D5C48] focus:ring-[#2D8A6A] disabled:opacity-70"
+                            />
+                            <span className="font-medium text-[#245C4F]">{option.label}</span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
+                  <p className="mt-2 text-xs text-[#2D8A6A]">Select one or more roles. Leave empty to show the event to all portals.</p>
+                </fieldset>
+                <div className="flex flex-wrap gap-3 lg:col-span-2">
+                  <button
+                    type="submit"
+                    disabled={editSaving}
+                    className="inline-flex items-center gap-2 rounded-full bg-[linear-gradient(135deg,#0D3B2E,#0D5C48)] px-5 py-3 text-sm font-semibold text-[#FFF5D6] shadow-[0_16px_34px_-24px_rgba(13,59,46,0.65)] disabled:opacity-70"
+                  >
+                    {editSaving ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Pencil className="h-4 w-4" />}
+                    {editSaving ? "Saving..." : "Save changes"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={closeEditModal}
+                    className="inline-flex items-center rounded-full border border-[#2D8A6A]/20 bg-white px-5 py-3 text-sm font-semibold text-[#063F32] transition hover:bg-[#F1EADC]"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        ) : null}
 
         {message ? (
           <div className="fixed right-4 top-4 z-[10000] rounded-2xl border border-[#2D8A6A]/20 bg-[linear-gradient(135deg,#0D3B2E,#0D5C48)] px-4 py-3 text-sm font-semibold text-[#FFF5D6] shadow-[0_18px_40px_-24px_rgba(13,59,46,0.55)]">

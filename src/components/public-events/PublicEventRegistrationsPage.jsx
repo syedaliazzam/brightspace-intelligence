@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ChevronDown, Eye, RotateCcw, Search } from "lucide-react";
+import { ChevronDown, Eye, Pencil, RotateCcw, Search } from "lucide-react";
 import { formatEventDate, formatEventDateTime, formatMoney, formatRegistrationStatusLabel, normalizeRegistrationStatus } from "@/lib/publicEvents";
 
 const INITIAL_CREATE_FORM = {
@@ -16,6 +16,20 @@ const INITIAL_CREATE_FORM = {
   schoolName: "",
   className: "",
   notes: "",
+};
+
+const INITIAL_EDIT_FORM = {
+  eventId: "",
+  email: "",
+  whatsapp: "",
+  studentName: "",
+  studentNamesText: "",
+  parentName: "",
+  schoolName: "",
+  className: "",
+  notes: "",
+  amountDue: "",
+  status: "pending",
 };
 
 function isValidName(value) {
@@ -309,6 +323,12 @@ function hasTextValue(value) {
   return Boolean(String(value || "").trim());
 }
 
+function truncateSelectLabel(value, limit = 42) {
+  const text = String(value || "").trim();
+  if (text.length <= limit) return text;
+  return `${text.slice(0, Math.max(0, limit - 3)).trimEnd()}...`;
+}
+
 export default function PublicEventRegistrationsPage({ portalLabel = "Coordinator portal", title = "Event registrations", description = "Review public event registrations, verify payments, and track each registration from one LMS table.", canManage = true, }) {
   const pageSize = 7;
   const normalizedPortalLabel = String(portalLabel).toLowerCase().trim();
@@ -348,6 +368,12 @@ export default function PublicEventRegistrationsPage({ portalLabel = "Coordinato
   const [createSubmitError, setCreateSubmitError] = useState("");
   const [createSuccess, setCreateSuccess] = useState(null);
   const [createEventOpen, setCreateEventOpen] = useState(false);
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [editForm, setEditForm] = useState(INITIAL_EDIT_FORM);
+  const [editErrors, setEditErrors] = useState({});
+  const [editSubmitting, setEditSubmitting] = useState(false);
+  const [editEventOpen, setEditEventOpen] = useState(false);
+  const [editingItem, setEditingItem] = useState(null);
   const [selected, setSelected] = useState(null);
   const [receivedAmountDrafts, setReceivedAmountDrafts] = useState({});
   const [actionLoadingId, setActionLoadingId] = useState("");
@@ -523,6 +549,21 @@ export default function PublicEventRegistrationsPage({ portalLabel = "Coordinato
     Number(showSchoolNameColumn) +
     Number(showClassNameColumn) +
     Number(showReceivedAmountColumn);
+  const registrationTableColumnWidths = useMemo(() => {
+    const widths = [190, 280, 160];
+    if (showStudentNameColumn) widths.push(220);
+    if (showParentNameColumn) widths.push(200);
+    if (showSchoolNameColumn) widths.push(200);
+    if (showClassNameColumn) widths.push(170);
+    widths.push(280, 210);
+    if (showReceivedAmountColumn) widths.push(300);
+    widths.push(150, 250, 430);
+    return widths;
+  }, [showClassNameColumn, showParentNameColumn, showReceivedAmountColumn, showSchoolNameColumn, showStudentNameColumn]);
+  const registrationTableWidth = useMemo(
+    () => registrationTableColumnWidths.reduce((sum, width) => sum + width, 0),
+    [registrationTableColumnWidths]
+  );
   const totalPages = Math.max(1, Math.ceil(filteredItems.length / pageSize));
   const safePage = Math.min(page, totalPages);
   const visibleItems = useMemo(() => filteredItems.slice((safePage - 1) * pageSize, (safePage - 1) * pageSize + pageSize), [filteredItems, safePage]);
@@ -619,6 +660,105 @@ export default function PublicEventRegistrationsPage({ portalLabel = "Coordinato
     setCreateSuccess(null);
     setCreateSubmitting(false);
     resetCreateForm();
+  }
+
+  function openEditModal(item) {
+    setEditingItem(item);
+    setEditErrors({});
+    setEditSubmitting(false);
+    setEditEventOpen(false);
+    setEditForm({
+      eventId: item.event_id || "",
+      email: item.email || "",
+      whatsapp: item.whatsapp || "",
+      studentName: item.student_name || "",
+      studentNamesText: Array.isArray(item.student_names) ? item.student_names.join("\n") : "",
+      parentName: item.parent_name || "",
+      schoolName: item.school_name || "",
+      className: item.class_input || "",
+      notes: item.notes || "",
+      amountDue: String(Number(item.amount_due || 0)),
+      status: normalizeRegistrationStatus(item.status),
+    });
+    setEditModalOpen(true);
+  }
+
+  function closeEditModal() {
+    setEditModalOpen(false);
+    setEditingItem(null);
+    setEditForm(INITIAL_EDIT_FORM);
+    setEditErrors({});
+    setEditSubmitting(false);
+  }
+
+  function validateEditForm() {
+    const nextErrors = {};
+    const emailValue = String(editForm.email || "").trim().toLowerCase();
+    const whatsappValue = String(editForm.whatsapp || "").trim();
+    const amountValue = Number(editForm.amountDue || 0);
+
+    if (!editForm.eventId) nextErrors.eventId = "Please select an event.";
+    if (!emailValue) {
+      nextErrors.email = "Email is required.";
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailValue)) {
+      nextErrors.email = "Please enter a valid email address.";
+    }
+    if (!whatsappValue) nextErrors.whatsapp = "WhatsApp number is required.";
+    if (!Number.isFinite(amountValue) || amountValue < 0) nextErrors.amountDue = "Please enter a valid amount.";
+
+    return nextErrors;
+  }
+
+  async function handleEditRegistration(event) {
+    event.preventDefault();
+    if (!editingItem?.id || editSubmitting) return;
+
+    const nextErrors = validateEditForm();
+    if (Object.keys(nextErrors).length > 0) {
+      setEditErrors(nextErrors);
+      return;
+    }
+
+    setEditSubmitting(true);
+    setEditErrors({});
+
+    try {
+      const studentNames = String(editForm.studentNamesText || "")
+        .split(/\r?\n|,/)
+        .map((item) => item.trim())
+        .filter(Boolean);
+
+      const response = await fetch("/api/coordinator/public-event-registrations/" + encodeURIComponent(editingItem.id), {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          editRegistration: true,
+          eventId: editForm.eventId,
+          email: String(editForm.email || "").trim(),
+          whatsapp: String(editForm.whatsapp || "").trim(),
+          studentName: String(editForm.studentName || "").trim(),
+          studentNames,
+          parentName: String(editForm.parentName || "").trim(),
+          schoolName: String(editForm.schoolName || "").trim(),
+          className: String(editForm.className || "").trim(),
+          notes: String(editForm.notes || "").trim(),
+          amountDue: Number(editForm.amountDue || 0),
+          status: editForm.status,
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data?.message || "Unable to update registration record.");
+
+      setTone("success");
+      setMessage(data?.message || "Registration record updated.");
+      closeEditModal();
+      await load();
+    } catch (error) {
+      setTone("error");
+      setMessage(error instanceof Error ? error.message : "Unable to update registration record.");
+    } finally {
+      setEditSubmitting(false);
+    }
   }
 
   function validateCreateForm() {
@@ -755,9 +895,9 @@ export default function PublicEventRegistrationsPage({ portalLabel = "Coordinato
             <label className="block">
               <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.16em] text-[#0D5C48]">Event</span>
               <div className="relative">
-                <select value={filters.eventId} onFocus={() => setOpenFilterSelect("event")} onBlur={() => setOpenFilterSelect("")} onChange={(event) => { setOpenFilterSelect(""); setFilters((current) => ({ ...current, eventId: event.target.value })); }} className="w-full appearance-none rounded-2xl border border-[#2D8A6A]/20 bg-white px-4 py-3 pr-11 text-sm text-[#063F32] outline-none focus:border-[#2D8A6A]">
+                <select value={filters.eventId} onFocus={() => setOpenFilterSelect("event")} onBlur={() => setOpenFilterSelect("")} onChange={(event) => { setOpenFilterSelect(""); setFilters((current) => ({ ...current, eventId: event.target.value })); }} className="w-full min-w-0 appearance-none truncate rounded-2xl border border-[#2D8A6A]/20 bg-white px-4 py-3 pr-11 text-sm text-[#063F32] outline-none focus:border-[#2D8A6A]">
                   <option value="all">All events</option>
-                  {events.map((item) => <option key={item.id} value={item.id}>{item.title}</option>)}
+                  {events.map((item) => <option key={item.id} value={item.id} title={item.title || ""}>{truncateSelectLabel(item.title)}</option>)}
                 </select>
                 <ChevronDown className={`pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#0D5C48] transition ${openFilterSelect === "event" ? "rotate-180" : ""}`} />
               </div>
@@ -824,53 +964,61 @@ export default function PublicEventRegistrationsPage({ portalLabel = "Coordinato
             <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-[#0D5C48]">Registered events data</p>
             <div className="text-sm font-semibold text-[#245C4F]">Showing {filteredItems.length === 0 ? 0 : (safePage - 1) * pageSize + 1}-{Math.min(safePage * pageSize, filteredItems.length)} of {filteredItems.length}</div>
           </div>
-          <div className="overflow-x-auto">
-            <table className="min-w-full table-fixed text-left text-sm">
+          <div className="w-full overflow-x-auto overflow-y-hidden overscroll-x-contain">
+            <div className="shrink-0" style={{ width: `${registrationTableWidth}px`, minWidth: `${registrationTableWidth}px`, maxWidth: `${registrationTableWidth}px` }}>
+            <table className="w-full table-fixed border-collapse text-left text-sm" style={{ tableLayout: "fixed" }}>
+              <colgroup>
+                {registrationTableColumnWidths.map((width, index) => (
+                  <col key={`${width}-${index}`} style={{ width: `${width}px` }} />
+                ))}
+              </colgroup>
               <thead className="bg-[linear-gradient(180deg,#FAF7F0_0%,#F1EADC_100%)] text-xs uppercase tracking-[0.18em] text-[#0D5C48]">
                 <tr>
-                  <th className="whitespace-nowrap px-6 py-4">Registration No</th>
-                  <th className="w-[280px] min-w-[280px] px-6 py-4">Event</th>
-                  <th className="whitespace-nowrap px-6 py-4">Event Date</th>
-                  {showStudentNameColumn ? <th className="whitespace-nowrap px-6 py-4">Student Name</th> : null}
-                  {showParentNameColumn ? <th className="whitespace-nowrap px-6 py-4">Parent Name</th> : null}
-                  {showSchoolNameColumn ? <th className="whitespace-nowrap px-6 py-4">School Name</th> : null}
-                  {showClassNameColumn ? <th className="whitespace-nowrap px-6 py-4">Class Name</th> : null}
-                  <th className="whitespace-nowrap px-6 py-4">Email</th>
-                  <th className="whitespace-nowrap px-6 py-4">WhatsApp</th>
-                  {showReceivedAmountColumn ? <th className="whitespace-nowrap px-6 py-4">Received Amount</th> : null}
-                  <th className="whitespace-nowrap px-6 py-4">Status</th>
-                  <th className="whitespace-nowrap px-6 py-4">Submitted</th>
-                  <th className="w-[280px] min-w-[280px] whitespace-nowrap px-6 py-4">Actions</th>
+                  <th className="overflow-hidden whitespace-nowrap px-6 py-4">Registration No</th>
+                  <th className="overflow-hidden whitespace-nowrap px-6 py-4">Event</th>
+                  <th className="overflow-hidden whitespace-nowrap px-6 py-4">Event Date</th>
+                  {showStudentNameColumn ? <th className="overflow-hidden whitespace-nowrap px-6 py-4">Student Name</th> : null}
+                  {showParentNameColumn ? <th className="overflow-hidden whitespace-nowrap px-6 py-4">Parent Name</th> : null}
+                  {showSchoolNameColumn ? <th className="overflow-hidden whitespace-nowrap px-6 py-4">School Name</th> : null}
+                  {showClassNameColumn ? <th className="overflow-hidden whitespace-nowrap px-6 py-4">Class Name</th> : null}
+                  <th className="overflow-hidden whitespace-nowrap px-6 py-4">Email</th>
+                  <th className="overflow-hidden whitespace-nowrap px-6 py-4">WhatsApp</th>
+                  {showReceivedAmountColumn ? <th className="overflow-hidden whitespace-nowrap px-6 py-4">Received Amount</th> : null}
+                  <th className="overflow-hidden whitespace-nowrap px-6 py-4">Status</th>
+                  <th className="overflow-hidden whitespace-nowrap px-6 py-4">Submitted</th>
+                  <th className="overflow-hidden whitespace-nowrap px-6 py-4">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#F1EADC]">
                 {visibleItems.length ? visibleItems.map((item) => (
                   <tr key={item.id}>
-                    <td className="px-6 py-4 font-semibold text-[#063F32]">{item.registration_no}</td>
-                    <td className="w-[280px] min-w-[280px] px-6 py-4 font-medium leading-6 text-[#063F32]">{item.event_name}</td>
-                    <td className="px-6 py-4 text-[#245C4F]">{formatEventDate(item.event_start_at)}</td>
+                    <td className="overflow-hidden whitespace-nowrap px-6 py-4 font-semibold text-[#063F32]">{item.registration_no}</td>
+                    <td className="whitespace-normal break-words px-6 py-4 font-medium leading-6 text-[#063F32]"><span className="block" title={item.event_name || ""}>{item.event_name}</span></td>
+                    <td className="overflow-hidden whitespace-nowrap px-6 py-4 text-[#245C4F]">{formatEventDate(item.event_start_at)}</td>
                     {showStudentNameColumn ? (
-                      <td className="px-6 py-4 text-[#245C4F]">
-                        {Array.isArray(item.student_names) && item.student_names.length > 0
-                          ? item.student_names.join(", ")
-                          : item.student_name || "-"}
+                      <td className="whitespace-normal break-words px-6 py-4 text-[#245C4F]">
+                        <span className="block" title={Array.isArray(item.student_names) && item.student_names.length > 0 ? item.student_names.join(", ") : item.student_name || "-"}>
+                          {Array.isArray(item.student_names) && item.student_names.length > 0
+                            ? item.student_names.join(", ")
+                            : item.student_name || "-"}
+                        </span>
                       </td>
                     ) : null}
-                    {showParentNameColumn ? <td className="px-6 py-4 text-[#245C4F]">{item.parent_name || "-"}</td> : null}
-                    {showSchoolNameColumn ? <td className="px-6 py-4 text-[#245C4F]">{item.school_name || "-"}</td> : null}
-                    {showClassNameColumn ? <td className="px-6 py-4 text-[#245C4F]">{item.class_input || "-"}</td> : null}
-                    <td className="px-6 py-4 text-[#245C4F]">{item.email || "-"}</td>
-                    <td className="px-6 py-4 text-[#245C4F]">{item.whatsapp || "-"}</td>
+                    {showParentNameColumn ? <td className="whitespace-normal break-words px-6 py-4 text-[#245C4F]"><span className="block" title={item.parent_name || "-"}>{item.parent_name || "-"}</span></td> : null}
+                    {showSchoolNameColumn ? <td className="whitespace-normal break-words px-6 py-4 text-[#245C4F]"><span className="block" title={item.school_name || "-"}>{item.school_name || "-"}</span></td> : null}
+                    {showClassNameColumn ? <td className="whitespace-normal break-words px-6 py-4 text-[#245C4F]"><span className="block" title={item.class_input || "-"}>{item.class_input || "-"}</span></td> : null}
+                    <td className="whitespace-normal break-all px-6 py-4 text-[#245C4F]"><span className="block" title={item.email || "-"}>{item.email || "-"}</span></td>
+                    <td className="whitespace-normal break-words px-6 py-4 text-[#245C4F]"><span className="block" title={item.whatsapp || "-"}>{item.whatsapp || "-"}</span></td>
                     {showReceivedAmountColumn ? (
-                      <td className="px-6 py-4">
+                      <td className="overflow-hidden whitespace-nowrap px-6 py-4">
                         {normalizeRegistrationStatus(item.status) === "free" ? (
-                          <div className="flex min-w-max flex-nowrap items-center gap-2 sm:min-w-[220px]">
-                            <div className="w-full min-w-[130px] rounded-full border border-[#2D8A6A]/10 bg-[#F7F2E8] px-3 py-2 text-sm font-semibold text-[#063F32]">
+                          <div className="flex w-full flex-nowrap items-center gap-2">
+                            <div className="w-full min-w-0 rounded-full border border-[#2D8A6A]/10 bg-[#F7F2E8] px-3 py-2 text-sm font-semibold text-[#063F32]">
                               0.00
                             </div>
                           </div>
                         ) : (
-                          <div className="flex min-w-max flex-nowrap items-center gap-2 sm:min-w-[220px]">
+                          <div className="flex w-full flex-nowrap items-center gap-2">
                             <input
                               type="number"
                               min="0"
@@ -878,7 +1026,7 @@ export default function PublicEventRegistrationsPage({ portalLabel = "Coordinato
                               value={receivedAmountDrafts[item.id] ?? String(Number(item.amount_due || 0))}
                               placeholder="Enter received amount"
                               onChange={(event) => updateReceivedAmountDraft(item.id, event.target.value)}
-                              className="w-full min-w-[130px] rounded-full border border-[#2D8A6A]/20 bg-white px-3 py-2 text-sm text-[#063F32] outline-none focus:border-[#2D8A6A]"
+                              className="min-w-0 flex-1 rounded-full border border-[#2D8A6A]/20 bg-white px-3 py-2 text-sm text-[#063F32] outline-none focus:border-[#2D8A6A]"
                             />
                             <button
                               type="button"
@@ -892,14 +1040,17 @@ export default function PublicEventRegistrationsPage({ portalLabel = "Coordinato
                         )}
                       </td>
                     ) : null}
-                    <td className="px-6 py-4"><span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${statusTone(item.status)}`}>{item.status_label || formatRegistrationStatusLabel(item.status)}</span></td>
-                    <td className="px-6 py-4 text-[#245C4F]">{formatEventDateTime(item.submitted_at)}</td>
-                    <td className="w-[280px] min-w-[280px] max-w-[280px] px-6 py-4">
-                      <div className="flex max-w-full flex-nowrap items-center gap-2 whitespace-nowrap">
+                    <td className="overflow-hidden whitespace-nowrap px-6 py-4"><span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${statusTone(item.status)}`}>{item.status_label || formatRegistrationStatusLabel(item.status)}</span></td>
+                    <td className="overflow-hidden whitespace-nowrap px-6 py-4 text-[#245C4F]">{formatEventDateTime(item.submitted_at)}</td>
+                    <td className="overflow-hidden whitespace-nowrap px-6 py-4">
+                      <div className="flex w-full flex-nowrap items-center gap-2 whitespace-nowrap">
                         <button type="button" onClick={() => setSelected(item)} className="inline-flex shrink-0 items-center rounded-full border border-[#2D8A6A]/20 bg-white px-2.5 py-1.5 text-[10px] font-semibold text-[#063F32] whitespace-nowrap transition hover:bg-[#F1EADC]"><span className="inline-flex items-center gap-1 whitespace-nowrap"><Eye className="h-3 w-3" />View</span></button>
+                        {canManage ? (
+                          <button type="button" onClick={() => openEditModal(item)} className="inline-flex shrink-0 items-center rounded-full border border-[#2D8A6A]/20 bg-white px-2.5 py-1.5 text-[10px] font-semibold text-[#063F32] whitespace-nowrap transition hover:bg-[#F1EADC]"><span className="inline-flex items-center gap-1 whitespace-nowrap"><Pencil className="h-3 w-3" />Edit</span></button>
+                        ) : null}
                         {canManage && normalizeRegistrationStatus(item.status) !== "free" ? (
-                          <div className="flex min-w-0 flex-nowrap items-center gap-2 overflow-hidden whitespace-nowrap">
-                            <select value={draftStatuses[item.id] || normalizeRegistrationStatus(item.status)} onChange={(event) => setDraftStatuses((current) => ({ ...current, [item.id]: event.target.value }))} className="w-[90px] min-w-[90px] shrink-0 rounded-full border border-[#2D8A6A]/20 bg-white px-3 py-2 text-[11px] font-semibold text-[#063F32] outline-none focus:border-[#2D8A6A]">
+                          <div className="flex min-w-0 flex-nowrap items-center gap-2 whitespace-nowrap">
+                            <select value={draftStatuses[item.id] || normalizeRegistrationStatus(item.status)} onChange={(event) => setDraftStatuses((current) => ({ ...current, [item.id]: event.target.value }))} className="w-[120px] min-w-[120px] shrink-0 rounded-full border border-[#2D8A6A]/20 bg-white px-3 py-2 text-[11px] font-semibold text-[#063F32] outline-none focus:border-[#2D8A6A]">
                               <option value="pending">Pending</option>
                               <option value="verified">Verified</option>
                               <option value="free">Free</option>
@@ -920,6 +1071,7 @@ export default function PublicEventRegistrationsPage({ portalLabel = "Coordinato
                 )}
               </tbody>
             </table>
+            </div>
           </div>
           {filteredItems.length > pageSize ? (
             <div className="flex flex-col gap-3 border-t border-[#2D8A6A]/10 px-6 py-4 sm:flex-row sm:items-center sm:justify-between">
@@ -987,11 +1139,11 @@ export default function PublicEventRegistrationsPage({ portalLabel = "Coordinato
                             }));
                           }}
                           disabled={createSubmitting}
-                          className="w-full appearance-none rounded-2xl border border-[#2D8A6A]/20 bg-white px-4 py-3 pr-11 text-sm text-[#063F32] outline-none focus:border-[#2D8A6A]"
+                          className="w-full min-w-0 appearance-none truncate rounded-2xl border border-[#2D8A6A]/20 bg-white px-4 py-3 pr-11 text-sm text-[#063F32] outline-none focus:border-[#2D8A6A]"
                         >
                           <option value="">Select an open event</option>
                           {availableCreateEvents.map((item) => (
-                            <option key={item.id} value={item.id}>{item.title}</option>
+                            <option key={item.id} value={item.id} title={item.title || ""}>{truncateSelectLabel(item.title)}</option>
                           ))}
                         </select>
                         <ChevronDown className={`pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#0D5C48] transition-transform duration-200 ${createEventOpen ? "rotate-180" : ""}`} />
@@ -1152,7 +1304,7 @@ export default function PublicEventRegistrationsPage({ portalLabel = "Coordinato
                                   const digits = normalizePhoneDigits(event.target.value).slice(0, selectedWhatsappDigitsRequired);
                                   setCreateForm((current) => ({ ...current, whatsapp: digits }));
                                 }}
-                                placeholder="Local digits only"
+                                placeholder="Digits only"
                                 inputMode="tel"
                                 maxLength={selectedWhatsappDigitsRequired}
                                 disabled={createSubmitting || createFormLocked}
@@ -1192,6 +1344,101 @@ export default function PublicEventRegistrationsPage({ portalLabel = "Coordinato
                   </div>
                 </form>
               )}
+            </div>
+          </div>
+        ) : null}
+
+        {editModalOpen ? (
+          <div className="fixed inset-0 z-[10000] flex items-center justify-center overflow-y-auto bg-[#063F32]/45 px-4 py-6 backdrop-blur-sm">
+            <div className="w-full max-w-4xl max-h-[calc(100vh-48px)] overflow-y-auto rounded-[2rem] border border-[#2D8A6A]/15 bg-[#FAF7F0] shadow-[0_24px_80px_-36px_rgba(13,59,46,0.24)]">
+              <div className="flex items-start justify-between gap-4 border-b border-[#F1EADC] px-6 py-4">
+                <div>
+                  <p className="text-sm font-semibold uppercase tracking-[0.24em] text-[#C9A227]">Edit registration</p>
+                  <h2 className="mt-2 text-2xl font-semibold text-[#063F32]">{editingItem?.registration_no || "Registration"}</h2>
+                </div>
+                <button type="button" onClick={closeEditModal} className="rounded-xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-3 py-2 text-sm font-semibold text-[#063F32] transition hover:bg-[#F1EADC]">Close</button>
+              </div>
+              <form onSubmit={handleEditRegistration} className="space-y-5 p-6 text-sm text-[#245C4F]">
+                <div className="grid gap-4 md:grid-cols-2">
+                  <label className="block md:col-span-2">
+                    <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.16em] text-[#0D5C48]">Event</span>
+                    <div className="relative">
+                      <select
+                        value={editForm.eventId}
+                        onFocus={() => setEditEventOpen(true)}
+                        onBlur={() => setEditEventOpen(false)}
+                        onChange={(event) => setEditForm((current) => ({ ...current, eventId: event.target.value }))}
+                        disabled={editSubmitting}
+                        className="w-full min-w-0 appearance-none truncate rounded-2xl border border-[#2D8A6A]/20 bg-white px-4 py-3 pr-11 text-sm text-[#063F32] outline-none focus:border-[#2D8A6A] disabled:cursor-not-allowed disabled:bg-[#F7F2E8]"
+                        required
+                      >
+                        <option value="">Select event</option>
+                        {events.map((item) => <option key={item.id} value={item.id} title={item.title || ""}>{truncateSelectLabel(item.title)}</option>)}
+                      </select>
+                      <ChevronDown className={`pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#0D5C48] transition-transform duration-200 ${editEventOpen ? "rotate-180" : ""}`} />
+                    </div>
+                    {editErrors.eventId ? <p className="mt-2 text-xs font-semibold text-rose-700">{editErrors.eventId}</p> : null}
+                  </label>
+
+                  <label className="block">
+                    <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.16em] text-[#0D5C48]">Student name</span>
+                    <input value={editForm.studentName} onChange={(event) => setEditForm((current) => ({ ...current, studentName: event.target.value }))} disabled={editSubmitting} className="w-full rounded-2xl border border-[#2D8A6A]/20 bg-white px-4 py-3 text-sm text-[#063F32] outline-none focus:border-[#2D8A6A] disabled:cursor-not-allowed disabled:bg-[#F7F2E8]" />
+                  </label>
+                  <label className="block">
+                    <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.16em] text-[#0D5C48]">Parent name</span>
+                    <input value={editForm.parentName} onChange={(event) => setEditForm((current) => ({ ...current, parentName: event.target.value }))} disabled={editSubmitting} className="w-full rounded-2xl border border-[#2D8A6A]/20 bg-white px-4 py-3 text-sm text-[#063F32] outline-none focus:border-[#2D8A6A] disabled:cursor-not-allowed disabled:bg-[#F7F2E8]" />
+                  </label>
+                  <label className="block">
+                    <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.16em] text-[#0D5C48]">School name</span>
+                    <input value={editForm.schoolName} onChange={(event) => setEditForm((current) => ({ ...current, schoolName: event.target.value }))} disabled={editSubmitting} className="w-full rounded-2xl border border-[#2D8A6A]/20 bg-white px-4 py-3 text-sm text-[#063F32] outline-none focus:border-[#2D8A6A] disabled:cursor-not-allowed disabled:bg-[#F7F2E8]" />
+                  </label>
+                  <label className="block">
+                    <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.16em] text-[#0D5C48]">Class name</span>
+                    <input value={editForm.className} onChange={(event) => setEditForm((current) => ({ ...current, className: event.target.value }))} disabled={editSubmitting} className="w-full rounded-2xl border border-[#2D8A6A]/20 bg-white px-4 py-3 text-sm text-[#063F32] outline-none focus:border-[#2D8A6A] disabled:cursor-not-allowed disabled:bg-[#F7F2E8]" />
+                  </label>
+                  <label className="block">
+                    <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.16em] text-[#0D5C48]">Email</span>
+                    <input type="email" value={editForm.email} onChange={(event) => setEditForm((current) => ({ ...current, email: event.target.value }))} disabled={editSubmitting} className="w-full rounded-2xl border border-[#2D8A6A]/20 bg-white px-4 py-3 text-sm text-[#063F32] outline-none focus:border-[#2D8A6A] disabled:cursor-not-allowed disabled:bg-[#F7F2E8]" required />
+                    {editErrors.email ? <p className="mt-2 text-xs font-semibold text-rose-700">{editErrors.email}</p> : null}
+                  </label>
+                  <label className="block">
+                    <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.16em] text-[#0D5C48]">WhatsApp</span>
+                    <input value={editForm.whatsapp} onChange={(event) => setEditForm((current) => ({ ...current, whatsapp: event.target.value }))} disabled={editSubmitting} className="w-full rounded-2xl border border-[#2D8A6A]/20 bg-white px-4 py-3 text-sm text-[#063F32] outline-none focus:border-[#2D8A6A] disabled:cursor-not-allowed disabled:bg-[#F7F2E8]" required />
+                    {editErrors.whatsapp ? <p className="mt-2 text-xs font-semibold text-rose-700">{editErrors.whatsapp}</p> : null}
+                  </label>
+                  <label className="block">
+                    <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.16em] text-[#0D5C48]">Received amount</span>
+                    <input type="number" min="0" step="0.01" value={editForm.amountDue} onChange={(event) => setEditForm((current) => ({ ...current, amountDue: event.target.value }))} disabled={editSubmitting} className="w-full rounded-2xl border border-[#2D8A6A]/20 bg-white px-4 py-3 text-sm text-[#063F32] outline-none focus:border-[#2D8A6A] disabled:cursor-not-allowed disabled:bg-[#F7F2E8]" required />
+                    {editErrors.amountDue ? <p className="mt-2 text-xs font-semibold text-rose-700">{editErrors.amountDue}</p> : null}
+                  </label>
+                  <label className="block">
+                    <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.16em] text-[#0D5C48]">Status</span>
+                    <div className="relative">
+                      <select value={editForm.status} onChange={(event) => setEditForm((current) => ({ ...current, status: event.target.value }))} disabled={editSubmitting} className="w-full appearance-none rounded-2xl border border-[#2D8A6A]/20 bg-white px-4 py-3 pr-11 text-sm text-[#063F32] outline-none focus:border-[#2D8A6A] disabled:cursor-not-allowed disabled:bg-[#F7F2E8]">
+                        <option value="pending">Pending</option>
+                        <option value="verified">Verified</option>
+                        <option value="free">Free</option>
+                        <option value="cancelled">Cancelled</option>
+                      </select>
+                      <ChevronDown className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#0D5C48]" />
+                    </div>
+                  </label>
+                  <label className="block md:col-span-2">
+                    <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.16em] text-[#0D5C48]">Student names</span>
+                    <textarea rows={3} value={editForm.studentNamesText} onChange={(event) => setEditForm((current) => ({ ...current, studentNamesText: event.target.value }))} placeholder="One student per line, or comma separated" disabled={editSubmitting} className="w-full rounded-[24px] border border-[#2D8A6A]/20 bg-white px-4 py-3 text-sm text-[#063F32] outline-none focus:border-[#2D8A6A] disabled:cursor-not-allowed disabled:bg-[#F7F2E8]" />
+                  </label>
+                  <label className="block md:col-span-2">
+                    <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.16em] text-[#0D5C48]">Comments</span>
+                    <textarea rows={4} value={editForm.notes} onChange={(event) => setEditForm((current) => ({ ...current, notes: event.target.value }))} disabled={editSubmitting} className="w-full rounded-[24px] border border-[#2D8A6A]/20 bg-white px-4 py-3 text-sm text-[#063F32] outline-none focus:border-[#2D8A6A] disabled:cursor-not-allowed disabled:bg-[#F7F2E8]" />
+                  </label>
+                </div>
+                <div className="flex items-center justify-end gap-3">
+                  <button type="button" onClick={closeEditModal} className="rounded-full border border-[#2D8A6A]/20 bg-white px-4 py-2 text-sm font-semibold text-[#063F32] transition hover:bg-[#F1EADC]">Cancel</button>
+                  <button type="submit" disabled={editSubmitting} className="inline-flex w-full items-center justify-center rounded-full bg-[#0D5C48] px-5 py-3 text-sm font-semibold text-[#FAF7F0] transition hover:bg-[#063F32] disabled:opacity-70 sm:w-auto">
+                    {editSubmitting ? "Saving..." : "Save changes"}
+                  </button>
+                </div>
+              </form>
             </div>
           </div>
         ) : null}

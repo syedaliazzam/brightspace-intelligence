@@ -1,12 +1,13 @@
 import crypto from "crypto";
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { createCalendarLectureEvent, extractMeetCodeFromLink } from "@/lib/googleCalendar";
+import { createCalendarLectureEvent, extractMeetCodeFromLink, updateCalendarLectureEvent } from "@/lib/googleCalendar";
 import prisma from "@/lib/prisma";
 import { isEventVisibleToRole, normalizeVisibleRoles } from "@/lib/internalEventsVisibility";
 
 const READ_ROLES = new Set(["admin", "coordinator", "superadmin", "teacher", "parent"]);
 const WRITE_ROLES = new Set(["admin", "coordinator", "superadmin"]);
+const EDITABLE_INTERNAL_EVENT_STATUSES = new Set(["scheduled", "completed", "cancelled"]);
 
 function json(message, status = 200, extra = {}) {
   return NextResponse.json({ message, ...extra }, { status });
@@ -294,5 +295,121 @@ export async function POST(request) {
     );
   } catch (error) {
     return json(error instanceof Error ? error.message : "Unable to create internal event.", 500);
+  }
+}
+
+export async function PATCH(request) {
+  const session = await auth();
+  const role = String(session?.user?.role || "").toLowerCase();
+
+  if (!session?.user) return json("Unauthorized.", 401);
+  if (!WRITE_ROLES.has(role)) return json("Forbidden.", 403);
+
+  try {
+    const body = await request.json();
+    const id = clean(body?.id);
+    const title = clean(body?.title);
+    const description = clean(body?.description);
+    const attendeeUserId = clean(body?.attendeeUserId);
+    const scheduledStart = parseDateTime(body?.scheduledStart);
+    const scheduledEnd = parseDateTime(body?.scheduledEnd);
+    const status = clean(body?.status || "scheduled").toLowerCase();
+    const visibleToRoles = normalizeVisibleRoles(body?.visibleToRoles ?? body?.visible_to_roles ?? []);
+    if (role === "coordinator" && !visibleToRoles.includes("coordinator")) {
+      visibleToRoles.push("coordinator");
+    }
+
+    if (!id) return json("Event id is required.", 400);
+    if (!title) return json("Event title is required.", 400);
+    if (!attendeeUserId) return json("Attendee is required.", 400);
+    if (!scheduledStart || !scheduledEnd || scheduledEnd <= scheduledStart) {
+      return json("Valid start and end time are required.", 400);
+    }
+    if (!EDITABLE_INTERNAL_EVENT_STATUSES.has(status)) {
+      return json("A valid event status is required.", 400);
+    }
+
+    const [existingEvent] = await prisma.$queryRaw`
+      SELECT
+        ie.id::text AS id,
+        ie.host_user_id::text AS host_user_id,
+        ie.google_calendar_event_id,
+        host.email AS host_email
+      FROM internal_events ie
+      LEFT JOIN users host ON host.id = ie.host_user_id
+      WHERE ie.id = ${id}::uuid
+      LIMIT 1
+    `;
+
+    if (!existingEvent?.id) return json("Internal event not found.", 404);
+
+    const attendee = await getAttendee(attendeeUserId);
+    if (!attendee?.id) throw new Error("Selected attendee is not available.");
+
+    const visibleToRolesSql = visibleToRoles.length
+      ? `ARRAY[${visibleToRoles.map((roleName) => `'${String(roleName).replace(/'/g, "''")}'`).join(", ")}]::text[]`
+      : "NULL";
+
+    await prisma.$executeRaw`
+      UPDATE internal_events
+      SET
+        title = ${title},
+        description = ${description || null},
+        attendee_user_id = ${attendee.id}::uuid,
+        scheduled_start = ${scheduledStart},
+        scheduled_end = ${scheduledEnd},
+        status = ${status},
+        updated_at = NOW()
+      WHERE id = ${id}::uuid
+    `;
+
+    await prisma.$executeRawUnsafe(`
+      UPDATE internal_events
+      SET visible_to_roles = ${visibleToRolesSql}
+      WHERE id = '${id.replace(/'/g, "''")}'::uuid
+    `);
+
+    let calendarError = "";
+    if (existingEvent.google_calendar_event_id) {
+      try {
+        const calendarData = await updateCalendarLectureEvent(existingEvent.google_calendar_event_id, {
+          title,
+          description,
+          start: scheduledStart,
+          end: scheduledEnd,
+          organizerEmail: existingEvent.host_email || session.user.email || "",
+          attendees: [{ email: attendee.email, name: attendee.full_name }],
+        });
+
+        await prisma.$executeRaw`
+          UPDATE internal_events
+          SET google_calendar_event_id = ${calendarData?.eventId || existingEvent.google_calendar_event_id},
+              google_meet_link = COALESCE(NULLIF(${calendarData?.meetLink || ""}, ''), google_meet_link),
+              google_meet_space_id = COALESCE(NULLIF(${calendarData?.meetSpaceId || extractMeetCodeFromLink(calendarData?.meetLink || "") || ""}, ''), google_meet_space_id),
+              calendar_html_link = COALESCE(NULLIF(${calendarData?.eventHtmlLink || ""}, ''), calendar_html_link),
+              google_last_error = NULL,
+              updated_at = NOW()
+          WHERE id = ${id}::uuid
+        `;
+      } catch (error) {
+        calendarError = error instanceof Error ? error.message : "Google Calendar event could not be updated.";
+        await prisma.$executeRaw`
+          UPDATE internal_events
+          SET google_last_error = ${calendarError},
+              updated_at = NOW()
+          WHERE id = ${id}::uuid
+        `;
+      }
+    }
+
+    return json(
+      calendarError
+        ? "Internal event updated, but Google Calendar/Meet could not be updated."
+        : "Internal event updated successfully.",
+      200,
+      { calendar_error: calendarError || "" }
+    );
+  } catch (error) {
+    return json(error instanceof Error ? error.message : "Unable to update internal event.", 500);
   }
 }

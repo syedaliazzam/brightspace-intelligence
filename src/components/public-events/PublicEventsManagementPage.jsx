@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Check, ChevronDown, ClipboardCopy, Eye, FileVideo, ImagePlus, RefreshCw, RotateCcw, Search } from "lucide-react";
+import { Check, ChevronDown, ClipboardCopy, Eye, FileVideo, ImagePlus, Pencil, RefreshCw, RotateCcw, Search } from "lucide-react";
 import {
   cleanText,
   formatEventDate,
@@ -48,6 +48,31 @@ function formatTimeOnly(value) {
     minute: "2-digit",
     hour12: true,
   }).format(date);
+}
+
+const pakistanInputFormatter = new Intl.DateTimeFormat("en-GB", {
+  timeZone: "Asia/Karachi",
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
+  hour12: false,
+});
+
+function getPakistanInputParts(value) {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+
+  const parts = Object.fromEntries(
+    pakistanInputFormatter.formatToParts(date).map((part) => [part.type, part.value])
+  );
+  const hour = parts.hour === "24" ? "00" : parts.hour;
+  return {
+    date: `${parts.year}-${parts.month}-${parts.day}`,
+    time: `${hour}:${parts.minute}`,
+  };
 }
 
 const PUBLIC_EVENT_TABLE_COLUMNS = [
@@ -137,19 +162,24 @@ export default function PublicEventsManagementPage({
   const pageSize = 7;
   const formRef = useRef(null);
   const fileInputRef = useRef(null);
+  const editFileInputRef = useRef(null);
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [editSubmitting, setEditSubmitting] = useState(false);
   const [message, setMessage] = useState("");
   const [tone, setTone] = useState("success");
   const [selected, setSelected] = useState(null);
   const [descriptionItem, setDescriptionItem] = useState(null);
+  const [editingItem, setEditingItem] = useState(null);
   const [copiedMeetLink, setCopiedMeetLink] = useState("");
   const [previewImage, setPreviewImage] = useState("");
+  const [editPreviewImage, setEditPreviewImage] = useState("");
   const [publicationLoadingId, setPublicationLoadingId] = useState("");
   const [syncingRecordingId, setSyncingRecordingId] = useState("");
   const [formResetKey, setFormResetKey] = useState(0);
   const [form, setForm] = useState(EMPTY_FORM);
+  const [editForm, setEditForm] = useState(EMPTY_FORM);
   const [openCreateModal, setOpenCreateModal] = useState(false);
   const [openFilterSelect, setOpenFilterSelect] = useState("");
   const [recordsPage, setRecordsPage] = useState(1);
@@ -160,6 +190,7 @@ export default function PublicEventsManagementPage({
     search: "",
   });
   const [categoryOpen, setCategoryOpen] = useState(false);
+  const [editCategoryOpen, setEditCategoryOpen] = useState(false);
 
   async function load() {
     setLoading(true);
@@ -216,6 +247,12 @@ export default function PublicEventsManagementPage({
     }
   }, [previewImage]);
 
+  useEffect(() => () => {
+    if (editPreviewImage?.startsWith("blob:")) {
+      URL.revokeObjectURL(editPreviewImage);
+    }
+  }, [editPreviewImage]);
+
   useEffect(() => {
     if (!copiedMeetLink) return undefined;
     const timer = window.setTimeout(() => setCopiedMeetLink(""), 1800);
@@ -262,6 +299,47 @@ export default function PublicEventsManagementPage({
       column: "all",
       search: "",
     });
+  }
+
+  function closeEditModal() {
+    if (editPreviewImage?.startsWith("blob:")) {
+      URL.revokeObjectURL(editPreviewImage);
+    }
+    setEditingItem(null);
+    setEditForm(EMPTY_FORM);
+    setEditPreviewImage("");
+    if (editFileInputRef.current) {
+      editFileInputRef.current.value = "";
+    }
+  }
+
+  function openEditModal(item) {
+    const start = getPakistanInputParts(item.start_at) || {};
+    const end = getPakistanInputParts(item.end_at) || {};
+    const deadline = getPakistanInputParts(item.registration_deadline) || start;
+
+    if (editPreviewImage?.startsWith("blob:")) {
+      URL.revokeObjectURL(editPreviewImage);
+    }
+
+    setEditingItem(item);
+    setEditForm({
+      eventCategory: item.event_category || "",
+      title: item.title || "",
+      description: item.description || "",
+      startDate: start.date || "",
+      endDate: end.date || "",
+      startTime: start.time || "",
+      endTime: end.time || "",
+      eventFeeAmount: item.event_fee_amount ?? "",
+      registrationDeadlineDate: deadline.date || "",
+      registrationDeadlineTime: deadline.time || "",
+      image: null,
+    });
+    setEditPreviewImage(item.image_url || "");
+    if (editFileInputRef.current) {
+      editFileInputRef.current.value = "";
+    }
   }
 
   async function handleSubmit(event) {
@@ -311,6 +389,56 @@ export default function PublicEventsManagementPage({
       setMessage(error instanceof Error ? error.message : "Unable to create public event.");
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  async function handleEditSubmit(event) {
+    event.preventDefault();
+    if (!editingItem?.id) return;
+
+    setEditSubmitting(true);
+    setMessage("");
+
+    try {
+      const payload = new FormData();
+      payload.set("eventCategory", editForm.eventCategory);
+      payload.set("title", editForm.title);
+      payload.set("description", editForm.description);
+      payload.set("startDate", editForm.startDate);
+      payload.set("endDate", editForm.endDate);
+      payload.set("startTime", editForm.startTime);
+      payload.set("endTime", editForm.endTime);
+      payload.set("eventFeeAmount", editForm.eventFeeAmount);
+      payload.set("registrationDeadlineDate", editForm.registrationDeadlineDate || editForm.startDate);
+      payload.set("registrationDeadlineTime", editForm.registrationDeadlineTime || editForm.startTime);
+      if (editForm.image instanceof File) {
+        payload.set("image", editForm.image);
+      }
+
+      const response = await fetch(`${apiPath}/${encodeURIComponent(editingItem.id)}`, {
+        method: "PATCH",
+        body: payload,
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data?.message || "Unable to update public event.");
+
+      setTone("success");
+      setMessage(data?.message || "Public event updated successfully.");
+      closeEditModal();
+      const refreshedItems = await load();
+      setSelected((current) => {
+        if (!current) return current;
+        return refreshedItems.find((item) => item.id === current.id) || current;
+      });
+      setDescriptionItem((current) => {
+        if (!current) return current;
+        return refreshedItems.find((item) => item.id === current.id) || current;
+      });
+    } catch (error) {
+      setTone("error");
+      setMessage(error instanceof Error ? error.message : "Unable to update public event.");
+    } finally {
+      setEditSubmitting(false);
     }
   }
 
@@ -667,7 +795,7 @@ export default function PublicEventsManagementPage({
                     <th className="min-w-[130px] whitespace-nowrap px-6 py-4">Publication</th>
                     <th className="min-w-[220px] whitespace-nowrap px-6 py-4">Meet Link</th>
                     <th className="min-w-[140px] whitespace-nowrap px-6 py-4">Description</th>
-                    <th className="min-w-[170px] whitespace-nowrap px-6 py-4">Actions</th>
+                    <th className="min-w-[260px] whitespace-nowrap px-6 py-4">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#F1EADC]">
@@ -722,6 +850,11 @@ export default function PublicEventsManagementPage({
                             <button type="button" onClick={() => setSelected(item)} className="whitespace-nowrap rounded-full border border-[#2D8A6A]/20 bg-white px-4 py-2 text-xs font-semibold text-[#063F32] transition hover:bg-[#F1EADC]">
                               <span className="inline-flex items-center gap-2"><Eye className="h-3.5 w-3.5" /> View</span>
                             </button>
+                            {canManage ? (
+                              <button type="button" onClick={() => openEditModal(item)} className="whitespace-nowrap rounded-full border border-[#2D8A6A]/20 bg-white px-4 py-2 text-xs font-semibold text-[#063F32] transition hover:bg-[#F1EADC]">
+                                <span className="inline-flex items-center gap-2"><Pencil className="h-3.5 w-3.5" /> Edit</span>
+                              </button>
+                            ) : null}
                             {canManage ? (
                               <button
                                 type="button"
@@ -786,6 +919,122 @@ export default function PublicEventsManagementPage({
               </div>
             ) : null}
           </section>
+        ) : null}
+
+        {canManage && editingItem ? (
+          <div className="fixed inset-0 z-[10020] flex items-start justify-center bg-[#063F32]/45 px-4 py-6 backdrop-blur-sm sm:py-10">
+            <div className="w-full max-w-5xl overflow-hidden rounded-[2rem] border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(250,247,240,0.99))] shadow-[0_24px_80px_-36px_rgba(13,59,46,0.3)]">
+              <div className="flex items-start justify-between gap-4 border-b border-[#2D8A6A]/10 px-6 py-5">
+                <div>
+                  <p className="text-[13px] font-bold uppercase tracking-[0.24em] text-[#0D5C48]">Public event</p>
+                  <h2 className="mt-2 text-2xl font-semibold tracking-tight text-[#063F32]">Edit public event</h2>
+                </div>
+                <button
+                  type="button"
+                  onClick={closeEditModal}
+                  className="rounded-xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-3 py-2 text-sm font-semibold text-[#063F32] transition hover:bg-[#F1EADC]"
+                >
+                  Close
+                </button>
+              </div>
+              <div className="max-h-[80vh] overflow-y-auto p-6">
+                <form className="grid gap-4 md:grid-cols-2" onSubmit={handleEditSubmit}>
+                  <label className="block md:col-span-2">
+                    <span className="mb-2 block text-sm font-semibold text-[#245C4F]">Select Event Category</span>
+                    <div className="relative">
+                      <select
+                        value={editForm.eventCategory}
+                        onChange={(event) => setEditForm((current) => ({ ...current, eventCategory: event.target.value }))}
+                        onFocus={() => setEditCategoryOpen(true)}
+                        onBlur={() => setEditCategoryOpen(false)}
+                        className="w-full appearance-none rounded-2xl border border-[#2D8A6A]/20 bg-white px-4 py-3 pr-10 text-sm outline-none focus:border-[#2D8A6A] focus:ring-2 focus:ring-[#FFF5D6]"
+                        required
+                      >
+                        <option value="">Select a category</option>
+                        {EVENT_CATEGORIES.map((cat) => (
+                          <option key={cat.id} value={cat.id}>{cat.label}</option>
+                        ))}
+                      </select>
+                      <ChevronDown
+                        className={`pointer-events-none absolute right-3 top-1/2 h-5 w-5 -translate-y-1/2 text-[#245C4F] transition-transform ${
+                          editCategoryOpen ? "rotate-180" : ""
+                        }`}
+                      />
+                    </div>
+                  </label>
+                  <label className="block">
+                    <span className="mb-2 block text-sm font-semibold text-[#245C4F]">Event name</span>
+                    <input value={editForm.title} onChange={(event) => setEditForm((current) => ({ ...current, title: event.target.value }))} className="w-full rounded-2xl border border-[#2D8A6A]/20 bg-white px-4 py-3 text-sm outline-none focus:border-[#2D8A6A] focus:ring-2 focus:ring-[#FFF5D6]" required />
+                  </label>
+                  <label className="block">
+                    <span className="mb-2 block text-sm font-semibold text-[#245C4F]">Event fee</span>
+                    <input type="number" min="0" step="0.01" value={editForm.eventFeeAmount} onChange={(event) => setEditForm((current) => ({ ...current, eventFeeAmount: event.target.value }))} className="w-full rounded-2xl border border-[#2D8A6A]/20 bg-white px-4 py-3 text-sm outline-none focus:border-[#2D8A6A] focus:ring-2 focus:ring-[#FFF5D6]" required />
+                  </label>
+                  <label className="block">
+                    <span className="mb-2 block text-sm font-semibold text-[#245C4F]">Start date</span>
+                    <input type="date" value={editForm.startDate} onChange={(event) => setEditForm((current) => ({ ...current, startDate: event.target.value }))} className="w-full rounded-2xl border border-[#2D8A6A]/20 bg-white px-4 py-3 text-sm outline-none focus:border-[#2D8A6A] focus:ring-2 focus:ring-[#FFF5D6]" required />
+                  </label>
+                  <label className="block">
+                    <span className="mb-2 block text-sm font-semibold text-[#245C4F]">End date</span>
+                    <input type="date" value={editForm.endDate} onChange={(event) => setEditForm((current) => ({ ...current, endDate: event.target.value }))} className="w-full rounded-2xl border border-[#2D8A6A]/20 bg-white px-4 py-3 text-sm outline-none focus:border-[#2D8A6A] focus:ring-2 focus:ring-[#FFF5D6]" required />
+                  </label>
+                  <label className="block">
+                    <span className="mb-2 block text-sm font-semibold text-[#245C4F]">Start time</span>
+                    <input type="time" value={editForm.startTime} onChange={(event) => setEditForm((current) => ({ ...current, startTime: event.target.value }))} className="w-full rounded-2xl border border-[#2D8A6A]/20 bg-white px-4 py-3 text-sm outline-none focus:border-[#2D8A6A] focus:ring-2 focus:ring-[#FFF5D6]" required />
+                  </label>
+                  <label className="block">
+                    <span className="mb-2 block text-sm font-semibold text-[#245C4F]">End time</span>
+                    <input type="time" value={editForm.endTime} onChange={(event) => setEditForm((current) => ({ ...current, endTime: event.target.value }))} className="w-full rounded-2xl border border-[#2D8A6A]/20 bg-white px-4 py-3 text-sm outline-none focus:border-[#2D8A6A] focus:ring-2 focus:ring-[#FFF5D6]" required />
+                  </label>
+                  <label className="block">
+                    <span className="mb-2 block text-sm font-semibold text-[#245C4F]">Registration deadline date</span>
+                    <input type="date" value={editForm.registrationDeadlineDate} onChange={(event) => setEditForm((current) => ({ ...current, registrationDeadlineDate: event.target.value }))} className="w-full rounded-2xl border border-[#2D8A6A]/20 bg-white px-4 py-3 text-sm outline-none focus:border-[#2D8A6A] focus:ring-2 focus:ring-[#FFF5D6]" />
+                  </label>
+                  <label className="block">
+                    <span className="mb-2 block text-sm font-semibold text-[#245C4F]">Registration deadline time</span>
+                    <input type="time" value={editForm.registrationDeadlineTime} onChange={(event) => setEditForm((current) => ({ ...current, registrationDeadlineTime: event.target.value }))} className="w-full rounded-2xl border border-[#2D8A6A]/20 bg-white px-4 py-3 text-sm outline-none focus:border-[#2D8A6A] focus:ring-2 focus:ring-[#FFF5D6]" />
+                  </label>
+                  <label className="block md:col-span-2">
+                    <span className="mb-2 block text-sm font-semibold text-[#245C4F]">Description</span>
+                    <textarea rows={4} value={editForm.description} onChange={(event) => setEditForm((current) => ({ ...current, description: event.target.value }))} className="w-full rounded-2xl border border-[#2D8A6A]/20 bg-white px-4 py-3 text-sm outline-none focus:border-[#2D8A6A] focus:ring-2 focus:ring-[#FFF5D6]" required />
+                  </label>
+                  <label className="block md:col-span-2">
+                    <span className="mb-2 block text-sm font-semibold text-[#245C4F]">Replace event image</span>
+                    <input
+                      ref={editFileInputRef}
+                      type="file"
+                      accept="image/*"
+                      onChange={(event) => {
+                        const file = event.target.files?.[0] || null;
+                        setEditForm((current) => ({ ...current, image: file }));
+                        if (editPreviewImage?.startsWith("blob:")) URL.revokeObjectURL(editPreviewImage);
+                        setEditPreviewImage(file ? URL.createObjectURL(file) : editingItem.image_url || "");
+                      }}
+                      className="w-full rounded-2xl border border-[#2D8A6A]/20 bg-white px-4 py-3 text-sm outline-none file:mr-4 file:rounded-xl file:border-0 file:bg-[#0D5C48] file:px-3 file:py-2 file:text-sm file:font-semibold file:text-[#FAF7F0]"
+                    />
+                  </label>
+                  {editPreviewImage ? (
+                    <div className="md:col-span-2 overflow-hidden rounded-[1.5rem] border border-[#2D8A6A]/15 bg-white">
+                      <img src={editPreviewImage} alt="Event preview" className="h-60 w-full object-cover" />
+                    </div>
+                  ) : null}
+                  <div className="md:col-span-2 flex flex-wrap gap-3">
+                    <button type="submit" disabled={editSubmitting} className="inline-flex items-center gap-2 rounded-full bg-[linear-gradient(135deg,#0D3B2E,#0D5C48)] px-5 py-3 text-sm font-semibold text-[#FFF5D6] shadow-[0_16px_34px_-24px_rgba(13,59,46,0.65)] disabled:opacity-70">
+                      {editSubmitting ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Pencil className="h-4 w-4" />}
+                      {editSubmitting ? "Saving..." : "Save changes"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={closeEditModal}
+                      className="inline-flex items-center rounded-full border border-[#2D8A6A]/20 bg-white px-5 py-3 text-sm font-semibold text-[#063F32]"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          </div>
         ) : null}
 
         {canManage && openCreateModal ? (
