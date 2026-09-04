@@ -49,7 +49,7 @@ export default function CoordinatorParentsPage() {
           </p>
           <h1 className="mt-4 font-display text-3xl font-bold tracking-tight text-[#FAF7F0] sm:text-4xl">Family registry</h1>
           <p className="mt-3 text-sm leading-7 text-[#FAF7F0] sm:text-base">
-            Manage parent contact records and linked students.
+            Manage parent contact records.
           </p>
         </div>
       </section>

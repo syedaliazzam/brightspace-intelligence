@@ -244,6 +244,11 @@ export default function LectureScheduleForm({ options, onSuccess }) {
       return;
     }
 
+    if (form.startDate === form.endDate && startHours === endHours && startMinutes === endMinutes) {
+      showToast("Lecture end time must be after the start time.", true);
+      return;
+    }
+
     if (!form.days.length) {
       showToast("Select at least one lecture day.");
       return;

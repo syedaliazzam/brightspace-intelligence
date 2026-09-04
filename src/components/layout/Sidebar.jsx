@@ -5,7 +5,7 @@ import { signOut } from "next-auth/react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { getNavigationForRole } from "@/config/navigation";
 import {
   LayoutDashboard,
@@ -105,6 +105,8 @@ export default function Sidebar({
     .replace(/^Superadmin$/, "Super Admin")
     .replace(/^Admin$/, "Admin");
   const items = getNavigationForRole(role);
+  const navRef = useRef(null);
+  const scrollStorageKey = `lms-sidebar-scroll:${role}`;
   const userManagementPathPrefix = role === "superadmin" ? "/superadmin/users" : "/admin/users";
   const [openGroups, setOpenGroups] = useState({
     userManagement: pathname.startsWith(userManagementPathPrefix),
@@ -113,6 +115,30 @@ export default function Sidebar({
   const adminView = String(searchParams.get("view") || "").toLowerCase();
   const isUserManagementActive =
     pathname.startsWith(userManagementPathPrefix) || openGroups.userManagement;
+
+  useEffect(() => {
+    const nav = navRef.current;
+    if (!nav || typeof window === "undefined") return;
+
+    const savedScroll = Number(window.sessionStorage.getItem(scrollStorageKey) || 0);
+    window.requestAnimationFrame(() => {
+      nav.scrollTop = savedScroll;
+    });
+
+    function rememberScroll() {
+      window.sessionStorage.setItem(scrollStorageKey, String(nav.scrollTop));
+    }
+
+    nav.addEventListener("scroll", rememberScroll, { passive: true });
+    return () => nav.removeEventListener("scroll", rememberScroll);
+  }, [scrollStorageKey]);
+
+  function handleNavigationClick() {
+    if (typeof window !== "undefined" && navRef.current) {
+      window.sessionStorage.setItem(scrollStorageKey, String(navRef.current.scrollTop));
+    }
+    onMobileClose?.();
+  }
 
   const shell = (
     <aside
@@ -168,6 +194,7 @@ export default function Sidebar({
       </div>
 
       <nav
+        ref={navRef}
         className="scrollbar-thin scrollbar-thumb-white/20 min-h-0 flex-1 space-y-1 overflow-x-hidden overflow-y-auto px-3 py-4 overscroll-contain"
       >
         {items.map((item) => {
@@ -229,7 +256,7 @@ export default function Sidebar({
                               ? "bg-[linear-gradient(135deg,#C9A227_0%,#E4C766_100%)] text-[#063F32] shadow-[0_10px_24px_rgba(201,162,39,0.22)]"
                               : "text-[#F1EADC]/75 hover:bg-white/10 hover:text-[#FAF7F0]"
                             } ${collapsed ? "lg:grid-cols-[40px_0px] lg:gap-0 lg:px-2 lg:place-content-center" : ""}`}
-                          onClick={onMobileClose}
+                          onClick={handleNavigationClick}
                         >
                           <span
                             className={`grid h-9 w-9 shrink-0 place-items-center rounded-xl transition ${active
@@ -260,7 +287,7 @@ export default function Sidebar({
                   ? "bg-[linear-gradient(135deg,#C9A227_0%,#E4C766_100%)] text-[#063F32] shadow-[0_10px_24px_rgba(201,162,39,0.22)]"
                   : "text-[#F1EADC]/75 hover:bg-white/10 hover:text-[#FAF7F0]"
                 } ${collapsed ? "lg:grid-cols-[40px_0px] lg:gap-0 lg:px-2 lg:place-content-center" : ""}`}
-              onClick={onMobileClose}
+              onClick={handleNavigationClick}
             >
               <span
                 className={`grid h-10 w-10 shrink-0 place-items-center rounded-2xl text-[11px] font-semibold transition ${active ? "bg-[#FFF5D6] text-[#063F32]" : "bg-white/10 text-[#FAF7F0] group-hover:bg-white/15"

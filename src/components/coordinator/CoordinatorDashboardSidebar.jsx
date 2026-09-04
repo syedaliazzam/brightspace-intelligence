@@ -2,7 +2,7 @@
 
 import { AnimatePresence, motion } from "framer-motion";
 import { signOut } from "next-auth/react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -57,7 +57,9 @@ function NavIcon({ Icon, active, tone }) {
 
 export default function CoordinatorDashboardSidebar({ profile }) {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const navRef = useRef(null);
   const pathname = usePathname();
+  const scrollStorageKey = "coordinator-sidebar-scroll";
 
   useEffect(() => {
     function handleResize() {
@@ -68,6 +70,30 @@ export default function CoordinatorDashboardSidebar({ profile }) {
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, []);
+
+  useEffect(() => {
+    const nav = navRef.current;
+    if (!nav || typeof window === "undefined") return;
+
+    const savedScroll = Number(window.sessionStorage.getItem(scrollStorageKey) || 0);
+    window.requestAnimationFrame(() => {
+      nav.scrollTop = savedScroll;
+    });
+
+    function rememberScroll() {
+      window.sessionStorage.setItem(scrollStorageKey, String(nav.scrollTop));
+    }
+
+    nav.addEventListener("scroll", rememberScroll, { passive: true });
+    return () => nav.removeEventListener("scroll", rememberScroll);
+  }, []);
+
+  function handleNavigationClick() {
+    if (typeof window !== "undefined" && navRef.current) {
+      window.sessionStorage.setItem(scrollStorageKey, String(navRef.current.scrollTop));
+    }
+    setMobileOpen(false);
+  }
 
   const shell = (
     <aside className="flex h-full w-72 flex-col overflow-hidden border-r border-[#2D8A6A]/12 bg-[linear-gradient(180deg,rgba(255,255,255,0.95)_0%,rgba(250,247,240,0.98)_100%)] shadow-[0_18px_60px_-40px_rgba(13,59,46,0.28)] backdrop-blur-xl">
@@ -83,14 +109,14 @@ export default function CoordinatorDashboardSidebar({ profile }) {
         </div>
       </div>
 
-      <nav className="scrollbar-thin scrollbar-thumb-white/20 min-h-0 flex-1 space-y-1 overflow-x-hidden overflow-y-auto px-3 py-4 overscroll-contain">
+      <nav ref={navRef} className="scrollbar-thin scrollbar-thumb-white/20 min-h-0 flex-1 space-y-1 overflow-x-hidden overflow-y-auto px-3 py-4 overscroll-contain">
         {NAV_ITEMS.map((item) => {
           const active = isActive(pathname, item.href);
           return (
             <Link
               key={item.href}
               href={item.href}
-              onClick={() => setMobileOpen(false)}
+              onClick={handleNavigationClick}
               className={`grid min-h-[52px] grid-cols-[40px_minmax(0,1fr)] items-center gap-3 rounded-2xl px-3 py-1.5 text-sm font-medium transition ${
                 active
                   ? "bg-[linear-gradient(135deg,#C9A227,#E4C766)] text-[#063F32] ring-1 ring-inset ring-[#E4C766]/40"
@@ -130,7 +156,7 @@ export default function CoordinatorDashboardSidebar({ profile }) {
         <div className="flex items-center justify-between px-4 py-3 sm:px-6">
           <Link
             href="/coordinator/dashboard"
-            onClick={() => setMobileOpen(false)}
+            onClick={handleNavigationClick}
             className="flex items-center gap-3 text-left"
           >
             <div className="flex h-11 w-11 items-center justify-center overflow-hidden rounded-2xl bg-transparent">

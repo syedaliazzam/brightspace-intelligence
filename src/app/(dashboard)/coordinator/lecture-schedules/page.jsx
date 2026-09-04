@@ -1,8 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import LectureScheduleForm from "@/components/coordinator/LectureScheduleForm";
-import LectureScheduleTable from "@/components/coordinator/LectureScheduleTable";
+import LectureScheduleTable, { expandLectureScheduleRows } from "@/components/coordinator/LectureScheduleTable";
 import ShowMoreSection from "@/components/coordinator/ShowMoreSection";
 import { OpenBookLoader } from "@/components/shared/AshShajrahLoaders";
 
@@ -47,6 +47,8 @@ export default function CoordinatorLectureSchedulesPage() {
     );
   }, [load]);
 
+  const lectureRows = useMemo(() => expandLectureScheduleRows(state.items), [state.items]);
+
   return (
     <div className="min-h-screen space-y-6 bg-[#FAF7F0] px-4 py-6 sm:px-6 lg:px-8">
       <div className="mx-auto w-full max-w-7xl space-y-6">
@@ -63,7 +65,7 @@ export default function CoordinatorLectureSchedulesPage() {
             </p>
           </div>
           <div className="rounded-2xl border border-[#E4C766]/30 bg-[#FAF7F0]/10 px-4 py-3 text-sm text-[#FAF7F0]">
-            {state.items.length} lectures loaded
+            {lectureRows.length} lectures loaded
           </div>
         </div>
       </section>
@@ -72,7 +74,7 @@ export default function CoordinatorLectureSchedulesPage() {
       <LectureScheduleForm options={state} onSuccess={load} />
       {state.loading ? <OpenBookLoader title="Loading lecture schedules" subtitle="Fetching schedule data..." /> : null}
       <ShowMoreSection
-        items={state.items}
+        items={lectureRows}
         initialCount={7}
         step={7}
         renderItems={(visibleItems) => <LectureScheduleTable items={visibleItems} onRefresh={load} />}

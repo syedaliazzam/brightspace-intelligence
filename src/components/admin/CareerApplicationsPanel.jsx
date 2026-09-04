@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { ExternalLink, Download, Search, Trash2 } from "lucide-react";
+import { ExternalLink, Download, Search, Trash2, Pencil } from "lucide-react";
 import { OpenBookLoader } from "@/components/shared/AshShajrahLoaders";
 import AdminDataTable from "@/components/admin/AdminDataTable";
 
@@ -17,6 +17,19 @@ export default function CareerApplicationsPanel() {
   const [selectedMessage, setSelectedMessage] = useState(null);
   const [search, setSearch] = useState("");
   const [deleteTarget, setDeleteTarget] = useState(null);
+  const [editTarget, setEditTarget] = useState(null);
+  const [editForm, setEditForm] = useState({
+    full_name: "",
+    email: "",
+    whatsapp: "",
+    interested_role: "",
+    source: "",
+    message: "",
+    admin_notes: "",
+  });
+  const [editResumeFile, setEditResumeFile] = useState(null);
+  const [editError, setEditError] = useState("");
+  const [savingEdit, setSavingEdit] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
@@ -97,15 +110,86 @@ export default function CareerApplicationsPanel() {
     }
   }
 
+  function openEdit(row) {
+    setEditTarget(row);
+    setEditForm({
+      full_name: row.full_name || "",
+      email: row.email || "",
+      whatsapp: row.whatsapp || "",
+      interested_role: row.interested_role || "",
+      source: row.source || "",
+      message: row.message || "",
+      admin_notes: row.admin_notes || "",
+    });
+    setEditResumeFile(null);
+    setEditError("");
+  }
+
+  async function handleEditSubmit(event) {
+    event.preventDefault();
+    if (!editTarget?.id) return;
+
+    setSavingEdit(true);
+    setEditError("");
+
+    try {
+      const formData = new FormData();
+      Object.entries(editForm).forEach(([key, value]) => {
+        formData.append(key, value || "");
+      });
+      if (editResumeFile) {
+        formData.append("resume", editResumeFile);
+      }
+
+      const response = await fetch(`/api/admin/career-applications/${encodeURIComponent(editTarget.id)}`, {
+        method: "PATCH",
+        body: formData,
+      });
+      const data = await response.json().catch(() => ({}));
+
+      if (!response.ok) {
+        throw new Error(data?.message || "Unable to update career application.");
+      }
+
+      setState((current) => ({
+        ...current,
+        items: current.items.map((item) => (item.id === editTarget.id ? { ...item, ...(data.item || editForm) } : item)),
+      }));
+      setSelectedMessage((current) => (current?.id === editTarget.id ? { ...current, ...(data.item || editForm) } : current));
+      setEditResumeFile(null);
+      setEditTarget(null);
+    } catch (error) {
+      setEditError(error instanceof Error ? error.message : "Unable to update career application.");
+    } finally {
+      setSavingEdit(false);
+    }
+  }
+
   const columns = useMemo(
     () => [
-      { key: "full_name", label: "Full Name" },
-      { key: "email", label: "Email" },
-      { key: "whatsapp", label: "WhatsApp" },
-      { key: "interested_role", label: "Interested Role" },
+      {
+        key: "full_name",
+        label: "Full Name",
+        headerClassName: "min-w-[150px] whitespace-nowrap",
+        render: (row) => <span className="break-words">{row.full_name || "-"}</span>,
+      },
+      {
+        key: "email",
+        label: "Email",
+        headerClassName: "min-w-[220px] whitespace-nowrap",
+        render: (row) => <span className="break-all">{row.email || "-"}</span>,
+      },
+      { key: "whatsapp", label: "WhatsApp", headerClassName: "min-w-[150px] whitespace-nowrap" },
+      {
+        key: "interested_role",
+        label: "Interested Role",
+        headerClassName: "min-w-[190px] whitespace-nowrap",
+        render: (row) => <span className="break-words">{row.interested_role || "-"}</span>,
+      },
       {
         key: "message",
         label: "Message",
+        headerClassName: "min-w-[140px] whitespace-nowrap",
         render: (row) => (
           <div className="inline-block">
             <button
@@ -118,8 +202,18 @@ export default function CareerApplicationsPanel() {
           </div>
         ),
       },
-      { key: "source", label: "Source" },
-      { key: "submitted_at", label: "Submitted At", render: (row) => formatDate(row.submitted_at) },
+      {
+        key: "source",
+        label: "Source",
+        headerClassName: "min-w-[140px] whitespace-nowrap",
+        render: (row) => <span className="break-words">{row.source || "-"}</span>,
+      },
+      {
+        key: "submitted_at",
+        label: "Submitted At",
+        headerClassName: "min-w-[190px] whitespace-nowrap",
+        render: (row) => formatDate(row.submitted_at),
+      },
     ],
     []
   );
@@ -156,28 +250,37 @@ export default function CareerApplicationsPanel() {
             columns={columns}
             rows={filteredItems}
             emptyMessage="No career applications found."
+            tableOnMobile
             actions={(row) => (
               <div className="flex min-w-max items-center gap-2 whitespace-nowrap">
                 <a
                   href={`/api/admin/career-applications/${encodeURIComponent(row.id)}/resume`}
                   target="_blank"
                   rel="noreferrer"
-                  className="inline-flex items-center gap-2 rounded-xl border border-[#2D8A6A]/20 bg-[#EAF6EF] px-3 py-2 text-xs font-semibold text-[#0D5C48] transition hover:bg-[#DFF2E7]"
+                  className="inline-flex items-center justify-center gap-2 rounded-xl border border-[#2D8A6A]/20 bg-[#EAF6EF] px-3 py-2 text-xs font-semibold text-[#0D5C48] transition hover:bg-[#DFF2E7]"
                 >
                   <ExternalLink className="h-4 w-4" />
-                  View PDF
+                  View Document
                 </a>
                 <a
                   href={`/api/admin/career-applications/${encodeURIComponent(row.id)}/resume?download=1`}
-                  className="inline-flex items-center gap-2 rounded-xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-3 py-2 text-xs font-semibold text-[#063F32] transition hover:bg-[#F1EADC]"
+                  className="inline-flex items-center justify-center gap-2 rounded-xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-3 py-2 text-xs font-semibold text-[#063F32] transition hover:bg-[#F1EADC]"
                 >
                   <Download className="h-4 w-4" />
-                  Download PDF
+                  Download Document
                 </a>
                 <button
                   type="button"
+                  onClick={() => openEdit(row)}
+                  className="inline-flex items-center justify-center gap-2 rounded-xl border border-[#2D8A6A]/20 bg-white px-3 py-2 text-xs font-semibold text-[#063F32] transition hover:bg-[#F1EADC]"
+                >
+                  <Pencil className="h-4 w-4" />
+                  Edit
+                </button>
+                <button
+                  type="button"
                   onClick={() => setDeleteTarget(row)}
-                  className="inline-flex items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700 transition hover:bg-rose-100"
+                  className="inline-flex items-center justify-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700 transition hover:bg-rose-100"
                 >
                   <Trash2 className="h-4 w-4" />
                   Delete
@@ -216,6 +319,127 @@ export default function CareerApplicationsPanel() {
                   </p>
                 </div>
               </div>
+            </div>
+          ) : null}
+
+          {editTarget ? (
+            <div className="fixed inset-0 z-[10000] overflow-y-auto bg-[#063F32]/45 px-4 py-8 backdrop-blur-sm sm:py-10">
+              <form onSubmit={handleEditSubmit} className="mx-auto max-h-[calc(100vh-4rem)] w-full max-w-3xl overflow-y-auto rounded-[2rem] border border-[#2D8A6A]/15 bg-[#FAF7F0] p-6 shadow-[0_24px_80px_-36px_rgba(13,59,46,0.24)] sm:max-h-[calc(100vh-5rem)] sm:p-8">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <p className="text-sm font-semibold uppercase tracking-[0.24em] text-[#C9A227]">
+                      Edit application
+                    </p>
+                    <h2 className="mt-3 font-display text-2xl font-bold tracking-tight text-[#063F32]">
+                      {editTarget.full_name || "Career application"}
+                    </h2>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setEditTarget(null)}
+                    disabled={savingEdit}
+                    className="rounded-xl border border-[#2D8A6A]/20 bg-white px-3 py-2 text-sm font-semibold text-[#063F32] transition hover:bg-[#F1EADC] disabled:opacity-60"
+                  >
+                    Close
+                  </button>
+                </div>
+
+                {editError ? (
+                  <div className="mt-5 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">
+                    {editError}
+                  </div>
+                ) : null}
+
+                <div className="mt-6 grid gap-4 md:grid-cols-2">
+                  {[
+                    ["full_name", "Full name"],
+                    ["email", "Email"],
+                    ["whatsapp", "WhatsApp"],
+                    ["interested_role", "Interested role"],
+                    ["source", "Source"],
+                  ].map(([key, label]) => (
+                    <label key={key} className="space-y-2">
+                      <span className="text-sm font-semibold text-[#245C4F]">{label}</span>
+                      <input
+                        value={editForm[key]}
+                        onChange={(event) => setEditForm((current) => ({ ...current, [key]: event.target.value }))}
+                        className="w-full rounded-2xl border border-[#2D8A6A]/20 bg-white px-4 py-3 text-sm text-[#063F32] outline-none transition focus:border-[#2D8A6A] focus:ring-4 focus:ring-[#C9A227]/20"
+                      />
+                    </label>
+                  ))}
+
+                  <label className="space-y-2 md:col-span-2">
+                    <span className="text-sm font-semibold text-[#245C4F]">Message</span>
+                    <textarea
+                      rows={4}
+                      value={editForm.message}
+                      onChange={(event) => setEditForm((current) => ({ ...current, message: event.target.value }))}
+                      className="w-full rounded-2xl border border-[#2D8A6A]/20 bg-white px-4 py-3 text-sm text-[#063F32] outline-none transition focus:border-[#2D8A6A] focus:ring-4 focus:ring-[#C9A227]/20"
+                    />
+                  </label>
+
+                  <label className="space-y-2 md:col-span-2">
+                    <span className="text-sm font-semibold text-[#245C4F]">Admin notes</span>
+                    <textarea
+                      rows={3}
+                      value={editForm.admin_notes}
+                      onChange={(event) => setEditForm((current) => ({ ...current, admin_notes: event.target.value }))}
+                      className="w-full rounded-2xl border border-[#2D8A6A]/20 bg-white px-4 py-3 text-sm text-[#063F32] outline-none transition focus:border-[#2D8A6A] focus:ring-4 focus:ring-[#C9A227]/20"
+                    />
+                  </label>
+
+                  <div className="space-y-3 md:col-span-2">
+                    <span className="text-sm font-semibold text-[#245C4F]">Resume / document</span>
+                    <label className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#2D8A6A]/20 bg-white px-4 py-3">
+                      <span className="min-w-0 text-sm text-[#245C4F]">
+                        Current:{" "}
+                        <span className="font-semibold text-[#063F32]">
+                          {editTarget.resume_file_name || "No document uploaded"}
+                        </span>
+                      </span>
+                      <span className="rounded-xl bg-[#0D5C48] px-4 py-2 text-sm font-semibold text-[#FAF7F0]">
+                        Choose new file
+                      </span>
+                      <input
+                        type="file"
+                        accept=".pdf,.doc,.docx,.png,.jpg,.jpeg"
+                        onChange={(event) => setEditResumeFile(event.target.files?.[0] || null)}
+                        className="sr-only"
+                      />
+                    </label>
+                    {editResumeFile ? (
+                      <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#C9A227]/30 bg-[#FFF8E7] px-4 py-3 text-sm text-[#063F32]">
+                        <span className="font-semibold">Selected file: {editResumeFile.name}</span>
+                        <button
+                          type="button"
+                          onClick={() => setEditResumeFile(null)}
+                          className="rounded-xl border border-[#2D8A6A]/20 bg-white px-3 py-1.5 text-xs font-semibold text-[#063F32] transition hover:bg-[#F1EADC]"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    ) : null}
+                  </div>
+                </div>
+
+                <div className="mt-6 flex flex-wrap justify-end gap-3 border-t border-[#2D8A6A]/10 pt-5">
+                  <button
+                    type="button"
+                    onClick={() => setEditTarget(null)}
+                    disabled={savingEdit}
+                    className="rounded-xl border border-[#2D8A6A]/20 bg-white px-4 py-2.5 text-sm font-semibold text-[#063F32] transition hover:bg-[#F1EADC] disabled:opacity-60"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={savingEdit}
+                    className="rounded-xl bg-[#0D5C48] px-4 py-2.5 text-sm font-semibold text-[#FAF7F0] transition hover:bg-[#063F32] disabled:cursor-not-allowed disabled:opacity-70"
+                  >
+                    {savingEdit ? "Saving..." : "Save changes"}
+                  </button>
+                </div>
+              </form>
             </div>
           ) : null}
 

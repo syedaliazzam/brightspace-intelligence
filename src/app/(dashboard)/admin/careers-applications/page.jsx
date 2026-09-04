@@ -6,6 +6,7 @@ import CareerApplicationsPanel from "@/components/admin/CareerApplicationsPanel"
 export default function AdminCareersApplicationsPage() {
   const pathname = usePathname() || "";
   const isSuperAdminPortal = pathname.startsWith("/superadmin");
+  const isCoordinatorPortal = pathname.startsWith("/coordinator");
 
   return (
     <div className="min-h-screen bg-[#FAF7F0]">
@@ -15,7 +16,7 @@ export default function AdminCareersApplicationsPage() {
           <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(135deg,rgba(13,59,46,0.98),rgba(13,92,72,0.94))]" />
           <div className="relative">
             <p className="inline-flex rounded-full border border-[#E4C766]/30 bg-[#FFF5D6]/12 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.28em] text-[#FFF5D6]">
-              {isSuperAdminPortal ? "Super Admin portal" : "Admin portal"}
+              {isSuperAdminPortal ? "Super Admin portal" : isCoordinatorPortal ? "Coordinator portal" : "Admin portal"}
             </p>
             <h1 className="mt-4 font-display text-3xl font-bold tracking-tight text-[#FAF7F0] sm:text-4xl">
               Careers applications

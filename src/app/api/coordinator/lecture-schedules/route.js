@@ -370,7 +370,7 @@ export async function GET(request) {
                 AND ls2.teacher_id = ls.teacher_id
                 AND ls2.subject_id = ls.subject_id
                 AND ls2.title = ls.title
-                AND ls2.description = ls.description
+                AND ls2.description IS NOT DISTINCT FROM ls.description
                 AND ls2.rescheduled_from_id IS NOT DISTINCT FROM ls.rescheduled_from_id
                 AND e2.course_id = e.course_id
             ) AS day_parts
@@ -461,10 +461,11 @@ export async function GET(request) {
               AND lsd.teacher_id = ls.teacher_id
               AND lsd.subject_id = ls.subject_id
               AND lsd.title = ls.title
-              AND lsd.description = ls.description
+              AND lsd.description IS NOT DISTINCT FROM ls.description
+              AND lsd.status = ls.status
               AND lsd.rescheduled_from_id IS NOT DISTINCT FROM ls.rescheduled_from_id
               AND ed.course_id = e.course_id
-            ORDER BY TO_CHAR(lsd.scheduled_start, 'YYYY-MM-DD'), lsd.scheduled_start ASC, lsd.id ASC
+            ORDER BY TO_CHAR(lsd.scheduled_start, 'YYYY-MM-DD'), lsd.updated_at DESC NULLS LAST, lsd.scheduled_start ASC, lsd.id ASC
           ) occurrence_rows
         ) occurrence_map ON TRUE
         LEFT JOIN LATERAL (
@@ -486,7 +487,7 @@ export async function GET(request) {
               AND lsr.teacher_id = ls.teacher_id
               AND lsr.subject_id = ls.subject_id
               AND lsr.title = ls.title
-              AND lsr.description = ls.description
+              AND lsr.description IS NOT DISTINCT FROM ls.description
               AND lsr.rescheduled_from_id IS NOT DISTINCT FROM ls.rescheduled_from_id
               AND e3.course_id = e.course_id
               AND NULLIF(COALESCE(lsr.google_meet_sync_meta->'recording'->>'url', lsr.recording_drive_url), '') IS NOT NULL
@@ -515,7 +516,7 @@ export async function GET(request) {
                   AND lsr2.teacher_id = ls.teacher_id
                   AND lsr2.subject_id = ls.subject_id
                   AND lsr2.title = ls.title
-                  AND lsr2.description = ls.description
+                  AND lsr2.description IS NOT DISTINCT FROM ls.description
                   AND lsr2.rescheduled_from_id IS NOT DISTINCT FROM ls.rescheduled_from_id
                   AND e4.course_id = e.course_id
                   AND NULLIF(COALESCE(lsr2.google_meet_sync_meta->'recording'->>'url', lsr2.recording_drive_url), '') IS NOT NULL
@@ -621,6 +622,10 @@ export async function POST(request) {
       endMinutes > 59
     ) {
       return json("Please provide valid lecture start and end times.", 400);
+    }
+
+    if (startHours === endHours && startMinutes === endMinutes) {
+      return json("Lecture end time must be after the start time.", 400);
     }
 
     const isOvernight = startHours > endHours || (startHours === endHours && startMinutes >= endMinutes);

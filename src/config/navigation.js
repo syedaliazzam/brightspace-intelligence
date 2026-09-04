@@ -86,6 +86,7 @@ export const dashboardNavigation = {
     { label: "Reports", href: "/coordinator/reports" },
     { label: "Sent Emails", href: "/coordinator/sent-emails" },
     { label: "Admin", href: "/coordinator/admin" },
+    { label: "Careers Applications", href: "/coordinator/careers-applications" },
   ],
   teacher: [
     { label: "Dashboard", href: "/teacher/dashboard" },

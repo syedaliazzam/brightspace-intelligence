@@ -30,6 +30,7 @@ async function getLecture(id) {
     SELECT
       ls.id::text AS id,
       ls.enrollment_id::text AS enrollment_id,
+      e.course_id::text AS course_id,
       ls.student_id::text AS student_id,
       ls.teacher_id::text AS teacher_id,
       ls.subject_id::text AS subject_id,
@@ -39,6 +40,10 @@ async function getLecture(id) {
       ls.scheduled_end,
       ls.status::text AS status,
       ls.google_calendar_event_id,
+      ls.google_meet_link,
+      ls.meet_link_source,
+      ls.google_meet_space_id,
+      ls.rescheduled_from_id::text AS rescheduled_from_id,
       ls.scheduled_by::text AS coordinator_user_id,
       cu.email AS coordinator_email,
       su.id::text AS student_user_id,
@@ -51,6 +56,7 @@ async function getLecture(id) {
       tu.email AS teacher_email,
       tu.full_name AS teacher_name
     FROM lecture_schedules ls
+    INNER JOIN enrollments e ON e.id = ls.enrollment_id
     INNER JOIN student_profiles sp ON sp.id = ls.student_id
     INNER JOIN users su ON su.id = sp.user_id
     LEFT JOIN users cu ON cu.id = ls.scheduled_by
@@ -142,6 +148,17 @@ export async function PATCH(request, context) {
       return json("Scheduled start and end are required.", 400);
     }
 
+    const scheduledStartDate = new Date(scheduledStart);
+    const scheduledEndDate = new Date(scheduledEnd);
+
+    if (
+      Number.isNaN(scheduledStartDate.getTime()) ||
+      Number.isNaN(scheduledEndDate.getTime()) ||
+      scheduledEndDate <= scheduledStartDate
+    ) {
+      return json("Lecture end time must be after the start time.", 400);
+    }
+
     const [existingClassMeet] = await prisma.$queryRaw`
       SELECT
         ls.google_meet_link AS google_meet_link,
@@ -197,7 +214,7 @@ export async function PATCH(request, context) {
 
       await prisma.$transaction(async (tx) => {
         await tx.$executeRaw`
-          UPDATE lecture_schedules
+          UPDATE lecture_schedules target
           SET title = ${title || lecture.title},
               description = ${description || lecture.description || null},
               scheduled_start = ${scheduledStart}::timestamp,
@@ -207,22 +224,21 @@ export async function PATCH(request, context) {
               meet_link_source = ${resolvedMeetSource},
               google_meet_space_id = COALESCE(${calendarData.meetSpaceId || extractMeetCodeFromLink(manualMeetLink) || null}, google_meet_space_id),
               updated_at = NOW()
-          WHERE id = ${id}::uuid
+          FROM enrollments target_enrollment
+          WHERE target_enrollment.id = target.enrollment_id
+            AND target_enrollment.course_id = ${lecture.course_id}::uuid
+            AND target.teacher_id = ${lecture.teacher_id}::uuid
+            AND target.subject_id = ${lecture.subject_id}::uuid
+            AND target.title = ${lecture.title}
+            AND target.description IS NOT DISTINCT FROM ${lecture.description || null}
+            AND target.google_calendar_event_id IS NOT DISTINCT FROM ${lecture.google_calendar_event_id || null}
+            AND target.google_meet_link IS NOT DISTINCT FROM ${lecture.google_meet_link || null}
+            AND target.meet_link_source IS NOT DISTINCT FROM ${lecture.meet_link_source || null}
+            AND target.google_meet_space_id IS NOT DISTINCT FROM ${lecture.google_meet_space_id || null}
+            AND target.rescheduled_from_id IS NOT DISTINCT FROM ${lecture.rescheduled_from_id || null}::uuid
+            AND target.scheduled_start = ${lecture.scheduled_start}::timestamp
+            AND target.scheduled_end = ${lecture.scheduled_end}::timestamp
         `;
-
-        if (lecture.google_calendar_event_id) {
-          await tx.$executeRaw`
-            UPDATE lecture_schedules
-            SET title = ${title || lecture.title},
-                description = ${description || lecture.description || null},
-                google_meet_link = ${resolvedMeetLink},
-                meet_link_source = ${resolvedMeetSource},
-                google_meet_space_id = COALESCE(${calendarData.meetSpaceId || extractMeetCodeFromLink(manualMeetLink) || null}, google_meet_space_id),
-                updated_at = NOW()
-            WHERE google_calendar_event_id = ${lecture.google_calendar_event_id}
-              AND id <> ${id}::uuid
-          `;
-        }
 
         await createAuditLog(
           {

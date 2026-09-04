@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
 import ClientPortal from "@/components/shared/ClientPortal";
-import { formatDateTimeRange } from "@/lib/dateTime";
 import { getLectureDisplayStatus, getLecturePrimaryLink } from "@/lib/lectureStatus";
 
 const EMPTY_FORM = {
@@ -16,12 +15,77 @@ const EMPTY_FORM = {
   googleMeetLink: "",
 };
 
+function getOccurrenceRows(item) {
+  if (item?.is_occurrence_row) return [];
+
+  const details =
+    item?.occurrence_details && typeof item.occurrence_details === "object"
+      ? item.occurrence_details
+      : {};
+
+  return Object.entries(details)
+    .map(([dateKey, detail]) => ({
+      dateKey,
+      ...(detail && typeof detail === "object" ? detail : {}),
+    }))
+    .filter((detail) => detail.id || detail.scheduled_start || detail.start_time)
+    .sort((a, b) => String(a.scheduled_start || a.dateKey).localeCompare(String(b.scheduled_start || b.dateKey)));
+}
+
+export function expandLectureScheduleRows(items) {
+  return (items || []).flatMap((item) => {
+    const occurrences = getOccurrenceRows(item);
+    if (occurrences.length <= 1) {
+      const occurrence = occurrences[0] || {};
+      return [{
+        ...item,
+        is_occurrence_row: true,
+        id: occurrence.id || item.id,
+        scheduled_start: occurrence.scheduled_start || item.scheduled_start,
+        scheduled_end: occurrence.scheduled_end || item.scheduled_end,
+        start_date: occurrence.dateKey || item.start_date,
+        end_date: occurrence.scheduled_end ? String(occurrence.scheduled_end).replace(" ", "T").split("T")[0] : item.end_date,
+        start_time: occurrence.start_time || item.start_time,
+        end_time: occurrence.end_time || item.end_time,
+      }];
+    }
+
+    return occurrences.map((occurrence, index) => ({
+      ...item,
+      is_occurrence_row: true,
+      id: occurrence.id || item.id,
+      schedule_group_id: item.id,
+      scheduled_start: occurrence.scheduled_start || item.scheduled_start,
+      scheduled_end: occurrence.scheduled_end || item.scheduled_end,
+      start_date: occurrence.dateKey || item.start_date,
+      end_date: occurrence.scheduled_end ? String(occurrence.scheduled_end).replace(" ", "T").split("T")[0] : occurrence.dateKey || item.end_date,
+      start_time: occurrence.start_time || item.start_time,
+      end_time: occurrence.end_time || item.end_time,
+    }));
+  });
+}
+
+function getLectureDayLabel(item) {
+  const rawDate = item?.start_date || item?.scheduled_start;
+  if (!rawDate) return item?.days_active || "N/A";
+
+  const normalized = String(rawDate).includes("T") ? String(rawDate) : `${rawDate}T00:00:00`;
+  const date = new Date(normalized);
+  if (Number.isNaN(date.getTime())) return item?.days_active || "N/A";
+
+  return date.toLocaleDateString("en-US", { weekday: "short" });
+}
+
 export default function LectureScheduleTable({ items = [], onRefresh }) {
   const finalStatuses = new Set(["cancelled", "verified_by_coordinator", "completed_by_teacher"]);
+  const scheduleRows = expandLectureScheduleRows(items);
   const [editingItem, setEditingItem] = useState(null);
+  const [cancelTarget, setCancelTarget] = useState(null);
+  const [cancelError, setCancelError] = useState("");
   const [form, setForm] = useState(EMPTY_FORM);
   const [formError, setFormError] = useState("");
   const [saving, setSaving] = useState(false);
+  const [canceling, setCanceling] = useState(false);
 
   async function patchSchedule(id, payload) {
     const response = await fetch(`/api/coordinator/lecture-schedules/${id}`, {
@@ -29,7 +93,13 @@ export default function LectureScheduleTable({ items = [], onRefresh }) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
-    const data = await response.json();
+    const responseText = await response.text();
+    let data = {};
+    try {
+      data = responseText ? JSON.parse(responseText) : {};
+    } catch {
+      throw new Error("Unable to update lecture schedule. Please refresh and try again.");
+    }
 
     if (!response.ok) {
       throw new Error(data?.message || "Unable to update lecture schedule.");
@@ -67,6 +137,33 @@ export default function LectureScheduleTable({ items = [], onRefresh }) {
     setFormError("");
   }
 
+  function openCancelConfirm(item) {
+    setCancelTarget(item);
+    setCancelError("");
+  }
+
+  function closeCancelConfirm() {
+    if (canceling) return;
+    setCancelTarget(null);
+    setCancelError("");
+  }
+
+  async function confirmCancelSchedule() {
+    if (!cancelTarget) return;
+
+    setCanceling(true);
+    setCancelError("");
+
+    try {
+      await patchSchedule(cancelTarget.id, { action: "cancel" });
+      setCancelTarget(null);
+    } catch (error) {
+      setCancelError(error instanceof Error ? error.message : "Unable to cancel lecture schedule.");
+    } finally {
+      setCanceling(false);
+    }
+  }
+
   async function submitEdit(event) {
     event.preventDefault();
     if (!editingItem) return;
@@ -97,6 +194,17 @@ export default function LectureScheduleTable({ items = [], onRefresh }) {
     try {
       const scheduledStart = `${form.startDate}T${form.startTime}:00`;
       const scheduledEnd = `${form.endDate}T${form.endTime}:00`;
+      const scheduledStartDate = new Date(scheduledStart);
+      const scheduledEndDate = new Date(scheduledEnd);
+
+      if (
+        Number.isNaN(scheduledStartDate.getTime()) ||
+        Number.isNaN(scheduledEndDate.getTime()) ||
+        scheduledEndDate <= scheduledStartDate
+      ) {
+        setFormError("Lecture end time must be after the start time.");
+        return;
+      }
 
       await patchSchedule(editingItem.id, {
         action: "update",
@@ -132,27 +240,27 @@ export default function LectureScheduleTable({ items = [], onRefresh }) {
   return (
     <>
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="overflow-hidden rounded-[1.75rem] border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(250,247,240,0.98)_100%)] shadow-[0_20px_70px_-36px_rgba(6,63,50,0.18)] backdrop-blur-xl">
-        <div className="hidden grid-cols-[minmax(0,1.2fr)_minmax(0,0.9fr)_minmax(0,0.8fr)_minmax(0,0.8fr)_minmax(0,0.8fr)_minmax(0,0.8fr)_minmax(0,0.8fr)_minmax(0,1.15fr)_minmax(0,1.35fr)_220px] gap-3 border-b border-[#2D8A6A]/10 bg-[linear-gradient(180deg,#FAF7F0_0%,#F1EADC_100%)] px-5 py-4 text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48] lg:grid lg:items-center">
+        <div className="hidden grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)_minmax(96px,1fr)_minmax(96px,1fr)_minmax(92px,0.9fr)_minmax(92px,0.9fr)_minmax(70px,0.7fr)_minmax(0,1.1fr)_minmax(0,1.25fr)_220px] gap-3 border-b border-[#2D8A6A]/10 bg-[linear-gradient(180deg,#FAF7F0_0%,#F1EADC_100%)] px-5 py-4 text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48] lg:grid lg:items-center">
           <span>Lecture</span>
           <span>Subject</span>
-          <span>Start date</span>
-          <span>End date</span>
-          <span>Start time</span>
-          <span>End time</span>
+          <span className="whitespace-nowrap">Start date</span>
+          <span className="whitespace-nowrap">End date</span>
+          <span className="whitespace-nowrap">Start time</span>
+          <span className="whitespace-nowrap">End time</span>
           <span>Days</span>
           <span>Status</span>
           <span>Class</span>
           <span className="text-right">Actions</span>
         </div>
         <div className="divide-y divide-[#2D8A6A]/10">
-          {items.length ? (
-            items.map((item) => {
+          {scheduleRows.length ? (
+            scheduleRows.map((item) => {
               const statusKey = String(item.status || "").toLowerCase();
               const isFinal = finalStatuses.has(statusKey);
               const primaryLink = getLecturePrimaryLink(item);
 
               return (
-                <div key={item.id} className="grid gap-3 px-5 py-4 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,0.9fr)_minmax(0,0.8fr)_minmax(0,0.8fr)_minmax(0,0.8fr)_minmax(0,0.8fr)_minmax(0,0.8fr)_minmax(0,1.15fr)_minmax(0,1.35fr)_220px] lg:items-center">
+                <div key={item.id} className="grid gap-3 px-5 py-4 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)_minmax(96px,1fr)_minmax(96px,1fr)_minmax(92px,0.9fr)_minmax(92px,0.9fr)_minmax(70px,0.7fr)_minmax(0,1.1fr)_minmax(0,1.25fr)_220px] lg:items-center">
                   <div>
                     <p className="font-semibold text-[#063F32]">{item.title}</p>
                     <p className="mt-1 text-sm text-[#245C4F]">
@@ -164,7 +272,7 @@ export default function LectureScheduleTable({ items = [], onRefresh }) {
                   <p className="text-sm text-[#245C4F]">{item.end_date || String(item.scheduled_end || '').split('T')[0]}</p>
                   <p className="text-sm text-[#245C4F]">{item.start_time || ''}</p>
                   <p className="text-sm text-[#245C4F]">{item.end_time || ''}</p>
-                  <p className="text-sm text-[#245C4F]">{item.days_active || 'N/A'}</p>
+                  <p className="text-sm text-[#245C4F]">{getLectureDayLabel(item)}</p>
                   <p className="min-w-0 text-sm leading-6 text-[#245C4F] break-words">{item.display_status || item.status || getLectureDisplayStatus(item)}</p>
                   <div className="min-w-0 text-sm leading-6 text-[#245C4F] break-words">
                     <p>{item.course_title}</p>
@@ -189,11 +297,7 @@ export default function LectureScheduleTable({ items = [], onRefresh }) {
                     <button
                       type="button"
                       disabled={isFinal}
-                      onClick={() => {
-                        if (window.confirm("Are you sure you want to cancel this lecture schedule?")) {
-                          patchSchedule(item.id, { action: "cancel" }).catch((error) => window.alert(error.message));
-                        }
-                      }}
+                      onClick={() => openCancelConfirm(item)}
                       className="rounded-xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-3 py-2 text-xs font-semibold text-rose-700 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       Cancel
@@ -368,6 +472,63 @@ export default function LectureScheduleTable({ items = [], onRefresh }) {
                   </button>
                 </div>
               </form>
+            </div>
+          </div>
+        </ClientPortal>
+      ) : null}
+
+      {cancelTarget ? (
+        <ClientPortal targetId="coordinator-page-portal-root">
+          <div className="absolute inset-x-0 top-0 z-[10000] isolate flex min-h-full items-center justify-center bg-[#063F32]/45 px-4 py-10 backdrop-blur-sm">
+            <div className="w-full max-w-lg overflow-hidden rounded-[2rem] border border-rose-200/70 bg-[#FAF7F0] shadow-[0_30px_90px_-40px_rgba(6,63,50,0.35)]">
+              <div className="border-b border-[#2D8A6A]/10 bg-[linear-gradient(135deg,#fff7ed,#fff1f2)] px-6 py-5">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-rose-700">
+                  Cancel lecture
+                </p>
+                <h2 className="mt-2 text-2xl font-semibold text-[#063F32]">
+                  Are you sure?
+                </h2>
+                <p className="mt-2 text-sm leading-6 text-[#245C4F]">
+                  This will cancel the selected lecture schedule only.
+                </p>
+              </div>
+
+              <div className="space-y-4 px-6 py-5">
+                <div className="rounded-2xl border border-[#2D8A6A]/15 bg-white/75 p-4">
+                  <p className="font-semibold text-[#063F32]">{cancelTarget.title || "Lecture schedule"}</p>
+                  <p className="mt-1 text-sm text-[#245C4F]">
+                    {cancelTarget.subject_name || "Subject"} · {cancelTarget.course_title || "Class"}
+                  </p>
+                  <p className="mt-1 text-sm text-[#245C4F]">
+                    {cancelTarget.start_date || String(cancelTarget.scheduled_start || "").split("T")[0]} · {cancelTarget.start_time || ""}
+                  </p>
+                </div>
+
+                {cancelError ? (
+                  <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">
+                    {cancelError}
+                  </div>
+                ) : null}
+
+                <div className="flex flex-wrap justify-end gap-3 border-t border-[#2D8A6A]/10 pt-5">
+                  <button
+                    type="button"
+                    onClick={closeCancelConfirm}
+                    disabled={canceling}
+                    className="rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-5 py-3 text-sm font-semibold text-[#063F32] transition hover:bg-[#F1EADC] disabled:opacity-50"
+                  >
+                    Keep lecture
+                  </button>
+                  <button
+                    type="button"
+                    onClick={confirmCancelSchedule}
+                    disabled={canceling}
+                    className="rounded-2xl bg-rose-700 px-5 py-3 text-sm font-semibold text-white transition hover:bg-rose-800 disabled:cursor-not-allowed disabled:opacity-70"
+                  >
+                    {canceling ? "Cancelling..." : "Cancel lecture"}
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         </ClientPortal>

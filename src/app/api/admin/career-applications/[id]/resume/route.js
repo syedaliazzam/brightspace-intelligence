@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 
-const ALLOWED_ROLES = new Set(["superadmin", "admin"]);
+const ALLOWED_ROLES = new Set(["superadmin", "admin", "coordinator"]);
 
 function contentDisposition(fileName, download = false) {
   const safeName = String(fileName || "resume.pdf").replace(/"/g, "");

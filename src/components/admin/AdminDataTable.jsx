@@ -25,6 +25,7 @@ export default function AdminDataTable({
   loadingTitle = "Loading data",
   loadingSubtitle = "Preparing the table...",
   resetKey = "",
+  tableOnMobile = false,
 }) {
   const effectiveActions = actions;
   const [page, setPage] = useState(1);
@@ -63,13 +64,13 @@ export default function AdminDataTable({
 
   return (
     <section className="space-y-4">
-      <div className="hidden overflow-hidden rounded-[1.75rem] border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(250,247,240,0.98)_100%)] shadow-[0_20px_70px_-36px_rgba(13,59,46,0.18)] backdrop-blur-xl lg:block">
+      <div className={`${tableOnMobile ? "block" : "hidden lg:block"} overflow-hidden rounded-[1.75rem] border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(250,247,240,0.98)_100%)] shadow-[0_20px_70px_-36px_rgba(13,59,46,0.18)] backdrop-blur-xl`}>
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-[#F1EADC]">
             <thead className="bg-[linear-gradient(180deg,#FAF7F0_0%,#F1EADC_100%)]">
               <tr className="text-left text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]">
                 {columns.map((column) => (
-                  <th key={column.key} className="px-6 py-4">
+                  <th key={column.key} className={`px-6 py-4 ${column.headerClassName || ""}`}>
                     {column.label}
                   </th>
                 ))}
@@ -112,7 +113,7 @@ export default function AdminDataTable({
         ) : null}
       </div>
 
-      <div className="grid gap-4 lg:hidden">
+      <div className={`${tableOnMobile ? "hidden" : "grid"} gap-4 lg:hidden`}>
         {visibleRows.map((row, index) => (
           <motion.article
             key={`${row[keyField] || row.id || "row"}-${index}`}
