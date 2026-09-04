@@ -80,11 +80,13 @@ export default function LectureScheduleTable({ items = [], onRefresh }) {
   const finalStatuses = new Set(["cancelled", "verified_by_coordinator", "completed_by_teacher"]);
   const scheduleRows = expandLectureScheduleRows(items);
   const [editingItem, setEditingItem] = useState(null);
+  const [rescheduleTarget, setRescheduleTarget] = useState(null);
   const [cancelTarget, setCancelTarget] = useState(null);
   const [cancelError, setCancelError] = useState("");
   const [form, setForm] = useState(EMPTY_FORM);
   const [formError, setFormError] = useState("");
   const [saving, setSaving] = useState(false);
+  const [rescheduling, setRescheduling] = useState(false);
   const [canceling, setCanceling] = useState(false);
 
   async function patchSchedule(id, payload) {
@@ -133,6 +135,34 @@ export default function LectureScheduleTable({ items = [], onRefresh }) {
   function closeEdit() {
     if (saving) return;
     setEditingItem(null);
+    setForm(EMPTY_FORM);
+    setFormError("");
+  }
+
+  function openReschedule(item) {
+    const rawStart = String(item.scheduled_start || "").replace(" ", "T");
+    const rawEnd = String(item.scheduled_end || "").replace(" ", "T");
+    const startDate = item.start_date || (rawStart ? rawStart.split("T")[0] : "");
+    const endDate = item.end_date || (rawEnd ? rawEnd.split("T")[0] : startDate);
+    const startTime = item.start_time || (rawStart.includes("T") ? rawStart.split("T")[1]?.slice(0, 5) : "");
+    const endTime = item.end_time || (rawEnd.includes("T") ? rawEnd.split("T")[1]?.slice(0, 5) : "");
+
+    setRescheduleTarget(item);
+    setForm({
+      title: item.title || "",
+      description: item.description || "",
+      startDate: startDate || "",
+      endDate: endDate || startDate || "",
+      startTime: startTime || "",
+      endTime: endTime || "",
+      googleMeetLink: item.google_meet_link || "",
+    });
+    setFormError("");
+  }
+
+  function closeReschedule() {
+    if (rescheduling) return;
+    setRescheduleTarget(null);
     setForm(EMPTY_FORM);
     setFormError("");
   }
@@ -224,35 +254,68 @@ export default function LectureScheduleTable({ items = [], onRefresh }) {
     }
   }
 
-  function promptReschedule(item) {
-    const scheduledStart = window.prompt("New start (YYYY-MM-DDTHH:mm)", item.scheduled_start?.replace(" ", "T").slice(0, 16) || "");
-    const scheduledEnd = window.prompt("New end (YYYY-MM-DDTHH:mm)", item.scheduled_end?.replace(" ", "T").slice(0, 16) || "");
-    if (!scheduledStart || !scheduledEnd) return;
-    const googleMeetLink = window.prompt("New Google Meet Link (optional fallback)", item.google_meet_link || "") || "";
-    if (googleMeetLink.trim() && !googleMeetLink.trim().startsWith("https://meet.google.com/")) {
-      window.alert("Google Meet link must start with https://meet.google.com/.");
+  async function submitReschedule(event) {
+    event.preventDefault();
+    if (!rescheduleTarget) return;
+
+    if (!form.startDate || !form.endDate || !form.startTime || !form.endTime) {
+      setFormError("Start date, end date, start time, and end time are required.");
       return;
     }
-    const notes = window.prompt("Optional reason / notes", item.description || "") || "";
-    patchSchedule(item.id, { action: "reschedule", scheduledStart, scheduledEnd, googleMeetLink: googleMeetLink.trim(), description: notes }).catch((error) => window.alert(error.message));
+
+    const scheduledStart = `${form.startDate}T${form.startTime}:00`;
+    const scheduledEnd = `${form.endDate}T${form.endTime}:00`;
+    const scheduledStartDate = new Date(scheduledStart);
+    const scheduledEndDate = new Date(scheduledEnd);
+
+    if (
+      Number.isNaN(scheduledStartDate.getTime()) ||
+      Number.isNaN(scheduledEndDate.getTime()) ||
+      scheduledEndDate <= scheduledStartDate
+    ) {
+      setFormError("Lecture end time must be after the start time.");
+      return;
+    }
+
+    setRescheduling(true);
+    setFormError("");
+
+    try {
+      await patchSchedule(rescheduleTarget.id, {
+        action: "reschedule",
+        scheduledStart,
+        scheduledEnd,
+        googleMeetLink: form.googleMeetLink.trim(),
+        description: form.description.trim(),
+      });
+
+      setRescheduleTarget(null);
+      setForm(EMPTY_FORM);
+    } catch (error) {
+      setFormError(error instanceof Error ? error.message : "Unable to reschedule lecture.");
+    } finally {
+      setRescheduling(false);
+    }
   }
 
   return (
     <>
-      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="overflow-hidden rounded-[1.75rem] border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(250,247,240,0.98)_100%)] shadow-[0_20px_70px_-36px_rgba(6,63,50,0.18)] backdrop-blur-xl">
-        <div className="hidden grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)_minmax(96px,1fr)_minmax(96px,1fr)_minmax(92px,0.9fr)_minmax(92px,0.9fr)_minmax(70px,0.7fr)_minmax(0,1.1fr)_minmax(0,1.25fr)_220px] gap-3 border-b border-[#2D8A6A]/10 bg-[linear-gradient(180deg,#FAF7F0_0%,#F1EADC_100%)] px-5 py-4 text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48] lg:grid lg:items-center">
-          <span>Lecture</span>
-          <span>Subject</span>
-          <span className="whitespace-nowrap">Start date</span>
-          <span className="whitespace-nowrap">End date</span>
-          <span className="whitespace-nowrap">Start time</span>
-          <span className="whitespace-nowrap">End time</span>
-          <span>Days</span>
-          <span>Status</span>
-          <span>Class</span>
-          <span className="text-right">Actions</span>
-        </div>
-        <div className="divide-y divide-[#2D8A6A]/10">
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mt-2 overflow-hidden rounded-[1.75rem] border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(250,247,240,0.98)_100%)] shadow-[0_20px_70px_-36px_rgba(6,63,50,0.18)] backdrop-blur-xl">
+        <div className="overflow-x-auto pb-2">
+          <div className="min-w-[1840px] bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(250,247,240,0.98)_100%)]">
+            <div className="grid grid-cols-[minmax(210px,1.2fr)_minmax(150px,0.85fr)_minmax(140px,0.75fr)_minmax(140px,0.75fr)_minmax(130px,0.7fr)_minmax(130px,0.7fr)_minmax(100px,0.55fr)_minmax(190px,1fr)_minmax(180px,1fr)_260px] items-center gap-4 border-b border-[#2D8A6A]/10 bg-[linear-gradient(180deg,#FAF7F0_0%,#F1EADC_100%)] px-5 py-4 text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]">
+              <span className="whitespace-nowrap">Lecture</span>
+              <span className="whitespace-nowrap">Subject</span>
+              <span className="whitespace-nowrap">Start date</span>
+              <span className="whitespace-nowrap">End date</span>
+              <span className="whitespace-nowrap">Start time</span>
+              <span className="whitespace-nowrap">End time</span>
+              <span className="whitespace-nowrap">Days</span>
+              <span className="whitespace-nowrap">Status</span>
+              <span className="whitespace-nowrap">Class</span>
+              <span className="whitespace-nowrap text-left">Actions</span>
+            </div>
+            <div className="divide-y divide-[#2D8A6A]/10">
           {scheduleRows.length ? (
             scheduleRows.map((item) => {
               const statusKey = String(item.status || "").toLowerCase();
@@ -260,7 +323,7 @@ export default function LectureScheduleTable({ items = [], onRefresh }) {
               const primaryLink = getLecturePrimaryLink(item);
 
               return (
-                <div key={item.id} className="grid gap-3 px-5 py-4 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)_minmax(96px,1fr)_minmax(96px,1fr)_minmax(92px,0.9fr)_minmax(92px,0.9fr)_minmax(70px,0.7fr)_minmax(0,1.1fr)_minmax(0,1.25fr)_220px] lg:items-center">
+                <div key={item.id} className="grid grid-cols-[minmax(210px,1.2fr)_minmax(150px,0.85fr)_minmax(140px,0.75fr)_minmax(140px,0.75fr)_minmax(130px,0.7fr)_minmax(130px,0.7fr)_minmax(100px,0.55fr)_minmax(190px,1fr)_minmax(180px,1fr)_260px] items-center gap-4 px-5 py-4">
                   <div>
                     <p className="font-semibold text-[#063F32]">{item.title}</p>
                     <p className="mt-1 text-sm text-[#245C4F]">
@@ -277,7 +340,7 @@ export default function LectureScheduleTable({ items = [], onRefresh }) {
                   <div className="min-w-0 text-sm leading-6 text-[#245C4F] break-words">
                     <p>{item.course_title}</p>
                   </div>
-                  <div className="flex flex-wrap gap-2 lg:justify-end">
+                  <div className="flex min-w-max justify-start gap-2 whitespace-nowrap pr-3">
                     <button
                       type="button"
                       disabled={isFinal}
@@ -289,7 +352,7 @@ export default function LectureScheduleTable({ items = [], onRefresh }) {
                     <button
                       type="button"
                       disabled={isFinal}
-                      onClick={() => promptReschedule(item)}
+                      onClick={() => openReschedule(item)}
                       className="rounded-xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-3 py-2 text-xs font-semibold text-[#063F32] transition hover:bg-[#F1EADC] disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       Reschedule
@@ -309,6 +372,8 @@ export default function LectureScheduleTable({ items = [], onRefresh }) {
           ) : (
             <div className="px-5 py-10 text-sm text-[#245C4F]">No lecture schedules available.</div>
           )}
+            </div>
+          </div>
         </div>
       </motion.div>
 
@@ -469,6 +534,152 @@ export default function LectureScheduleTable({ items = [], onRefresh }) {
                     className="rounded-2xl bg-[#0D5C48] px-5 py-3 text-sm font-semibold text-[#FAF7F0] transition hover:bg-[#063F32] disabled:cursor-not-allowed disabled:opacity-70"
                   >
                     {saving ? "Saving..." : "Save Changes"}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </ClientPortal>
+      ) : null}
+
+      {rescheduleTarget ? (
+        <ClientPortal targetId="coordinator-page-portal-root">
+          <div className="absolute inset-x-0 top-0 z-[9999] isolate flex min-h-full items-center justify-center overflow-visible bg-[#063F32]/45 px-4 py-10 backdrop-blur-sm">
+            <div className="w-full max-w-3xl overflow-hidden rounded-[2rem] border border-[#2D8A6A]/20 bg-[#FAF7F0] shadow-[0_30px_90px_-40px_rgba(6,63,50,0.24)]">
+              <div className="border-b border-[#2D8A6A]/10 bg-[linear-gradient(135deg,#FAF7F0,#F1EADC)] px-6 py-5">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#C9A227]">
+                      Reschedule lecture
+                    </p>
+                    <h2 className="mt-2 text-2xl font-semibold text-[#063F32]">
+                      {rescheduleTarget.title || "Lecture schedule"}
+                    </h2>
+                    <p className="mt-2 text-sm leading-6 text-[#245C4F]">
+                      Update the lecture date, time, Meet link, and reschedule notes.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={closeReschedule}
+                    disabled={rescheduling}
+                    className="rounded-full border border-[#2D8A6A]/20 bg-white px-3 py-2 text-sm font-semibold text-[#063F32] transition hover:bg-[#F1EADC] disabled:opacity-50"
+                  >
+                    Close
+                  </button>
+                </div>
+              </div>
+
+              {formError ? (
+                <div className="mx-6 mt-5 rounded-[1.5rem] border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700 shadow-[0_14px_30px_-24px_rgba(225,29,72,0.25)]">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-rose-600">Reschedule blocked</p>
+                      <p className="mt-1 font-medium">{formError}</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setFormError("")}
+                      className="rounded-xl border border-rose-200 bg-white px-3 py-2 text-xs font-semibold text-rose-700 transition hover:bg-rose-100"
+                    >
+                      Close
+                    </button>
+                  </div>
+                </div>
+              ) : null}
+
+              <div className="mx-6 mt-5 grid grid-cols-2 gap-3 rounded-2xl border border-[#2D8A6A]/15 bg-white/70 p-4 text-xs sm:grid-cols-4">
+                <div>
+                  <span className="block font-medium text-[#2D8A6A]">Class</span>
+                  <span className="font-semibold text-[#063F32]">{rescheduleTarget.course_title || "N/A"}</span>
+                </div>
+                <div>
+                  <span className="block font-medium text-[#2D8A6A]">Subject</span>
+                  <span className="font-semibold text-[#063F32]">{rescheduleTarget.subject_name || "N/A"}</span>
+                </div>
+                <div>
+                  <span className="block font-medium text-[#2D8A6A]">Teacher</span>
+                  <span className="font-semibold text-[#063F32]">{rescheduleTarget.teacher_name || "N/A"}</span>
+                </div>
+                <div>
+                  <span className="block font-medium text-[#2D8A6A]">Current day</span>
+                  <span className="font-semibold text-[#063F32]">{getLectureDayLabel(rescheduleTarget)}</span>
+                </div>
+              </div>
+
+              <form onSubmit={submitReschedule} className="px-6 py-6">
+                <div className="grid gap-4 md:grid-cols-2">
+                  <label className="space-y-2">
+                    <span className="text-sm font-medium text-[#245C4F]">New Start Date</span>
+                    <input
+                      type="date"
+                      required
+                      value={form.startDate}
+                      onChange={(e) => setForm((current) => ({ ...current, startDate: e.target.value }))}
+                      className="w-full rounded-2xl border border-[#2D8A6A]/20 bg-white px-4 py-3 text-sm text-[#063F32] outline-none transition focus:border-[#2D8A6A] focus:ring-4 focus:ring-[#C9A227]/20"
+                    />
+                  </label>
+
+                  <label className="space-y-2">
+                    <span className="text-sm font-medium text-[#245C4F]">New End Date</span>
+                    <input
+                      type="date"
+                      required
+                      value={form.endDate}
+                      onChange={(e) => setForm((current) => ({ ...current, endDate: e.target.value }))}
+                      className="w-full rounded-2xl border border-[#2D8A6A]/20 bg-white px-4 py-3 text-sm text-[#063F32] outline-none transition focus:border-[#2D8A6A] focus:ring-4 focus:ring-[#C9A227]/20"
+                    />
+                  </label>
+
+                  <label className="space-y-2">
+                    <span className="text-sm font-medium text-[#245C4F]">New Start Time</span>
+                    <input
+                      type="time"
+                      required
+                      value={form.startTime}
+                      onChange={(e) => setForm((current) => ({ ...current, startTime: e.target.value }))}
+                      className="w-full rounded-2xl border border-[#2D8A6A]/20 bg-white px-4 py-3 text-sm text-[#063F32] outline-none transition focus:border-[#2D8A6A] focus:ring-4 focus:ring-[#C9A227]/20"
+                    />
+                  </label>
+
+                  <label className="space-y-2">
+                    <span className="text-sm font-medium text-[#245C4F]">New End Time</span>
+                    <input
+                      type="time"
+                      required
+                      value={form.endTime}
+                      onChange={(e) => setForm((current) => ({ ...current, endTime: e.target.value }))}
+                      className="w-full rounded-2xl border border-[#2D8A6A]/20 bg-white px-4 py-3 text-sm text-[#063F32] outline-none transition focus:border-[#2D8A6A] focus:ring-4 focus:ring-[#C9A227]/20"
+                    />
+                  </label>
+
+                  <label className="space-y-2 md:col-span-2">
+                    <span className="text-sm font-medium text-[#245C4F]">Reason / Notes</span>
+                    <textarea
+                      rows={3}
+                      value={form.description}
+                      onChange={(e) => setForm((current) => ({ ...current, description: e.target.value }))}
+                      placeholder="Add reschedule reason or notes..."
+                      className="w-full rounded-2xl border border-[#2D8A6A]/20 bg-white px-4 py-3 text-sm text-[#063F32] outline-none transition focus:border-[#2D8A6A] focus:ring-4 focus:ring-[#C9A227]/20"
+                    />
+                  </label>
+                </div>
+
+                <div className="mt-6 flex flex-wrap justify-end gap-3 border-t border-[#2D8A6A]/10 pt-5">
+                  <button
+                    type="button"
+                    onClick={closeReschedule}
+                    disabled={rescheduling}
+                    className="rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-5 py-3 text-sm font-semibold text-[#063F32] transition hover:bg-[#F1EADC] disabled:opacity-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={rescheduling}
+                    className="rounded-2xl bg-[#0D5C48] px-5 py-3 text-sm font-semibold text-[#FAF7F0] transition hover:bg-[#063F32] disabled:cursor-not-allowed disabled:opacity-70"
+                  >
+                    {rescheduling ? "Rescheduling..." : "Save Reschedule"}
                   </button>
                 </div>
               </form>

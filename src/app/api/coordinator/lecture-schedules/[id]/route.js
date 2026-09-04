@@ -303,56 +303,20 @@ export async function PATCH(request, context) {
       }
     }
 
-    const [newLecture] = await prisma.$transaction(async (tx) => {
+    const [rescheduledLecture] = await prisma.$transaction(async (tx) => {
       await tx.$executeRaw`
         UPDATE lecture_schedules
-        SET status = 'rescheduled'::lecture_status,
+        SET title = ${title || lecture.title},
+            description = ${description || lecture.description || null},
+            scheduled_start = ${scheduledStart}::timestamp,
+            scheduled_end = ${scheduledEnd}::timestamp,
+            google_calendar_event_id = ${calendarData.eventId || lecture.google_calendar_event_id || null},
+            google_meet_link = ${resolvedMeetLink || null},
+            meet_link_source = ${resolvedMeetSource},
+            google_meet_space_id = ${calendarData.meetSpaceId || null},
+            status = 'scheduled'::lecture_status,
             updated_at = NOW()
         WHERE id = ${id}::uuid
-      `;
-
-      const rows = await tx.$queryRaw`
-        INSERT INTO lecture_schedules (
-          id,
-          enrollment_id,
-          student_id,
-          teacher_id,
-          subject_id,
-          scheduled_by,
-          title,
-          description,
-          scheduled_start,
-          scheduled_end,
-          google_calendar_event_id,
-          google_meet_link,
-          meet_link_source,
-          google_meet_space_id,
-          status,
-          rescheduled_from_id,
-          created_at,
-          updated_at
-        )
-        VALUES (
-          ${crypto.randomUUID()}::uuid,
-          ${lecture.enrollment_id}::uuid,
-          ${lecture.student_id}::uuid,
-          ${lecture.teacher_id}::uuid,
-          ${lecture.subject_id}::uuid,
-          ${session.user.id}::uuid,
-          ${title || lecture.title},
-          ${description || lecture.description || null},
-          ${scheduledStart}::timestamp,
-          ${scheduledEnd}::timestamp,
-          ${calendarData.eventId || null},
-          ${resolvedMeetLink || null},
-          ${resolvedMeetSource},
-          ${calendarData.meetSpaceId || null},
-          'scheduled'::lecture_status,
-          ${id}::uuid,
-          NOW(),
-          NOW()
-        )
-        RETURNING id::text AS id
       `;
 
       await createNotifications(
@@ -367,9 +331,13 @@ export async function PATCH(request, context) {
           actorUserId: session.user.id,
           action: "lecture_rescheduled",
           entityType: "lecture_schedules",
-          entityId: rows[0].id,
-          oldData: { previousLectureId: id, status: lecture.status },
-          newData: { rescheduledFromId: id, scheduledStart, scheduledEnd },
+          entityId: id,
+          oldData: {
+            status: lecture.status,
+            scheduledStart: lecture.scheduled_start,
+            scheduledEnd: lecture.scheduled_end,
+          },
+          newData: { status: "scheduled", scheduledStart, scheduledEnd },
         },
         tx
       );
@@ -392,11 +360,11 @@ export async function PATCH(request, context) {
           ls.google_meet_space_id,
           ls.rescheduled_from_id::text AS rescheduled_from_id
         FROM lecture_schedules ls
-        WHERE ls.id = ${rows[0].id}::uuid
+        WHERE ls.id = ${id}::uuid
       `;
     });
 
-    return json("Lecture rescheduled.", 200, { item: newLecture });
+    return json("Lecture rescheduled.", 200, { item: rescheduledLecture });
   } catch (error) {
     const guard = roleGuardResponse(error);
     if (guard) {
