@@ -42,11 +42,12 @@ export async function POST(request) {
     const schoolName = cleanText(body?.schoolName);
     const className = cleanText(body?.className);
     const notes = cleanText(body?.notes);
+    const customFieldValues = body?.customFieldValues && typeof body.customFieldValues === "object" && !Array.isArray(body.customFieldValues)
+      ? body.customFieldValues
+      : {};
     const displayName = deriveDisplayName(eventCategory, studentName, parentName, studentNames);
 
     if (!eventId) return json("Event id is required.", 400);
-    if (!email || !email.includes("@")) return json("A valid email is required.", 400);
-    if (!whatsapp) return json("WhatsApp number is required.", 400);
 
     const [event] = await prisma.$queryRaw`
       SELECT
@@ -58,6 +59,7 @@ export async function POST(request) {
         pe.event_fee_amount::float8 AS event_fee_amount,
         pe.registration_deadline,
         pe.event_category,
+        COALESCE(pe.registration_form_schema, '[]'::jsonb) AS registration_form_schema,
         LOWER(pe.publication_status::text) AS publication_status,
         pe.created_by::text AS created_by,
         creator.full_name AS coordinator_name,
@@ -86,40 +88,67 @@ export async function POST(request) {
     }
 
     const category = String(eventCategory || event.event_category || "").toLowerCase().trim();
-    if ((category === "alh-students" || category === "general-students") && !studentName) {
+    let formSchema = Array.isArray(event.registration_form_schema) ? event.registration_form_schema : [];
+    if (typeof event.registration_form_schema === "string") {
+      try {
+        const parsedSchema = JSON.parse(event.registration_form_schema);
+        formSchema = Array.isArray(parsedSchema) ? parsedSchema : [];
+      } catch {
+        formSchema = [];
+      }
+    }
+    const configuredEmailField = formSchema.find((field) => String(field.id || "").toLowerCase() === "email" || String(field.label || "").trim().toLowerCase() === "email");
+    const effectiveEmail = email || (configuredEmailField ? cleanText(customFieldValues[configuredEmailField.id]).toLowerCase() : "");
+    const usesConfiguredForm = formSchema.length > 0;
+    const requiresField = (id) => !usesConfiguredForm || formSchema.some((field) => field.id === id && field.enabled !== false && field.required);
+    if (requiresField("email") && (!email || !email.includes("@"))) return json("A valid email is required.", 400);
+    if (requiresField("whatsapp") && !whatsapp) return json("WhatsApp number is required.", 400);
+    for (const field of formSchema) {
+      if (field.enabled === false || !field.required) continue;
+      const fieldValue = field.id === "studentNames"
+        ? studentNames.filter(Boolean).join(", ")
+        : customFieldValues[field.id];
+      if (!cleanText(fieldValue)) return json(`${field.label || "This field"} is required.`, 400);
+    }
+    if (!usesConfiguredForm && (category === "alh-students" || category === "general-students") && !studentName) {
       return json("Student name is required for this event category.", 400);
     }
-    if (category === "general-students") {
+    if (!usesConfiguredForm && category === "general-students") {
       if (!schoolName) return json("School name is required for this event category.", 400);
       if (!className) return json("Class is required for this event category.", 400);
     }
-    if (category === "alh-parents") {
+    if (!usesConfiguredForm && category === "alh-parents") {
       if (!parentName) return json("Parent name is required for this event category.", 400);
       if (!studentNames.length) return json("At least one student name is required for this event category.", 400);
     }
-    if (category === "general-parents" && !parentName) {
+    if (!usesConfiguredForm && category === "general-parents" && !parentName) {
       return json("Parent name is required for this event category.", 400);
     }
 
-    const [duplicate] = await prisma.$queryRaw`
-      SELECT id::text AS id
-      FROM public_event_registrations
-      WHERE event_id = ${eventId}::uuid
-        AND LOWER(COALESCE(status::text, 'pending')) <> 'cancelled'
-        AND LOWER(COALESCE(email, '')) = ${email}
-      LIMIT 1
-    `;
+    const [duplicate] = effectiveEmail
+      ? await prisma.$queryRaw`
+        SELECT id::text AS id
+        FROM public_event_registrations
+        WHERE event_id = ${eventId}::uuid
+          AND LOWER(COALESCE(status::text, 'pending')) <> 'cancelled'
+          AND (
+            LOWER(TRIM(COALESCE(email, ''))) = ${effectiveEmail.trim()}
+            OR LOWER(TRIM(COALESCE(custom_field_values->>'email', ''))) = ${effectiveEmail.trim()}
+          )
+        LIMIT 1
+      `
+      : [null];
 
     if (duplicate?.id) {
       return json("A registration already exists for this event with the same email address.", 400);
     }
 
-    const [existingUser] = await prisma.$queryRaw`
+    const [existingUser] = effectiveEmail ? await prisma.$queryRaw`
       SELECT id::text AS id
       FROM users
-      WHERE LOWER(COALESCE(email, '')) = ${email}
+      WHERE LOWER(TRIM(COALESCE(email, ''))) = ${effectiveEmail.trim()}
       LIMIT 1
-    `;
+    ` : [null];
 
     const isFreeRegistration = Boolean(existingUser?.id);
     const registrationAmount = isFreeRegistration ? 0 : Number(event.event_fee_amount || 0);
@@ -139,6 +168,7 @@ export async function POST(request) {
         email,
         whatsapp,
         notes,
+        custom_field_values,
         amount_due,
         status,
         submitted_at,
@@ -154,9 +184,10 @@ export async function POST(request) {
         ${parentName || null},
         ${schoolName || null},
         ${className || null},
-        ${email},
+        ${effectiveEmail},
         ${whatsappCountryCode && whatsapp ? `${whatsappCountryCode} ${whatsapp}` : whatsapp},
         ${notes || null},
+        ${JSON.stringify(customFieldValues)}::jsonb,
         ${registrationAmount},
         ${registrationStatus},
         NOW(),

@@ -16,6 +16,7 @@ const INITIAL_CREATE_FORM = {
   schoolName: "",
   className: "",
   notes: "",
+  customFieldValues: {},
 };
 
 const INITIAL_EDIT_FORM = {
@@ -30,6 +31,7 @@ const INITIAL_EDIT_FORM = {
   notes: "",
   amountDue: "",
   status: "pending",
+  customFieldValues: {},
 };
 
 function isValidName(value) {
@@ -38,6 +40,117 @@ function isValidName(value) {
 
 function normalizePhoneDigits(value) {
   return String(value || "").replace(/\D/g, "");
+}
+
+function normalizeWhatsappValue(value, countryCode) {
+  let digits = normalizePhoneDigits(value);
+  const countryDigits = normalizePhoneDigits(countryCode);
+  if (countryDigits && digits.startsWith(countryDigits)) digits = digits.slice(countryDigits.length);
+  if (digits.startsWith("0")) digits = digits.slice(1);
+  return digits;
+}
+
+function sanitizeNumberInput(value) {
+  const cleaned = String(value || "").replace(/[^0-9.-]/g, "");
+  const sign = cleaned.startsWith("-") ? "-" : "";
+  const unsigned = cleaned.replace(/-/g, "");
+  const [whole, ...decimals] = unsigned.split(".");
+  return `${sign}${whole}${decimals.length ? `.${decimals.join("")}` : ""}`;
+}
+
+function getRegistrationFormFields(event) {
+  const raw = event?.registration_form_schema;
+  const normalize = (fields) => fields.map((field) => {
+    const rawType = String(field.type || "text").toLowerCase();
+    return { ...field, type: { int: "number", integer: "number", float: "number", phone: "tel", long_text: "textarea", multiple_student_names: "repeatable-text" }[rawType] || rawType };
+  });
+  if (Array.isArray(raw)) return normalize(raw);
+  if (typeof raw !== "string") return [];
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? normalize(parsed) : [];
+  } catch {
+    return [];
+  }
+}
+
+function parseCustomFieldValues(values) {
+  let parsed = values;
+  if (typeof parsed === "string") {
+    try {
+      parsed = JSON.parse(parsed);
+    } catch {
+      parsed = {};
+    }
+  }
+  if (Array.isArray(parsed)) {
+    return parsed.reduce((acc, item) => {
+      const fieldId = String(item?.fieldId || item?.id || "").trim();
+      if (fieldId) acc[fieldId] = item?.value ?? "";
+      return acc;
+    }, {});
+  }
+  return parsed && typeof parsed === "object" ? parsed : {};
+}
+
+function isBuiltInRegistrationField(id) {
+  return ["email", "whatsapp", "studentName", "studentNames", "parentName", "schoolName", "className", "notes"].includes(String(id || ""));
+}
+
+function getCustomFieldValue(item, fieldId) {
+  const values = parseCustomFieldValues(item?.custom_field_values);
+  const fallbackValues = {
+    email: item?.email,
+    whatsapp: item?.whatsapp,
+    studentName: Array.isArray(item?.student_names) && item.student_names.length > 0 ? item.student_names.join(", ") : item?.student_name,
+    studentNames: Array.isArray(item?.student_names) ? item.student_names : item?.student_name,
+    parentName: item?.parent_name,
+    schoolName: item?.school_name,
+    className: item?.class_input,
+    notes: item?.notes,
+  };
+  let value = values && typeof values === "object" && values[fieldId] !== undefined
+    ? values[fieldId]
+    : fallbackValues[fieldId];
+  if (fieldId === "whatsapp" && value) {
+    const phone = String(value).trim();
+    value = phone.startsWith("+") ? phone : `+92 ${phone}`;
+  }
+  if ((fieldId === "studentNames" || fieldId === "studentName") && typeof value === "string") {
+    value = value.split(/\r?\n|,/).map((name) => name.trim()).filter(Boolean).join(", ");
+  }
+  if (Array.isArray(value)) return value.filter(Boolean).join(", ") || "-";
+  return value === null || value === undefined || String(value).trim() === "" ? "-" : String(value);
+}
+
+function getEditableStudentNames(value) {
+  const names = String(value || "").split(/\r?\n|,/).map((name) => name.trim());
+  return names.length ? names : [""];
+}
+
+function getRegistrationItemFallbacks(item) {
+  return {
+    email: item?.email || "",
+    whatsapp: item?.whatsapp || "",
+    studentName: item?.student_name || "",
+    studentNames: Array.isArray(item?.student_names)
+      ? item.student_names.join("\n")
+      : String(item?.student_name || "").split(",").map((name) => name.trim()).filter(Boolean).join("\n"),
+    parentName: item?.parent_name || "",
+    schoolName: item?.school_name || "",
+    className: item?.class_input || "",
+    notes: item?.notes || "",
+  };
+}
+
+function uniqueById(records) {
+  const seen = new Set();
+  return (Array.isArray(records) ? records : []).filter((record) => {
+    const id = String(record?.id || "").trim();
+    if (!id || seen.has(id)) return false;
+    seen.add(id);
+    return true;
+  });
 }
 
 const COUNTRY_PHONE_DIGIT_LIMITS = {
@@ -319,10 +432,6 @@ function matchesSearch(item, query) {
     .some((entry) => entry.includes(value));
 }
 
-function hasTextValue(value) {
-  return Boolean(String(value || "").trim());
-}
-
 function truncateSelectLabel(value, limit = 42) {
   const text = String(value || "").trim();
   if (text.length <= limit) return text;
@@ -389,8 +498,8 @@ export default function PublicEventRegistrationsPage({ portalLabel = "Coordinato
       const response = await fetch("/api/coordinator/public-event-registrations", { cache: "no-store" });
       const data = await response.json();
       if (!response.ok) throw new Error(data?.message || "Unable to load event registrations.");
-      setItems(Array.isArray(data.items) ? data.items : []);
-      setEvents(Array.isArray(data.events) ? data.events : []);
+      setItems(uniqueById(data.items));
+      setEvents(uniqueById(data.events));
     } catch (error) {
       setTone("error");
       setMessage(error instanceof Error ? error.message : "Unable to load event registrations.");
@@ -407,8 +516,8 @@ export default function PublicEventRegistrationsPage({ portalLabel = "Coordinato
         const data = await response.json();
         if (!active) return;
         if (!response.ok) throw new Error(data?.message || "Unable to load event registrations.");
-        setItems(Array.isArray(data.items) ? data.items : []);
-        setEvents(Array.isArray(data.events) ? data.events : []);
+        setItems(uniqueById(data.items));
+        setEvents(uniqueById(data.events));
       } catch (error) {
         if (!active) return;
         setTone("error");
@@ -500,7 +609,23 @@ export default function PublicEventRegistrationsPage({ portalLabel = "Coordinato
   }, [events]);
 
   const selectedCreateEvent = useMemo(() => getSelectedEvent(events, createForm.eventId), [createForm.eventId, events]);
+  const selectedEditEvent = useMemo(() => getSelectedEvent(events, editForm.eventId), [editForm.eventId, events]);
+  const selectedDetailEvent = useMemo(() => getSelectedEvent(events, selected?.event_id), [events, selected?.event_id]);
+  const selectedDetailFields = useMemo(
+    () => getRegistrationFormFields(selectedDetailEvent).filter((field) => field.enabled !== false),
+    [selectedDetailEvent]
+  );
+  const editCustomFields = useMemo(
+    () => getRegistrationFormFields(selectedEditEvent).filter((field) => field.enabled !== false),
+    [selectedEditEvent]
+  );
+  const editHasConfiguredFields = editCustomFields.length > 0;
+  const selectedDetailVisibleFields = useMemo(
+    () => selectedDetailFields.filter((field) => getCustomFieldValue(selected, field.id) !== "-"),
+    [selected, selectedDetailFields]
+  );
   const selectedCreateEventCategory = normalizeEventCategory(selectedCreateEvent?.event_category || createForm.eventCategory || "");
+  const hasBuilderFields = getRegistrationFormFields(selectedCreateEvent).length > 0;
   const createFormLocked = createForm.eventId ? !isEventRegistrationOpen(selectedCreateEvent) : false;
   const selectedWhatsappDigitsRequired = getCountryDialLength(createForm.whatsappCountryCode);
   const whatsappDigitsEntered = normalizePhoneDigits(createForm.whatsapp).length;
@@ -535,31 +660,33 @@ export default function PublicEventRegistrationsPage({ portalLabel = "Coordinato
     () => summaryItems.reduce((sum, item) => (normalizeRegistrationStatus(item.status) === "verified" ? sum + Number(item.amount_due || 0) : sum), 0),
     [summaryItems]
   );
-  const showStudentNameColumn = filteredItems.some((item) =>
-    (Array.isArray(item.student_names) && item.student_names.some((name) => hasTextValue(name))) ||
-    hasTextValue(item.student_name)
-  );
-  const showParentNameColumn = filteredItems.some((item) => hasTextValue(item.parent_name));
-  const showSchoolNameColumn = filteredItems.some((item) => hasTextValue(item.school_name));
-  const showClassNameColumn = filteredItems.some((item) => hasTextValue(item.class_input));
+  const customRegistrationColumns = useMemo(() => {
+    const sourceEvents = filters.eventId === "all"
+      ? events
+      : events.filter((event) => event.id === filters.eventId);
+    const columns = [];
+    const seen = new Set();
+    sourceEvents.forEach((event) => {
+      getRegistrationFormFields(event).forEach((field) => {
+        const id = String(field.id || "").trim();
+        if (!id || seen.has(id)) return;
+        seen.add(id);
+        columns.push({ id, label: String(field.label || id) });
+      });
+    });
+    return columns;
+  }, [events, filters.eventId]);
   const tableColumnCount =
-    8 +
-    Number(showStudentNameColumn) +
-    Number(showParentNameColumn) +
-    Number(showSchoolNameColumn) +
-    Number(showClassNameColumn) +
+    6 +
+    customRegistrationColumns.length +
     Number(showReceivedAmountColumn);
   const registrationTableColumnWidths = useMemo(() => {
     const widths = [190, 280, 160];
-    if (showStudentNameColumn) widths.push(220);
-    if (showParentNameColumn) widths.push(200);
-    if (showSchoolNameColumn) widths.push(200);
-    if (showClassNameColumn) widths.push(170);
-    widths.push(280, 210);
+    customRegistrationColumns.forEach(() => widths.push(220));
     if (showReceivedAmountColumn) widths.push(300);
     widths.push(150, 250, 430);
     return widths;
-  }, [showClassNameColumn, showParentNameColumn, showReceivedAmountColumn, showSchoolNameColumn, showStudentNameColumn]);
+  }, [customRegistrationColumns, showReceivedAmountColumn]);
   const registrationTableWidth = useMemo(
     () => registrationTableColumnWidths.reduce((sum, width) => sum + width, 0),
     [registrationTableColumnWidths]
@@ -663,22 +790,35 @@ export default function PublicEventRegistrationsPage({ portalLabel = "Coordinato
   }
 
   function openEditModal(item) {
+    const parsedCustomFieldValues = parseCustomFieldValues(item.custom_field_values);
+    const fallbackValues = getRegistrationItemFallbacks(item);
+    const configuredFields = getRegistrationFormFields(getSelectedEvent(events, item.event_id)).filter((field) => field.enabled !== false);
+    const hydratedCustomFieldValues = configuredFields.reduce((acc, field) => {
+      const fieldId = String(field.id || "").trim();
+      if (!fieldId) return acc;
+      const savedValue = parsedCustomFieldValues[fieldId];
+      acc[fieldId] = savedValue !== undefined ? savedValue : fallbackValues[fieldId] ?? "";
+      return acc;
+    }, { ...parsedCustomFieldValues });
+    const studentNamesValue = hydratedCustomFieldValues.studentNames ?? fallbackValues.studentNames;
+
     setEditingItem(item);
     setEditErrors({});
     setEditSubmitting(false);
     setEditEventOpen(false);
     setEditForm({
       eventId: item.event_id || "",
-      email: item.email || "",
-      whatsapp: item.whatsapp || "",
-      studentName: item.student_name || "",
-      studentNamesText: Array.isArray(item.student_names) ? item.student_names.join("\n") : "",
-      parentName: item.parent_name || "",
-      schoolName: item.school_name || "",
-      className: item.class_input || "",
-      notes: item.notes || "",
+      email: hydratedCustomFieldValues.email ?? fallbackValues.email,
+      whatsapp: hydratedCustomFieldValues.whatsapp ?? fallbackValues.whatsapp,
+      studentName: hydratedCustomFieldValues.studentName ?? fallbackValues.studentName,
+      studentNamesText: Array.isArray(studentNamesValue) ? studentNamesValue.join("\n") : String(studentNamesValue || ""),
+      parentName: hydratedCustomFieldValues.parentName ?? fallbackValues.parentName,
+      schoolName: hydratedCustomFieldValues.schoolName ?? fallbackValues.schoolName,
+      className: hydratedCustomFieldValues.className ?? fallbackValues.className,
+      notes: hydratedCustomFieldValues.notes ?? fallbackValues.notes,
       amountDue: String(Number(item.amount_due || 0)),
       status: normalizeRegistrationStatus(item.status),
+      customFieldValues: hydratedCustomFieldValues,
     });
     setEditModalOpen(true);
   }
@@ -691,19 +831,37 @@ export default function PublicEventRegistrationsPage({ portalLabel = "Coordinato
     setEditSubmitting(false);
   }
 
+  function updateEditField(fieldId, value) {
+    setEditForm((current) => ({
+      ...current,
+      ...(fieldId === "studentNames" ? { studentNamesText: value } : { [fieldId]: value }),
+      customFieldValues: { ...current.customFieldValues, [fieldId]: value },
+    }));
+  }
+
   function validateEditForm() {
     const nextErrors = {};
     const emailValue = String(editForm.email || "").trim().toLowerCase();
     const whatsappValue = String(editForm.whatsapp || "").trim();
     const amountValue = Number(editForm.amountDue || 0);
+    const configuredFields = getRegistrationFormFields(selectedEditEvent).filter((field) => field.enabled !== false);
+    const hasConfiguredForm = configuredFields.length > 0;
 
     if (!editForm.eventId) nextErrors.eventId = "Please select an event.";
-    if (!emailValue) {
+    if (hasConfiguredForm) {
+      configuredFields.filter((field) => field.required).forEach((field) => {
+        const value = field.id === "studentNames"
+          ? String(editForm.studentNamesText || "").trim()
+          : String(editForm[field.id] ?? editForm.customFieldValues?.[field.id] ?? "").trim();
+        if (!value) nextErrors[field.id] = `${field.label || "This field"} is required.`;
+      });
+    }
+    if (!hasConfiguredForm && !emailValue) {
       nextErrors.email = "Email is required.";
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailValue)) {
+    } else if (emailValue && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailValue)) {
       nextErrors.email = "Please enter a valid email address.";
     }
-    if (!whatsappValue) nextErrors.whatsapp = "WhatsApp number is required.";
+    if (!hasConfiguredForm && !whatsappValue) nextErrors.whatsapp = "WhatsApp number is required.";
     if (!Number.isFinite(amountValue) || amountValue < 0) nextErrors.amountDue = "Please enter a valid amount.";
 
     return nextErrors;
@@ -742,6 +900,7 @@ export default function PublicEventRegistrationsPage({ portalLabel = "Coordinato
           schoolName: String(editForm.schoolName || "").trim(),
           className: String(editForm.className || "").trim(),
           notes: String(editForm.notes || "").trim(),
+          customFieldValues: editForm.customFieldValues || {},
           amountDue: Number(editForm.amountDue || 0),
           status: editForm.status,
         }),
@@ -754,6 +913,7 @@ export default function PublicEventRegistrationsPage({ portalLabel = "Coordinato
       closeEditModal();
       await load();
     } catch (error) {
+      setEditErrors((current) => ({ ...current, form: error instanceof Error ? error.message : "Unable to update registration record." }));
       setTone("error");
       setMessage(error instanceof Error ? error.message : "Unable to update registration record.");
     } finally {
@@ -764,40 +924,51 @@ export default function PublicEventRegistrationsPage({ portalLabel = "Coordinato
   function validateCreateForm() {
     const nextErrors = {};
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    const whatsappDigits = normalizePhoneDigits(createForm.whatsapp);
+    const whatsappDigits = normalizeWhatsappValue(createForm.whatsapp, createForm.whatsappCountryCode);
     const category = String(selectedCreateEventCategory || "").trim();
     const emailValue = String(createForm.email || "").trim().toLowerCase();
     const studentNameValue = String(createForm.studentName || "").trim();
     const parentNameValue = String(createForm.parentName || "").trim();
     const schoolNameValue = String(createForm.schoolName || "").trim();
     const classValue = String(createForm.className || "").trim();
-    const studentNames = Array.isArray(createForm.studentNames) ? createForm.studentNames.map((item) => String(item || "").trim()).filter(Boolean) : [];
+  const studentNames = Array.isArray(createForm.studentNames) ? createForm.studentNames.map((item) => String(item || "").trim()).filter(Boolean) : [];
+    const hasConfiguredForm = getRegistrationFormFields(selectedCreateEvent).length > 0;
+    if (hasConfiguredForm) {
+      getRegistrationFormFields(selectedCreateEvent).filter((field) => field.enabled !== false && field.required).forEach((field) => {
+        const value = field.id === "studentNames"
+          ? studentNames.join(", ")
+          : String(createForm[field.id] || createForm.customFieldValues?.[field.id] || "").trim();
+        if (!value) nextErrors[field.id] = `${field.label || "This field"} is required.`;
+      });
+    }
 
     if (!createForm.eventId) {
       nextErrors.eventId = "Please select an event.";
     }
-    if (!emailValue) {
+    const configuredFields = getRegistrationFormFields(selectedCreateEvent).filter((field) => field.enabled !== false);
+    const requiresField = (id) => !hasConfiguredForm || configuredFields.some((field) => field.id === id && field.required);
+    if (requiresField("email") && !emailValue) {
       nextErrors.email = "Email is required.";
-    } else if (!emailRegex.test(emailValue)) {
+    } else if (emailValue && !emailRegex.test(emailValue)) {
       nextErrors.email = "Please enter a valid email address.";
     }
-    if (!whatsappDigits) {
+    if (requiresField("whatsapp") && !whatsappDigits) {
       nextErrors.whatsapp = "WhatsApp number is required.";
-    } else if (whatsappDigits.length !== selectedWhatsappDigitsRequired) {
+    } else if (whatsappDigits && whatsappDigits.length !== selectedWhatsappDigitsRequired) {
       nextErrors.whatsapp = "Please enter a valid WhatsApp number.";
     }
-    if ((category === "alh-students" || category === "general-students") && !studentNameValue) {
+    if (!hasConfiguredForm && (category === "alh-students" || category === "general-students") && !studentNameValue) {
       nextErrors.studentName = "Student name is required.";
     }
-    if (category === "general-students") {
+    if (!hasConfiguredForm && category === "general-students") {
       if (!schoolNameValue) nextErrors.schoolName = "School name is required.";
       if (!classValue) nextErrors.className = "Class is required.";
     }
-    if (category === "alh-parents") {
+    if (!hasConfiguredForm && category === "alh-parents") {
       if (studentNames.length === 0) nextErrors.studentNames = "At least one student name is required.";
       if (!parentNameValue) nextErrors.parentName = "Parent name is required.";
     }
-    if (category === "general-parents" && !parentNameValue) {
+    if (!hasConfiguredForm && category === "general-parents" && !parentNameValue) {
       nextErrors.parentName = "Parent name is required.";
     }
 
@@ -811,6 +982,7 @@ export default function PublicEventRegistrationsPage({ portalLabel = "Coordinato
     const nextErrors = validateCreateForm();
     if (Object.keys(nextErrors).length > 0) {
       setCreateErrors(nextErrors);
+      setCreateSubmitError("");
       return;
     }
 
@@ -827,13 +999,14 @@ export default function PublicEventRegistrationsPage({ portalLabel = "Coordinato
         eventCategory: selectedCreateEventCategory,
         email: String(createForm.email || "").trim(),
         whatsappCountryCode: String(createForm.whatsappCountryCode || "").trim(),
-        whatsapp: normalizePhoneDigits(createForm.whatsapp),
+        whatsapp: normalizeWhatsappValue(createForm.whatsapp, createForm.whatsappCountryCode),
         studentName: String(createForm.studentName || "").trim(),
         studentNames: Array.isArray(createForm.studentNames) ? createForm.studentNames.map((item) => String(item || "").trim()).filter(Boolean) : [],
         parentName: String(createForm.parentName || "").trim(),
         schoolName: String(createForm.schoolName || "").trim(),
         className: String(createForm.className || "").trim(),
         notes: String(createForm.notes || "").trim(),
+        customFieldValues: createForm.customFieldValues || {},
       }),
     });
       const data = await response.json().catch(() => ({}));
@@ -977,12 +1150,7 @@ export default function PublicEventRegistrationsPage({ portalLabel = "Coordinato
                   <th className="overflow-hidden whitespace-nowrap px-6 py-4">Registration No</th>
                   <th className="overflow-hidden whitespace-nowrap px-6 py-4">Event</th>
                   <th className="overflow-hidden whitespace-nowrap px-6 py-4">Event Date</th>
-                  {showStudentNameColumn ? <th className="overflow-hidden whitespace-nowrap px-6 py-4">Student Name</th> : null}
-                  {showParentNameColumn ? <th className="overflow-hidden whitespace-nowrap px-6 py-4">Parent Name</th> : null}
-                  {showSchoolNameColumn ? <th className="overflow-hidden whitespace-nowrap px-6 py-4">School Name</th> : null}
-                  {showClassNameColumn ? <th className="overflow-hidden whitespace-nowrap px-6 py-4">Class Name</th> : null}
-                  <th className="overflow-hidden whitespace-nowrap px-6 py-4">Email</th>
-                  <th className="overflow-hidden whitespace-nowrap px-6 py-4">WhatsApp</th>
+                  {customRegistrationColumns.map((field) => <th key={field.id} className="overflow-hidden whitespace-nowrap px-6 py-4" title={field.label}>{field.label}</th>)}
                   {showReceivedAmountColumn ? <th className="overflow-hidden whitespace-nowrap px-6 py-4">Received Amount</th> : null}
                   <th className="overflow-hidden whitespace-nowrap px-6 py-4">Status</th>
                   <th className="overflow-hidden whitespace-nowrap px-6 py-4">Submitted</th>
@@ -995,20 +1163,10 @@ export default function PublicEventRegistrationsPage({ portalLabel = "Coordinato
                     <td className="overflow-hidden whitespace-nowrap px-6 py-4 font-semibold text-[#063F32]">{item.registration_no}</td>
                     <td className="whitespace-normal break-words px-6 py-4 font-medium leading-6 text-[#063F32]"><span className="block" title={item.event_name || ""}>{item.event_name}</span></td>
                     <td className="overflow-hidden whitespace-nowrap px-6 py-4 text-[#245C4F]">{formatEventDate(item.event_start_at)}</td>
-                    {showStudentNameColumn ? (
-                      <td className="whitespace-normal break-words px-6 py-4 text-[#245C4F]">
-                        <span className="block" title={Array.isArray(item.student_names) && item.student_names.length > 0 ? item.student_names.join(", ") : item.student_name || "-"}>
-                          {Array.isArray(item.student_names) && item.student_names.length > 0
-                            ? item.student_names.join(", ")
-                            : item.student_name || "-"}
-                        </span>
-                      </td>
-                    ) : null}
-                    {showParentNameColumn ? <td className="whitespace-normal break-words px-6 py-4 text-[#245C4F]"><span className="block" title={item.parent_name || "-"}>{item.parent_name || "-"}</span></td> : null}
-                    {showSchoolNameColumn ? <td className="whitespace-normal break-words px-6 py-4 text-[#245C4F]"><span className="block" title={item.school_name || "-"}>{item.school_name || "-"}</span></td> : null}
-                    {showClassNameColumn ? <td className="whitespace-normal break-words px-6 py-4 text-[#245C4F]"><span className="block" title={item.class_input || "-"}>{item.class_input || "-"}</span></td> : null}
-                    <td className="whitespace-normal break-all px-6 py-4 text-[#245C4F]"><span className="block" title={item.email || "-"}>{item.email || "-"}</span></td>
-                    <td className="whitespace-normal break-words px-6 py-4 text-[#245C4F]"><span className="block" title={item.whatsapp || "-"}>{item.whatsapp || "-"}</span></td>
+                    {customRegistrationColumns.map((field) => {
+                      const value = getCustomFieldValue(item, field.id);
+                      return <td key={field.id} className="whitespace-normal break-words px-6 py-4 text-[#245C4F]"><span className="block" title={value}>{value}</span></td>;
+                    })}
                     {showReceivedAmountColumn ? (
                       <td className="overflow-hidden whitespace-nowrap px-6 py-4">
                         {normalizeRegistrationStatus(item.status) === "free" ? (
@@ -1185,6 +1343,7 @@ export default function PublicEventRegistrationsPage({ portalLabel = "Coordinato
 
                     {createForm.eventId ? (
                       <>
+                        <div className={hasBuilderFields ? "hidden" : "contents"}>
                         {selectedCreateEventCategory === "alh-students" || selectedCreateEventCategory === "general-students" ? (
                           <label className="block md:col-span-2">
                             <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.16em] text-[#0D5C48]">Student name *</span>
@@ -1283,10 +1442,12 @@ export default function PublicEventRegistrationsPage({ portalLabel = "Coordinato
                         </div>
                       ) : null}
 
-                        <div className="grid gap-4 md:col-span-2 md:grid-cols-2">
+                        </div>
+
+                        <div className={`grid gap-4 md:col-span-2 md:grid-cols-2 ${hasBuilderFields ? "hidden" : ""}`}>
                           <label className="block">
                             <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.16em] text-[#0D5C48]">Email *</span>
-                            <input type="email" value={createForm.email} onChange={(event) => setCreateForm((current) => ({ ...current, email: event.target.value }))} placeholder="name@gmail.com" disabled={createSubmitting || createFormLocked} className="w-full rounded-2xl border border-[#2D8A6A]/20 bg-white px-4 py-3 text-sm text-[#063F32] outline-none focus:border-[#2D8A6A] disabled:cursor-not-allowed disabled:bg-[#F7F2E8]" />
+                            <input type="email" value={createForm.email} onChange={(event) => { setCreateForm((current) => ({ ...current, email: event.target.value })); setCreateErrors((current) => ({ ...current, email: "" })); }} placeholder="name@gmail.com" disabled={createSubmitting || createFormLocked} className="w-full rounded-2xl border border-[#2D8A6A]/20 bg-white px-4 py-3 text-sm text-[#063F32] outline-none focus:border-[#2D8A6A] disabled:cursor-not-allowed disabled:bg-[#F7F2E8]" />
                             {createErrors.email ? <p className="mt-2 text-xs font-semibold text-rose-700">{createErrors.email}</p> : null}
                           </label>
 
@@ -1303,6 +1464,7 @@ export default function PublicEventRegistrationsPage({ portalLabel = "Coordinato
                                 onChange={(event) => {
                                   const digits = normalizePhoneDigits(event.target.value).slice(0, selectedWhatsappDigitsRequired);
                                   setCreateForm((current) => ({ ...current, whatsapp: digits }));
+                                  setCreateErrors((current) => ({ ...current, whatsapp: "" }));
                                 }}
                                 placeholder="Digits only"
                                 inputMode="tel"
@@ -1318,7 +1480,16 @@ export default function PublicEventRegistrationsPage({ portalLabel = "Coordinato
                           </label>
                         </div>
 
-                        <label className="block md:col-span-2">
+                        {getRegistrationFormFields(selectedCreateEvent).filter((field) => field.enabled !== false).map((field) => (
+                          <label key={field.id} className="block md:col-span-2">
+                            <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.16em] text-[#0D5C48]">{field.label}{field.required ? " *" : ""}</span>
+                            {field.type === "repeatable-text" ? <div className="space-y-2">{(createForm.studentNames?.length ? createForm.studentNames : [""]).map((studentName, index) => <div key={`${field.id}-${index}`} className="flex gap-2"><input value={studentName} onChange={(event) => setCreateForm((current) => { const names = [...(current.studentNames || [""])]; names[index] = event.target.value; return { ...current, studentNames: names }; })} placeholder={field.placeholder || `Student ${index + 1}`} disabled={createSubmitting || createFormLocked} className="w-full rounded-2xl border border-[#2D8A6A]/20 bg-white px-4 py-3 text-sm text-[#063F32] outline-none focus:border-[#2D8A6A]" />{index === (createForm.studentNames?.length || 1) - 1 ? <button type="button" onClick={() => setCreateForm((current) => ({ ...current, studentNames: [...(current.studentNames || [""]), ""] }))} className="rounded-xl bg-[#0D5C48] px-3 text-lg font-semibold text-[#FFF5D6]">+</button> : null}</div>)}</div> : field.type === "tel" ? <div><div className="grid gap-2 sm:grid-cols-[120px_minmax(0,1fr)]"><select value={createForm.whatsappCountryCode} onChange={(event) => setCreateForm((current) => ({ ...current, whatsappCountryCode: event.target.value }))} disabled={createSubmitting || createFormLocked} className="rounded-2xl border border-[#2D8A6A]/20 bg-white px-3 py-3 text-sm text-[#063F32]"><option value="+92">+92</option>{countryCodes.filter((code) => code !== "+92").map((code) => <option key={code} value={code}>{code}</option>)}</select><input type="tel" inputMode="numeric" value={createForm[field.id] || createForm.customFieldValues?.[field.id] || ""} onChange={(event) => { const limit = getCountryDialLength(createForm.whatsappCountryCode); const nextValue = normalizePhoneDigits(event.target.value).slice(0, limit); setCreateForm((current) => ({ ...current, [field.id]: nextValue, whatsapp: field.id === "whatsapp" ? nextValue : current.whatsapp, customFieldValues: { ...current.customFieldValues, [field.id]: nextValue } })); setCreateErrors((current) => ({ ...current, [field.id]: "" })); }} placeholder={field.placeholder || "Phone number"} disabled={createSubmitting || createFormLocked} className="rounded-2xl border border-[#2D8A6A]/20 bg-white px-4 py-3 text-sm text-[#063F32]" /></div><p className="mt-1 text-xs text-[#6B7280]">{getCountryDialLength(createForm.whatsappCountryCode) - normalizePhoneDigits(createForm[field.id] || "").length} digits remaining</p></div> : field.type === "textarea" ? <textarea rows={3} value={createForm[field.id] || createForm.customFieldValues?.[field.id] || ""} onChange={(event) => setCreateForm((current) => ({ ...current, [field.id]: event.target.value, customFieldValues: { ...current.customFieldValues, [field.id]: event.target.value } }))} placeholder={field.placeholder || ""} disabled={createSubmitting || createFormLocked} className="w-full rounded-[24px] border border-[#2D8A6A]/20 bg-white px-4 py-3 text-sm text-[#063F32] outline-none focus:border-[#2D8A6A]" /> : <input type={field.type} inputMode={field.type === "number" ? "decimal" : undefined} value={createForm[field.id] || createForm.customFieldValues?.[field.id] || ""} onChange={(event) => { const nextValue = field.type === "number" ? sanitizeNumberInput(event.target.value) : event.target.value; setCreateForm((current) => ({ ...current, [field.id]: nextValue, customFieldValues: { ...current.customFieldValues, [field.id]: nextValue } })); setCreateErrors((current) => ({ ...current, [field.id]: "" })); }} placeholder={field.placeholder || ""} disabled={createSubmitting || createFormLocked} className="w-full rounded-2xl border border-[#2D8A6A]/20 bg-white px-4 py-3 text-sm text-[#063F32] outline-none focus:border-[#2D8A6A]" />}
+                            {field.helperText ? <span className="mt-1 block text-xs text-[#245C4F]">{field.helperText}</span> : null}
+                            {createErrors[field.id] ? <span className="mt-1 block text-xs font-semibold text-rose-700">{createErrors[field.id]}</span> : null}
+                          </label>
+                        ))}
+
+                        <label className={`block md:col-span-2 ${hasBuilderFields ? "hidden" : ""}`}>
                           <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.16em] text-[#0D5C48]">Comments</span>
                           <textarea value={createForm.notes} onChange={(event) => setCreateForm((current) => ({ ...current, notes: event.target.value }))} rows={4} placeholder="If you want to share anything in advance with the coordinator" disabled={createSubmitting || createFormLocked} className="w-full rounded-[24px] border border-[#2D8A6A]/20 bg-white px-4 py-3 text-sm text-[#063F32] outline-none focus:border-[#2D8A6A] disabled:cursor-not-allowed disabled:bg-[#F7F2E8]" />
                         </label>
@@ -1359,6 +1530,7 @@ export default function PublicEventRegistrationsPage({ portalLabel = "Coordinato
                 <button type="button" onClick={closeEditModal} className="rounded-xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-3 py-2 text-sm font-semibold text-[#063F32] transition hover:bg-[#F1EADC]">Close</button>
               </div>
               <form onSubmit={handleEditRegistration} className="space-y-5 p-6 text-sm text-[#245C4F]">
+                {editErrors.form ? <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700">{editErrors.form}</div> : null}
                 <div className="grid gap-4 md:grid-cols-2">
                   <label className="block md:col-span-2">
                     <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.16em] text-[#0D5C48]">Event</span>
@@ -1380,6 +1552,7 @@ export default function PublicEventRegistrationsPage({ portalLabel = "Coordinato
                     {editErrors.eventId ? <p className="mt-2 text-xs font-semibold text-rose-700">{editErrors.eventId}</p> : null}
                   </label>
 
+                  {!editHasConfiguredFields ? <>
                   <label className="block">
                     <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.16em] text-[#0D5C48]">Student name</span>
                     <input value={editForm.studentName} onChange={(event) => setEditForm((current) => ({ ...current, studentName: event.target.value }))} disabled={editSubmitting} className="w-full rounded-2xl border border-[#2D8A6A]/20 bg-white px-4 py-3 text-sm text-[#063F32] outline-none focus:border-[#2D8A6A] disabled:cursor-not-allowed disabled:bg-[#F7F2E8]" />
@@ -1406,6 +1579,28 @@ export default function PublicEventRegistrationsPage({ portalLabel = "Coordinato
                     <input value={editForm.whatsapp} onChange={(event) => setEditForm((current) => ({ ...current, whatsapp: event.target.value }))} disabled={editSubmitting} className="w-full rounded-2xl border border-[#2D8A6A]/20 bg-white px-4 py-3 text-sm text-[#063F32] outline-none focus:border-[#2D8A6A] disabled:cursor-not-allowed disabled:bg-[#F7F2E8]" required />
                     {editErrors.whatsapp ? <p className="mt-2 text-xs font-semibold text-rose-700">{editErrors.whatsapp}</p> : null}
                   </label>
+                  </> : null}
+                  {editCustomFields.map((field) => (
+                    <label key={field.id} className="block md:col-span-2">
+                      <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.16em] text-[#0D5C48]">{field.label}{field.required ? " *" : ""}</span>
+                      {field.type === "repeatable-text" ? (
+                        <div className="space-y-2">
+                          {getEditableStudentNames(editForm.studentNamesText).map((studentName, index, names) => (
+                            <div key={`${field.id}-${index}`} className="flex gap-2">
+                              <input value={studentName} onChange={(event) => { const nextNames = [...names]; nextNames[index] = event.target.value; updateEditField(field.id, nextNames.join("\n")); }} placeholder={field.placeholder || `Student ${index + 1}`} disabled={editSubmitting} className="w-full rounded-2xl border border-[#2D8A6A]/20 bg-white px-4 py-3 text-sm text-[#063F32] outline-none focus:border-[#2D8A6A] disabled:cursor-not-allowed disabled:bg-[#F7F2E8]" />
+                              {index === names.length - 1 ? <button type="button" onClick={() => updateEditField(field.id, [...names, ""].join("\n"))} disabled={editSubmitting} className="rounded-xl bg-[#0D5C48] px-3 text-lg font-semibold text-[#FFF5D6] disabled:opacity-70">+</button> : null}
+                            </div>
+                          ))}
+                        </div>
+                      ) : field.type === "textarea" ? (
+                        <textarea rows={3} value={field.id === "studentNames" ? editForm.studentNamesText : (editForm[field.id] ?? editForm.customFieldValues?.[field.id] ?? "")} onChange={(event) => { updateEditField(field.id, event.target.value); setEditErrors((current) => ({ ...current, [field.id]: "" })); }} placeholder={field.placeholder || ""} disabled={editSubmitting} className="w-full rounded-[24px] border border-[#2D8A6A]/20 bg-white px-4 py-3 text-sm text-[#063F32] outline-none focus:border-[#2D8A6A] disabled:cursor-not-allowed disabled:bg-[#F7F2E8]" />
+                      ) : (
+                        <input type={field.type === "number" ? "number" : field.type === "tel" ? "tel" : field.type} value={editForm[field.id] ?? editForm.customFieldValues?.[field.id] ?? ""} onChange={(event) => { updateEditField(field.id, event.target.value); setEditErrors((current) => ({ ...current, [field.id]: "" })); }} placeholder={field.placeholder || ""} disabled={editSubmitting} className="w-full rounded-2xl border border-[#2D8A6A]/20 bg-white px-4 py-3 text-sm text-[#063F32] outline-none focus:border-[#2D8A6A] disabled:cursor-not-allowed disabled:bg-[#F7F2E8]" />
+                      )}
+                      {field.helperText ? <span className="mt-1 block text-xs text-[#245C4F]">{field.helperText}</span> : null}
+                      {editErrors[field.id] ? <span className="mt-1 block text-xs font-semibold text-rose-700">{editErrors[field.id]}</span> : null}
+                    </label>
+                  ))}
                   <label className="block">
                     <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.16em] text-[#0D5C48]">Received amount</span>
                     <input type="number" min="0" step="0.01" value={editForm.amountDue} onChange={(event) => setEditForm((current) => ({ ...current, amountDue: event.target.value }))} disabled={editSubmitting} className="w-full rounded-2xl border border-[#2D8A6A]/20 bg-white px-4 py-3 text-sm text-[#063F32] outline-none focus:border-[#2D8A6A] disabled:cursor-not-allowed disabled:bg-[#F7F2E8]" required />
@@ -1423,6 +1618,7 @@ export default function PublicEventRegistrationsPage({ portalLabel = "Coordinato
                       <ChevronDown className="pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#0D5C48]" />
                     </div>
                   </label>
+                  {!editHasConfiguredFields ? <>
                   <label className="block md:col-span-2">
                     <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.16em] text-[#0D5C48]">Student names</span>
                     <textarea rows={3} value={editForm.studentNamesText} onChange={(event) => setEditForm((current) => ({ ...current, studentNamesText: event.target.value }))} placeholder="One student per line, or comma separated" disabled={editSubmitting} className="w-full rounded-[24px] border border-[#2D8A6A]/20 bg-white px-4 py-3 text-sm text-[#063F32] outline-none focus:border-[#2D8A6A] disabled:cursor-not-allowed disabled:bg-[#F7F2E8]" />
@@ -1431,6 +1627,7 @@ export default function PublicEventRegistrationsPage({ portalLabel = "Coordinato
                     <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.16em] text-[#0D5C48]">Comments</span>
                     <textarea rows={4} value={editForm.notes} onChange={(event) => setEditForm((current) => ({ ...current, notes: event.target.value }))} disabled={editSubmitting} className="w-full rounded-[24px] border border-[#2D8A6A]/20 bg-white px-4 py-3 text-sm text-[#063F32] outline-none focus:border-[#2D8A6A] disabled:cursor-not-allowed disabled:bg-[#F7F2E8]" />
                   </label>
+                  </> : null}
                 </div>
                 <div className="flex items-center justify-end gap-3">
                   <button type="button" onClick={closeEditModal} className="rounded-full border border-[#2D8A6A]/20 bg-white px-4 py-2 text-sm font-semibold text-[#063F32] transition hover:bg-[#F1EADC]">Cancel</button>
@@ -1460,7 +1657,15 @@ export default function PublicEventRegistrationsPage({ portalLabel = "Coordinato
                   <div className="rounded-2xl border border-[#2D8A6A]/12 bg-white px-4 py-3"><p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]">Status</p><p className="mt-1">{formatRegistrationStatusLabel(selected.status)}</p></div>
                 </div>
                 <div className="grid gap-3 md:grid-cols-2">
+                {selectedDetailVisibleFields.length ? (
                   <div className="rounded-2xl border border-[#2D8A6A]/12 bg-white px-4 py-4">
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]">Event registration details</p>
+                    <div className="mt-3 space-y-2">
+                      {selectedDetailVisibleFields.map((field) => <p key={field.id}><span className="font-semibold text-[#063F32]">{field.label || field.id}:</span> {getCustomFieldValue(selected, field.id)}</p>)}
+                    </div>
+                  </div>
+                ) : null}
+                  {!selectedDetailFields.length ? <div className="rounded-2xl border border-[#2D8A6A]/12 bg-white px-4 py-4">
                     <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]">Participant information</p>
                     <div className="mt-3 space-y-2">
                       <p><span className="font-semibold text-[#063F32]">Student Name:</span> {Array.isArray(selected.student_names) && selected.student_names.length > 0 ? selected.student_names.join(", ") : selected.student_name || "-"}</p>
@@ -1468,9 +1673,9 @@ export default function PublicEventRegistrationsPage({ portalLabel = "Coordinato
                       <p><span className="font-semibold text-[#063F32]">School Name:</span> {selected.school_name || "-"}</p>
                       <p><span className="font-semibold text-[#063F32]">Class:</span> {selected.class_input || "-"}</p>
                       <p><span className="font-semibold text-[#063F32]">Email:</span> {selected.email || "-"}</p>
-                      <p><span className="font-semibold text-[#063F32]">WhatsApp:</span> {selected.whatsapp || "-"}</p>
+                      {selected.whatsapp ? <p><span className="font-semibold text-[#063F32]">WhatsApp:</span> {String(selected.whatsapp).startsWith("+") ? selected.whatsapp : `+92 ${selected.whatsapp}`}</p> : null}
                     </div>
-                  </div>
+                  </div> : null}
                   <div className="rounded-2xl border border-[#2D8A6A]/12 bg-white px-4 py-4">
                     <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]">Event and verification</p>
                     <div className="mt-3 space-y-2">
@@ -1482,7 +1687,7 @@ export default function PublicEventRegistrationsPage({ portalLabel = "Coordinato
                   </div>
                 </div>
                 <div className="grid gap-3 md:grid-cols-2">
-                  <div className="rounded-2xl border border-[#2D8A6A]/12 bg-white px-4 py-4">
+                  <div className="rounded-2xl border border-[#2D8A6A]/12 bg-white px-4 py-4 md:col-span-2">
                     <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]">Coordinator contact</p>
                     <div className="mt-3 space-y-2">
                       <p><span className="font-semibold text-[#063F32]">Name:</span> {selected.coordinator_name || "-"}</p>
@@ -1490,10 +1695,10 @@ export default function PublicEventRegistrationsPage({ portalLabel = "Coordinato
                       <p><span className="font-semibold text-[#063F32]">Phone:</span> {selected.coordinator_phone || "+92 3473547036"}</p>
                     </div>
                   </div>
-                  <div className="rounded-2xl border border-[#2D8A6A]/12 bg-white px-4 py-4">
+                  {selected.notes ? <div className="rounded-2xl border border-[#2D8A6A]/12 bg-white px-4 py-4">
                     <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]">Notes</p>
-                    <p className="mt-3 whitespace-pre-line">{selected.notes || "No notes provided."}</p>
-                  </div>
+                    <p className="mt-3 whitespace-pre-line">{selected.notes}</p>
+                  </div> : null}
                 </div>
               </div>
             </div>

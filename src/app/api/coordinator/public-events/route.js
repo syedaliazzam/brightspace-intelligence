@@ -121,6 +121,7 @@ export async function GET() {
         pe.google_calendar_last_error,
         pe.recording_drive_url,
         pe.recording_synced_at,
+        COALESCE(pe.registration_form_schema, '[]'::jsonb) AS registration_form_schema,
         pe.created_by::text AS created_by,
         creator.full_name AS created_by_name,
         creator.email AS created_by_email,
@@ -169,6 +170,14 @@ export async function POST(request) {
     const registrationDeadlineDate = cleanText(formData.get("registrationDeadlineDate"));
     const registrationDeadlineTime = cleanText(formData.get("registrationDeadlineTime"));
     const file = formData.get("image");
+    let registrationFormSchema = [];
+    try {
+      const rawSchema = formData.get("registrationFormSchema");
+      const parsedSchema = JSON.parse(String(rawSchema || "[]"));
+      registrationFormSchema = Array.isArray(parsedSchema) ? parsedSchema : [];
+    } catch {
+      return json("Registration form fields must be valid.", 400);
+    }
 
     if (!eventCategory) return json("Event category is required.", 400);
     if (!title) return json("Event name is required.", 400);
@@ -213,6 +222,7 @@ export async function POST(request) {
         end_at,
         event_fee_amount,
         registration_deadline,
+        registration_form_schema,
         publication_status,
         image_bucket,
         image_object_path,
@@ -237,6 +247,7 @@ export async function POST(request) {
         ${endAt},
         ${eventFeeAmount},
         ${registrationDeadline},
+        ${JSON.stringify(registrationFormSchema)}::jsonb,
         ${"published"},
         ${upload.bucket},
         ${upload.objectPath},

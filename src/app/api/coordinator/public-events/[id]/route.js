@@ -75,6 +75,14 @@ export async function PATCH(request, context) {
       const registrationDeadlineDate = cleanText(formData.get("registrationDeadlineDate"));
       const registrationDeadlineTime = cleanText(formData.get("registrationDeadlineTime"));
       const file = formData.get("image");
+      let registrationFormSchema = [];
+      try {
+        const rawSchema = formData.get("registrationFormSchema");
+        const parsedSchema = JSON.parse(String(rawSchema || "[]"));
+        registrationFormSchema = Array.isArray(parsedSchema) ? parsedSchema : [];
+      } catch {
+        return json("Registration form fields must be valid.", 400);
+      }
 
       if (!eventCategory) return json("Event category is required.", 400);
       if (!title) return json("Event name is required.", 400);
@@ -132,6 +140,7 @@ export async function PATCH(request, context) {
           end_at = ${endAt},
           event_fee_amount = ${eventFeeAmount},
           registration_deadline = ${registrationDeadline},
+          registration_form_schema = ${JSON.stringify(registrationFormSchema)}::jsonb,
           image_bucket = COALESCE(NULLIF(${upload?.bucket || ""}, ''), image_bucket),
           image_object_path = COALESCE(NULLIF(${upload?.objectPath || ""}, ''), image_object_path),
           image_stored_path = COALESCE(NULLIF(${upload?.storedPath || ""}, ''), image_stored_path),

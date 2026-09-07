@@ -22,6 +22,7 @@ export async function GET() {
         pe.end_at,
         pe.event_fee_amount::float8 AS event_fee_amount,
         pe.registration_deadline,
+        COALESCE(pe.registration_form_schema, '[]'::jsonb) AS registration_form_schema,
         LOWER(pe.publication_status::text) AS publication_status,
         pe.image_stored_path,
         pe.created_at,

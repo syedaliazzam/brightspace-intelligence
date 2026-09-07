@@ -57,12 +57,13 @@ export async function PATCH(request, context) {
       const schoolName = cleanText(body?.schoolName);
       const className = cleanText(body?.className);
       const notes = cleanText(body?.notes);
+      const customFieldValues = body?.customFieldValues && typeof body.customFieldValues === "object" && !Array.isArray(body.customFieldValues)
+        ? JSON.stringify(body.customFieldValues)
+        : "{}";
       const amountDue = Number(body?.amountDue ?? 0);
       const statusToSave = normalizeRegistrationStatus(cleanText(body?.status) || "pending");
 
       if (!eventId) return json("Event is required.", 400);
-      if (!email || !email.includes("@")) return json("A valid email is required.", 400);
-      if (!whatsapp) return json("WhatsApp number is required.", 400);
       if (!Number.isFinite(amountDue) || amountDue < 0) return json("A valid amount is required.", 400);
 
       const [event] = await prisma.$queryRaw`
@@ -72,6 +73,7 @@ export async function PATCH(request, context) {
           pe.title AS event_name,
           pe.start_at,
           pe.end_at,
+          COALESCE(pe.registration_form_schema, '[]'::jsonb) AS registration_form_schema,
           creator.full_name AS coordinator_name,
           creator.email AS coordinator_email,
           creator.phone AS coordinator_phone
@@ -82,6 +84,18 @@ export async function PATCH(request, context) {
       `;
 
       if (!event?.id) return json("Public event not found.", 404);
+      let formSchema = Array.isArray(event.registration_form_schema) ? event.registration_form_schema : [];
+      if (typeof event.registration_form_schema === "string") {
+        try {
+          const parsedSchema = JSON.parse(event.registration_form_schema);
+          formSchema = Array.isArray(parsedSchema) ? parsedSchema : [];
+        } catch {
+          formSchema = [];
+        }
+      }
+      const configuredEmailField = formSchema.find((field) => String(field.id || "").toLowerCase() === "email" || String(field.label || "").trim().toLowerCase() === "email");
+      const effectiveEmail = (email || (configuredEmailField ? cleanText(body?.customFieldValues?.[configuredEmailField.id]) : "")).trim().toLowerCase();
+      if (effectiveEmail && !effectiveEmail.includes("@")) return json("A valid email is required.", 400);
 
       const [currentRegistration] = await prisma.$queryRaw`
         SELECT per.registration_no
@@ -92,15 +106,18 @@ export async function PATCH(request, context) {
 
       if (!currentRegistration?.registration_no) return json("Registration record not found.", 404);
 
-      const [duplicate] = await prisma.$queryRaw`
+      const [duplicate] = effectiveEmail ? await prisma.$queryRaw`
         SELECT per.id::text AS id
         FROM public_event_registrations per
         WHERE per.event_id = ${eventId}::uuid
           AND per.id <> ${id}::uuid
           AND LOWER(COALESCE(per.status::text, 'pending')) <> 'cancelled'
-          AND LOWER(COALESCE(per.email, '')) = ${email}
+          AND (
+            LOWER(TRIM(COALESCE(per.email, ''))) = ${effectiveEmail}
+            OR LOWER(TRIM(COALESCE(per.custom_field_values->>'email', ''))) = ${effectiveEmail}
+          )
         LIMIT 1
-      `;
+      ` : [null];
 
       if (duplicate?.id) {
         return json("Another registration already exists for this event with the same email address.", 400);
@@ -120,9 +137,10 @@ export async function PATCH(request, context) {
           parent_name = ${parentName || null},
           school_name = ${schoolName || null},
           class_input = ${className || null},
-          email = ${email},
+          email = ${effectiveEmail},
           whatsapp = ${whatsapp},
           notes = ${notes || null},
+          custom_field_values = ${customFieldValues}::jsonb,
           amount_due = ${amountDue},
           status = ${statusToSave},
           verified_by = ${statusToSave === "verified" ? session.user.id : null}::uuid,

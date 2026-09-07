@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Check, ChevronDown, ClipboardCopy, Eye, FileVideo, ImagePlus, Pencil, RefreshCw, RotateCcw, Search } from "lucide-react";
+import { ArrowDown, ArrowUp, Check, ChevronDown, ClipboardCopy, Eye, FileVideo, ImagePlus, Pencil, Plus, RefreshCw, RotateCcw, Search, X } from "lucide-react";
 import {
   cleanText,
   formatEventDate,
@@ -30,7 +30,117 @@ const EMPTY_FORM = {
   registrationDeadlineDate: "",
   registrationDeadlineTime: "",
   image: null,
+  registrationFormSchema: [],
 };
+
+const SYSTEM_REGISTRATION_FIELDS = [
+  { id: "email", label: "Email", type: "email", required: true, system: true },
+  { id: "whatsapp", label: "WhatsApp number", type: "tel", required: true, system: true },
+  { id: "studentName", label: "Student name", type: "text", system: true },
+  { id: "parentName", label: "Parent / guardian name", type: "text", system: true },
+  { id: "studentNames", label: "Students", type: "repeatable-text", system: true },
+  { id: "schoolName", label: "School name", type: "text", system: true },
+  { id: "className", label: "Class", type: "text", system: true },
+  { id: "notes", label: "Additional notes", type: "textarea", system: true },
+];
+
+function normalizeRegistrationField(field, index) {
+  const rawType = String(field.type || "text").toLowerCase();
+  const fieldType = { int: "number", integer: "number", float: "number", phone: "tel", long_text: "textarea" }[rawType] || rawType;
+  return {
+    id: String(field.id || `custom-${Date.now()}-${index}`),
+    label: String(field.label || "Custom field").trim(),
+    type: ["text", "email", "tel", "number", "date", "textarea", "repeatable-text"].includes(fieldType) ? fieldType : "text",
+    required: Boolean(field.required),
+    placeholder: String(field.placeholder || ""),
+    helperText: String(field.helperText || ""),
+    enabled: field.enabled !== false,
+    system: Boolean(field.system),
+  };
+}
+
+function parseRegistrationFormSchema(value) {
+  const normalize = (fields) => fields.map((field) => {
+    const rawType = String(field.type || "text").toLowerCase();
+    return {
+      ...field,
+      type: { int: "number", integer: "number", float: "number", phone: "tel", long_text: "textarea" }[rawType] || rawType,
+    };
+  });
+  if (Array.isArray(value)) return normalize(value);
+  if (typeof value !== "string") return [];
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? normalize(parsed) : [];
+  } catch {
+    return [];
+  }
+}
+
+function RegistrationFormBuilder({ value, onChange, category }) {
+  const [search, setSearch] = useState("");
+  const [previewMode, setPreviewMode] = useState("desktop");
+  const [newField, setNewField] = useState(null);
+  const selected = Array.isArray(value) ? value : [];
+  const selectedIds = new Set(selected.map((field) => field.id));
+  const available = SYSTEM_REGISTRATION_FIELDS.filter((field) => !selectedIds.has(field.id) && field.label.toLowerCase().includes(search.toLowerCase()));
+  const addField = (field) => onChange([...selected, normalizeRegistrationField(field, selected.length)]);
+  const addCustom = () => setNewField({ label: "", type: "text", required: false, placeholder: "", helperText: "", defaultValue: "" });
+  const updateField = (id, changes) => onChange(selected.map((field) => field.id === id ? { ...field, ...changes } : field));
+  const removeField = (id) => onChange(selected.filter((field) => field.id !== id));
+  const moveField = (index, direction) => {
+    const nextIndex = index + direction;
+    if (nextIndex < 0 || nextIndex >= selected.length) return;
+    const next = [...selected];
+    [next[index], next[nextIndex]] = [next[nextIndex], next[index]];
+    onChange(next);
+  };
+
+  return (
+    <div className="md:col-span-2 rounded-[1.5rem] border border-[#2D8A6A]/15 bg-[#F7F2E8] p-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div><p className="text-xs font-bold uppercase tracking-[0.2em] text-[#C9A227]">Registration form builder</p><p className="mt-1 text-sm text-[#245C4F]">Choose existing fields or add fields for this event.</p></div>
+        <button type="button" onClick={addCustom} className="rounded-full bg-[#0D5C48] px-4 py-2 text-xs font-semibold text-[#FFF5D6]">Add new field</button>
+      </div>
+      <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search existing fields" className="mt-4 w-full rounded-xl border border-[#2D8A6A]/20 bg-white px-3 py-2 text-sm text-[#063F32] outline-none" />
+      <div className="mt-4 rounded-xl border border-[#2D8A6A]/10 bg-white/70 p-3">
+        <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#0D5C48]">Available fields</p>
+        <div className="mt-3 flex flex-wrap gap-2">
+        {available.map((field) => <button key={field.id} type="button" onClick={() => addField(field)} className="rounded-full border border-[#2D8A6A]/20 bg-white px-3 py-2 text-xs font-semibold text-[#0D5C48]">+ {field.label}</button>)}
+        {!available.length ? <span className="text-xs text-[#6B7280]">All matching fields are selected.</span> : null}
+        </div>
+      </div>
+      <div className="mt-4 rounded-xl border border-[#2D8A6A]/10 bg-white/70 p-3">
+        <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#0D5C48]">Selected fields</p>
+        <div className="mt-3 space-y-2">
+        {selected.map((field, index) => (
+          <div key={field.id} draggable onDragStart={(event) => event.dataTransfer.setData("text/plain", String(index))} onDragOver={(event) => event.preventDefault()} onDrop={(event) => { const from = Number(event.dataTransfer.getData("text/plain")); if (!Number.isInteger(from) || from === index) return; const next = [...selected]; const [moved] = next.splice(from, 1); next.splice(index, 0, moved); onChange(next); }} className="rounded-xl border border-[#2D8A6A]/15 bg-white p-3">
+            <div className="flex flex-wrap items-center gap-2"><input value={field.label} onChange={(event) => updateField(field.id, { label: event.target.value })} className="min-w-[180px] flex-1 rounded-lg border border-[#2D8A6A]/15 px-2 py-1 text-xs font-bold text-[#0D5C48]" /><span className="text-[10px] uppercase tracking-wide text-[#6B7280]">{field.type}</span><label className="ml-auto flex items-center gap-1 text-xs text-[#245C4F]"><input type="checkbox" checked={field.required} onChange={(event) => updateField(field.id, { required: event.target.checked })} /> Required</label><label className="flex items-center gap-1 text-xs text-[#245C4F]"><input type="checkbox" checked={field.enabled !== false} onChange={(event) => updateField(field.id, { enabled: event.target.checked })} /> Enabled</label><button type="button" aria-label="Move field up" onClick={() => moveField(index, -1)} disabled={index === 0} className="rounded-md p-1 text-[#0D5C48] disabled:opacity-30"><ArrowUp className="h-4 w-4" /></button><button type="button" aria-label="Move field down" onClick={() => moveField(index, 1)} disabled={index === selected.length - 1} className="rounded-md p-1 text-[#0D5C48] disabled:opacity-30"><ArrowDown className="h-4 w-4" /></button><button type="button" onClick={() => removeField(field.id)} className="text-xs font-semibold text-rose-700">Remove</button></div>
+            <div className="mt-2 grid gap-2 sm:grid-cols-3"><input value={field.placeholder || ""} onChange={(event) => updateField(field.id, { placeholder: event.target.value })} placeholder="Placeholder text" className="rounded-lg border border-[#2D8A6A]/15 px-2 py-1 text-xs" /><input value={field.helperText || ""} onChange={(event) => updateField(field.id, { helperText: event.target.value })} placeholder="Help text" className="rounded-lg border border-[#2D8A6A]/15 px-2 py-1 text-xs" /><input value={field.defaultValue || ""} onChange={(event) => updateField(field.id, { defaultValue: event.target.value })} placeholder="Default value" className="rounded-lg border border-[#2D8A6A]/15 px-2 py-1 text-xs" /></div>
+          </div>
+        ))}
+        {!selected.length ? <p className="rounded-lg border border-dashed border-[#2D8A6A]/20 px-3 py-4 text-xs text-[#6B7280]">No fields selected yet.</p> : null}
+        </div>
+      </div>
+      {newField ? <div className="mt-4 rounded-xl border border-[#E4C766]/50 bg-white p-4"><div className="flex items-center justify-between"><p className="text-xs font-bold uppercase tracking-[0.18em] text-[#0D5C48]">Add new field</p><button type="button" onClick={() => setNewField(null)} aria-label="Close add field" className="text-[#0D5C48]"><X className="h-4 w-4" /></button></div><div className="mt-3 grid gap-2 sm:grid-cols-2"><input autoFocus value={newField.label} onChange={(event) => setNewField((current) => ({ ...current, label: event.target.value }))} placeholder="Field label" className="rounded-lg border border-[#2D8A6A]/15 px-3 py-2 text-sm" /><select value={newField.type} onChange={(event) => setNewField((current) => ({ ...current, type: event.target.value }))} className="rounded-lg border border-[#2D8A6A]/15 px-3 py-2 text-sm"><option value="text">Short text</option><option value="textarea">Long text</option><option value="email">Email</option><option value="tel">Phone</option><option value="number">Number</option><option value="date">Date</option></select><input value={newField.placeholder} onChange={(event) => setNewField((current) => ({ ...current, placeholder: event.target.value }))} placeholder="Placeholder text" className="rounded-lg border border-[#2D8A6A]/15 px-3 py-2 text-sm" /><input value={newField.helperText} onChange={(event) => setNewField((current) => ({ ...current, helperText: event.target.value }))} placeholder="Help text" className="rounded-lg border border-[#2D8A6A]/15 px-3 py-2 text-sm" /><input value={newField.defaultValue} onChange={(event) => setNewField((current) => ({ ...current, defaultValue: event.target.value }))} placeholder="Default value" className="rounded-lg border border-[#2D8A6A]/15 px-3 py-2 text-sm" /><label className="flex items-center gap-2 text-sm text-[#245C4F]"><input type="checkbox" checked={newField.required} onChange={(event) => setNewField((current) => ({ ...current, required: event.target.checked }))} /> Required field</label></div><button type="button" onClick={() => { if (!newField.label.trim()) return; addField({ ...newField, id: `custom-${Date.now()}`, system: false }); setNewField(null); }} className="mt-3 inline-flex items-center gap-2 rounded-full bg-[#0D5C48] px-4 py-2 text-xs font-semibold text-[#FFF5D6]"><Plus className="h-3.5 w-3.5" /> Add field</button></div> : null}
+      <div className="mt-5 rounded-[1.25rem] border border-[#2D8A6A]/15 bg-[#FAF7F0] p-4">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div><p className="text-xs font-bold uppercase tracking-[0.2em] text-[#C9A227]">Live preview</p><p className="mt-1 text-xs text-[#245C4F]">{category ? `${category} registration form` : "Registration form"}</p></div>
+          <div className="flex gap-1 rounded-full border border-[#2D8A6A]/15 bg-white p-1">
+            {["desktop", "tablet", "mobile"].map((mode) => <button key={mode} type="button" onClick={() => setPreviewMode(mode)} className={`rounded-full px-3 py-1 text-[11px] font-semibold capitalize ${previewMode === mode ? "bg-[#0D5C48] text-[#FFF5D6]" : "text-[#0D5C48]"}`}>{mode}</button>)}
+          </div>
+        </div>
+        <div className={`mx-auto mt-3 rounded-xl border border-[#2D8A6A]/15 bg-white p-4 transition-all ${previewMode === "mobile" ? "max-w-[220px]" : previewMode === "tablet" ? "max-w-[420px]" : "max-w-full"}`}>
+          <p className="text-sm font-semibold text-[#063F32]">Event registration</p>
+          <div className="mt-3 space-y-2">
+            {selected.filter((field) => field.enabled !== false).map((field) => <div key={field.id} className="rounded-lg border border-[#2D8A6A]/10 bg-[#FAF7F0] px-3 py-2 text-xs text-[#245C4F]"><span className="font-semibold text-[#063F32]">{field.label}{field.required ? " *" : ""}</span>{field.type === "textarea" ? <div className="mt-1 min-h-12 rounded border border-[#2D8A6A]/10 bg-white px-2 py-2 text-[#8A9B94]">{field.defaultValue || field.placeholder || "Enter your response"}</div> : <div className={`mt-1 rounded border border-[#2D8A6A]/10 bg-white px-2 py-2 ${field.defaultValue ? "text-[#245C4F]" : "text-[#8A9B94]"}`}>{field.defaultValue || field.placeholder || "Enter your response"}</div>}{field.helperText ? <p className="mt-1 text-[10px] text-[#6B7280]">{field.helperText}</p> : null}</div>)}
+            {!selected.some((field) => field.enabled !== false) ? <p className="text-xs text-[#6B7280]">Select fields to preview the form.</p> : null}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 function eventTone(status) {
   const normalized = String(status || "").toLowerCase();
@@ -335,6 +445,7 @@ export default function PublicEventsManagementPage({
       registrationDeadlineDate: deadline.date || "",
       registrationDeadlineTime: deadline.time || "",
       image: null,
+      registrationFormSchema: parseRegistrationFormSchema(item.registration_form_schema),
     });
     setEditPreviewImage(item.image_url || "");
     if (editFileInputRef.current) {
@@ -359,6 +470,7 @@ export default function PublicEventsManagementPage({
       payload.set("eventFeeAmount", form.eventFeeAmount);
       payload.set("registrationDeadlineDate", form.registrationDeadlineDate || form.startDate);
       payload.set("registrationDeadlineTime", form.registrationDeadlineTime || form.startTime);
+      payload.set("registrationFormSchema", JSON.stringify(form.registrationFormSchema || []));
       if (form.image instanceof File) {
         payload.set("image", form.image);
       }
@@ -411,6 +523,7 @@ export default function PublicEventsManagementPage({
       payload.set("eventFeeAmount", editForm.eventFeeAmount);
       payload.set("registrationDeadlineDate", editForm.registrationDeadlineDate || editForm.startDate);
       payload.set("registrationDeadlineTime", editForm.registrationDeadlineTime || editForm.startTime);
+      payload.set("registrationFormSchema", JSON.stringify(editForm.registrationFormSchema || []));
       if (editForm.image instanceof File) {
         payload.set("image", editForm.image);
       }
@@ -939,6 +1052,7 @@ export default function PublicEventsManagementPage({
               </div>
               <div className="max-h-[80vh] overflow-y-auto p-6">
                 <form className="grid gap-4 md:grid-cols-2" onSubmit={handleEditSubmit}>
+                  <RegistrationFormBuilder category={editForm.eventCategory} value={editForm.registrationFormSchema} onChange={(registrationFormSchema) => setEditForm((current) => ({ ...current, registrationFormSchema }))} />
                   <label className="block md:col-span-2">
                     <span className="mb-2 block text-sm font-semibold text-[#245C4F]">Select Event Category</span>
                     <div className="relative">
@@ -962,6 +1076,7 @@ export default function PublicEventsManagementPage({
                       />
                     </div>
                   </label>
+                  <div className="md:col-span-2 rounded-xl border border-[#E4C766]/40 bg-[#FFF5D6]/45 px-4 py-3"><p className="text-[11px] font-bold uppercase tracking-[0.2em] text-[#0D5C48]">Event details</p><p className="mt-1 text-xs text-[#245C4F]">Set the information and schedule for this public event.</p></div>
                   <label className="block">
                     <span className="mb-2 block text-sm font-semibold text-[#245C4F]">Event name</span>
                     <input value={editForm.title} onChange={(event) => setEditForm((current) => ({ ...current, title: event.target.value }))} className="w-full rounded-2xl border border-[#2D8A6A]/20 bg-white px-4 py-3 text-sm outline-none focus:border-[#2D8A6A] focus:ring-2 focus:ring-[#FFF5D6]" required />
@@ -1078,6 +1193,7 @@ export default function PublicEventsManagementPage({
                       />
                     </div>
                   </label>
+                  <RegistrationFormBuilder category={form.eventCategory} value={form.registrationFormSchema} onChange={(registrationFormSchema) => setForm((current) => ({ ...current, registrationFormSchema }))} />
                   <label className="block">
                     <span className="mb-2 block text-sm font-semibold text-[#245C4F]">Event name</span>
                     <input value={form.title} onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))} className="w-full rounded-2xl border border-[#2D8A6A]/20 bg-white px-4 py-3 text-sm outline-none focus:border-[#2D8A6A] focus:ring-2 focus:ring-[#FFF5D6]" required />

@@ -34,6 +34,7 @@ export async function GET() {
         per.email,
         per.whatsapp,
         per.notes,
+        COALESCE(per.custom_field_values, '{}'::jsonb) AS custom_field_values,
         per.submitted_at,
         per.verified_at,
         per.verified_by::text AS verified_by,
@@ -68,6 +69,7 @@ export async function GET() {
         pe.end_at,
         pe.event_fee_amount::float8 AS event_fee_amount,
         pe.registration_deadline,
+        COALESCE(pe.registration_form_schema, '[]'::jsonb) AS registration_form_schema,
         LOWER(COALESCE(pe.publication_status::text, 'draft')) AS publication_status
       FROM public_events pe
       ORDER BY pe.start_at DESC NULLS LAST, pe.created_at DESC NULLS LAST
