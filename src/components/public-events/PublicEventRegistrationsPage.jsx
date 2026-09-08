@@ -74,6 +74,22 @@ function getRegistrationFormFields(event) {
   }
 }
 
+const LEGACY_REGISTRATION_FIELDS = [
+  { id: "studentName", label: "Student Name" },
+  { id: "studentNames", label: "Student Names" },
+  { id: "parentName", label: "Parent Name" },
+  { id: "schoolName", label: "School Name" },
+  { id: "className", label: "Class" },
+  { id: "email", label: "Email" },
+  { id: "whatsapp", label: "WhatsApp" },
+  { id: "notes", label: "Notes" },
+];
+
+function getRegistrationDisplayFields(event) {
+  const configuredFields = getRegistrationFormFields(event).filter((field) => field.enabled !== false);
+  return configuredFields.length ? configuredFields : LEGACY_REGISTRATION_FIELDS;
+}
+
 function parseCustomFieldValues(values) {
   let parsed = values;
   if (typeof parsed === "string") {
@@ -612,7 +628,7 @@ export default function PublicEventRegistrationsPage({ portalLabel = "Coordinato
   const selectedEditEvent = useMemo(() => getSelectedEvent(events, editForm.eventId), [editForm.eventId, events]);
   const selectedDetailEvent = useMemo(() => getSelectedEvent(events, selected?.event_id), [events, selected?.event_id]);
   const selectedDetailFields = useMemo(
-    () => getRegistrationFormFields(selectedDetailEvent).filter((field) => field.enabled !== false),
+    () => getRegistrationDisplayFields(selectedDetailEvent),
     [selectedDetailEvent]
   );
   const editCustomFields = useMemo(
@@ -667,15 +683,20 @@ export default function PublicEventRegistrationsPage({ portalLabel = "Coordinato
     const columns = [];
     const seen = new Set();
     sourceEvents.forEach((event) => {
-      getRegistrationFormFields(event).forEach((field) => {
+      const hasConfiguredFields = getRegistrationFormFields(event).length > 0;
+      getRegistrationDisplayFields(event).forEach((field) => {
         const id = String(field.id || "").trim();
         if (!id || seen.has(id)) return;
+        if (!hasConfiguredFields) {
+          const hasValue = filteredItems.some((item) => item.event_id === event.id && getCustomFieldValue(item, id) !== "-");
+          if (!hasValue) return;
+        }
         seen.add(id);
         columns.push({ id, label: String(field.label || id) });
       });
     });
     return columns;
-  }, [events, filters.eventId]);
+  }, [events, filteredItems, filters.eventId]);
   const tableColumnCount =
     6 +
     customRegistrationColumns.length +
