@@ -551,6 +551,7 @@ export async function POST(request) {
               : "",
           studentName: student.student_name,
           voucherNo,
+          monthlyFee: currentMonthFee,
           amount: computedTotalPayable,
           current_pending_due: computedCurrentPendingDue,
         });
@@ -574,7 +575,7 @@ export async function POST(request) {
         html: buildFeeVoucherEmailHtml({
           studentName: job.studentName,
           voucherNo: job.voucherNo,
-          monthlyFee: `PKR ${Number(baseAmount).toLocaleString("en-PK")}`,
+          monthlyFee: `PKR ${Number(job.monthlyFee || 0).toLocaleString("en-PK")}`,
           amount: `PKR ${Number(job.amount || baseAmount).toLocaleString("en-PK")}`,
           currentPendingDue: `PKR ${Number(job.current_pending_due || baseAmount).toLocaleString("en-PK")}`,
           dueDate,
