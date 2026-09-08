@@ -68,6 +68,113 @@ async function getClasses() {
   `;
 }
 
+async function getStudentsByClass() {
+  const rows = await prisma.$queryRaw`
+    SELECT
+      e.course_id::text AS class_id,
+      sp.id::text AS student_id,
+      e.registration_id::text AS registration_id,
+      u.full_name AS student_name,
+      COALESCE(NULLIF(TRIM(u.email), ''), NULLIF(TRIM(rl.email), '')) AS student_email,
+      u.phone AS student_phone,
+      COALESCE(pu.full_name, '') AS parent_name,
+      COALESCE(NULLIF(TRIM(pu.email), ''), NULLIF(TRIM(rl.email), '')) AS parent_email,
+      COALESCE(NULLIF(TRIM(pu.phone), ''), NULLIF(TRIM(rl.phone), '')) AS parent_phone,
+      COALESCE(default_discount.discount_amount::float8, 0) AS default_discount_amount,
+      COALESCE(previous_history.remaining_due::float8, admission_history.remaining_due::float8, 0) AS current_pending_due
+    FROM enrollments e
+    INNER JOIN student_profiles sp ON sp.id = e.student_id
+    INNER JOIN users u ON u.id = sp.user_id
+    LEFT JOIN registration_leads rl ON rl.id = e.registration_id
+    LEFT JOIN LATERAL (
+      SELECT spp.parent_id
+      FROM student_parents spp
+      WHERE spp.student_id = sp.id
+      ORDER BY spp.is_primary DESC, spp.id DESC
+      LIMIT 1
+    ) primary_parent ON TRUE
+    LEFT JOIN parent_profiles pp ON pp.id = primary_parent.parent_id
+    LEFT JOIN users pu ON pu.id = pp.user_id
+    LEFT JOIN LATERAL (
+      SELECT fv.discount_amount
+      FROM fee_vouchers fv
+      WHERE fv.registration_id = e.registration_id
+        AND NOT EXISTS (
+          SELECT 1
+          FROM regular_monthly_fee_voucher_items item
+          WHERE item.voucher_id = fv.id
+        )
+      ORDER BY fv.created_at ASC NULLS LAST, fv.voucher_no ASC NULLS LAST, fv.id ASC
+      LIMIT 1
+    ) default_discount ON TRUE
+    LEFT JOIN LATERAL (
+      SELECT GREATEST(
+        COALESCE(fhr.previous_month_due::float8, 0)
+        + CASE
+          WHEN COALESCE(fv.regular_fee_amount::float8, 0) > 0 THEN GREATEST(
+            COALESCE(fv.regular_fee_amount::float8, 0)
+            - COALESCE(fv.discount_amount::float8, 0)
+            - COALESCE(fv.scholarship_amount::float8, 0),
+            0
+          )
+          ELSE COALESCE(fhr.current_month_fee::float8, fv.total_amount::float8, fv.amount::float8, 0)
+        END
+        - COALESCE(fhr.this_month_paid::float8, 0),
+        0
+      ) AS remaining_due
+      FROM fee_history_records fhr
+      LEFT JOIN fee_vouchers fv ON fv.id = fhr.voucher_id
+      WHERE fhr.student_id = sp.id
+        AND fhr.batch_id IS NOT NULL
+      ORDER BY fv.voucher_no DESC NULLS LAST, fhr.due_date DESC NULLS LAST, fhr.created_at DESC NULLS LAST, fhr.id DESC
+      LIMIT 1
+    ) previous_history ON TRUE
+    LEFT JOIN LATERAL (
+      SELECT
+        COALESCE(
+          fhr.remaining_due::float8,
+          COALESCE(fv.total_amount::float8, fv.amount::float8, 0) - COALESCE(fs.paid_amount::float8, 0),
+          0
+        ) AS remaining_due
+      FROM fee_vouchers fv
+      LEFT JOIN LATERAL (
+        SELECT fee_history_records.remaining_due
+        FROM fee_history_records
+        WHERE fee_history_records.voucher_id = fv.id
+        ORDER BY fee_history_records.created_at DESC NULLS LAST, fee_history_records.id DESC
+        LIMIT 1
+      ) fhr ON TRUE
+      LEFT JOIN LATERAL (
+        SELECT fee_submissions.paid_amount
+        FROM fee_submissions
+        WHERE fee_submissions.voucher_id = fv.id
+        ORDER BY fee_submissions.created_at DESC NULLS LAST, fee_submissions.id DESC
+        LIMIT 1
+      ) fs ON TRUE
+      WHERE fv.registration_id = e.registration_id
+        AND NOT EXISTS (
+          SELECT 1
+          FROM regular_monthly_fee_voucher_items item
+          WHERE item.voucher_id = fv.id
+        )
+      ORDER BY fv.voucher_no DESC NULLS LAST, fv.created_at DESC NULLS LAST, fv.id DESC
+      LIMIT 1
+    ) admission_history ON TRUE
+    WHERE LOWER(e.status) = 'active'
+      AND COALESCE(sp.status, 'active'::user_status) = 'active'::user_status
+      AND u.status = 'active'::user_status
+    ORDER BY u.full_name ASC
+  `;
+
+  return rows.reduce((acc, row) => {
+    const classId = String(row.class_id || "");
+    if (!classId) return acc;
+    if (!acc[classId]) acc[classId] = [];
+    acc[classId].push(row);
+    return acc;
+  }, {});
+}
+
 async function getHistory() {
   return prisma.$queryRaw`
     SELECT
@@ -100,6 +207,8 @@ async function getHistory() {
           'parent_email', COALESCE(NULLIF(TRIM(item.parent_email), ''), NULLIF(TRIM(pu.email), ''), NULLIF(TRIM(rl.email), '')),
           'parent_phone', COALESCE(NULLIF(TRIM(item.parent_phone), ''), NULLIF(TRIM(pu.phone), ''), NULLIF(TRIM(rl.phone), '')),
           'base_amount', item.base_amount::float8,
+          'discount_amount', COALESCE(fv.discount_amount::float8, 0),
+          'discount_percent', COALESCE(fv.discount_percent::float8, 0),
           'late_fee_amount', item.late_fee_amount::float8,
           'due_date', item.due_date,
           'status', item.status,
@@ -213,12 +322,13 @@ async function getTableColumns(tableName) {
 export async function GET() {
   try {
     await requireRole(ALLOWED_ROLES);
-    const [classes, history, paymentMethods] = await Promise.all([
+    const [classes, history, paymentMethods, studentsByClass] = await Promise.all([
       getClasses(),
       getHistory(),
       getPaymentMethods(),
+      getStudentsByClass(),
     ]);
-    return json("Regular fee voucher data fetched.", 200, { classes, history, paymentMethods });
+    return json("Regular fee voucher data fetched.", 200, { classes, history, paymentMethods, studentsByClass });
   } catch (error) {
     const guard = roleGuardResponse(error);
     if (guard) return guard;
@@ -236,6 +346,9 @@ export async function POST(request) {
     const baseAmount = Number(body?.baseAmount || 0);
     const lateFeeAmount = 0;
     const paymentMethodId = normalizeText(body?.paymentMethodId);
+    const studentDiscounts = body?.studentDiscounts && typeof body.studentDiscounts === "object" && !Array.isArray(body.studentDiscounts)
+      ? body.studentDiscounts
+      : {};
 
     if (!classId) return json("Class is required.", 400);
     if (!Number.isFinite(baseAmount) || baseAmount <= 0) return json("Base monthly fee is required.", 400);
@@ -316,8 +429,11 @@ export async function POST(request) {
       for (const student of students) {
         const voucherNo = `${getVoucherPrefix(new Date())}-${padSequence(voucherSequence)}`;
         voucherSequence += 1;
+        const discountAmount = Math.max(0, Math.min(baseAmount, Number(studentDiscounts[student.student_id] || 0)));
+        const discountPercent = baseAmount > 0 ? (discountAmount / baseAmount) * 100 : 0;
+        const currentMonthFee = Math.max(0, baseAmount - discountAmount);
         let computedCurrentPendingDue = 0;
-        let computedTotalPayable = baseAmount;
+        let computedTotalPayable = currentMonthFee;
         const paymentMethodColumnFragment = voucherColumns.has("payment_method_id")
           ? Prisma.sql`, "payment_method_id"`
           : Prisma.empty;
@@ -328,13 +444,25 @@ export async function POST(request) {
           ? Prisma.sql`, "total_amount"`
           : Prisma.empty;
         const totalAmountValueFragment = voucherColumns.has("total_amount")
-          ? Prisma.sql`, ${baseAmount}`
+          ? Prisma.sql`, ${currentMonthFee}`
           : Prisma.empty;
         const regularFeeAmountColumnFragment = voucherColumns.has("regular_fee_amount")
           ? Prisma.sql`, "regular_fee_amount"`
           : Prisma.empty;
         const regularFeeAmountValueFragment = voucherColumns.has("regular_fee_amount")
           ? Prisma.sql`, ${baseAmount}`
+          : Prisma.empty;
+        const discountAmountColumnFragment = voucherColumns.has("discount_amount")
+          ? Prisma.sql`, "discount_amount"`
+          : Prisma.empty;
+        const discountAmountValueFragment = voucherColumns.has("discount_amount")
+          ? Prisma.sql`, ${discountAmount}`
+          : Prisma.empty;
+        const discountPercentColumnFragment = voucherColumns.has("discount_percent")
+          ? Prisma.sql`, "discount_percent"`
+          : Prisma.empty;
+        const discountPercentValueFragment = voucherColumns.has("discount_percent")
+          ? Prisma.sql`, ${discountPercent}`
           : Prisma.empty;
         const paymentMethodOptionsColumnFragment = voucherColumns.has("payment_method_options")
           ? Prisma.sql`, "payment_method_options"`
@@ -349,13 +477,17 @@ export async function POST(request) {
             ${paymentMethodColumnFragment}
             ${totalAmountColumnFragment}
             ${regularFeeAmountColumnFragment}
+            ${discountAmountColumnFragment}
+            ${discountPercentColumnFragment}
             ${paymentMethodOptionsColumnFragment},
             "payment_instructions", "created_at", "updated_at"
           ) VALUES (
-            gen_random_uuid(), ${voucherNo}, ${student.registration_id || null}::uuid, ${baseAmount}, ${dueDate}::date, 'unpaid'::voucher_status
+            gen_random_uuid(), ${voucherNo}, ${student.registration_id || null}::uuid, ${currentMonthFee}, ${dueDate}::date, 'unpaid'::voucher_status
             ${paymentMethodValueFragment}
             ${totalAmountValueFragment}
             ${regularFeeAmountValueFragment}
+            ${discountAmountValueFragment}
+            ${discountPercentValueFragment}
             ${paymentMethodOptionsValueFragment},
             NULL, NOW(), NOW()
           )
@@ -381,11 +513,11 @@ export async function POST(request) {
             monthLabel: monthLabel || '',
             dueDate,
             previousMonthDue: computedCurrentPendingDue,
-            discountAmount: 0,
-            currentMonthFee: baseAmount,
+            discountAmount,
+            currentMonthFee,
             thisMonthPaid: 0,
           });
-          computedTotalPayable = Number(computedHistory?.totalAmount || (baseAmount + computedCurrentPendingDue));
+          computedTotalPayable = Number(computedHistory?.totalAmount || (currentMonthFee + computedCurrentPendingDue));
           if (voucherColumns.has("total_amount")) {
             await tx.$executeRaw`
               UPDATE fee_vouchers
@@ -397,6 +529,8 @@ export async function POST(request) {
             ...student,
             voucher_no: voucherNo,
             current_pending_due: computedCurrentPendingDue,
+            discount_amount: discountAmount,
+            discount_percent: discountPercent,
             total_amount: computedTotalPayable,
           });
         } else {
@@ -404,6 +538,8 @@ export async function POST(request) {
             ...student,
             voucher_no: voucherNo,
             current_pending_due: computedCurrentPendingDue,
+            discount_amount: discountAmount,
+            discount_percent: discountPercent,
             total_amount: computedTotalPayable,
           });
         }

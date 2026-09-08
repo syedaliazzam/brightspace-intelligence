@@ -212,6 +212,12 @@ async function loadStudentHistory(studentId) {
             fv.amount::float8,
             0
           )
+          WHEN COALESCE(fv.regular_fee_amount::float8, 0) > 0 THEN GREATEST(
+            COALESCE(fv.regular_fee_amount::float8, 0)
+            - COALESCE(fv.discount_amount::float8, 0)
+            - COALESCE(fv.scholarship_amount::float8, 0),
+            0
+          )
           ELSE COALESCE(fhr.current_month_fee::float8, fv.total_amount::float8, fv.amount::float8, 0)
         END AS current_month_fee,
         CASE

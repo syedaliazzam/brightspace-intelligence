@@ -844,20 +844,17 @@ export default function CoordinatorFeeHistoryPage({ portalLabel = "Coordinator p
                         const parts = getCurrentMonthFeeParts(row);
                         const currentMonthFeeValue = Number(parts.currentMonthFee || draft.current_month_fee || row.current_month_fee || 0);
                         const isAdmissionRow = String(row.source_type || "").toLowerCase() === "voucher-direct" || Number(parts.admissionFee || 0) > 0;
-                        const isCarryForwardRow = String(row.source_type || "").toLowerCase() === "history" && Number(row.previous_month_due || row.computedPreviousMonthDue || 0) > 0;
                         const hasAdmissionBreakdown = isAdmissionRow;
                         const hasMonthlyBreakdown = !hasAdmissionBreakdown && parts.regularFee > 0;
                         const hasBreakdown = hasAdmissionBreakdown || hasMonthlyBreakdown;
                         const currentFeeParts = {
                           regularFee: hasBreakdown ? parts.regularFee : currentMonthFeeValue,
                           admissionFee: hasAdmissionBreakdown ? parts.admissionFee : 0,
-                          discount: hasAdmissionBreakdown ? parts.discount : 0,
-                          scholarshipAmount: hasAdmissionBreakdown ? parts.scholarshipAmount : 0,
+                          discount: hasBreakdown ? parts.discount : 0,
+                          scholarshipAmount: hasBreakdown ? parts.scholarshipAmount : 0,
                           currentMonthFee: isAdmissionRow
                             ? Number(row.current_month_fee || row.total_amount || Math.max(parts.regularFee + parts.admissionFee - parts.discount - parts.scholarshipAmount, 0))
-                            : isCarryForwardRow
-                              ? parts.regularFee || currentMonthFeeValue
-                              : currentMonthFeeValue || parts.regularFee,
+                            : currentMonthFeeValue || parts.currentMonthFee || parts.regularFee,
                         };
                         const previousMonthDueValue = Number(
                           isAdmissionRow

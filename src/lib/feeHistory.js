@@ -100,7 +100,20 @@ export async function getLatestFeeHistoryCarryForward(tx, studentId) {
       fee_history_records.previous_month_due::float8 AS previous_month_due,
       fee_history_records.current_month_fee::float8 AS current_month_fee,
       fee_history_records.this_month_paid::float8 AS this_month_paid,
-      fee_history_records.remaining_due::float8 AS remaining_due
+      GREATEST(
+        COALESCE(fee_history_records.previous_month_due::float8, 0)
+        + CASE
+          WHEN COALESCE(fv.regular_fee_amount::float8, 0) > 0 THEN GREATEST(
+            COALESCE(fv.regular_fee_amount::float8, 0)
+            - COALESCE(fv.discount_amount::float8, 0)
+            - COALESCE(fv.scholarship_amount::float8, 0),
+            0
+          )
+          ELSE COALESCE(fee_history_records.current_month_fee::float8, fv.total_amount::float8, fv.amount::float8, 0)
+        END
+        - COALESCE(fee_history_records.this_month_paid::float8, 0),
+        0
+      ) AS remaining_due
     FROM fee_history_records
     LEFT JOIN fee_vouchers fv ON fv.id = fee_history_records.voucher_id
     WHERE fee_history_records.student_id = ${studentId}::uuid

@@ -35,6 +35,8 @@ export default function RegularFeeVouchersPage() {
   const [classes, setClasses] = useState([]);
   const [history, setHistory] = useState([]);
   const [paymentMethods, setPaymentMethods] = useState([]);
+  const [studentsByClass, setStudentsByClass] = useState({});
+  const [studentDiscounts, setStudentDiscounts] = useState({});
   const [form, setForm] = useState({ classId: "", dueDate: "", monthLabel: "", baseAmount: "", paymentMethodId: "" });
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -58,6 +60,7 @@ export default function RegularFeeVouchersPage() {
       setClasses(data.classes || []);
       setHistory(data.history || []);
       setPaymentMethods(data.paymentMethods || []);
+      setStudentsByClass(data.studentsByClass || {});
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : "Unable to load regular fee vouchers.");
     } finally {
@@ -77,7 +80,10 @@ export default function RegularFeeVouchersPage() {
     if (form.paymentMethodId) return;
     const firstMethod = paymentMethods[0];
     if (!firstMethod?.id) return;
-    setForm((current) => (current.paymentMethodId ? current : { ...current, paymentMethodId: firstMethod.id }));
+    const timer = window.setTimeout(() => {
+      setForm((current) => (current.paymentMethodId ? current : { ...current, paymentMethodId: firstMethod.id }));
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [paymentMethods, form.paymentMethodId]);
 
   function closeSelectState(setter) {
@@ -85,21 +91,54 @@ export default function RegularFeeVouchersPage() {
   }
 
   const selectedClass = useMemo(() => classes.find((item) => item.id === form.classId), [classes, form.classId]);
+  const selectedClassStudents = useMemo(() => studentsByClass[form.classId] || [], [form.classId, studentsByClass]);
 
   function handleClassChange(value) {
     const nextClass = classes.find((item) => item.id === value) || null;
+    const nextStudents = studentsByClass[value] || [];
+    const defaultDiscounts = nextStudents.reduce((acc, student) => {
+      const discount = Number(student.default_discount_amount || 0);
+      if (student.student_id && discount > 0) {
+        acc[student.student_id] = String(discount);
+      }
+      return acc;
+    }, {});
     setForm((current) => ({
       ...current,
       classId: value,
       baseAmount: nextClass?.regular_fee_amount ? String(nextClass.regular_fee_amount) : "",
     }));
+    setStudentDiscounts(defaultDiscounts);
+  }
+
+  function updateStudentDiscount(studentId, value) {
+    const baseAmount = Number(form.baseAmount || 0);
+    const cleaned = String(value || "").replace(/[^0-9.]/g, "");
+    const [whole, ...decimalParts] = cleaned.split(".");
+    const normalized = `${whole}${decimalParts.length ? `.${decimalParts.join("")}` : ""}`;
+    const amount = Math.max(0, Math.min(baseAmount || Number.MAX_SAFE_INTEGER, Number(normalized || 0)));
+    setStudentDiscounts((current) => ({
+      ...current,
+      [studentId]: normalized === "" ? "" : String(amount),
+    }));
+  }
+
+  function getStudentDiscount(studentId) {
+    return Number(studentDiscounts[studentId] || 0);
+  }
+
+  function getStudentTotalPayable(student) {
+    const baseAmount = Number(form.baseAmount || 0);
+    const pendingDue = Number(student?.current_pending_due || 0);
+    const discount = getStudentDiscount(student?.student_id);
+    return Math.max(0, baseAmount - discount) + pendingDue;
   }
 
   const detailItems = useMemo(() => {
     const items = Array.isArray(detailItem?.items) ? detailItem.items : [];
     const start = (detailPage - 1) * PAGE_SIZE;
     return items.slice(start, start + PAGE_SIZE);
-  }, [detailItem?.items, detailPage]);
+  }, [detailItem, detailPage]);
 
   const detailTotalItems = Array.isArray(detailItem?.items) ? detailItem.items.length : 0;
   const historyItems = useMemo(() => {
@@ -113,7 +152,7 @@ export default function RegularFeeVouchersPage() {
     if (approveProofFile?.name) return approveProofFile.name;
     if (approveRow?.proof_file_path) return "Existing proof available";
     return "No file chosen";
-  }, [approveProofFile?.name, approveRow?.proof_file_path]);
+  }, [approveProofFile, approveRow]);
 
   const approveProofPreview = useMemo(() => {
     if (!approveProofFile) return null;
@@ -178,14 +217,15 @@ export default function RegularFeeVouchersPage() {
     setSubmitting(true);
     setError("");
     try {
-      const response = await fetch("/api/coordinator/regular-fee-vouchers", {
+          const response = await fetch("/api/coordinator/regular-fee-vouchers", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
+        body: JSON.stringify({ ...form, studentDiscounts }),
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data?.message || "Unable to create vouchers.");
       setForm({ classId: "", dueDate: "", monthLabel: "", baseAmount: "", paymentMethodId: "" });
+      setStudentDiscounts({});
       await load();
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : "Unable to create vouchers.");
@@ -289,14 +329,79 @@ export default function RegularFeeVouchersPage() {
               </div>
               {!paymentMethods.length ? <p className="mt-2 text-sm text-[#245C4F]">No payment methods available.</p> : null}
             </div>
-            <div className="flex items-end justify-start">
+            {form.classId ? (
+              <div className="md:col-span-2">
+                <div className="mb-3 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+                  <div>
+                    <p className="text-sm font-semibold text-[#063F32]">Student fee details</p>
+                    <p className="text-xs text-[#245C4F]">Add a discount only for students who need it in this monthly voucher.</p>
+                  </div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#0D5C48]">
+                    {selectedClassStudents.length} students
+                  </p>
+                </div>
+                <div className="overflow-x-auto rounded-[1.5rem] border border-[#2D8A6A]/15 bg-white">
+                  <table className="min-w-[980px] w-full text-left text-sm">
+                    <thead className="bg-[linear-gradient(180deg,#FAF7F0_0%,#F1EADC_100%)] text-xs uppercase tracking-[0.16em] text-[#0D5C48]">
+                      <tr>
+                        <th className="px-4 py-3">Student</th>
+                        <th className="px-4 py-3">Parent</th>
+                        <th className="px-4 py-3">Monthly Fee</th>
+                        <th className="px-4 py-3">Pending Due</th>
+                        <th className="px-4 py-3">Discount</th>
+                        <th className="px-4 py-3">Total Payable</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[#F1EADC]">
+                      {selectedClassStudents.length ? selectedClassStudents.map((student) => {
+                        const discount = getStudentDiscount(student.student_id);
+                        return (
+                          <tr key={student.student_id}>
+                            <td className="px-4 py-4">
+                              <p className="font-semibold text-[#063F32]">{student.student_name || "-"}</p>
+                              <p className="mt-1 text-xs text-[#245C4F]">{student.student_email || student.parent_email || "-"}</p>
+                            </td>
+                            <td className="px-4 py-4 text-[#245C4F]">
+                              <p>{student.parent_name || "-"}</p>
+                              <p className="mt-1 text-xs">{student.parent_phone || student.student_phone || "-"}</p>
+                            </td>
+                            <td className="px-4 py-4 font-semibold text-[#063F32]">{formatMoney(form.baseAmount)}</td>
+                            <td className="px-4 py-4 text-[#245C4F]">{formatMoney(student.current_pending_due || 0)}</td>
+                            <td className="px-4 py-4">
+                              <input
+                                type="number"
+                                min="0"
+                                max={Number(form.baseAmount || 0) || undefined}
+                                step="0.01"
+                                value={studentDiscounts[student.student_id] ?? ""}
+                                onChange={(event) => updateStudentDiscount(student.student_id, event.target.value)}
+                                placeholder="0"
+                                className="w-32 rounded-xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-3 py-2 text-sm font-semibold text-[#063F32] outline-none transition focus:border-[#2D8A6A] focus:bg-white focus:ring-4 focus:ring-[#FFF5D6]"
+                              />
+                              {discount > 0 ? (
+                                <p className="mt-1 text-xs text-[#245C4F]">
+                                  {Number(form.baseAmount || 0) > 0 ? `${((discount / Number(form.baseAmount || 1)) * 100).toFixed(2)}%` : "Discount added"}
+                                </p>
+                              ) : null}
+                            </td>
+                            <td className="px-4 py-4 font-semibold text-[#063F32]">{formatMoney(getStudentTotalPayable(student))}</td>
+                          </tr>
+                        );
+                      }) : (
+                        <tr>
+                          <td colSpan={6} className="px-4 py-8 text-center text-[#245C4F]">
+                            No verified students found for this class.
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ) : null}
+            <div className="flex items-end justify-start md:col-span-2">
               <button type="submit" disabled={submitting || !selectedClass} className="rounded-2xl bg-[#0D5C48] px-5 py-3 text-sm font-semibold text-[#FAF7F0] transition hover:bg-[#063F32] disabled:opacity-60">{submitting ? "Generating..." : "Generate vouchers"}</button>
             </div>
-            {selectedClass?.regular_fee_amount ? (
-              <p className="md:col-span-2 text-sm text-[#245C4F]">
-                Regular fee for {selectedClass.title} is auto-selected as {formatMoney(selectedClass.regular_fee_amount)}.
-              </p>
-            ) : null}
           </form>
         </section>
 
@@ -362,6 +467,7 @@ export default function RegularFeeVouchersPage() {
                         <th className="px-4 py-3">Phone</th>
                         <th className="px-4 py-3">Monthly Fee</th>
                         <th className="px-4 py-3">Current Pending Due</th>
+                        <th className="px-4 py-3">Discount</th>
                         <th className="px-4 py-3">Total Amount</th>
                         <th className="px-4 py-3">Payment Status</th>
                         <th className="px-4 py-3">Voucher Status</th>
@@ -381,7 +487,8 @@ export default function RegularFeeVouchersPage() {
                           <td className="px-4 py-4 text-[#245C4F]">{row.student_phone || row.parent_phone || "-"}</td>
                           <td className="px-4 py-4 text-[#245C4F]">{formatMoney(row.base_amount)}</td>
                           <td className="px-4 py-4 text-[#245C4F]">{formatMoney(row.current_pending_due || 0)}</td>
-                          <td className="px-4 py-4 font-semibold text-[#063F32]">{formatMoney((Number(row.base_amount || 0) + Number(row.current_pending_due || 0)))}</td>
+                          <td className="px-4 py-4 text-[#245C4F]">{formatMoney(row.discount_amount || 0)}</td>
+                          <td className="px-4 py-4 font-semibold text-[#063F32]">{formatMoney(row.total_amount || (Number(row.base_amount || 0) + Number(row.current_pending_due || 0) - Number(row.discount_amount || 0)))}</td>
                           <td className="px-4 py-4">
                             <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${STATUS_STYLES[String(row.payment_status || "not_submitted").toLowerCase()] || STATUS_STYLES.not_submitted}`}>
                               {formatStatus(row.payment_status || "not_submitted")}
@@ -411,7 +518,7 @@ export default function RegularFeeVouchersPage() {
                         </tr>
                       )) : (
                         <tr>
-                          <td className="px-4 py-6 text-center text-[#245C4F]" colSpan={10}>No student voucher rows available.</td>
+                          <td className="px-4 py-6 text-center text-[#245C4F]" colSpan={11}>No student voucher rows available.</td>
                         </tr>
                       )}
                     </tbody>
@@ -434,7 +541,7 @@ export default function RegularFeeVouchersPage() {
 
         {approveRow ? (
           <ClientPortal targetId="coordinator-page-portal-root">
-            <div className="fixed inset-0 z-[10000] flex items-start justify-center bg-[#063F32]/45 px-4 pt-10 pb-10 backdrop-blur-sm">
+            <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-[#063F32]/45 px-4 pt-10 pb-10 backdrop-blur-sm">
               <div className="w-full max-w-2xl rounded-[2rem] border border-[#2D8A6A]/15 bg-[#FAF7F0] p-6 shadow-[0_24px_80px_-36px_rgba(13,59,46,0.24)] sm:p-8">
                 <div className="flex items-start justify-between gap-4">
                   <div>

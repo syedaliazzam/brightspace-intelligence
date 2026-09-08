@@ -219,7 +219,7 @@ export default function FeeVoucherPreviewModal({ voucher, onClose }) {
             </div>
 
             {approveOpen ? (
-              <div className="fixed inset-0 z-[10000] flex items-start justify-center bg-[#063F32]/45 px-4 pt-10 pb-10 backdrop-blur-sm">
+              <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-[#063F32]/45 px-4 pt-10 pb-10 backdrop-blur-sm">
                 <div className="w-full max-w-2xl rounded-[2rem] border border-[#2D8A6A]/15 bg-[#FAF7F0] p-6 shadow-[0_24px_80px_-36px_rgba(13,59,46,0.24)] sm:p-8">
                   <div className="flex items-start justify-between gap-4">
                     <div>
