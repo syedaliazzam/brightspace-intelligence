@@ -201,25 +201,28 @@ async function loadStudentHistory(studentId) {
           WHEN COALESCE(fv.admission_fee_amount::float8, 0) > 0 THEN COALESCE(fv.discount_amount::float8, 0)
           ELSE COALESCE(fhr.discount_amount::float8, fv.discount_amount::float8, 0)
         END AS discount_amount,
-        CASE
-          WHEN COALESCE(fv.admission_fee_amount::float8, 0) > 0 THEN COALESCE(
-            fv.total_amount::float8,
-            (
+        COALESCE(
+          fhr.current_month_fee::float8,
+          CASE
+            WHEN COALESCE(fv.admission_fee_amount::float8, 0) > 0 THEN COALESCE(
+              fv.total_amount::float8,
+              (
+                COALESCE(fv.regular_fee_amount::float8, 0)
+                + COALESCE(fv.admission_fee_amount::float8, 0)
+                - COALESCE(fv.discount_amount::float8, 0)
+              ),
+              fv.amount::float8,
+              0
+            )
+            WHEN COALESCE(fv.regular_fee_amount::float8, 0) > 0 THEN GREATEST(
               COALESCE(fv.regular_fee_amount::float8, 0)
-              + COALESCE(fv.admission_fee_amount::float8, 0)
               - COALESCE(fv.discount_amount::float8, 0)
-            ),
-            fv.amount::float8,
-            0
-          )
-          WHEN COALESCE(fv.regular_fee_amount::float8, 0) > 0 THEN GREATEST(
-            COALESCE(fv.regular_fee_amount::float8, 0)
-            - COALESCE(fv.discount_amount::float8, 0)
-            - COALESCE(fv.scholarship_amount::float8, 0),
-            0
-          )
-          ELSE COALESCE(fhr.current_month_fee::float8, fv.total_amount::float8, fv.amount::float8, 0)
-        END AS current_month_fee,
+              - COALESCE(fv.scholarship_amount::float8, 0),
+              0
+            )
+            ELSE COALESCE(fv.total_amount::float8, fv.amount::float8, 0)
+          END
+        ) AS current_month_fee,
         CASE
           WHEN COALESCE(fv.admission_fee_amount::float8, 0) > 0 THEN COALESCE(
             fv.total_amount::float8,

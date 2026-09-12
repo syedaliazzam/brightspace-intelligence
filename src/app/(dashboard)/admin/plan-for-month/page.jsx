@@ -38,6 +38,7 @@ export default async function AdminPlanForMonthPage() {
             description="Create and manage monthly plans. Admins can edit and upload plan images from this page."
             showHeader={false}
             showTableMediaPreviews={false}
+            disableCache
           />
         </div>
       </div>

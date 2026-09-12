@@ -11,6 +11,8 @@ export default function SuperAdminLibraryPage() {
       title="Library"
       description="Manage educational resources, videos, and documents."
       cacheNamespace="superadmin-library"
+      showTableFilePreviews={false}
+      portalTargetId="superadmin-library-page-root"
     />
   );
 }

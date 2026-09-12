@@ -33,12 +33,11 @@ export async function GET() {
       SELECT
         id::text AS id,
         title,
-        class_level
+        COALESCE(NULLIF(TRIM(class_level), ''), NULLIF(TRIM(title), '')) AS class_level
       FROM courses
-      WHERE class_level IS NOT NULL
-        AND TRIM(class_level) <> ''
+      WHERE COALESCE(NULLIF(TRIM(class_level), ''), NULLIF(TRIM(title), '')) IS NOT NULL
         AND LOWER(status::text) = 'active'
-      ORDER BY class_level ASC
+      ORDER BY COALESCE(NULLIF(TRIM(class_level), ''), NULLIF(TRIM(title), '')) ASC
     `;
 
     return json("Class levels fetched.", 200, { success: true, items });

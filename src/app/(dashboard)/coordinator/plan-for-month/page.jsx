@@ -23,7 +23,11 @@ export default async function PlanForMonthPage() {
     <div className="relative min-h-screen bg-[#FAF7F0]">
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(201,162,39,0.12),transparent_35%),radial-gradient(circle_at_top_right,rgba(45,138,106,0.12),transparent_32%),linear-gradient(180deg,#FAF7F0_0%,#F7F1E3_100%)]" />
       <div className="relative mx-auto max-w-7xl space-y-6 px-4 py-4 sm:px-6 lg:px-8">
-        <PlanForMonthClient />
+        <PlanForMonthClient
+          showTableMediaPreviews={false}
+          editModalPortalTargetId="coordinator-page-portal-root"
+          editModalPageScoped
+        />
       </div>
     </div>
   );

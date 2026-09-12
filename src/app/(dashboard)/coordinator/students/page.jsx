@@ -11,10 +11,13 @@ export default function CoordinatorStudentsPage() {
   const [classOptions, setClassOptions] = useState([]);
   const [search, setSearch] = useState("");
   const [classLevel, setClassLevel] = useState("");
+  const [status, setStatus] = useState("");
   const [classOpen, setClassOpen] = useState(false);
+  const [statusOpen, setStatusOpen] = useState(false);
 
   function closeSelectState() {
     setClassOpen(false);
+    setStatusOpen(false);
   }
 
   const load = useCallback(async () => {
@@ -54,23 +57,30 @@ export default function CoordinatorStudentsPage() {
   }, []);
 
   useEffect(() => {
-    load().catch((error) =>
-      setState({ items: [], loading: false, error: error.message })
-    );
+    const timer = window.setTimeout(() => {
+      load().catch((error) =>
+        setState({ items: [], loading: false, error: error.message })
+      );
+    }, 0);
+
+    return () => window.clearTimeout(timer);
   }, [load]);
 
   const filteredItems = useMemo(() => {
     const term = String(search || "").trim().toLowerCase();
     const selectedClass = String(classLevel || "").trim().toLowerCase();
+    const selectedStatus = String(status || "").trim().toLowerCase();
 
     return state.items.filter((item) => {
       const name = String(item.full_name || item.student_name || "").toLowerCase();
       const itemClass = String(item.class_level || item.grade_level || item.course_title || "").toLowerCase();
+      const itemStatus = String(item.status || "").toLowerCase();
       const matchesSearch = !term || name.includes(term);
       const matchesClass = !selectedClass || itemClass === selectedClass;
-      return matchesSearch && matchesClass;
+      const matchesStatus = !selectedStatus || itemStatus === selectedStatus;
+      return matchesSearch && matchesClass && matchesStatus;
     });
-  }, [state.items, search, classLevel]);
+  }, [state.items, search, classLevel, status]);
 
   return (
     <div className="min-h-screen space-y-6 bg-[#FAF7F0] px-4 py-6 sm:px-6 lg:px-8">
@@ -88,7 +98,7 @@ export default function CoordinatorStudentsPage() {
         </div>
       </section>
 
-      <div className="grid gap-3 rounded-[2rem] border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(250,247,240,0.98)_100%)] p-4 shadow-[0_20px_70px_-36px_rgba(13,59,46,0.18)] backdrop-blur-xl md:grid-cols-[minmax(0,1.4fr)_220px]">
+      <div className="grid gap-3 rounded-[2rem] border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(250,247,240,0.98)_100%)] p-4 shadow-[0_20px_70px_-36px_rgba(13,59,46,0.18)] backdrop-blur-xl md:grid-cols-[minmax(0,1.4fr)_220px_220px]">
         <label className="space-y-2">
           <span className="text-xs font-semibold uppercase tracking-[0.2em] text-[#245C4F]">Search student name</span>
           <input
@@ -119,6 +129,28 @@ export default function CoordinatorStudentsPage() {
             <ChevronDown
               aria-hidden="true"
               className={`pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#0D5C48] transition-transform duration-200 ${classOpen ? "rotate-180" : "rotate-0"}`}
+            />
+          </div>
+        </label>
+        <label className="space-y-2">
+          <span className="text-xs font-semibold uppercase tracking-[0.2em] text-[#245C4F]">Status filter</span>
+          <div className="relative">
+            <select
+              value={status}
+              onChange={(event) => setStatus(event.target.value)}
+              onMouseDown={() => setStatusOpen((current) => !current)}
+              onFocus={() => setStatusOpen(true)}
+              onBlur={closeSelectState}
+              className="w-full appearance-none rounded-2xl border border-[#2D8A6A]/25 bg-[#FAF7F0] px-4 py-3 pr-11 text-sm text-[#063F32] outline-none transition focus:border-[#2D8A6A] focus:ring-4 focus:ring-[#C9A227]/20"
+            >
+              <option value="">All statuses</option>
+              <option value="active">active</option>
+              <option value="suspended">suspended</option>
+              <option value="archived">archived</option>
+            </select>
+            <ChevronDown
+              aria-hidden="true"
+              className={`pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#0D5C48] transition-transform duration-200 ${statusOpen ? "rotate-180" : "rotate-0"}`}
             />
           </div>
         </label>

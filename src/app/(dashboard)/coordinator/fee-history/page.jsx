@@ -135,8 +135,13 @@ function getCurrentMonthFeeParts(row) {
   };
 }
 
-export default function CoordinatorFeeHistoryPage({ portalLabel = "Coordinator portal", canEdit = true }) {
+export default function CoordinatorFeeHistoryPage({
+  portalLabel = "Coordinator portal",
+  canEdit = true,
+  classOptionsApiPath = "/api/coordinator/classes",
+}) {
   const [items, setItems] = useState([]);
+  const [liveClassOptions, setLiveClassOptions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
@@ -168,10 +173,21 @@ export default function CoordinatorFeeHistoryPage({ portalLabel = "Coordinator p
     setLoading(true);
     setError("");
     try {
-      const response = await fetch("/api/coordinator/fee-history", { cache: "no-store" });
+      const [response, classesResponse] = await Promise.all([
+        fetch("/api/coordinator/fee-history", { cache: "no-store" }),
+        fetch(classOptionsApiPath, { cache: "no-store" }),
+      ]);
       const data = await response.json().catch(() => ({}));
+      const classesData = await classesResponse.json().catch(() => ({}));
       if (!response.ok) throw new Error(data?.message || "Unable to load fee history.");
       setItems(Array.isArray(data.items) ? data.items : []);
+      if (classesResponse.ok) {
+        setLiveClassOptions(
+          (Array.isArray(classesData.items) ? classesData.items : [])
+            .map((item) => String(item?.class_level || item?.title || "").trim())
+            .filter(Boolean)
+        );
+      }
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : "Unable to load fee history.");
       setItems([]);
@@ -530,8 +546,8 @@ export default function CoordinatorFeeHistoryPage({ portalLabel = "Coordinator p
   }, [historyColumnFilter, historySearchTerm, historyStatusFilter]);
 
   const classOptions = useMemo(() => {
-    return Array.from(new Set(items.map((item) => String(item.class_level || "").trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b));
-  }, [items]);
+    return Array.from(new Set(liveClassOptions.filter(Boolean))).sort((a, b) => a.localeCompare(b));
+  }, [liveClassOptions]);
 
   const filteredItems = useMemo(() => {
     const query = normalizeText(searchTerm);
@@ -842,7 +858,7 @@ export default function CoordinatorFeeHistoryPage({ portalLabel = "Coordinator p
                           this_month_paid: moneyInputValue(row.this_month_paid),
                         };
                         const parts = getCurrentMonthFeeParts(row);
-                        const currentMonthFeeValue = Number(parts.currentMonthFee || draft.current_month_fee || row.current_month_fee || 0);
+                        const currentMonthFeeValue = Number(draft.current_month_fee || row.current_month_fee || parts.currentMonthFee || 0);
                         const isAdmissionRow = String(row.source_type || "").toLowerCase() === "voucher-direct" || Number(parts.admissionFee || 0) > 0;
                         const hasAdmissionBreakdown = isAdmissionRow;
                         const hasMonthlyBreakdown = !hasAdmissionBreakdown && parts.regularFee > 0;
@@ -854,7 +870,7 @@ export default function CoordinatorFeeHistoryPage({ portalLabel = "Coordinator p
                           scholarshipAmount: hasBreakdown ? parts.scholarshipAmount : 0,
                           currentMonthFee: isAdmissionRow
                             ? Number(row.current_month_fee || row.total_amount || Math.max(parts.regularFee + parts.admissionFee - parts.discount - parts.scholarshipAmount, 0))
-                            : currentMonthFeeValue || parts.currentMonthFee || parts.regularFee,
+                            : currentMonthFeeValue,
                         };
                         const previousMonthDueValue = Number(
                           isAdmissionRow

@@ -131,7 +131,7 @@ function getOverviewCacheKey(view) {
 
 function getStatusOptions(view) {
   if (view === "students" || view === "parents") {
-    return ["", "active", "archived"];
+    return ["", "active", "suspended", "archived"];
   }
 
   return ["", "active", "suspended"];
@@ -255,6 +255,7 @@ export default function AdminUsersPage() {
     overviewItems: [],
     summary: null,
   });
+  const [classCatalog, setClassCatalog] = useState([]);
   const [modal, setModal] = useState({ open: false, record: null });
   const [detailModal, setDetailModal] = useState({ open: false, record: null });
   const [resetModal, setResetModal] = useState({
@@ -298,6 +299,34 @@ export default function AdminUsersPage() {
       role: rolePreset,
     }));
   }, [rolePreset, view]);
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadClassCatalog() {
+      if (view !== "students") {
+        if (active) setClassCatalog([]);
+        return;
+      }
+
+      try {
+        const response = await fetch("/api/admin/class-levels", { cache: "no-store" });
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) return;
+        if (active) {
+          setClassCatalog(Array.isArray(data.items) ? data.items : []);
+        }
+      } catch {
+        if (active) setClassCatalog([]);
+      }
+    }
+
+    void loadClassCatalog();
+
+    return () => {
+      active = false;
+    };
+  }, [view]);
 
   const loadOverview = useCallback(async (options = {}) => {
     const requestId = ++loadOverviewRequestRef.current;
@@ -518,6 +547,52 @@ export default function AdminUsersPage() {
     }
   }, [isStaffView, rolePreset, view]);
 
+  const mergeSavedStaffRecord = useCallback((item) => {
+    if (!item?.id || !isStaffView) {
+      return;
+    }
+
+    const normalizedItem = {
+      ...item,
+      role: String(item.role || "").toLowerCase(),
+      roles: item.roles || item.role,
+    };
+    const cacheKey = getCacheKey({ ...DEFAULT_FILTERS, role: rolePreset });
+    const overviewCacheKey = getOverviewCacheKey(view);
+
+    setState((current) => {
+      const allStaffItems = dedupeUsersById([normalizedItem, ...(current.allStaffItems || [])]);
+      const items = dedupeUsersById([normalizedItem, ...(current.items || [])]);
+      const overviewItems = dedupeUsersById([normalizedItem, ...(current.overviewItems || [])]);
+
+      writeCache(cacheKey, { items: allStaffItems });
+      writeCache(overviewCacheKey, {
+        items: allStaffItems,
+        summary: {
+          total: allStaffItems.length,
+          active: allStaffItems.filter((row) => String(row.status || "").toLowerCase() === "active").length,
+          suspended: allStaffItems.filter((row) => String(row.status || "").toLowerCase() === "suspended").length,
+          archived: allStaffItems.filter((row) => String(row.status || "").toLowerCase() === "archived").length,
+        },
+      });
+
+      return {
+        ...current,
+        loading: false,
+        overviewLoading: false,
+        items,
+        allStaffItems,
+        overviewItems,
+        summary: {
+          total: overviewItems.length,
+          active: overviewItems.filter((row) => String(row.status || "").toLowerCase() === "active").length,
+          suspended: overviewItems.filter((row) => String(row.status || "").toLowerCase() === "suspended").length,
+          archived: overviewItems.filter((row) => String(row.status || "").toLowerCase() === "archived").length,
+        },
+      };
+    });
+  }, [isStaffView, rolePreset, view]);
+
   useEffect(() => {
     const timer = window.setTimeout(() => {
       void loadOverview();
@@ -713,12 +788,12 @@ export default function AdminUsersPage() {
 
     return Array.from(
       new Set(
-        (state.overviewItems || [])
-          .map((item) => String(item.class_level || "").trim())
+        classCatalog
+          .map((item) => String(item.class_level || item.title || "").trim())
           .filter(Boolean)
       )
     ).sort((left, right) => left.localeCompare(right));
-  }, [state.overviewItems, view]);
+  }, [classCatalog, view]);
 
   const statusOptions = useMemo(() => getStatusOptions(view), [view]);
 
@@ -991,10 +1066,10 @@ export default function AdminUsersPage() {
         <form
           className={`grid gap-3 ${
             view === "staff"
-              ? "lg:grid-cols-[minmax(0,1.2fr)_220px_220px_auto]"
+              ? "lg:grid-cols-[minmax(0,1.2fr)_220px_220px]"
               : view === "students"
-                ? "lg:grid-cols-[minmax(0,1.2fr)_220px_220px_auto]"
-                : "lg:grid-cols-[minmax(0,1.2fr)_220px_auto]"
+                ? "lg:grid-cols-[minmax(0,1.2fr)_220px_220px]"
+                : "lg:grid-cols-[minmax(0,1.2fr)_220px]"
           }`}
           onSubmit={submitSearch}
         >
@@ -1105,12 +1180,6 @@ export default function AdminUsersPage() {
             </div>
           </label>
 
-          <button
-            type="submit"
-            className="mt-7 inline-flex h-12 items-center justify-center rounded-2xl border border-[#2D8A6A]/20 bg-[#0D5C48] px-4 text-sm font-semibold text-[#FAF7F0] transition hover:bg-[#063F32]"
-          >
-            Apply
-          </button>
         </form>
         </section>
 
@@ -1363,7 +1432,10 @@ export default function AdminUsersPage() {
                 ]
           }
           onClose={() => setModal({ open: false, record: null })}
-          onSuccess={() => Promise.all([loadOverview({ force: true }), loadTable({ force: true })])}
+          onSuccess={(item) => {
+            mergeSavedStaffRecord(item);
+            void Promise.all([loadOverview({ force: true }), loadTable({ force: true })]);
+          }}
         />
       ) : null}
 

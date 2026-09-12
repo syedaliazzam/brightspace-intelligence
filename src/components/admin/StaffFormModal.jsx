@@ -24,6 +24,18 @@ const STATUS_OPTIONS = [
   { label: "Suspended", value: "suspended" },
 ];
 
+const STUDENT_STATUS_OPTIONS = [
+  { label: "Active", value: "active" },
+  { label: "Suspended", value: "suspended" },
+  { label: "Archived", value: "archived" },
+];
+
+const USER_STATUS_OPTIONS = [
+  { label: "Active", value: "active" },
+  { label: "Suspended", value: "suspended" },
+  { label: "Archived", value: "archived" },
+];
+
 const PARENT_RELATION_OPTIONS = [
   { label: "Mother", value: "mother" },
   { label: "Father", value: "father" },
@@ -61,6 +73,7 @@ export default function StaffFormModal({
   const [form, setForm] = useState(getInitialState(record));
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
+  const [existingUser, setExistingUser] = useState(null);
   const [showPassword, setShowPassword] = useState(false);
   const [relationOpen, setRelationOpen] = useState(false);
   const [roleOpen, setRoleOpen] = useState(false);
@@ -74,9 +87,12 @@ export default function StaffFormModal({
       return;
     }
 
+    // Reset the modal state each time a fresh record/create flow is opened.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setForm(getInitialState(record));
     setPending(false);
     setError("");
+    setExistingUser(null);
     setShowPassword(false);
     setRelationOpen(false);
     setRoleOpen(false);
@@ -93,6 +109,7 @@ export default function StaffFormModal({
     setRoleOpen(false);
     setStatusOpen(false);
     setError("");
+    setExistingUser(null);
     setForm(getInitialState(record));
     onClose?.();
   }
@@ -101,6 +118,7 @@ export default function StaffFormModal({
     event.preventDefault();
     setPending(true);
     setError("");
+    setExistingUser(null);
 
     try {
       const endpoint =
@@ -142,6 +160,9 @@ export default function StaffFormModal({
       const data = await response.json();
 
       if (!response.ok) {
+        if (data?.existingUser) {
+          setExistingUser(data.existingUser);
+        }
         throw new Error(data?.message || "Unable to save staff record.");
       }
 
@@ -346,7 +367,7 @@ export default function StaffFormModal({
                   </label>
                 ) : null}
 
-                {mode === "edit" && !isParentEdit ? (
+                {mode === "edit" ? (
                   <label className="block">
                     <span className="mb-2 block text-sm font-medium text-[#245C4F]">
                       Status
@@ -360,7 +381,7 @@ export default function StaffFormModal({
                         onBlur={() => window.setTimeout(() => setStatusOpen(false), 0)}
                         onMouseDown={() => setStatusOpen((current) => !current)}
                       >
-                        {STATUS_OPTIONS.map((option) => (
+                        {(isStudentEdit || isParentEdit ? USER_STATUS_OPTIONS : STATUS_OPTIONS).map((option) => (
                           <option key={option.value} value={option.value}>
                             {option.label}
                           </option>
@@ -400,9 +421,18 @@ export default function StaffFormModal({
               </div>
 
               {error ? (
-                <p className="rounded-2xl bg-rose-50 px-4 py-3 text-sm text-rose-700">
-                  {error}
-                </p>
+                <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                  <p className="font-semibold">{error}</p>
+                  {existingUser ? (
+                    <div className="mt-3 grid gap-2 rounded-2xl border border-rose-100 bg-white/80 p-3 text-[#063F32] sm:grid-cols-2">
+                      <p><span className="font-semibold">Name:</span> {existingUser.name || "Not provided"}</p>
+                      <p><span className="font-semibold">Email:</span> {existingUser.email || "Not provided"}</p>
+                      <p><span className="font-semibold">Phone:</span> {existingUser.phone || "Not provided"}</p>
+                      <p><span className="font-semibold">Role:</span> {existingUser.roles || "Not provided"}</p>
+                      <p><span className="font-semibold">Status:</span> {existingUser.status || "Not provided"}</p>
+                    </div>
+                  ) : null}
+                </div>
               ) : null}
 
               <div className="flex flex-wrap justify-end gap-3">

@@ -1,7 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { ChevronDown, RotateCcw, Search } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { ChevronDown, RefreshCw, RotateCcw, Search } from "lucide-react";
+
+const CACHE_KEY = "resend-emails:list";
+const CACHE_TTL = 60 * 1000;
 
 function formatDateTime(value) {
   if (!value) return "-";
@@ -36,50 +39,109 @@ function searchableValue(item, column) {
   return String(item?.[column] || "");
 }
 
+function readCache() {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.sessionStorage.getItem(CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (Date.now() - parsed.timestamp > CACHE_TTL) {
+      window.sessionStorage.removeItem(CACHE_KEY);
+      return null;
+    }
+    return parsed.payload;
+  } catch {
+    return null;
+  }
+}
+
+function writeCache(payload) {
+  if (typeof window === "undefined") return;
+  try {
+    window.sessionStorage.setItem(
+      CACHE_KEY,
+      JSON.stringify({ timestamp: Date.now(), payload })
+    );
+  } catch {
+    // SessionStorage may fail in private mode
+  }
+}
+
 export default function ResendEmailsPage({
   portalLabel = "Coordinator portal",
   title = "Sent emails",
   description = "Review emails sent to users through Resend.",
 }) {
   const pageSize = 7;
-  const [items, setItems] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const initialCache = readCache();
+  const [items, setItems] = useState(() => (Array.isArray(initialCache?.items) ? initialCache.items : []));
+  const [loading, setLoading] = useState(!initialCache);
+  const [refreshing, setRefreshing] = useState(false);
   const [message, setMessage] = useState("");
   const [tone, setTone] = useState("success");
   const [page, setPage] = useState(1);
   const [openSelect, setOpenSelect] = useState("");
   const [selectedEmail, setSelectedEmail] = useState(null);
   const [emailPopupLoading, setEmailPopupLoading] = useState(false);
+  const emailDetailsCache = useRef(new Map());
   const [filters, setFilters] = useState({
     event: "all",
     column: "all",
     search: "",
   });
 
-  async function load() {
-    setLoading(true);
+  async function load({ force = false } = {}) {
+    if (force) {
+      setRefreshing(true);
+    } else {
+      const cached = readCache();
+      if (cached && Array.isArray(cached.items)) {
+        setItems(cached.items);
+        setLoading(false);
+        return;
+      }
+      setLoading(true);
+    }
+
     try {
-      const response = await fetch("/api/coordinator/resend-emails", { cache: "no-store" });
+      const url = force ? "/api/coordinator/resend-emails?force=true" : "/api/coordinator/resend-emails";
+      const response = await fetch(url, { cache: "no-store" });
       const data = await response.json();
       if (!response.ok) throw new Error(data?.message || "Unable to load sent emails.");
-      setItems(Array.isArray(data.items) ? data.items : []);
+      const loadedItems = Array.isArray(data.items) ? data.items : [];
+      setItems(loadedItems);
+      writeCache({ items: loadedItems });
     } catch (error) {
       setTone("error");
       setMessage(error instanceof Error ? error.message : "Unable to load sent emails.");
-      setItems([]);
+      if (!items.length) {
+        setItems([]);
+      }
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   }
 
   async function openEmail(id) {
+    if (!id) return;
+
+    if (emailDetailsCache.current.has(id)) {
+      setSelectedEmail(emailDetailsCache.current.get(id));
+      return;
+    }
+
     setEmailPopupLoading(true);
     setSelectedEmail({ subject: "Loading...", html: "", text: "", to: [] });
     try {
       const response = await fetch(`/api/coordinator/resend-emails/${encodeURIComponent(id)}`, { cache: "no-store" });
       const data = await response.json();
       if (!response.ok) throw new Error(data?.message || "Unable to load email content.");
-      setSelectedEmail(data.item || null);
+      const item = data.item || null;
+      if (item) {
+        emailDetailsCache.current.set(id, item);
+      }
+      setSelectedEmail(item);
     } catch (error) {
       setSelectedEmail(null);
       setTone("error");
@@ -261,11 +323,21 @@ export default function ResendEmailsPage({
               </div>
             </label>
 
-            <div className="flex items-end gap-3">
+            <div className="flex items-end gap-2 sm:gap-3">
+              <button
+                type="button"
+                onClick={() => void load({ force: true })}
+                disabled={refreshing || loading}
+                title="Force refresh sent emails"
+                className="inline-flex h-[46px] items-center gap-2 rounded-2xl border border-[#2D8A6A]/20 bg-white px-4 text-sm font-semibold text-[#0D5C48] transition hover:border-[#2D8A6A] hover:bg-[#F7FBF8] disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
+                {refreshing ? "Refreshing..." : "Refresh"}
+              </button>
               <button
                 type="button"
                 onClick={() => setFilters({ event: "all", column: "all", search: "" })}
-                className="inline-flex h-[46px] items-center gap-2 rounded-2xl border border-[#2D8A6A]/20 bg-white px-4 text-sm font-semibold text-[#0D5C48] transition hover:border-[#2D8A6A]"
+                className="inline-flex h-[46px] items-center gap-2 rounded-2xl border border-[#2D8A6A]/20 bg-white px-4 text-sm font-semibold text-[#0D5C48] transition hover:border-[#2D8A6A] hover:bg-[#F7FBF8]"
               >
                 <RotateCcw className="h-4 w-4" />
                 Reset

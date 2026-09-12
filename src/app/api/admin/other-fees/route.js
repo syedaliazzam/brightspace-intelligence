@@ -12,9 +12,9 @@ function normalizeText(value) {
   return typeof value === "string" ? value.trim() : "";
 }
 
-function normalizeLettersOnly(value) {
+function normalizeReferenceText(value) {
   if (typeof value !== "string") return "";
-  return value.replace(/[^A-Za-z]/g, "");
+  return value.replace(/[^A-Za-z ]/g, "").replace(/\s+/g, " ").trim();
 }
 
 function normalizeMoney(value) {
@@ -107,7 +107,7 @@ export async function POST(request) {
     const name = normalizeText(body?.name || body?.title);
     const feeType = normalizeText(body?.fee_type || body?.feeType);
     const classLevel = normalizeText(body?.class_level || body?.classLevel);
-    const discountReference = normalizeLettersOnly(body?.discount_reference || body?.discountReference || body?.reference);
+    const discountReference = normalizeReferenceText(body?.discount_reference || body?.discountReference || body?.reference);
     const description = normalizeText(body?.description);
     const amount = normalizeMoney(body?.amount);
     const discountId = normalizeText(body?.discount_id || body?.discountId);
@@ -169,7 +169,7 @@ export async function PATCH(request) {
     const name = normalizeText(body?.name || body?.title);
     const feeType = normalizeText(body?.fee_type || body?.feeType);
     const classLevel = normalizeText(body?.class_level || body?.classLevel);
-    const discountReference = normalizeLettersOnly(body?.discount_reference || body?.discountReference || body?.reference);
+    const discountReference = normalizeReferenceText(body?.discount_reference || body?.discountReference || body?.reference);
     const description = normalizeText(body?.description);
     const amount = normalizeMoney(body?.amount);
     const discountId = normalizeText(body?.discount_id || body?.discountId);

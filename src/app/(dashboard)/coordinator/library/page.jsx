@@ -10,6 +10,8 @@ export default function CoordinatorLibraryPage() {
       portalLabel="Coordinator portal"
       title="Library"
       description="Manage educational resources, videos, and documents."
+      cacheNamespace="coordinator-library"
+      showTableFilePreviews={false}
     />
   );
 }

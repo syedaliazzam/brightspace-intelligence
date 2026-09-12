@@ -32,6 +32,15 @@ function writeLibraryCache(key, data) {
   }
 }
 
+function clearLibraryCache(key) {
+  if (!key || typeof window === "undefined") return;
+  try {
+    window.sessionStorage.removeItem(key);
+  } catch {
+    // Ignore storage failures; the next load can still fetch fresh data.
+  }
+}
+
 function formatDate(value) {
   if (!value) return "-";
   const date = new Date(value);
@@ -209,6 +218,11 @@ export default function LibraryPageShell({
     return query ? `?${query}` : "";
   }
 
+  function getLibraryCacheKey() {
+    if (!cacheNamespace) return "";
+    return `${cacheNamespace}:library:${buildPortalQuery()}`;
+  }
+
   async function loadData() {
     setLoading(true);
     setError("");
@@ -327,6 +341,7 @@ export default function LibraryPageShell({
       resetForm();
       setMessage("Document saved successfully.");
       window.setTimeout(() => setMessage(""), 3000);
+      clearLibraryCache(getLibraryCacheKey());
       await loadData();
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : "Unable to save document.");
@@ -354,6 +369,7 @@ export default function LibraryPageShell({
       setDeleteTargetId(null);
       setMessage(data?.message || "Document archived successfully.");
       window.setTimeout(() => setMessage(""), 3000);
+      clearLibraryCache(getLibraryCacheKey());
       await loadData();
     } catch (deleteError) {
       setError(deleteError instanceof Error ? deleteError.message : "Unable to archive document.");

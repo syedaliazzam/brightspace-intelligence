@@ -252,7 +252,7 @@ export default function RegularFeeVouchersPage() {
         {error ? <div className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">{error}</div> : null}
 
         <section className="rounded-[2rem] border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(250,247,240,0.98)_100%)] p-5 shadow-[0_20px_70px_-36px_rgba(13,59,46,0.18)] backdrop-blur-xl sm:p-6">
-          <form className="grid gap-4 md:grid-cols-2" onSubmit={submit}>
+          <form className="grid min-w-0 gap-4 md:grid-cols-4" onSubmit={submit}>
             <label className="block">
               <span className="mb-2 block text-sm font-medium text-[#245C4F]">Class</span>
               <div className="relative">
@@ -299,7 +299,7 @@ export default function RegularFeeVouchersPage() {
                 required
               />
             </label>
-            <div className="md:col-span-2">
+            <div className="md:col-span-4">
               <p className="mb-3 block text-sm font-medium text-[#245C4F]">Bank / Payment Method</p>
                 <div className="grid gap-3 [@media(min-width:600px)]:grid-cols-2">
                 {paymentMethods.map((method) => {
@@ -330,7 +330,7 @@ export default function RegularFeeVouchersPage() {
               {!paymentMethods.length ? <p className="mt-2 text-sm text-[#245C4F]">No payment methods available.</p> : null}
             </div>
             {form.classId ? (
-              <div className="md:col-span-2">
+              <div className="min-w-0 md:col-span-4">
                 <div className="mb-3 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
                   <div>
                     <p className="text-sm font-semibold text-[#063F32]">Student fee details</p>
@@ -340,7 +340,7 @@ export default function RegularFeeVouchersPage() {
                     {selectedClassStudents.length} students
                   </p>
                 </div>
-                <div className="overflow-x-auto rounded-[1.5rem] border border-[#2D8A6A]/15 bg-white">
+                <div className="w-full max-w-full overflow-x-auto rounded-[1.5rem] border border-[#2D8A6A]/15 bg-white">
                   <table className="min-w-[980px] w-full text-left text-sm">
                     <thead className="bg-[linear-gradient(180deg,#FAF7F0_0%,#F1EADC_100%)] text-xs uppercase tracking-[0.16em] text-[#0D5C48]">
                       <tr>

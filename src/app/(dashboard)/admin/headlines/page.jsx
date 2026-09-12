@@ -296,22 +296,22 @@ export default function AdminHeadlinesPage() {
         </section>
 
         {!isAdminReadonlyPortal ? (
-        <section className="rounded-[2rem] border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(250,247,240,0.98)_100%)] p-5 shadow-[0_20px_70px_-36px_rgba(13,59,46,0.18)] backdrop-blur-xl sm:p-6">
-          <div className="mb-5 flex items-center justify-between gap-3">
-            <div>
-              <p className="text-sm font-semibold uppercase tracking-[0.22em] text-[#0D5C48]">Create headline</p>
-              <h2 className="mt-2 font-body text-2xl font-semibold tracking-tight text-[#063F32]">New dashboard headline</h2>
+          <section className="rounded-[2rem] border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(250,247,240,0.98)_100%)] p-5 shadow-[0_20px_70px_-36px_rgba(13,59,46,0.18)] backdrop-blur-xl sm:p-6">
+            <div className="mb-5 flex items-center justify-between gap-3">
+              <div>
+                <p className="text-sm font-semibold uppercase tracking-[0.22em] text-[#0D5C48]">Create headline</p>
+                <h2 className="mt-2 font-body text-2xl font-semibold tracking-tight text-[#063F32]">New dashboard headline</h2>
+              </div>
             </div>
-          </div>
 
-          <HeadlineForm
-            form={createForm}
-            onChange={setCreateForm}
-            onSubmit={createHeadline}
-            submitting={submitting}
-            submitLabel="Create headline"
-          />
-        </section>
+            <HeadlineForm
+              form={createForm}
+              onChange={setCreateForm}
+              onSubmit={createHeadline}
+              submitting={submitting}
+              submitLabel="Create headline"
+            />
+          </section>
         ) : null}
 
         {error ? (
@@ -326,66 +326,66 @@ export default function AdminHeadlinesPage() {
           </section>
         ) : null}
 
-         <AdminDataTable
-            loading={loading}
-            loadingTitle="Loading headlines"
-            loadingSubtitle="Preparing the announcement table..."
-            columns={[
-              {
-                key: "headline",
-                label: "Headline",
-                render: (row) => <p className="max-w-xl whitespace-pre-wrap font-medium text-[#063F32]">{row.headline}</p>,
-              },
-              {
-                key: "date_range",
-                label: "Date range",
-                render: (row) => `${formatDate(row.start_date)} to ${formatDate(row.end_date)}`,
-              },
-              {
-                key: "display_status",
-                label: "Status",
-                render: (row) => formatStatus(row.display_status),
-              },
-              {
-                key: "created_by_name",
-                label: "Created by",
-                render: (row) => row.created_by_name || "Admin",
-              },
-            ]}
-            rows={loading ? [] : items}
-            emptyMessage={loading ? "Loading headlines..." : "No headlines have been created yet."}
-            actions={!isAdminReadonlyPortal ? (row) => (
-              <>
-                <button
-                  type="button"
-                  onClick={() => startEdit(row)}
-                  className="rounded-xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-3 py-2 text-xs font-semibold text-[#063F32] transition hover:bg-[#F1EADC]"
-                >
-                  Edit
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setDeletingItem(row)}
-                  className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700 transition hover:bg-rose-100"
-                >
-                  {submitting ? (
-                    <span className="inline-flex items-center gap-2">
-                      <LeafSpinnerInline />
-                      Deleting...
-                    </span>
-                  ) : (
-                    "Delete"
-                  )}
-                </button>
-              </>
-            ) : null}
-          />
-        </div>
+        <AdminDataTable
+          loading={loading}
+          loadingTitle="Loading headlines"
+          loadingSubtitle="Preparing the announcement table..."
+          columns={[
+            {
+              key: "headline",
+              label: "Headline",
+              render: (row) => <p className="max-w-xl whitespace-pre-wrap font-medium text-[#063F32]">{row.headline}</p>,
+            },
+            {
+              key: "date_range",
+              label: "Date range",
+              render: (row) => `${formatDate(row.start_date)} to ${formatDate(row.end_date)}`,
+            },
+            {
+              key: "display_status",
+              label: "Status",
+              render: (row) => formatStatus(row.display_status),
+            },
+            {
+              key: "created_by_name",
+              label: "Created by",
+              render: (row) => row.created_by_name || "Admin",
+            },
+          ]}
+          rows={loading ? [] : items}
+          emptyMessage={loading ? "Loading headlines..." : "No headlines have been created yet."}
+          actions={!isAdminReadonlyPortal ? (row) => (
+            <>
+              <button
+                type="button"
+                onClick={() => startEdit(row)}
+                className="rounded-xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-3 py-2 text-xs font-semibold text-[#063F32] transition hover:bg-[#F1EADC]"
+              >
+                Edit
+              </button>
+              <button
+                type="button"
+                onClick={() => setDeletingItem(row)}
+                className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700 transition hover:bg-rose-100"
+              >
+                {submitting ? (
+                  <span className="inline-flex items-center gap-2">
+                    <LeafSpinnerInline />
+                    Deleting...
+                  </span>
+                ) : (
+                  "Delete"
+                )}
+              </button>
+            </>
+          ) : null}
+        />
+      </div>
 
-        {!isAdminReadonlyPortal && editingId ? (
-          <div className="fixed inset-0 z-50 overflow-y-auto bg-[#063F32]/45 px-4 pb-8 pt-24 backdrop-blur-sm sm:pt-28">
-            <div className="mx-auto w-full max-w-3xl">
-              <section className="overflow-hidden rounded-[2rem] border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(250,247,240,0.98)_100%)] shadow-[0_32px_90px_-38px_rgba(13,59,46,0.24)]">
+      {!isAdminReadonlyPortal && editingId ? (
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-[#063F32]/45 px-4 pb-8 pt-24 backdrop-blur-sm sm:pt-28">
+          <div className="mx-auto w-full max-w-3xl">
+            <section className="overflow-hidden rounded-[2rem] border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(250,247,240,0.98)_100%)] shadow-[0_32px_90px_-38px_rgba(13,59,46,0.24)]">
               <div className="bg-[linear-gradient(135deg,rgba(13,59,46,0.98),rgba(13,92,72,0.94))] px-6 py-6 text-[#FAF7F0] sm:px-8">
                 <div className="flex items-start justify-between gap-4">
                   <div className="max-w-2xl">
@@ -421,16 +421,16 @@ export default function AdminHeadlinesPage() {
                   submitLabel="Update headline"
                 />
               </div>
-              </section>
-            </div>
+            </section>
           </div>
-        ) : null}
+        </div>
+      ) : null}
 
-        {!isAdminReadonlyPortal && deletingItem ? (
-          <div className="fixed inset-0 z-[60] overflow-y-auto bg-[#063F32]/45 px-4 pb-8 pt-20 backdrop-blur-sm sm:pt-24">
-            <div className="mx-auto w-full max-w-2xl">
-              <section className="overflow-hidden rounded-[2rem] border border-rose-200 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(250,247,240,0.98)_100%)] shadow-[0_32px_90px_-38px_rgba(13,59,46,0.24)]">
-              <div className="bg-[linear-gradient(135deg,rgba(127,29,29,0.98),rgba(185,28,28,0.95),rgba(254,226,226,0.92))] px-6 py-6 text-white sm:px-8">
+      {!isAdminReadonlyPortal && deletingItem ? (
+        <div className="fixed inset-0 z-[60] overflow-y-auto bg-[#063F32]/45 px-4 pb-8 pt-20 backdrop-blur-sm sm:pt-24">
+          <div className="mx-auto w-full max-w-2xl">
+            <section className="overflow-hidden rounded-[2rem] border border-rose-200 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(250,247,240,0.98)_100%)] shadow-[0_32px_90px_-38px_rgba(13,59,46,0.24)]">
+              <div className="bg-rose-600 px-6 py-6 text-white sm:px-8">
                 <div className="flex items-start justify-between gap-4">
                   <div className="max-w-xl">
                     <p className="text-sm font-semibold uppercase tracking-[0.24em] text-rose-100">Delete headline</p>
@@ -483,10 +483,10 @@ export default function AdminHeadlinesPage() {
                   </button>
                 </div>
               </div>
-              </section>
-            </div>
+            </section>
           </div>
-        ) : null}
-      </div>
+        </div>
+      ) : null}
+    </div>
   );
 }

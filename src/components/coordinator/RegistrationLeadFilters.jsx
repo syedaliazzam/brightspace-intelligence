@@ -201,14 +201,16 @@ export default function RegistrationLeadFilters({
         </div>
 
         <div className="flex flex-col gap-3 sm:flex-row">
-          <button
-            type="button"
-            onClick={() => applyFilters(search.trim(), status)}
-            disabled={isPending}
-            className="inline-flex items-center justify-center rounded-2xl border border-[#2D8A6A]/20 bg-[#0D5C48] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[#063F32] disabled:cursor-not-allowed disabled:opacity-70"
-          >
-            {isPending ? "Applying..." : "Apply filters"}
-          </button>
+          {!clientSide ? (
+            <button
+              type="button"
+              onClick={() => applyFilters(search.trim(), status)}
+              disabled={isPending}
+              className="inline-flex items-center justify-center rounded-2xl border border-[#2D8A6A]/20 bg-[#0D5C48] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[#063F32] disabled:cursor-not-allowed disabled:opacity-70"
+            >
+              {isPending ? "Applying..." : "Apply filters"}
+            </button>
+          ) : null}
 
           {canSync ? (
             <button

@@ -135,17 +135,16 @@ export default function SubjectFormModal({
                     Available classes
                   </span>
                   <div className="rounded-2xl border border-[#2D8A6A]/15 bg-[#FAF7F0] p-4">
-                    <div className="grid gap-3 sm:grid-cols-2">
+                    <div className="grid gap-3 sm:grid-cols-3">
                       {classOptions.map((item) => {
                         const checked = form.courseIds.includes(item.id);
                         return (
                           <label
                             key={item.id}
-                            className={`flex items-center gap-3 rounded-2xl border px-4 py-3 text-sm transition ${
-                              checked
+                            className={`flex items-center gap-3 rounded-2xl border px-4 py-3 text-sm transition ${checked
                                 ? "border-[#C9A227]/35 bg-[#FFF5D6] text-[#063F32]"
                                 : "border-[#2D8A6A]/15 bg-white text-[#245C4F]"
-                            }`}
+                              }`}
                           >
                             <input
                               type="checkbox"

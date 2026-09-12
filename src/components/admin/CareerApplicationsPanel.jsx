@@ -5,6 +5,8 @@ import { ExternalLink, Download, Search, Trash2, Pencil } from "lucide-react";
 import { OpenBookLoader } from "@/components/shared/AshShajrahLoaders";
 import AdminDataTable from "@/components/admin/AdminDataTable";
 
+const CACHE_TTL = 60 * 1000;
+
 function formatDate(value) {
   if (!value) return "-";
   const date = new Date(value);
@@ -12,8 +14,42 @@ function formatDate(value) {
   return new Intl.DateTimeFormat("en-US", { dateStyle: "medium", timeStyle: "short" }).format(date);
 }
 
-export default function CareerApplicationsPanel() {
-  const [state, setState] = useState({ loading: true, error: "", items: [] });
+function readCache(key) {
+  if (!key || typeof window === "undefined") return null;
+  try {
+    const raw = window.sessionStorage.getItem(key);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed?.cachedAt || Date.now() - parsed.cachedAt >= CACHE_TTL) {
+      window.sessionStorage.removeItem(key);
+      return null;
+    }
+    return parsed.items;
+  } catch {
+    window.sessionStorage.removeItem(key);
+    return null;
+  }
+}
+
+function writeCache(key, items) {
+  if (!key || typeof window === "undefined") return;
+  try {
+    window.sessionStorage.setItem(key, JSON.stringify({ items, cachedAt: Date.now() }));
+  } catch {
+    // Keep the page usable if browser storage is unavailable.
+  }
+}
+
+export default function CareerApplicationsPanel({ cacheNamespace = "" }) {
+  const cacheKey = cacheNamespace ? `${cacheNamespace}:career-applications` : "";
+  const [state, setState] = useState(() => {
+    const cachedItems = readCache(cacheKey);
+    return {
+      loading: !Array.isArray(cachedItems),
+      error: "",
+      items: Array.isArray(cachedItems) ? cachedItems : [],
+    };
+  });
   const [selectedMessage, setSelectedMessage] = useState(null);
   const [search, setSearch] = useState("");
   const [deleteTarget, setDeleteTarget] = useState(null);
@@ -46,7 +82,9 @@ export default function CareerApplicationsPanel() {
         }
 
         if (active) {
-          setState({ loading: false, error: "", items: Array.isArray(data.items) ? data.items : [] });
+          const nextItems = Array.isArray(data.items) ? data.items : [];
+          writeCache(cacheKey, nextItems);
+          setState({ loading: false, error: "", items: nextItems });
         }
       } catch (error) {
         if (active) {
@@ -64,7 +102,7 @@ export default function CareerApplicationsPanel() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [cacheKey]);
 
   const filteredItems = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -98,6 +136,7 @@ export default function CareerApplicationsPanel() {
         ...current,
         items: current.items.filter((item) => item.id !== deleteTarget.id),
       }));
+      writeCache(cacheKey, state.items.filter((item) => item.id !== deleteTarget.id));
       setSelectedMessage((current) => (current?.id === deleteTarget.id ? null : current));
       setDeleteTarget(null);
     } catch (error) {
@@ -155,6 +194,10 @@ export default function CareerApplicationsPanel() {
         ...current,
         items: current.items.map((item) => (item.id === editTarget.id ? { ...item, ...(data.item || editForm) } : item)),
       }));
+      writeCache(
+        cacheKey,
+        state.items.map((item) => (item.id === editTarget.id ? { ...item, ...(data.item || editForm) } : item))
+      );
       setSelectedMessage((current) => (current?.id === editTarget.id ? { ...current, ...(data.item || editForm) } : current));
       setEditResumeFile(null);
       setEditTarget(null);
@@ -227,6 +270,7 @@ export default function CareerApplicationsPanel() {
       ) : null}
       {!state.loading ? (
         <section className="rounded-[1.75rem] border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(250,247,240,0.98)_100%)] p-4 shadow-[0_18px_60px_-36px_rgba(13,59,46,0.18)]">
+          <span className="mb-2 block text-sm font-medium text-[#245C4F]">Search</span>
           <label className="flex items-center gap-3 rounded-2xl border border-[#2D8A6A]/15 bg-white px-4 py-3 shadow-sm">
             <Search className="h-4 w-4 text-[#0D5C48]" />
             <input

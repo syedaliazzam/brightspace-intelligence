@@ -35,6 +35,7 @@ export default function ParentTable({ items = [], onRefresh }) {
   const [deleteItem, setDeleteItem] = useState(null);
   const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [relationOpen, setRelationOpen] = useState(false);
   const [statusOpen, setStatusOpen] = useState(false);
 
@@ -88,11 +89,16 @@ export default function ParentTable({ items = [], onRefresh }) {
 
   async function confirmArchive() {
     if (!deleteItem) return;
-    const response = await fetch(`/api/coordinator/parents?id=${deleteItem.id}`, { method: "DELETE" });
-    const data = await response.json();
-    if (!response.ok) throw new Error(data?.message || "Unable to archive parent.");
-    setDeleteItem(null);
-    onRefresh?.();
+    setDeleting(true);
+    try {
+      const response = await fetch(`/api/coordinator/parents?id=${deleteItem.id}`, { method: "DELETE" });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data?.message || "Unable to archive parent.");
+      setDeleteItem(null);
+      onRefresh?.();
+    } finally {
+      setDeleting(false);
+    }
   }
 
   function closeSelectState() {
@@ -325,11 +331,11 @@ export default function ParentTable({ items = [], onRefresh }) {
                 </p>
               </div>
               <div className="flex flex-wrap justify-end gap-3 px-6 py-5">
-                <button type="button" onClick={() => setDeleteItem(null)} className="rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 text-sm font-semibold text-[#063F32] transition hover:bg-[#F1EADC]">
+                <button type="button" onClick={() => setDeleteItem(null)} disabled={deleting} className="rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 text-sm font-semibold text-[#063F32] transition hover:bg-[#F1EADC] disabled:cursor-not-allowed disabled:opacity-70">
                   Cancel
                 </button>
-                <button type="button" onClick={() => confirmArchive().catch((error) => window.alert(error.message))} className="rounded-2xl bg-rose-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-rose-700">
-                  Delete
+                <button type="button" onClick={() => confirmArchive().catch((error) => window.alert(error.message))} disabled={deleting} className="rounded-2xl bg-rose-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-70">
+                  {deleting ? "Deleting..." : "Delete"}
                 </button>
               </div>
             </div>

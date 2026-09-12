@@ -97,11 +97,22 @@ export async function GET() {
       prisma.$queryRaw`SELECT COUNT(*)::int AS total FROM student_profiles WHERE status = 'active'`,
       prisma.$queryRaw`
         SELECT
-          COALESCE(NULLIF(TRIM(sp.grade_level), ''), 'Unassigned') AS class_level,
-          COUNT(*)::int AS total
-        FROM student_profiles sp
-        WHERE LOWER(COALESCE(sp.status::text, '')) = 'active'
-        GROUP BY COALESCE(NULLIF(TRIM(sp.grade_level), ''), 'Unassigned')
+          COALESCE(NULLIF(TRIM(c.class_level), ''), NULLIF(TRIM(c.title), ''), 'Unassigned') AS class_level,
+          COUNT(DISTINCT sp.id) FILTER (
+            WHERE LOWER(COALESCE(sp.status::text, '')) = 'active'
+              AND LOWER(COALESCE(e.status, '')) = 'active'
+              AND (
+                NULLIF(TRIM(sp.grade_level), '') IS NULL
+                OR LOWER(REGEXP_REPLACE(COALESCE(NULLIF(TRIM(c.class_level), ''), NULLIF(TRIM(c.title), '')), '[\\s_-]+', '', 'g')) =
+                   LOWER(REGEXP_REPLACE(TRIM(sp.grade_level), '[\\s_-]+', '', 'g'))
+              )
+          )::int AS total
+        FROM courses c
+        LEFT JOIN enrollments e ON e.course_id = c.id
+        LEFT JOIN student_profiles sp ON sp.id = e.student_id
+        WHERE LOWER(COALESCE(c.status::text, '')) = 'active'
+          AND COALESCE(NULLIF(TRIM(c.class_level), ''), NULLIF(TRIM(c.title), '')) IS NOT NULL
+        GROUP BY COALESCE(NULLIF(TRIM(c.class_level), ''), NULLIF(TRIM(c.title), ''), 'Unassigned')
         ORDER BY total DESC, class_level ASC
       `,
       prisma.$queryRaw`

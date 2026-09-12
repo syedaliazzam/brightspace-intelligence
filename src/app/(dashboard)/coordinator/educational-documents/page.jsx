@@ -16,8 +16,6 @@ const DOCUMENT_TYPES = [
   { id: "other", label: "Other" },
 ];
 
-const CLASS_LEVELS = ["Play Group", "Prep I", "Prep II"];
-
 function formatDate(value) {
   if (!value) return "-";
   const date = new Date(value);
@@ -26,6 +24,10 @@ function formatDate(value) {
 
 function normalizeText(value) {
   return String(value || "").trim().toLowerCase();
+}
+
+function normalizeClassKey(value) {
+  return normalizeText(value).replace(/[\s_-]+/g, "");
 }
 
 function isPdfPath(value) {
@@ -85,8 +87,12 @@ export default function EducationalDocumentsPage({
   portalLabel = "Coordinator portal",
   title = "Educational Documents",
   description = "Manage timetables, curriculum plans, material lists, and other educational resources for all classes.",
+  modalPortalTargetId = "coordinator-page-portal-root",
+  modalPageScoped = false,
+  classOptionsApiPath = "/api/coordinator/classes",
 }) {
   const [items, setItems] = useState([]);
+  const [classOptions, setClassOptions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
@@ -104,15 +110,29 @@ export default function EducationalDocumentsPage({
   const [form, setForm] = useState({ title: "", documentType: "", customDocumentType: "", classLevel: "" });
   const [selectedFiles, setSelectedFiles] = useState([]);
   const [submitting, setSubmitting] = useState(false);
+  const modalBackdropClassName = modalPageScoped
+    ? "pointer-events-auto absolute inset-0 z-[9999] flex items-center justify-center bg-[#063F32]/45 px-4 py-8"
+    : "fixed inset-0 z-[9999] flex items-center justify-center bg-[#063F32]/45 px-4 py-8";
 
   async function loadDocuments() {
     setLoading(true);
     setError("");
     try {
-      const response = await fetch("/api/coordinator/educational-documents", { cache: "no-store" });
+      const [response, classesResponse] = await Promise.all([
+        fetch("/api/coordinator/educational-documents", { cache: "no-store" }),
+        fetch(classOptionsApiPath, { cache: "no-store" }),
+      ]);
       const data = await response.json().catch(() => ({}));
+      const classesData = await classesResponse.json().catch(() => ({}));
       if (!response.ok) throw new Error(data?.message || "Unable to load educational documents.");
       setItems(Array.isArray(data.items) ? data.items : []);
+      if (classesResponse.ok) {
+        setClassOptions(
+          (Array.isArray(classesData.items) ? classesData.items : [])
+            .map((item) => String(item?.class_level || item?.title || "").trim())
+            .filter(Boolean)
+        );
+      }
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : "Unable to load educational documents.");
       setItems([]);
@@ -236,18 +256,23 @@ export default function EducationalDocumentsPage({
   }
 
   useEffect(() => {
-    void loadDocuments();
+    const timer = window.setTimeout(() => {
+      void loadDocuments();
+    }, 0);
+
+    return () => window.clearTimeout(timer);
   }, []);
 
   useEffect(() => {
-    setPage(1);
+    const timer = window.setTimeout(() => setPage(1), 0);
+    return () => window.clearTimeout(timer);
   }, [typeFilter, classFilter, searchTerm]);
 
   const filteredItems = useMemo(() => {
     const query = normalizeText(searchTerm);
     return items.filter((item) => {
       if (typeFilter !== "all" && String(item.document_type || "") !== typeFilter) return false;
-      if (classFilter !== "all" && String(item.class_level || "") !== classFilter) return false;
+      if (classFilter !== "all" && normalizeClassKey(item.class_level) !== normalizeClassKey(classFilter)) return false;
       if (!query) return true;
       return normalizeText(item.title).includes(query);
     });
@@ -259,6 +284,16 @@ export default function EducationalDocumentsPage({
     const startIndex = (safePage - 1) * PAGE_SIZE;
     return filteredItems.slice(startIndex, startIndex + PAGE_SIZE);
   }, [filteredItems, safePage]);
+
+  const documentClassOptions = useMemo(() => {
+    return Array.from(new Set(classOptions.filter(Boolean))).sort((left, right) => left.localeCompare(right));
+  }, [classOptions]);
+
+  const getClassLabel = (value) => {
+    const classValue = String(value || "").trim();
+    if (!classValue) return "All Classes";
+    return documentClassOptions.find((level) => normalizeClassKey(level) === normalizeClassKey(classValue)) || classValue;
+  };
 
   const getTypeLabel = (typeId) => {
     const type = DOCUMENT_TYPES.find((t) => t.id === typeId);
@@ -332,7 +367,7 @@ export default function EducationalDocumentsPage({
                 className="w-full appearance-none rounded-2xl border border-[#2D8A6A]/20 bg-white px-4 py-3 pr-11 text-sm text-[#063F32] outline-none focus:border-[#2D8A6A]"
               >
                 <option value="all">All classes</option>
-                {CLASS_LEVELS.map((level) => (
+                {documentClassOptions.map((level) => (
                   <option key={level} value={level}>
                     {level}
                   </option>
@@ -373,7 +408,7 @@ export default function EducationalDocumentsPage({
                       <td className="px-6 py-4 font-semibold text-[#0D5C48]">{String((safePage - 1) * PAGE_SIZE + index + 1).padStart(2, "0")}</td>
                       <td className="px-6 py-4 font-semibold text-[#063F32]">{item.title || "-"}</td>
                       <td className="px-6 py-4 text-[#245C4F]">{getTypeLabel(item.document_type) || "-"}</td>
-                      <td className="px-6 py-4 text-[#245C4F]">{item.class_level || "All Classes"}</td>
+                      <td className="px-6 py-4 text-[#245C4F]">{getClassLabel(item.class_level)}</td>
                       <td className="px-6 py-4">
                         <button
                           type="button"
@@ -443,8 +478,8 @@ export default function EducationalDocumentsPage({
       </div>
 
       {allowManage && showAddModal ? (
-        <ClientPortal targetId="coordinator-page-portal-root">
-          <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-[#063F32]/45 px-4 py-8">
+        <ClientPortal targetId={modalPortalTargetId}>
+          <div className={modalBackdropClassName}>
             <div className="w-full max-w-xl max-h-[85vh] overflow-y-auto rounded-[2rem] border border-[#2D8A6A]/15 bg-[#FAF7F0] p-5 shadow-[0_24px_80px_-36px_rgba(13,59,46,0.24)] sm:p-6">
               <div className="mb-6">
                 <h3 className="text-2xl font-semibold text-[#063F32]">{editingItem ? "Edit Document" : "Add Educational Document"}</h3>
@@ -511,7 +546,7 @@ export default function EducationalDocumentsPage({
                     className="w-full appearance-none rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 text-sm text-[#063F32] outline-none transition focus:border-[#2D8A6A] focus:bg-white focus:ring-4 focus:ring-[#FFF5D6]"
                   >
                     <option value="">All Classes</option>
-                    {CLASS_LEVELS.map((level) => (
+                    {documentClassOptions.map((level) => (
                       <option key={level} value={level}>
                         {level}
                       </option>
@@ -582,8 +617,8 @@ export default function EducationalDocumentsPage({
       ) : null}
 
       {allowManage && showDeleteModal ? (
-        <ClientPortal targetId="coordinator-page-portal-root">
-          <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-[#063F32]/45 px-4 py-8">
+        <ClientPortal targetId={modalPortalTargetId}>
+          <div className={modalBackdropClassName}>
             <div className="w-full max-w-sm max-h-[80vh] overflow-y-auto rounded-[2rem] border border-[#2D8A6A]/15 bg-[#FAF7F0] p-5 shadow-[0_24px_80px_-36px_rgba(13,59,46,0.24)]">
               <h3 className="text-lg font-semibold text-[#063F32]">Remove Document</h3>
               <p className="mt-3 text-sm text-[#245C4F]">Are you sure you want to remove this educational document from all portals? This action cannot be undone.</p>

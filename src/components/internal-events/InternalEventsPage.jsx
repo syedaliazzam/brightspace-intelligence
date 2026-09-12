@@ -110,6 +110,7 @@ function statusTone(item) {
 export default function InternalEventsPage({
   portalLabel = "Coordinator portal",
   canCreate = true,
+  localSearch = false,
 } = {}) {
   const [items, setItems] = useState([]);
   const [attendees, setAttendees] = useState([]);
@@ -140,13 +141,14 @@ export default function InternalEventsPage({
     scheduledEnd: "",
     status: "scheduled",
   });
+  const serverSearch = localSearch ? "" : search;
 
   const load = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
       const params = new URLSearchParams();
-      if (search) params.set("search", search);
+      if (serverSearch) params.set("search", serverSearch);
       const response = await fetch(`/api/internal-events?${params.toString()}`, { cache: "no-store" });
       const data = await response.json();
       if (!response.ok) throw new Error(data?.message || "Unable to load events.");
@@ -156,7 +158,7 @@ export default function InternalEventsPage({
     } finally {
       setLoading(false);
     }
-  }, [search]);
+  }, [serverSearch]);
 
   const loadOptions = useCallback(async () => {
     if (!canCreate) return;
@@ -185,13 +187,37 @@ export default function InternalEventsPage({
     return () => window.clearTimeout(timer);
   }, [message]);
 
+  const visibleItems = useMemo(() => {
+    if (!localSearch) return items;
+    const query = search.trim().toLowerCase();
+    if (!query) return items;
+
+    return items.filter((item) => {
+      const values = [
+        item.title,
+        item.description,
+        item.host_name,
+        item.attendee_name,
+        item.google_meet_link,
+        item.meet_code,
+        item.status,
+      ];
+
+      return values
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase()
+        .includes(query);
+    });
+  }, [items, localSearch, search]);
+
   const summary = useMemo(
     () => ({
-      total: items.length,
-      withMeet: items.filter((item) => item.google_meet_link).length,
-      recorded: items.filter((item) => item.recording_drive_url).length,
+      total: visibleItems.length,
+      withMeet: visibleItems.filter((item) => item.google_meet_link).length,
+      recorded: visibleItems.filter((item) => item.recording_drive_url).length,
     }),
-    [items]
+    [visibleItems]
   );
 
   async function handleSubmit(event) {
@@ -435,6 +461,7 @@ export default function InternalEventsPage({
 
         <section className="rounded-[1.75rem] border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(250,247,240,0.98)_100%)] shadow-[0_20px_70px_-36px_rgba(13,59,46,0.18)]">
           <div className="border-b border-[#2D8A6A]/10 px-5 py-5">
+            <span className="mb-2 block text-sm font-semibold text-[#245C4F]">Search</span>
             <input
               value={search}
               onChange={(event) => setSearch(event.target.value)}
@@ -450,7 +477,7 @@ export default function InternalEventsPage({
           <div className="flex items-center justify-between border-b border-[#2D8A6A]/10 px-5 py-5">
             <h2 className="text-lg font-semibold text-[#063F32]">Event records</h2>
             <span className="rounded-full bg-[#EAF6EF] px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]">
-              {items.length} items
+              {visibleItems.length} items
             </span>
           </div>
 
@@ -468,8 +495,8 @@ export default function InternalEventsPage({
                 </tr>
               </thead>
               <tbody>
-                {items.length ? (
-                  items.map((item) => (
+                {visibleItems.length ? (
+                  visibleItems.map((item) => (
                     <tr
                       key={item.id}
                       className="border-t border-[#2D8A6A]/10 transition"

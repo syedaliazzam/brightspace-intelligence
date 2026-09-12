@@ -13,6 +13,7 @@ export default function LectureVerificationTable({ items = [], onRefresh }) {
   const [submittingReject, setSubmittingReject] = useState(false);
   const [manualApproveItem, setManualApproveItem] = useState(null);
   const [manualApproving, setManualApproving] = useState(false);
+  const [approvingId, setApprovingId] = useState("");
 
   useEffect(() => {
     if (!syncNotice) return undefined;
@@ -91,6 +92,19 @@ export default function LectureVerificationTable({ items = [], onRefresh }) {
       setManualApproveItem(null);
     } finally {
       setManualApproving(false);
+    }
+  }
+
+  async function handleApproveClick(item) {
+    setApprovingId(item.id);
+    try {
+      if (!item.summary && !item.topic_covered) {
+        setManualApproveItem(item);
+        return;
+      }
+      await updateVerification(item.id, { action: "approve", manualConfirm: false });
+    } finally {
+      setApprovingId("");
     }
   }
 
@@ -240,16 +254,18 @@ export default function LectureVerificationTable({ items = [], onRefresh }) {
                   <>
                     <button
                       type="button"
-                      onClick={() => {
-                        if (!item.summary && !item.topic_covered) {
-                          setManualApproveItem(item);
-                          return;
-                        }
-                        updateVerification(item.id, { action: "approve", manualConfirm: false }).catch((error) => window.alert(error.message));
-                      }}
-                      className="rounded-xl bg-[#0D5C48] px-3 py-2 text-xs font-semibold text-[#FAF7F0] transition hover:bg-[#063F32] hover:shadow-sm focus:outline-none focus:ring-4 focus:ring-[#C9A227]/20"
+                      disabled={approvingId === item.id}
+                      onClick={() => handleApproveClick(item).catch((error) => window.alert(error.message))}
+                      className="inline-flex items-center gap-2 rounded-xl bg-[#0D5C48] px-3 py-2 text-xs font-semibold text-[#FAF7F0] transition hover:bg-[#063F32] hover:shadow-sm focus:outline-none focus:ring-4 focus:ring-[#C9A227]/20 disabled:cursor-not-allowed disabled:opacity-70"
                     >
-                      Approve
+                      {approvingId === item.id ? (
+                        <>
+                          <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-[#FFF5D6]/30 border-t-[#FFF5D6]" />
+                          Approving...
+                        </>
+                      ) : (
+                        "Approve"
+                      )}
                     </button>
                     <button
                       type="button"

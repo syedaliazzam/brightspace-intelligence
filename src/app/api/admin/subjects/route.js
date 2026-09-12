@@ -104,10 +104,9 @@ async function getAvailableClasses(tx = prisma) {
       title,
       class_level
     FROM courses
-    WHERE class_level IS NOT NULL
-      AND TRIM(class_level) <> ''
+    WHERE COALESCE(NULLIF(TRIM(class_level), ''), NULLIF(TRIM(title), '')) IS NOT NULL
       AND LOWER(status::text) = 'active'
-    ORDER BY class_level ASC
+    ORDER BY COALESCE(NULLIF(TRIM(class_level), ''), NULLIF(TRIM(title), '')) ASC
   `;
 }
 

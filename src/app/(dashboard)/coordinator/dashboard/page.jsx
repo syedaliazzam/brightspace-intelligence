@@ -7,8 +7,9 @@ import CoordinatorPortalSection from "@/components/coordinator/CoordinatorPortal
 import { OpenBookLoader } from "@/components/shared/AshShajrahLoaders";
 import UpcomingPublicEventsTicker from "@/components/layout/UpcomingPublicEventsTicker";
 
-const CACHE_KEY = "coordinator-dashboard";
+const CACHE_KEY = "coordinator-dashboard:v2";
 const CACHE_TTL = 60 * 1000;
+let pendingDashboardRequest = null;
 
 function readCache() {
   if (typeof window === "undefined") {
@@ -45,19 +46,25 @@ function writeCache(payload) {
   );
 }
 
-function writeNamedCache(key, payload) {
-  if (typeof window === "undefined") {
-    return;
-  }
-
-  window.sessionStorage.setItem(
-    key,
-    JSON.stringify({ timestamp: Date.now(), payload })
-  );
+function getDashboardState(payload, loading = false) {
+  return {
+    loading,
+    error: "",
+    stats: payload?.stats || null,
+    classDistribution: payload?.classDistribution || [],
+    recentLectures: payload?.recentLectures || [],
+    recentLeads: payload?.recentLeads || [],
+    reports: payload?.reports || null,
+  };
 }
 
-export default function CoordinatorDashboardPage() {
-  const [state, setState] = useState({
+function getInitialState() {
+  const cached = readCache();
+  if (cached) {
+    return getDashboardState(cached, false);
+  }
+
+  return {
     loading: true,
     error: "",
     stats: null,
@@ -65,7 +72,32 @@ export default function CoordinatorDashboardPage() {
     recentLectures: [],
     recentLeads: [],
     reports: null,
-  });
+  };
+}
+
+async function fetchDashboardData() {
+  if (!pendingDashboardRequest) {
+    pendingDashboardRequest = fetch("/api/coordinator/dashboard", { cache: "no-store" })
+      .then(async (response) => {
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data?.message || "Unable to load coordinator dashboard.");
+        }
+
+        writeCache(data);
+        return data;
+      })
+      .finally(() => {
+        pendingDashboardRequest = null;
+      });
+  }
+
+  return pendingDashboardRequest;
+}
+
+export default function CoordinatorDashboardPage() {
+  const [state, setState] = useState(getInitialState);
 
   useEffect(() => {
     let active = true;
@@ -86,24 +118,10 @@ export default function CoordinatorDashboardPage() {
       }
 
       try {
-        const response = await fetch("/api/coordinator/dashboard", { cache: "no-store" });
-        const data = await response.json();
-
-        if (!response.ok) {
-          throw new Error(data?.message || "Unable to load coordinator dashboard.");
-        }
+        const data = await fetchDashboardData();
 
         if (active) {
-          writeCache(data);
-          setState({
-            loading: false,
-            error: "",
-            stats: data.stats,
-            classDistribution: data.classDistribution || [],
-            recentLectures: data.recentLectures || [],
-            recentLeads: data.recentLeads || [],
-            reports: data.reports || null,
-          });
+          setState(getDashboardState(data, false));
         }
       } catch (error) {
         if (active) {
@@ -133,16 +151,12 @@ export default function CoordinatorDashboardPage() {
   const reportData = state.reports || null;
   const classDistribution = Array.isArray(state.classDistribution) ? state.classDistribution : [];
   const classColorPalette = ["#2D8A6A", "#2F6BFF", "#D94B4B", "#D4A017", "#7A5AF8", "#EF7D10"];
-  const preferredClasses = ["Prep-I", "Prep-II", "Play Group"];
-  const selectedClasses = preferredClasses.map((className) => {
-    const matchedClass = classDistribution.find(
-      (item) => String(item.classLevel || "").trim().toLowerCase() === className.toLowerCase()
-    );
-    return {
-      classLevel: className,
-      total: Number(matchedClass?.total || 0),
-    };
-  });
+  const selectedClasses = classDistribution
+    .map((item) => ({
+      classLevel: String(item.classLevel || "Unassigned").trim() || "Unassigned",
+      total: Number(item.total || 0),
+    }))
+    .sort((first, second) => second.total - first.total || first.classLevel.localeCompare(second.classLevel));
   const chartItems = [
     {
       key: "total",
@@ -168,7 +182,7 @@ export default function CoordinatorDashboardPage() {
     <div className="min-h-screen space-y-6 bg-[#FAF7F0]">
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(201,162,39,0.12),transparent_35%),radial-gradient(circle_at_top_right,rgba(45,138,106,0.12),transparent_32%),linear-gradient(180deg,#FAF7F0_0%,#F7F1E3_100%)]" />
       <div className="relative mx-auto max-w-7xl space-y-6 px-4 py-4 sm:px-6 lg:px-8">
-      <UpcomingPublicEventsTicker />
+      <UpcomingPublicEventsTicker cacheNamespace="coordinator-dashboard" />
       <section className="relative overflow-hidden rounded-[2rem] border border-[#2D8A6A]/15 bg-[linear-gradient(135deg,rgba(13,59,46,0.98),rgba(13,92,72,0.94))] p-6 text-[#FAF7F0] shadow-[0_24px_80px_-36px_rgba(13,59,46,0.32)] sm:p-8">
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(228,198,102,0.12),transparent_28%),radial-gradient(circle_at_bottom_left,rgba(101,184,145,0.14),transparent_30%)]" />
         <div className="relative max-w-3xl">

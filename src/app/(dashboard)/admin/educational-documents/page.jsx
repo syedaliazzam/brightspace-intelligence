@@ -10,6 +10,7 @@ export default function AdminEducationalDocumentsPage() {
       portalLabel="Admin portal"
       title="Educational Documents"
       description="View timetables, curriculum plans, material lists, and other educational resources."
+      classOptionsApiPath="/api/admin/class-levels"
     />
   );
 }

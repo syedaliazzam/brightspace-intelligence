@@ -27,7 +27,7 @@ export default function AdminCareersApplicationsPage() {
           </div>
         </section>
 
-        <CareerApplicationsPanel />
+        <CareerApplicationsPanel cacheNamespace={isCoordinatorPortal ? "coordinator-career-applications" : ""} />
       </div>
     </div>
   );

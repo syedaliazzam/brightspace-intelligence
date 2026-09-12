@@ -3,6 +3,11 @@ import { auth } from "@/lib/auth";
 
 const ALLOWED_ROLES = new Set(["coordinator", "admin", "superadmin"]);
 const RESEND_API_BASE_URL = process.env.RESEND_API_BASE_URL || "https://api.resend.com";
+const CACHE_TTL_MS = 60 * 1000;
+
+let cachedData = null;
+let cachedAt = 0;
+let inflightPromise = null;
 
 function json(message, status = 200, extra = {}) {
   return NextResponse.json({ message, ...extra }, { status });
@@ -56,7 +61,59 @@ async function fetchAllSentEmails(apiKey) {
   return { items };
 }
 
-export async function GET() {
+async function getOrFetchEmails(apiKey, force = false) {
+  const now = Date.now();
+  if (!force && cachedData && now - cachedAt < CACHE_TTL_MS) {
+    return { items: cachedData };
+  }
+
+  if (!force && inflightPromise) {
+    return inflightPromise;
+  }
+
+  inflightPromise = (async () => {
+    try {
+      const result = await fetchAllSentEmails(apiKey);
+      if (result.error) {
+        return { error: result.error };
+      }
+
+      const rawItems = Array.isArray(result.items)
+        ? result.items.map((item) => ({
+            id: String(item?.id || ""),
+            to: Array.isArray(item?.to) ? item.to : [],
+            from: String(item?.from || ""),
+            subject: String(item?.subject || ""),
+            created_at: item?.created_at || null,
+            last_event: String(item?.last_event || "pending"),
+            scheduled_at: item?.scheduled_at || null,
+            cc: Array.isArray(item?.cc) ? item.cc : [],
+            bcc: Array.isArray(item?.bcc) ? item.bcc : [],
+            reply_to: Array.isArray(item?.reply_to) ? item.reply_to : [],
+          }))
+        : [];
+
+      const seen = new Set();
+      const items = rawItems.filter((item) => {
+        const key = item.id || buildDedupKey(item);
+        if (!key) return true;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+
+      cachedData = items;
+      cachedAt = Date.now();
+      return { items };
+    } finally {
+      inflightPromise = null;
+    }
+  })();
+
+  return inflightPromise;
+}
+
+export async function GET(request) {
   const session = await auth();
   const role = String(session?.user?.role || "").toLowerCase();
 
@@ -69,42 +126,19 @@ export async function GET() {
   }
 
   try {
-    const result = await fetchAllSentEmails(apiKey);
+    const { searchParams } = new URL(request.url);
+    const force = searchParams.get("force") === "true";
+
+    const result = await getOrFetchEmails(apiKey, force);
     if (result.error) {
       return json(result.error, 500, { items: [] });
     }
 
-    const rawItems = Array.isArray(result.items)
-      ? result.items.map((item) => ({
-          id: String(item?.id || ""),
-          to: Array.isArray(item?.to) ? item.to : [],
-          from: String(item?.from || ""),
-          subject: String(item?.subject || ""),
-          created_at: item?.created_at || null,
-          last_event: String(item?.last_event || "pending"),
-          scheduled_at: item?.scheduled_at || null,
-          cc: Array.isArray(item?.cc) ? item.cc : [],
-          bcc: Array.isArray(item?.bcc) ? item.bcc : [],
-          reply_to: Array.isArray(item?.reply_to) ? item.reply_to : [],
-        }))
-      : [];
-
-    const seen = new Set();
-    const items = rawItems.filter((item) => {
-      const key = item.id || buildDedupKey(item);
-      if (!key) return true;
-      if (seen.has(key)) return false;
-      seen.add(key);
-      return true;
-    });
-
     return json("Resend sent emails fetched.", 200, {
-      items,
+      items: result.items || [],
       has_more: false,
     });
   } catch (error) {
     return json(error instanceof Error ? error.message : "Unable to fetch sent emails from Resend.", 500, { items: [] });
   }
 }
-
-

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
 import ClientPortal from "@/components/shared/ClientPortal";
+import { LeafSpinnerInline } from "@/components/shared/AshShajrahLoaders";
 import { getLectureDisplayStatus, getLecturePrimaryLink } from "@/lib/lectureStatus";
 
 const EMPTY_FORM = {
@@ -531,9 +532,16 @@ export default function LectureScheduleTable({ items = [], onRefresh }) {
                   <button
                     type="submit"
                     disabled={saving}
-                    className="rounded-2xl bg-[#0D5C48] px-5 py-3 text-sm font-semibold text-[#FAF7F0] transition hover:bg-[#063F32] disabled:cursor-not-allowed disabled:opacity-70"
+                    className="inline-flex items-center justify-center gap-2 rounded-2xl bg-[#0D5C48] px-5 py-3 text-sm font-semibold text-[#FAF7F0] transition hover:bg-[#063F32] disabled:cursor-not-allowed disabled:opacity-70"
                   >
-                    {saving ? "Saving..." : "Save Changes"}
+                    {saving ? (
+                      <>
+                        <LeafSpinnerInline />
+                        Saving...
+                      </>
+                    ) : (
+                      "Save Changes"
+                    )}
                   </button>
                 </div>
               </form>
@@ -677,9 +685,16 @@ export default function LectureScheduleTable({ items = [], onRefresh }) {
                   <button
                     type="submit"
                     disabled={rescheduling}
-                    className="rounded-2xl bg-[#0D5C48] px-5 py-3 text-sm font-semibold text-[#FAF7F0] transition hover:bg-[#063F32] disabled:cursor-not-allowed disabled:opacity-70"
+                    className="inline-flex items-center justify-center gap-2 rounded-2xl bg-[#0D5C48] px-5 py-3 text-sm font-semibold text-[#FAF7F0] transition hover:bg-[#063F32] disabled:cursor-not-allowed disabled:opacity-70"
                   >
-                    {rescheduling ? "Rescheduling..." : "Save Reschedule"}
+                    {rescheduling ? (
+                      <>
+                        <LeafSpinnerInline />
+                        Rescheduling...
+                      </>
+                    ) : (
+                      "Save Reschedule"
+                    )}
                   </button>
                 </div>
               </form>
@@ -734,9 +749,16 @@ export default function LectureScheduleTable({ items = [], onRefresh }) {
                     type="button"
                     onClick={confirmCancelSchedule}
                     disabled={canceling}
-                    className="rounded-2xl bg-rose-700 px-5 py-3 text-sm font-semibold text-white transition hover:bg-rose-800 disabled:cursor-not-allowed disabled:opacity-70"
+                    className="inline-flex items-center justify-center gap-2 rounded-2xl bg-rose-700 px-5 py-3 text-sm font-semibold text-white transition hover:bg-rose-800 disabled:cursor-not-allowed disabled:opacity-70"
                   >
-                    {canceling ? "Cancelling..." : "Cancel lecture"}
+                    {canceling ? (
+                      <>
+                        <LeafSpinnerInline />
+                        Cancelling...
+                      </>
+                    ) : (
+                      "Cancel lecture"
+                    )}
                   </button>
                 </div>
               </div>

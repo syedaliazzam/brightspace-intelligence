@@ -2,8 +2,39 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, RefreshCw, RotateCcw } from "lucide-react";
 import { LeafSpinnerInline, OpenBookLoader } from "@/components/shared/AshShajrahLoaders";
+
+const CACHE_KEY = "notes-threads:list";
+const CACHE_TTL = 60 * 1000;
+
+function readCache() {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.sessionStorage.getItem(CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (Date.now() - parsed.timestamp > CACHE_TTL) {
+      window.sessionStorage.removeItem(CACHE_KEY);
+      return null;
+    }
+    return parsed.payload;
+  } catch {
+    return null;
+  }
+}
+
+function writeCache(payload) {
+  if (typeof window === "undefined") return;
+  try {
+    window.sessionStorage.setItem(
+      CACHE_KEY,
+      JSON.stringify({ timestamp: Date.now(), payload })
+    );
+  } catch {
+    // SessionStorage may fail in private mode
+  }
+}
 
 function groupLectureOptions(lectures) {
   const map = new Map();
@@ -116,8 +147,10 @@ function SelectField({ value, onChange, onFocus, onBlur, className = "", childre
 
 export default function NoteThreadsBoard({ mode = "viewer", lectures = [], portalTargetId, allowReply = true, enabled = true }) {
   const canReply = allowReply && (mode === "teacher" || mode === "admin" || mode === "parent" || mode === "student");
-  const [threads, setThreads] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const initialCache = readCache();
+  const [threads, setThreads] = useState(() => (Array.isArray(initialCache?.items) ? initialCache.items : []));
+  const [loading, setLoading] = useState(!initialCache);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState("");
   const [filterColumn, setFilterColumn] = useState("all");
   const [filterText, setFilterText] = useState("");
@@ -134,6 +167,7 @@ export default function NoteThreadsBoard({ mode = "viewer", lectures = [], porta
   const [deletingThread, setDeletingThread] = useState(null);
   const [deletePending, setDeletePending] = useState(false);
   const activeThreadIdRef = useRef("");
+  const threadMessagesCache = useRef(new Map());
 
   const lectureOptions = useMemo(() => groupLectureOptions(lectures), [lectures]);
   const subjectOptions = useMemo(() => lectureOptions.filter((item) => item.classLevel === String(compose.classLevel || "").trim()), [lectureOptions, compose.classLevel]);
@@ -179,29 +213,60 @@ export default function NoteThreadsBoard({ mode = "viewer", lectures = [], porta
     (mode === "teacher" && ["parent", "student", "admin_only", "admin"].includes(selectedVisibility)) ||
     (mode === "admin" && (selectedVisibility === "admin_only" || selectedVisibility === "admin"));
 
-  async function loadThreads() {
-    setLoading(true);
+  async function loadThreads({ force = false } = {}) {
+    if (force) {
+      setRefreshing(true);
+    } else {
+      const cached = readCache();
+      if (cached && Array.isArray(cached.items)) {
+        setThreads(cached.items);
+        setLoading(false);
+        return;
+      }
+      setLoading(true);
+    }
+
     try {
       const response = await fetch("/api/notes/threads", { cache: "no-store" });
       const data = await response.json();
       if (!response.ok) throw new Error(data?.message || "Unable to load notes.");
-      setThreads(data.items || []);
+      const items = Array.isArray(data.items) ? data.items : [];
+      setThreads(items);
+      writeCache({ items });
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   }
 
-  async function openThread(thread) {
+  async function openThread(thread, { force = false } = {}) {
+    if (!thread?.id) return;
     setSelected(thread);
     setReplyText("");
+    activeThreadIdRef.current = thread.id;
+
+    if (!force && threadMessagesCache.current.has(thread.id)) {
+      setMessages(threadMessagesCache.current.get(thread.id));
+      setMessagesLoading(false);
+      return;
+    }
+
     setMessages([]);
     setMessagesLoading(true);
-    activeThreadIdRef.current = thread.id;
-    const response = await fetch(`/api/notes/threads/${thread.id}/messages`, { cache: "no-store" });
-    const data = await response.json();
-    if (!response.ok) throw new Error(data?.message || "Unable to load messages.");
-    if (String(activeThreadIdRef.current) === String(thread.id)) setMessages(data.items || []);
-    setMessagesLoading(false);
+    try {
+      const response = await fetch(`/api/notes/threads/${thread.id}/messages`, { cache: "no-store" });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data?.message || "Unable to load messages.");
+      const items = Array.isArray(data.items) ? data.items : [];
+      threadMessagesCache.current.set(thread.id, items);
+      if (String(activeThreadIdRef.current) === String(thread.id)) {
+        setMessages(items);
+      }
+    } finally {
+      if (String(activeThreadIdRef.current) === String(thread.id)) {
+        setMessagesLoading(false);
+      }
+    }
   }
 
   async function sendReply() {
@@ -216,8 +281,9 @@ export default function NoteThreadsBoard({ mode = "viewer", lectures = [], porta
       const data = await response.json();
       if (!response.ok) throw new Error(data?.message || "Unable to send reply.");
       setReplyText("");
-      await openThread(selected);
-      await loadThreads();
+      threadMessagesCache.current.delete(selected.id);
+      await openThread(selected, { force: true });
+      await loadThreads({ force: true });
     } finally {
       setReplyPending(false);
     }
@@ -235,7 +301,7 @@ export default function NoteThreadsBoard({ mode = "viewer", lectures = [], porta
       const data = await response.json();
       if (!response.ok) throw new Error(data?.message || "Unable to add note.");
       setCompose({ classLevel: "", subjectId: "", visibility: "parent", message: "" });
-      await loadThreads();
+      await loadThreads({ force: true });
     } finally {
       setComposePending(false);
     }
@@ -253,8 +319,9 @@ export default function NoteThreadsBoard({ mode = "viewer", lectures = [], porta
       if (!response.ok) throw new Error(data?.message || "Unable to update note.");
       setEditingThread(null);
       setEditingText("");
-      await loadThreads();
-      if (selected?.id === editingThread.id) await openThread(selected);
+      threadMessagesCache.current.delete(editingThread.id);
+      await loadThreads({ force: true });
+      if (selected?.id === editingThread.id) await openThread(selected, { force: true });
     } finally {
       setEditPending(false);
     }
@@ -266,9 +333,10 @@ export default function NoteThreadsBoard({ mode = "viewer", lectures = [], porta
       const response = await fetch(`/api/notes/threads/${deletingThread.id}`, { method: "DELETE" });
       const data = await response.json();
       if (!response.ok) throw new Error(data?.message || "Unable to delete note.");
+      threadMessagesCache.current.delete(deletingThread.id);
       setDeletingThread(null);
       if (selected?.id === deletingThread.id) setSelected(null);
-      await loadThreads();
+      await loadThreads({ force: true });
     } finally {
       setDeletePending(false);
     }
@@ -331,7 +399,7 @@ export default function NoteThreadsBoard({ mode = "viewer", lectures = [], porta
 
       <section className={`overflow-hidden ${panel}`}>
         <div className="border-b border-[#F1EADC] px-5 py-4">
-          <div className="grid gap-3 md:grid-cols-[240px_minmax(0,1fr)]">
+          <div className="grid gap-3 md:grid-cols-[220px_minmax(0,1fr)_auto]">
             <label className="block">
               <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]">Filter column</span>
               <SelectField
@@ -355,6 +423,18 @@ export default function NoteThreadsBoard({ mode = "viewer", lectures = [], porta
                 className="w-full rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 text-sm text-[#245C4F] outline-none transition placeholder:text-[#7A938B] focus:border-[#C9A227] focus:ring-4 focus:ring-[#FFF5D6]"
               />
             </label>
+            <div className="flex items-end gap-2">
+              <button
+                type="button"
+                onClick={() => void loadThreads({ force: true })}
+                disabled={refreshing || loading}
+                title="Force refresh notes"
+                className="inline-flex h-[46px] items-center gap-2 rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 text-sm font-semibold text-[#0D5C48] transition hover:border-[#2D8A6A] hover:bg-white disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <RefreshCw className={`h-4 w-4 ${refreshing ? "animate-spin" : ""}`} />
+                {refreshing ? "Refreshing..." : "Refresh"}
+              </button>
+            </div>
           </div>
         </div>
         <div className="overflow-x-auto">

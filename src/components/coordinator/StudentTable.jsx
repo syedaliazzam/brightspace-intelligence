@@ -38,6 +38,7 @@ export default function StudentTable({ items = [], onRefresh, classOptions = [] 
   const [formError, setFormError] = useState("");
   const [form, setForm] = useState(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [classOpen, setClassOpen] = useState(false);
   const [statusOpen, setStatusOpen] = useState(false);
   const liveClassOptions = Array.isArray(classOptions)
@@ -129,11 +130,16 @@ export default function StudentTable({ items = [], onRefresh, classOptions = [] 
   async function confirmArchive() {
     if (!deleteItem) return;
     const item = deleteItem;
-    const response = await fetch(`/api/coordinator/students?id=${item.id}`, { method: "DELETE" });
-    const data = await response.json();
-    if (!response.ok) throw new Error(data?.message || "Unable to archive student.");
-    setDeleteItem(null);
-    onRefresh?.();
+    setDeleting(true);
+    try {
+      const response = await fetch(`/api/coordinator/students?id=${item.id}`, { method: "DELETE" });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data?.message || "Unable to archive student.");
+      setDeleteItem(null);
+      onRefresh?.();
+    } finally {
+      setDeleting(false);
+    }
   }
 
   return (
@@ -414,6 +420,7 @@ export default function StudentTable({ items = [], onRefresh, classOptions = [] 
                 <button
                   type="button"
                   onClick={() => setDeleteItem(null)}
+                  disabled={deleting}
                   className="rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 text-sm font-semibold text-[#063F32] transition hover:bg-[#F1EADC]"
                 >
                   Cancel
@@ -421,9 +428,10 @@ export default function StudentTable({ items = [], onRefresh, classOptions = [] 
                 <button
                   type="button"
                   onClick={() => confirmArchive().catch((error) => setFormError(error instanceof Error ? error.message : "Unable to archive student."))}
-                  className="rounded-2xl bg-rose-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-rose-700"
+                  disabled={deleting}
+                  className="rounded-2xl bg-rose-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-70"
                 >
-                  Delete
+                  {deleting ? "Deleting..." : "Delete"}
                 </button>
               </div>
             </div>

@@ -391,7 +391,10 @@ export default function AdminFeeSettingsPage() {
         payload.name = String(payload.name || payload.title || "").trim();
         payload.fee_type = String(payload.fee_type || payload.feeType || "admission_fee").trim();
         payload.class_level = String(payload.class_level || payload.classLevel || "").trim();
-        payload.discount_reference = String(payload.discount_reference || payload.discountReference || payload.reference || "").replace(/[^A-Za-z]/g, "");
+        payload.discount_reference = String(payload.discount_reference || payload.discountReference || payload.reference || "")
+          .replace(/[^A-Za-z ]/g, "")
+          .replace(/\s+/g, " ")
+          .trim();
         payload.amount = Number(payload.amount || 0);
         payload.description = String(payload.description || "").trim();
         payload.status = String(payload.status || "active").trim().toLowerCase() || "active";
@@ -758,10 +761,12 @@ export default function AdminFeeSettingsPage() {
                   <td className="px-4 py-3 text-sm">{item.fee_type || "—"}</td>
                   <td className="px-4 py-3 text-sm">{item.class_level || "—"}</td>
                   <td className="px-4 py-3 text-sm">PKR {money(item.amount)}</td>
-                  <td className="px-4 py-3 text-sm">{item.discount_reference || item.reference || "—"}</td>
+                  <td className="min-w-[12rem] whitespace-normal px-4 py-3 text-sm">
+                    {item.discount_reference || item.reference || "—"}
+                  </td>
                   <td className="px-4 py-3 text-sm">{item.status || "active"}</td>
                   <td className="px-6 py-5 align-top text-sm text-[#245C4F]">
-                    <div className="flex flex-wrap items-center gap-2">
+                    <div className="flex min-w-max flex-nowrap items-center gap-2">
                       <button type="button" className={actionButtonClass} onClick={() => startEdit("other", item)}>Edit</button>
                       <button
                         type="button"

@@ -148,6 +148,40 @@ async function findExistingUser(email, phone) {
   return row?.id || null;
 }
 
+async function getExistingUserDetails(userId) {
+  if (!userId) {
+    return null;
+  }
+
+  const userColumns = await getTableColumns("users");
+  const displayNameSql = getDisplayNameSql(userColumns);
+  const [row] = await prisma.$queryRaw(
+    Prisma.sql`
+      SELECT
+        u.id::text AS id,
+        ${displayNameSql} AS name,
+        u.email,
+        u.phone,
+        LOWER(u.status::text) AS status,
+        COALESCE(
+          (
+            SELECT STRING_AGG(DISTINCT LOWER(ur_role.name), ', ')
+            FROM user_roles ur
+            INNER JOIN roles ur_role ON ur_role.id = ur.role_id
+            WHERE ur.user_id = u.id
+          ),
+          LOWER(r.name)
+        ) AS roles
+      FROM users u
+      INNER JOIN roles r ON r.id = u.role_id
+      WHERE u.id = ${userId}::uuid
+      LIMIT 1
+    `
+  );
+
+  return row || null;
+}
+
 async function ensureUniqueUser(email, phone, excludeId = "") {
   const existingUserId = await findExistingUser(email, phone);
 
@@ -598,7 +632,10 @@ export async function POST(request) {
       `;
 
       if (existingAssignment) {
-        return json("This user already has the selected role.", 400);
+        const existingUser = await getExistingUserDetails(existingUserId);
+        return json("This email is already registered with the selected role.", 400, {
+          existingUser,
+        });
       }
     }
 

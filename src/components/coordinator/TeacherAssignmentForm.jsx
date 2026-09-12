@@ -23,6 +23,18 @@ export default function TeacherAssignmentForm({ options, onSuccess }) {
     setSubjectOpen(false);
   }
 
+  const selectedCourseId = String(form.courseId || "").trim();
+  const assignedSubjectIds = new Set(
+    selectedCourseId
+      ? (Array.isArray(options?.items) ? options.items : [])
+          .filter((item) => String(item?.course_id || "").trim() === selectedCourseId)
+          .filter((item) => String(item?.status || "").toLowerCase() === "active")
+          .map((item) => String(item?.subject_id || "").trim())
+          .filter(Boolean)
+      : []
+  );
+  const availableClassSubjects = classSubjects.filter((item) => !assignedSubjectIds.has(String(item?.id || "").trim()));
+
   useEffect(() => {
     let active = true;
 
@@ -138,7 +150,7 @@ export default function TeacherAssignmentForm({ options, onSuccess }) {
                   ? "Select available subject"
                   : "Select class first"}
             </option>
-            {classSubjects.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+            {availableClassSubjects.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
           </select>
           <ChevronDown aria-hidden="true" className={`pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#0D5C48] transition-transform duration-200 ${subjectOpen ? "rotate-180" : "rotate-0"}`} />
         </div>

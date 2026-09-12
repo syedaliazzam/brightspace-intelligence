@@ -1,6 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
+import { useState } from "react";
 
 function formatDateOnly(value) {
   if (!value) return "-";
@@ -10,19 +11,26 @@ function formatDateOnly(value) {
 }
 
 export default function TeacherAssignmentTable({ items = [], onRefresh }) {
+  const [updatingId, setUpdatingId] = useState("");
+
   async function updateStatus(id, status) {
-    const response = await fetch(`/api/coordinator/teacher-assignments/${id}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status }),
-    });
-    const data = await response.json();
+    setUpdatingId(id);
+    try {
+      const response = await fetch(`/api/coordinator/teacher-assignments/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status }),
+      });
+      const data = await response.json();
 
-    if (!response.ok) {
-      throw new Error(data?.message || "Unable to update assignment.");
+      if (!response.ok) {
+        throw new Error(data?.message || "Unable to update assignment.");
+      }
+
+      onRefresh?.();
+    } finally {
+      setUpdatingId("");
     }
-
-    onRefresh?.();
   }
 
   return (
@@ -47,14 +55,21 @@ export default function TeacherAssignmentTable({ items = [], onRefresh }) {
               </div>
               <button
                 type="button"
+                disabled={updatingId === item.id}
                 onClick={() =>
                   updateStatus(item.id, item.status === "active" ? "suspended" : "active").catch((error) =>
                     window.alert(error.message)
                   )
                 }
-                className="rounded-xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-3 py-2 text-xs font-semibold text-[#063F32] transition hover:bg-[#F1EADC] lg:justify-self-end"
+                className="rounded-xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-3 py-2 text-xs font-semibold text-[#063F32] transition hover:bg-[#F1EADC] disabled:cursor-not-allowed disabled:opacity-70 lg:justify-self-end"
               >
-                {item.status === "active" ? "Suspend" : "Activate"}
+                {updatingId === item.id
+                  ? item.status === "active"
+                    ? "Suspending..."
+                    : "Activating..."
+                  : item.status === "active"
+                    ? "Suspend"
+                    : "Activate"}
               </button>
             </div>
           ))

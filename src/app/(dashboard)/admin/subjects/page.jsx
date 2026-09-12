@@ -21,7 +21,7 @@ function getCacheKey(filters) {
   if (filters.search) params.set("search", filters.search);
   if (filters.status) params.set("status", filters.status);
   if (filters.courseId) params.set("courseId", filters.courseId);
-  return `admin-subjects:${params.toString()}`;
+  return `admin-subjects:v2:${params.toString()}`;
 }
 
 function readCache(key) {

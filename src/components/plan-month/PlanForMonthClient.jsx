@@ -4,10 +4,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { ChevronDown, ChevronUp, FileImage, FileVideo, Plus } from "lucide-react";
 import ClientPortal from "@/components/shared/ClientPortal";
+import PaginationControls from "@/components/teacher/PaginationControls";
 import { STORAGE_SAFE_UPLOAD_MAX_BYTES, formatUploadLimit } from "@/lib/uploadLimits";
 
 const MONTHLY_PLANS_CACHE_KEY = "monthly-plans:list:v1";
 const MONTHLY_PLANS_CACHE_TTL_MS = 60 * 1000;
+const PAGE_SIZE = 7;
 
 function readMonthlyPlansCache() {
   if (typeof window === "undefined") return null;
@@ -262,6 +264,11 @@ export default function PlanForMonthClient({
   createButtonLabel = "Add Monthly Plan",
   showHeader = true,
   showTableMediaPreviews = true,
+  createModalPortalTargetId = "coordinator-page-portal-root",
+  createModalPageScoped = false,
+  editModalPortalTargetId = "",
+  editModalPageScoped = false,
+  disableCache = false,
 }) {
   const MAX_IMAGE_BYTES = STORAGE_SAFE_UPLOAD_MAX_BYTES;
   const MAX_VIDEO_BYTES = STORAGE_SAFE_UPLOAD_MAX_BYTES;
@@ -275,12 +282,22 @@ export default function PlanForMonthClient({
   const [plans, setPlans] = useState([]);
   const [search, setSearch] = useState("");
   const [filterMonth, setFilterMonth] = useState("");
+  const [page, setPage] = useState(1);
   const [previewImage, setPreviewImage] = useState("");
+  const createBackdropClassName = createModalPageScoped
+    ? "pointer-events-auto absolute inset-0 z-[9999] flex items-center justify-center overflow-y-auto bg-[#063F32]/45 px-4 py-8"
+    : "fixed inset-0 z-[9999] flex items-center justify-center bg-[#063F32]/45 px-4 py-8";
+  const editBackdropClassName = editModalPageScoped
+    ? "pointer-events-auto fixed inset-0 z-[9999] flex items-start justify-center overflow-y-auto bg-[#063F32]/45 px-4 pb-12 pt-24 sm:pt-28"
+    : "fixed inset-0 z-[9999] flex items-center justify-center bg-[#063F32]/45 px-4 py-8";
+  const editPanelClassName = editModalPageScoped
+    ? "w-full max-w-2xl max-h-[calc(100dvh-9rem)] overflow-y-auto rounded-[2rem] border border-[#2D8A6A]/15 bg-[#FAF7F0] p-5 shadow-[0_24px_80px_-36px_rgba(13,59,46,0.24)] sm:max-h-[calc(100dvh-10rem)] sm:p-6"
+    : "mx-auto mt-6 w-full max-w-2xl rounded-[2rem] border border-[#2D8A6A]/15 bg-white p-6 shadow-[0_24px_80px_-36px_rgba(13,59,46,0.22)] sm:p-8 max-h-[calc(100vh-128px)] overflow-auto";
 
   useEffect(() => {
     if (typeof document === "undefined") return;
     const prev = document.body.style.overflow;
-    if (editingPlan || previewImage) {
+    if ((editingPlan && !editModalPageScoped) || previewImage) {
       document.body.style.overflow = "hidden";
     } else {
       document.body.style.overflow = prev;
@@ -288,13 +305,15 @@ export default function PlanForMonthClient({
     return () => {
       try { document.body.style.overflow = prev; } catch {}
     };
+    // Modal scope is static per portal page; keeping this array stable avoids Fast Refresh hook-size warnings.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editingPlan, previewImage]);
 
   useEffect(() => {
     let active = true;
     async function load() {
       try {
-        const cachedItems = readMonthlyPlansCache();
+        const cachedItems = disableCache ? null : readMonthlyPlansCache();
         if (Array.isArray(cachedItems)) {
           setPlans(cachedItems);
           return;
@@ -304,7 +323,9 @@ export default function PlanForMonthClient({
         const data = await res.json();
         if (!active) return;
         const nextItems = Array.isArray(data?.items) ? data.items : [];
-        writeMonthlyPlansCache(nextItems);
+        if (!disableCache) {
+          writeMonthlyPlansCache(nextItems);
+        }
         setPlans(nextItems);
       } catch (err) {
         console.error(err);
@@ -312,7 +333,7 @@ export default function PlanForMonthClient({
     }
     void load();
     return () => { active = false; };
-  }, []);
+  }, [disableCache]);
 
   const months = useMemo(() => {
     const m = new Map();
@@ -340,6 +361,12 @@ export default function PlanForMonthClient({
       return (p.name || "").toLowerCase().includes(q) || (p.description || "").toLowerCase().includes(q);
     });
   }, [plans, search, filterMonth]);
+  const totalPages = Math.max(1, Math.ceil(visiblePlans.length / PAGE_SIZE));
+  const safePage = Math.min(page, totalPages);
+  const paginatedPlans = useMemo(() => {
+    const start = (safePage - 1) * PAGE_SIZE;
+    return visiblePlans.slice(start, start + PAGE_SIZE);
+  }, [safePage, visiblePlans]);
 
   const handleImageChange = (e) => {
     const files = Array.from(e.target.files || []);
@@ -347,6 +374,7 @@ export default function PlanForMonthClient({
   };
 
   function openEdit(plan) {
+    setMessage("");
     setEditingPlan(plan);
     setEditForm({
       name: plan.name || "",
@@ -370,6 +398,19 @@ export default function PlanForMonthClient({
   function closeEdit() {
     setEditingPlan(null);
     setEditForm({ name: "", startDate: "", endDate: "", images: [] });
+    setMessage("");
+  }
+
+  function openCreate() {
+    setMessage("");
+    setSuccessMessage("");
+    setShowCreateModal(true);
+  }
+
+  function closeCreate() {
+    setShowCreateModal(false);
+    setForm({ name: "", startDate: "", endDate: "", images: [] });
+    setMessage("");
   }
 
   const handleEditImageChange = (e) => {
@@ -445,7 +486,9 @@ export default function PlanForMonthClient({
       const d = await fetch("/api/monthly-plans", { cache: "no-store" });
       const newData = await d.json();
       const nextItems = Array.isArray(newData?.items) ? newData.items : [];
-      writeMonthlyPlansCache(nextItems);
+      if (!disableCache) {
+        writeMonthlyPlansCache(nextItems);
+      }
       setPlans(nextItems);
     } catch (err) {
       setMessage("Error: " + (err?.message || String(err)));
@@ -515,7 +558,9 @@ export default function PlanForMonthClient({
         const d = await fetch("/api/monthly-plans", { cache: "no-store" });
         const newData = await d.json();
         const nextItems = Array.isArray(newData?.items) ? newData.items : [];
-        writeMonthlyPlansCache(nextItems);
+        if (!disableCache) {
+          writeMonthlyPlansCache(nextItems);
+        }
         setPlans(nextItems);
       } else if (createResponse.status === 403) {
         setMessage("Forbidden: you do not have permission to create plans.");
@@ -550,7 +595,7 @@ export default function PlanForMonthClient({
             {canCreate ? (
               <button
                 type="button"
-                onClick={() => setShowCreateModal(true)}
+                onClick={openCreate}
                 className="inline-flex items-center justify-center gap-2 self-start rounded-2xl bg-[#FFF5D6] px-4 py-2 text-sm font-semibold text-[#063F32] transition hover:bg-[#F1EADC] lg:self-auto"
               >
                 <Plus size={18} />
@@ -565,7 +610,7 @@ export default function PlanForMonthClient({
         <div className="flex justify-end">
           <button
             type="button"
-            onClick={() => setShowCreateModal(true)}
+            onClick={openCreate}
             className="inline-flex items-center justify-center gap-2 rounded-2xl bg-[#FFF5D6] px-4 py-2 text-sm font-semibold text-[#063F32] transition hover:bg-[#F1EADC]"
           >
             <Plus size={18} />
@@ -575,14 +620,15 @@ export default function PlanForMonthClient({
       ) : null}
 
       {successMessage && (
-        <div className="fixed right-6 top-6 z-50 rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-3 shadow-xl shadow-emerald-200/40 text-sm font-semibold text-emerald-800">
-          {successMessage}
+        <div className="fixed right-6 top-6 z-50 overflow-hidden rounded-[1.25rem] border border-[#E4C766]/35 bg-[linear-gradient(135deg,#0D5C48_0%,#063F32_100%)] px-5 py-4 text-sm font-semibold text-[#FFF5D6] shadow-[0_20px_55px_-28px_rgba(13,59,46,0.55)]">
+          <span className="pointer-events-none absolute inset-x-4 top-0 h-px bg-[linear-gradient(90deg,transparent,#E4C766,transparent)]" />
+          <span className="relative">{successMessage}</span>
         </div>
       )}
       {editingPlan && (
-        <ClientPortal>
-          <div onClick={closeEdit} className="fixed inset-0 z-[9999] flex items-start justify-center overflow-y-auto bg-[#063F32]/80 px-4 py-6 backdrop-blur-sm">
-            <div onClick={(e) => e.stopPropagation()} className="mx-auto mt-6 w-full max-w-2xl rounded-[2rem] border border-[#2D8A6A]/15 bg-white p-6 shadow-[0_24px_80px_-36px_rgba(13,59,46,0.22)] sm:p-8 max-h-[calc(100vh-128px)] overflow-auto">
+        <ClientPortal targetId={editModalPortalTargetId}>
+          <div onClick={closeEdit} className={editBackdropClassName}>
+            <div onClick={(e) => e.stopPropagation()} className={editPanelClassName}>
             <div className="flex items-start justify-between gap-4">
               <div>
                 <p className="text-sm font-semibold uppercase tracking-[0.24em] text-[#0D5C48]">Monthly plan</p>
@@ -642,15 +688,15 @@ export default function PlanForMonthClient({
       </ClientPortal>
       )}
       {showCreateModal && canCreate ? (
-        <ClientPortal targetId="coordinator-page-portal-root">
-          <div onClick={() => setShowCreateModal(false)} className="fixed inset-0 z-[9999] flex items-center justify-center bg-[#063F32]/45 px-4 py-8">
+        <ClientPortal targetId={createModalPortalTargetId}>
+          <div onClick={closeCreate} className={createBackdropClassName}>
             <div onClick={(e) => e.stopPropagation()} className="w-full max-w-2xl max-h-[85vh] overflow-y-auto rounded-[2rem] border border-[#2D8A6A]/15 bg-[#FAF7F0] p-5 shadow-[0_24px_80px_-36px_rgba(13,59,46,0.24)] sm:p-6">
               <div className="flex items-start justify-between gap-4">
                 <div>
                   <p className="text-sm font-semibold uppercase tracking-[0.24em] text-[#0D5C48]">Monthly plan</p>
                   <h2 className="mt-2 text-2xl font-semibold tracking-tight text-[#063F32]">Add monthly plan</h2>
                 </div>
-                <button type="button" onClick={() => setShowCreateModal(false)} className="rounded-xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-3 py-2 text-sm font-semibold text-[#063F32] transition hover:bg-[#F1EADC]">Close</button>
+                <button type="button" onClick={closeCreate} className="rounded-xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-3 py-2 text-sm font-semibold text-[#063F32] transition hover:bg-[#F1EADC]">Close</button>
               </div>
               <form onSubmit={handleSubmit} className="mt-6 space-y-6">
                 <div className="grid gap-4 lg:grid-cols-2">
@@ -699,7 +745,7 @@ export default function PlanForMonthClient({
                   </div>
                 ) : null}
                 <div className="flex justify-end gap-3">
-                  <button type="button" onClick={() => setShowCreateModal(false)} className="rounded-2xl border px-4 py-2 text-sm">Cancel</button>
+                  <button type="button" onClick={closeCreate} className="rounded-2xl border px-4 py-2 text-sm">Cancel</button>
                   <button type="submit" disabled={saving} className="inline-flex rounded-2xl bg-[#0D5C48] px-5 py-3 text-sm font-semibold text-[#FAF7F0] transition hover:bg-[#063F32]">
                     {saving ? "Saving..." : "Save Plan"}
                   </button>
@@ -710,14 +756,25 @@ export default function PlanForMonthClient({
         </ClientPortal>
       ) : null}
       <section className="rounded-2xl border border-[#2D8A6A]/15 bg-white py-6 px-0 shadow-[0_20px_70px_-36px_rgba(13,59,46,0.18)] backdrop-blur-xl">
+          <span className="mb-2 block text-sm font-semibold text-[#245C4F] px-6">Search</span>
         <div className="mb-4 grid gap-3 sm:grid-cols-[1fr_240px] px-6">
           <input
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              setPage(1);
+            }}
             placeholder="Search plans..."
             className="w-full rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 text-sm text-[#063F32] outline-none focus:border-[#2D8A6A] focus:ring-4 focus:ring-[#C9A227]/20"
           />
-          <select value={filterMonth} onChange={(e) => setFilterMonth(e.target.value)} className="w-full rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 text-sm text-[#063F32] outline-none focus:border-[#2D8A6A] focus:ring-4 focus:ring-[#C9A227]/20">
+          <select
+            value={filterMonth}
+            onChange={(e) => {
+              setFilterMonth(e.target.value);
+              setPage(1);
+            }}
+            className="w-full rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 text-sm text-[#063F32] outline-none focus:border-[#2D8A6A] focus:ring-4 focus:ring-[#C9A227]/20"
+          >
             <option value="">All months</option>
             {months.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
           </select>
@@ -736,7 +793,7 @@ export default function PlanForMonthClient({
               </tr>
             </thead>
             <tbody className="divide-y divide-[#F1EADC] bg-[#FFFEFB]">
-              {visiblePlans.map((row, index) => (
+              {paginatedPlans.map((row, index) => (
                 <tr key={row.id} className={`align-top ${index % 2 === 0 ? "" : ""}`}>
                   <td className="px-6 py-5 text-sm text-[#063F32]">{row.name}</td>
                   <td className="px-6 py-5 text-sm text-[#245C4F]">{formatDate(row.start_date || row.startDate)}</td>
@@ -772,6 +829,14 @@ export default function PlanForMonthClient({
             </tbody>
           </table>
         </div>
+        {visiblePlans.length > PAGE_SIZE ? (
+          <PaginationControls
+            page={safePage}
+            pageSize={PAGE_SIZE}
+            totalItems={visiblePlans.length}
+            onPageChange={(nextPage) => setPage(Math.min(Math.max(1, nextPage), totalPages))}
+          />
+        ) : null}
       </section>
       {previewImage && (
         <ClientPortal>

@@ -4,6 +4,81 @@ import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useMemo, useState } from "react";
 import { formatEventDate, formatEventLifecycleLabel, formatEventLifecycleStatus } from "@/lib/publicEvents";
 
+const CACHE_TTL = 60 * 1000;
+const pendingTickerRequests = new Map();
+
+function getCacheKey(namespace) {
+  const key = String(namespace || "").trim();
+  return key ? `${key}:upcoming-public-events-ticker` : "";
+}
+
+function readCache(namespace) {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  const key = getCacheKey(namespace);
+  if (!key) {
+    return null;
+  }
+
+  const cached = window.sessionStorage.getItem(key);
+  if (!cached) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(cached);
+    if (Date.now() - parsed.timestamp > CACHE_TTL) {
+      window.sessionStorage.removeItem(key);
+      return null;
+    }
+
+    return Array.isArray(parsed.payload) ? parsed.payload : null;
+  } catch {
+    window.sessionStorage.removeItem(key);
+    return null;
+  }
+}
+
+function writeCache(namespace, payload) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  const key = getCacheKey(namespace);
+  if (!key) {
+    return;
+  }
+
+  window.sessionStorage.setItem(
+    key,
+    JSON.stringify({ timestamp: Date.now(), payload })
+  );
+}
+
+async function fetchTickerEvents(namespace) {
+  const key = getCacheKey(namespace) || "default";
+  if (!pendingTickerRequests.has(key)) {
+    pendingTickerRequests.set(
+      key,
+      fetch("/api/public-events", { cache: "no-store" })
+        .then(async (response) => {
+          const data = await response.json();
+          const upcoming = Array.isArray(data?.currentUpcoming) ? data.currentUpcoming : [];
+          const events = upcoming.slice(0, 8);
+          writeCache(namespace, events);
+          return events;
+        })
+        .finally(() => {
+          pendingTickerRequests.delete(key);
+        })
+    );
+  }
+
+  return pendingTickerRequests.get(key);
+}
+
 function normalizePublicEventWebsiteBase(value) {
   const raw = String(value || "").trim();
   if (!raw) return "https://ashshajrah.com";
@@ -81,22 +156,20 @@ function getStatusBadge(item) {
   return { lifecycle, label, tone };
 }
 
-export default function UpcomingPublicEventsTicker() {
-  const [events, setEvents] = useState([]);
+export default function UpcomingPublicEventsTicker({ cacheNamespace = "" } = {}) {
+  const [events, setEvents] = useState(() => readCache(cacheNamespace) || []);
   const [activeIndex, setActiveIndex] = useState(0);
-  const [loaded, setLoaded] = useState(false);
+  const [loaded, setLoaded] = useState(() => Boolean(readCache(cacheNamespace)));
 
   useEffect(() => {
     let active = true;
 
     async function load() {
       try {
-        const response = await fetch("/api/public-events", { cache: "no-store" });
-        const data = await response.json();
+        const events = await fetchTickerEvents(cacheNamespace);
         if (!active) return;
 
-        const upcoming = Array.isArray(data?.currentUpcoming) ? data.currentUpcoming : [];
-        setEvents(upcoming.slice(0, 8));
+        setEvents(events);
       } catch {
         if (active) setEvents([]);
       } finally {
@@ -108,7 +181,7 @@ export default function UpcomingPublicEventsTicker() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [cacheNamespace]);
 
   useEffect(() => {
     if (events.length <= 1) return undefined;
