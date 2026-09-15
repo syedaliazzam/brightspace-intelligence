@@ -32,9 +32,20 @@ function buildBodyHtml(value) {
     .join("");
 }
 
-function buildCustomEmailHtml({ subject, intro, message }) {
-  const safeSubject = subject.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-  const safeIntro = intro.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+function escapeHtml(value) {
+  return String(value || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function buildCustomEmailHtml({ subject, intro, message, linkLabel, linkUrl }) {
+  const safeSubject = escapeHtml(subject);
+  const safeIntro = escapeHtml(intro);
+  const safeLinkLabel = escapeHtml(linkLabel || "Open Link");
+  const safeLinkUrl = escapeHtml(linkUrl);
   return `
     <div style="margin:0;padding:0;background:radial-gradient(circle at top left,rgba(201,162,39,.12),transparent 26%),radial-gradient(circle at top right,rgba(45,138,106,.12),transparent 24%),linear-gradient(180deg,#FAF7F0 0%,#F7F1E3 100%);font-family:Arial,sans-serif;color:#063F32;">
       <div style="max-width:760px;margin:0 auto;padding:20px 10px 26px;">
@@ -49,6 +60,12 @@ function buildCustomEmailHtml({ subject, intro, message }) {
             <div style="padding:16px;border:1px solid #2D8A6A;border-radius:18px;background:#fffaf0;color:#063F32;font-size:15px;line-height:1.8;">
               ${buildBodyHtml(message)}
             </div>
+            ${safeLinkUrl ? `
+              <div style="margin:20px 0 0;text-align:center;">
+                <a href="${safeLinkUrl}" style="display:inline-flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#0D5C48,#0A4A3A);color:#FAF7F0;text-decoration:none;padding:12px 22px;border-radius:999px;font-weight:700;font-size:14px;box-shadow:0 10px 30px rgba(13,92,72,.24);border:1px solid rgba(228,198,102,.35);">${safeLinkLabel}</a>
+                <p style="margin:14px 0 0;font-size:12px;line-height:1.7;color:#245C4F;">If the button does not work, open this link: <a href="${safeLinkUrl}" style="color:#0D5C48;text-decoration:underline;word-break:break-all;">${safeLinkUrl}</a></p>
+              </div>
+            ` : ""}
           </div>
           <div style="padding:18px 28px;background:linear-gradient(135deg,#0D5C48,#0B4E3D);color:#F7F1E3;border-top:1px solid rgba(228,198,102,.25);">
             <div style="display:block;text-align:center;font-size:12px;line-height:1.8;opacity:.95;">Ash-Shajrah Learning Hub LMS</div>
@@ -142,6 +159,8 @@ export async function POST(request) {
     const subject = String(formData.get("subject") || "").trim();
     const intro = String(formData.get("intro") || "").trim();
     const message = String(formData.get("body") || "").trim();
+    const linkLabel = String(formData.get("linkLabel") || "").trim();
+    const linkUrl = String(formData.get("linkUrl") || "").trim();
     const parsedRecipients = JSON.parse(String(formData.get("recipients") || "[]"));
     const recipients = dedupeRecipients(Array.isArray(parsedRecipients) ? parsedRecipients : []);
     const imageFile = formData.get("image");
@@ -164,10 +183,13 @@ export async function POST(request) {
 
     if (!subject) return json("Subject is required.", 400);
     if (!message) return json("Body is required.", 400);
+    if (linkUrl && !/^https?:\/\/\S+\.\S+/i.test(linkUrl)) {
+      return json("Enter a valid link starting with http:// or https://.", 400);
+    }
     if (!recipients.length) return json("Select at least one receiver email.", 400);
 
-    const html = buildCustomEmailHtml({ subject, intro, message });
-    const text = [intro, message].filter(Boolean).join("\n\n");
+    const html = buildCustomEmailHtml({ subject, intro, message, linkLabel, linkUrl });
+    const text = [intro, message, linkUrl ? `${linkLabel || "Open Link"}: ${linkUrl}` : ""].filter(Boolean).join("\n\n");
     const attachments = imageAttachment ? [imageAttachment] : [];
 
     const results = await Promise.allSettled(

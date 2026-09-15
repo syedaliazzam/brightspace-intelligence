@@ -35,6 +35,8 @@ export default function CustomEmailsPage({
   const [subject, setSubject] = useState("");
   const [intro, setIntro] = useState("");
   const [body, setBody] = useState("");
+  const [linkLabel, setLinkLabel] = useState("");
+  const [linkUrl, setLinkUrl] = useState("");
   const [emailInput, setEmailInput] = useState("");
   const [selectedEmails, setSelectedEmails] = useState([]);
   const [imageFile, setImageFile] = useState(null);
@@ -108,6 +110,8 @@ export default function CustomEmailsPage({
     setSubject("");
     setIntro("");
     setBody("");
+    setLinkLabel("");
+    setLinkUrl("");
     setEmailInput("");
     setSelectedEmails([]);
     setImageFile(null);
@@ -143,6 +147,9 @@ export default function CustomEmailsPage({
     const nextErrors = {};
     if (!subject.trim()) nextErrors.subject = "Subject is required.";
     if (!body.trim()) nextErrors.body = "Body is required.";
+    if (linkUrl.trim() && !/^https?:\/\/\S+\.\S+/i.test(linkUrl.trim())) {
+      nextErrors.linkUrl = "Enter a valid link starting with http:// or https://.";
+    }
     if (!selectedEmails.length) nextErrors.receivers = "Select or write at least one receiver email.";
     setErrors(nextErrors);
     return Object.keys(nextErrors).length === 0;
@@ -160,6 +167,8 @@ export default function CustomEmailsPage({
           formData.append("subject", subject.trim());
           formData.append("intro", intro.trim());
           formData.append("body", body.trim());
+          formData.append("linkLabel", linkLabel.trim());
+          formData.append("linkUrl", linkUrl.trim());
           formData.append("recipients", JSON.stringify(selectedEmails));
           if (imageFile) formData.append("image", imageFile);
           return formData;
@@ -325,6 +334,34 @@ export default function CustomEmailsPage({
                           {imageFile?.name ? `Selected image: ${imageFile.name}` : "Optional image for this email."}
                         </p>
                       </label>
+
+                      <div className="rounded-2xl border border-[#2D8A6A]/15 bg-white p-4">
+                        <span className="mb-3 block text-sm font-semibold text-[#245C4F]">Add Link</span>
+                        <div className="grid gap-3 sm:grid-cols-2">
+                          <label className="block">
+                            <span className="mb-2 block text-xs font-bold uppercase tracking-[0.16em] text-[#0D5C48]">Link Label</span>
+                            <input
+                              value={linkLabel}
+                              onChange={(event) => setLinkLabel(event.target.value)}
+                              placeholder="Example: Open page"
+                              className="w-full rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 text-sm font-semibold text-[#063F32] outline-none transition focus:border-[#2D8A6A] focus:ring-4 focus:ring-[#FFF5D6]"
+                            />
+                          </label>
+                          <label className="block">
+                            <span className="mb-2 block text-xs font-bold uppercase tracking-[0.16em] text-[#0D5C48]">Link URL</span>
+                            <input
+                              value={linkUrl}
+                              onChange={(event) => {
+                                setLinkUrl(event.target.value);
+                                setErrors((current) => ({ ...current, linkUrl: "" }));
+                              }}
+                              placeholder="https://example.com"
+                              className="w-full rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 text-sm font-semibold text-[#063F32] outline-none transition focus:border-[#2D8A6A] focus:ring-4 focus:ring-[#FFF5D6]"
+                            />
+                            {errors.linkUrl ? <p className="mt-2 text-sm font-semibold text-rose-700">{errors.linkUrl}</p> : null}
+                          </label>
+                        </div>
+                      </div>
 
                       <div>
                         <span className="mb-2 block text-sm font-semibold text-[#245C4F]">Receiver Emails</span>
