@@ -47,7 +47,7 @@ function formatMoney(value) {
   return `PKR ${Number(value || 0).toLocaleString("en-PK")}`;
 }
 
-export default function PaymentVerificationTable({ items, onRefresh, canManage = true }) {
+export default function PaymentVerificationTable({ items, onRefresh, canManage = true, portalTargetId = "coordinator-page-portal-root" }) {
   const router = useRouter();
   const [pendingId, setPendingId] = useState("");
   const [selectedItem, setSelectedItem] = useState(null);
@@ -353,10 +353,11 @@ export default function PaymentVerificationTable({ items, onRefresh, canManage =
         onClose={() => setSelectedItem(null)}
         onApprove={(item) => verifyPayment(item.id, "approve")}
         onReject={(item) => verifyPayment(item.id, "reject")}
+        portalTargetId={portalTargetId}
       />
 
       {credentialsEmail ? (
-        <ClientPortal targetId="coordinator-page-portal-root">
+        <ClientPortal targetId={portalTargetId}>
         <div className="absolute inset-x-0 top-0 z-[9999] isolate flex min-h-full items-start justify-center overflow-visible bg-[#063F32]/45 px-4 pt-10 pb-10">
           <div className="w-full max-w-2xl rounded-[2rem] border border-[#2D8A6A]/15 bg-[#FAF7F0] p-6 shadow-[0_24px_80px_-36px_rgba(13,59,46,0.24)] sm:p-8">
             <p className="text-sm font-semibold uppercase tracking-[0.24em] text-[#C9A227]">
@@ -413,7 +414,7 @@ export default function PaymentVerificationTable({ items, onRefresh, canManage =
       ) : null}
 
       {rejectingItem ? (
-        <ClientPortal targetId="coordinator-page-portal-root">
+        <ClientPortal targetId={portalTargetId}>
         <div className="absolute inset-x-0 top-0 z-[9999] isolate flex min-h-full items-start justify-center overflow-visible bg-[#063F32]/45 px-4 pt-10 pb-10 backdrop-blur-sm">
           <div className="w-full max-w-2xl rounded-[2rem] border border-[#2D8A6A]/20 bg-[#FAF7F0] p-6 shadow-[0_24px_80px_-36px_rgba(6,63,50,0.24)] sm:p-8">
             <p className="text-sm font-semibold uppercase tracking-[0.24em] text-rose-700">Reject Payment</p>

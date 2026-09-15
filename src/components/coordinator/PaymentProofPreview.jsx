@@ -1,6 +1,7 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
+import { useEffect, useState } from "react";
 import ClientPortal from "@/components/shared/ClientPortal";
 import { buildInlinePreviewUrl } from "@/lib/filePreview";
 
@@ -8,20 +9,38 @@ function isPdf(url) {
   return String(url || "").toLowerCase().includes(".pdf");
 }
 
-export default function PaymentProofPreview({ item, onClose, onApprove, onReject }) {
+export default function PaymentProofPreview({ item, onClose, onApprove, onReject, portalTargetId = "coordinator-page-portal-root" }) {
+  const [pageHeight, setPageHeight] = useState(0);
+
+  useEffect(() => {
+    if (!item || typeof window === "undefined") return undefined;
+
+    const updatePageHeight = () => {
+      const portalRoot = document.getElementById(portalTargetId);
+      setPageHeight(Math.max(portalRoot?.scrollHeight || 0, window.innerHeight));
+    };
+
+    updatePageHeight();
+    window.addEventListener("resize", updatePageHeight);
+    return () => window.removeEventListener("resize", updatePageHeight);
+  }, [item, portalTargetId]);
+
   return (
     <AnimatePresence>
       {item ? (
-        <ClientPortal targetId="coordinator-page-portal-root">
-        <div className="absolute inset-x-0 top-0 z-[9999] isolate flex min-h-full items-start justify-center overflow-visible bg-[#063F32]/45 px-4 pt-10 pb-10">
+        <ClientPortal targetId={portalTargetId}>
+        <div
+          className="absolute inset-x-0 top-0 z-[9999] isolate flex items-start justify-center overflow-hidden bg-[#063F32]/45 py-8 backdrop-blur-sm sm:py-10"
+          style={{ minHeight: pageHeight ? `${pageHeight}px` : "100%" }}
+        >
           <motion.div
             initial={{ opacity: 0, y: 18 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 18 }}
             transition={{ duration: 0.2 }}
-            className="w-full max-w-4xl rounded-[2rem] border border-[#2D8A6A]/20 bg-[#FAF7F0] p-6 shadow-[0_24px_80px_-36px_rgba(6,63,50,0.22)] sm:p-8"
+            className="mx-4 flex max-h-[calc(100dvh-5rem)] w-full max-w-4xl flex-col overflow-hidden rounded-[2rem] border border-[#2D8A6A]/20 bg-[#FAF7F0] shadow-[0_24px_80px_-36px_rgba(6,63,50,0.22)]"
           >
-            <div className="flex items-start justify-between gap-4">
+            <div className="flex items-start justify-between gap-4 border-b border-[#2D8A6A]/10 p-6 sm:p-8">
               <div>
                 <p className="text-sm font-semibold uppercase tracking-[0.24em] text-[#0D5C48]">
                   Payment proof
@@ -40,7 +59,8 @@ export default function PaymentProofPreview({ item, onClose, onApprove, onReject
               </button>
             </div>
 
-            <div className="mt-6 grid gap-4 rounded-[1.75rem] border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(250,247,240,0.98)_100%)] p-5 shadow-[0_18px_60px_-36px_rgba(13,59,46,0.14)] sm:grid-cols-2">
+            <div className="min-h-0 flex-1 overflow-y-auto p-6 sm:p-8">
+            <div className="grid gap-4 rounded-[1.75rem] border border-[#2D8A6A]/15 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(250,247,240,0.98)_100%)] p-5 shadow-[0_18px_60px_-36px_rgba(13,59,46,0.14)] sm:grid-cols-2">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#245C4F]">Student</p>
                 <p className="mt-2 font-semibold text-[#063F32]">{item.student_name}</p>
@@ -91,6 +111,7 @@ export default function PaymentProofPreview({ item, onClose, onApprove, onReject
                 </button>
               </div>
             ) : null}
+            </div>
           </motion.div>
         </div>
         </ClientPortal>

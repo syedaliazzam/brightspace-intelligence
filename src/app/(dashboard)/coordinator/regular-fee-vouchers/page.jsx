@@ -165,16 +165,23 @@ export default function RegularFeeVouchersPage() {
     event.preventDefault();
     if (!approveRow?.voucher_id && !approveRow?.fee_submission_id) return;
 
-    setApprovePending(true);
     setApproveError("");
+    const resolvedAmount = Number(approveAmount || approveRow.paid_amount || approveRow.base_amount || approveRow.current_pending_due || 0);
+    if (!Number.isFinite(resolvedAmount) || resolvedAmount <= 0) {
+      setApproveError("Please enter a valid paid amount before approving.");
+      return;
+    }
+    if (!approveProofFile && !approveRow?.proof_file_path) {
+      return;
+      setApproveError("Please select a payment proof before approving.");
+    }
+
+    setApprovePending(true);
 
     try {
       const formData = new FormData();
       formData.append("action", "approve");
-      formData.append(
-        "paidAmount",
-        String(approveAmount || approveRow.paid_amount || approveRow.base_amount || approveRow.current_pending_due || 0)
-      );
+      formData.append("paidAmount", String(resolvedAmount));
       if (approveProofFile) {
         formData.append("proofFile", approveProofFile);
       }
@@ -557,7 +564,7 @@ export default function RegularFeeVouchersPage() {
                     Close
                   </button>
                 </div>
-                <form className="mt-6 grid gap-4" onSubmit={submitApprovePayment}>
+                <form className="mt-6 grid gap-4" onSubmit={submitApprovePayment} noValidate>
                   <label className="block">
                     <span className="mb-2 block text-sm font-medium text-[#245C4F]">Amount paid</span>
                     <input

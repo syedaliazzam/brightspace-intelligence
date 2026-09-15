@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import { ChevronDown, Search } from "lucide-react";
 import { jsPDF } from "jspdf";
+import ClientPortal from "@/components/shared/ClientPortal";
 import PaginationControls from "@/components/teacher/PaginationControls";
 import { applyCarryForwardHistoryRows, computeFeeHistoryAmounts } from "@/lib/feeHistory";
 
@@ -20,6 +21,11 @@ function formatDate(value) {
   return new Intl.DateTimeFormat("en-PK", { dateStyle: "medium" }).format(date);
 }
 
+function isPdfProof(row) {
+  const proofPath = String(row?.proof_file_path || row?.proof_file_url || "").split("?")[0].toLowerCase();
+  return proofPath.endsWith(".pdf") || proofPath.includes(".pdf");
+}
+
 function normalizeText(value) {
   return String(value || "").trim().toLowerCase();
 }
@@ -27,6 +33,11 @@ function normalizeText(value) {
 function moneyInputValue(value) {
   const amount = Number(value || 0);
   return Number.isFinite(amount) ? String(amount) : "0";
+}
+
+function moneyDraftNumber(value) {
+  const amount = Number(value || 0);
+  return Number.isFinite(amount) ? amount : 0;
 }
 
 function getFeeContactEmail(item) {
@@ -42,15 +53,16 @@ function computeAmounts(previousMonthDue, currentMonthFee, thisMonthPaid) {
   return { total, remaining };
 }
 
-function computeEditableFeeAmounts(draft = {}) {
+function computeEditableFeeAmounts(draft = {}, { applyScholarship = true } = {}) {
   const previousMonthDue = Number(draft.previous_month_due || 0);
   const regularFee = Number(draft.regular_fee_amount || 0);
   const admissionFee = Number(draft.admission_fee_amount || 0);
   const discount = Number(draft.discount_amount || 0);
   const scholarshipAmount = Number(draft.scholarship_amount || 0);
+  const appliedScholarshipAmount = applyScholarship ? scholarshipAmount : 0;
   const paidAmount = Number(draft.this_month_paid || 0);
   const discountPercent = Number(draft.discount_percent || 0);
-  const calculatedCurrentMonthFee = Math.max(0, regularFee + admissionFee - discount - scholarshipAmount);
+  const calculatedCurrentMonthFee = Math.max(0, regularFee + admissionFee - discount - appliedScholarshipAmount);
   const currentMonthFee = Number(draft.current_month_fee ?? calculatedCurrentMonthFee);
   const calculatedTotalAmount = previousMonthDue + currentMonthFee;
   const totalAmount = Number(draft.total_amount ?? calculatedTotalAmount);
@@ -64,6 +76,7 @@ function computeEditableFeeAmounts(draft = {}) {
     discount,
     discountPercent,
     scholarshipAmount,
+    appliedScholarshipAmount,
     paidAmount,
     currentMonthFee,
     totalAmount,
@@ -71,10 +84,15 @@ function computeEditableFeeAmounts(draft = {}) {
   };
 }
 
+function isAdmissionFeeHistoryRow(row) {
+  return String(row?.source_type || "").toLowerCase() === "voucher-direct"
+    || Number(row?.admission_fee_amount || 0) > 0;
+}
+
 function buildFeeEditDraft(row) {
   const parts = getCurrentMonthFeeParts(row);
   const previousMonthDue = Number(row.computedPreviousMonthDue ?? row.previous_month_due ?? 0);
-  const currentMonthFee = Number(row.current_month_fee || parts.currentMonthFee || 0);
+  const currentMonthFee = Number(row.current_month_fee ?? parts.currentMonthFee ?? 0);
   const regularFee = Number(parts.regularFee || (!parts.admissionFee ? currentMonthFee : 0));
 
   return {
@@ -121,10 +139,9 @@ function getCurrentMonthFeeParts(row) {
   const discount = Number(row?.discount_amount || 0);
   const scholarshipAmount = Number(row?.scholarship_amount || 0);
   const derivedTotal = Math.max(regularFee + admissionFee - discount - scholarshipAmount, 0);
-  const hasBreakdown = regularFee > 0 || admissionFee > 0 || discount > 0 || scholarshipAmount > 0;
-  const currentMonthFee = hasBreakdown
+  const currentMonthFee = row?.current_month_fee === null || row?.current_month_fee === undefined || row?.current_month_fee === ""
     ? derivedTotal
-    : Number(row?.current_month_fee || derivedTotal);
+    : Number(row.current_month_fee);
 
   return {
     regularFee,
@@ -139,6 +156,7 @@ export default function CoordinatorFeeHistoryPage({
   portalLabel = "Coordinator portal",
   canEdit = true,
   classOptionsApiPath = "/api/coordinator/classes",
+  portalTargetId = "coordinator-page-portal-root",
 }) {
   const [items, setItems] = useState([]);
   const [liveClassOptions, setLiveClassOptions] = useState([]);
@@ -166,6 +184,7 @@ export default function CoordinatorFeeHistoryPage({
   const [drafts, setDrafts] = useState({});
   const [feeEditTarget, setFeeEditTarget] = useState(null);
   const [feeEditDraft, setFeeEditDraft] = useState(null);
+  const [feeEditProofFile, setFeeEditProofFile] = useState(null);
   const [savingRowId, setSavingRowId] = useState("");
   const [voucherPdfLoadingId, setVoucherPdfLoadingId] = useState("");
 
@@ -232,7 +251,9 @@ export default function CoordinatorFeeHistoryPage({
         discount_amount: moneyInputValue(row.discount_amount),
         scholarship_amount: moneyInputValue(getCurrentMonthFeeParts(row).scholarshipAmount),
         current_month_fee: moneyInputValue(row.current_month_fee),
+        total_amount: moneyInputValue(row.total_amount),
         this_month_paid: moneyInputValue(row.this_month_paid),
+        remaining_due: moneyInputValue(row.remaining_due),
       }])));
     } catch (loadError) {
       setHistoryError(loadError instanceof Error ? loadError.message : "Unable to load student fee history.");
@@ -245,8 +266,16 @@ export default function CoordinatorFeeHistoryPage({
 
   function openFeeEdit(row) {
     if (!row?.id) return;
+    const nextDraft = buildFeeEditDraft(row);
+    if (
+      !isAdmissionFeeHistoryRow(row)
+      && Number(nextDraft.scholarship_amount || 0) <= 0
+      && selectedStudentScholarshipAmount > 0
+    ) {
+      nextDraft.scholarship_amount = moneyInputValue(selectedStudentScholarshipAmount);
+    }
     setFeeEditTarget(row);
-    setFeeEditDraft(buildFeeEditDraft(row));
+    setFeeEditDraft(nextDraft);
     setHistoryError("");
     setHistoryMessage("");
   }
@@ -254,16 +283,22 @@ export default function CoordinatorFeeHistoryPage({
   function closeFeeEdit() {
     setFeeEditTarget(null);
     setFeeEditDraft(null);
+    setFeeEditProofFile(null);
   }
 
   function updateFeeEditDraft(key, value) {
     setFeeEditDraft((current) => {
+      const applyScholarship = isAdmissionFeeHistoryRow(feeEditTarget);
       const next = {
         ...(current || {}),
         [key]: value,
       };
 
-      if (["previous_month_due", "regular_fee_amount", "admission_fee_amount", "discount_amount", "scholarship_amount", "this_month_paid"].includes(key)) {
+      if (key === "scholarship_amount") {
+        return next;
+      }
+
+      if (["previous_month_due", "regular_fee_amount", "admission_fee_amount", "discount_amount", "this_month_paid"].includes(key)) {
         if (key === "regular_fee_amount" && Number(next.discount_percent || 0) > 0) {
           next.discount_amount = moneyInputValue((Number(value || 0) * Number(next.discount_percent || 0)) / 100);
         }
@@ -278,22 +313,28 @@ export default function CoordinatorFeeHistoryPage({
           Number(next.regular_fee_amount || 0)
           + Number(next.admission_fee_amount || 0)
           - Number(next.discount_amount || 0)
-          - Number(next.scholarship_amount || 0)
+          - (applyScholarship ? Number(next.scholarship_amount || 0) : 0)
         );
         const totalAmountValue = previousMonthDueValue + currentMonthFeeValue;
         const remainingDueValue = Math.max(0, totalAmountValue - Number(next.this_month_paid || 0));
 
         next.current_month_fee = moneyInputValue(currentMonthFeeValue);
-        next.total_amount = moneyInputValue(totalAmountValue);
-        next.remaining_due = moneyInputValue(remainingDueValue);
+        if (key !== "previous_month_due") {
+          next.total_amount = moneyInputValue(totalAmountValue);
+          next.remaining_due = moneyInputValue(remainingDueValue);
+        }
       }
 
       if (["current_month_fee", "total_amount", "this_month_paid"].includes(key)) {
         const totalAmountValue = key === "current_month_fee"
           ? Number(next.previous_month_due || 0) + Number(value || 0)
           : Number(next.total_amount || 0);
-        next.total_amount = moneyInputValue(totalAmountValue);
-        next.remaining_due = moneyInputValue(Math.max(0, totalAmountValue - Number(next.this_month_paid || 0)));
+        if (key === "current_month_fee") {
+          next.total_amount = moneyInputValue(totalAmountValue);
+        }
+        if (key !== "total_amount") {
+          next.remaining_due = moneyInputValue(Math.max(0, totalAmountValue - Number(next.this_month_paid || 0)));
+        }
       }
 
       if (key === "discount_percent") {
@@ -303,7 +344,7 @@ export default function CoordinatorFeeHistoryPage({
           Number(next.regular_fee_amount || 0)
           + Number(next.admission_fee_amount || 0)
           - discountAmountValue
-          - Number(next.scholarship_amount || 0)
+          - (applyScholarship ? Number(next.scholarship_amount || 0) : 0)
         );
         const totalAmountValue = Number(next.previous_month_due || 0) + currentMonthFeeValue;
 
@@ -320,15 +361,11 @@ export default function CoordinatorFeeHistoryPage({
   async function saveHistoryRow(row, overrideDraft = null) {
     if (!row?.id) return;
     const draft = overrideDraft || drafts[row.id] || {};
-    const computedDraft = computeEditableFeeAmounts(draft);
     setSavingRowId(row.id);
     setHistoryMessage("");
     setHistoryError("");
     try {
-      const response = await fetch("/api/coordinator/fee-history", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+      const payload = {
           rowId: row.id,
           sourceType: row.source_type,
           studentId: row.student_id,
@@ -337,22 +374,52 @@ export default function CoordinatorFeeHistoryPage({
           registrationId: row.registration_id,
           monthLabel: row.month_label,
           dueDate: row.due_date,
-          previousMonthDue: computedDraft.previousMonthDue,
-          monthlyFeeAmount: computedDraft.regularFee,
-          admissionFeeAmount: computedDraft.admissionFee,
-          discountPercent: computedDraft.discountPercent,
-          discountAmount: computedDraft.discount,
-          scholarshipAmount: computedDraft.scholarshipAmount,
-          currentMonthFee: computedDraft.currentMonthFee,
-          totalAmount: computedDraft.totalAmount,
-          remainingDue: computedDraft.remainingDue,
-          thisMonthPaid: computedDraft.paidAmount,
-        }),
-      });
+          previousMonthDue: moneyDraftNumber(draft.previous_month_due),
+          monthlyFeeAmount: moneyDraftNumber(draft.regular_fee_amount),
+          admissionFeeAmount: moneyDraftNumber(draft.admission_fee_amount),
+          discountPercent: moneyDraftNumber(draft.discount_percent),
+          discountAmount: moneyDraftNumber(draft.discount_amount),
+          scholarshipAmount: moneyDraftNumber(draft.scholarship_amount),
+          currentMonthFee: moneyDraftNumber(draft.current_month_fee),
+          totalAmount: moneyDraftNumber(draft.total_amount),
+          remainingDue: moneyDraftNumber(draft.remaining_due),
+          thisMonthPaid: moneyDraftNumber(draft.this_month_paid),
+      };
+      const requestOptions = feeEditProofFile
+        ? (() => {
+            const formData = new FormData();
+            Object.entries(payload).forEach(([key, value]) => {
+              formData.append(key, value == null ? "" : String(value));
+            });
+            formData.append("proofFile", feeEditProofFile);
+            return { method: "PATCH", body: formData };
+          })()
+        : {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          };
+      const response = await fetch("/api/coordinator/fee-history", requestOptions);
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data?.message || "Unable to update fee history row.");
       closeFeeEdit();
-      if (selectedStudent?.student_id) {
+      if (Array.isArray(data?.items)) {
+        const nextItems = data.items;
+        const carryForwardRows = buildCarryForwardHistoryRows(nextItems);
+        setHistoryItems(nextItems);
+        setDrafts(Object.fromEntries(carryForwardRows.map((row) => [row.id, {
+          previous_month_due: moneyInputValue(row.computedPreviousMonthDue ?? row.previous_month_due),
+          regular_fee_amount: moneyInputValue(getCurrentMonthFeeParts(row).regularFee || row.current_month_fee),
+          admission_fee_amount: moneyInputValue(getCurrentMonthFeeParts(row).admissionFee),
+          discount_percent: moneyInputValue(row.discount_percent),
+          discount_amount: moneyInputValue(row.discount_amount),
+          scholarship_amount: moneyInputValue(getCurrentMonthFeeParts(row).scholarshipAmount),
+          current_month_fee: moneyInputValue(row.current_month_fee),
+          total_amount: moneyInputValue(row.total_amount),
+          this_month_paid: moneyInputValue(row.this_month_paid),
+          remaining_due: moneyInputValue(row.remaining_due),
+        }])));
+      } else if (selectedStudent?.student_id) {
         await openStudentHistory(selectedStudent, {
           clearMessage: false,
           clearRows: false,
@@ -380,6 +447,7 @@ export default function CoordinatorFeeHistoryPage({
       if (!response.ok) throw new Error(data?.message || "Unable to load voucher details.");
       const voucher = data?.item || {};
       const parts = getCurrentMonthFeeParts(row);
+      const displayScholarshipAmount = Number(parts.scholarshipAmount || selectedStudentScholarshipAmount || 0);
       const previousMonthDueValue = Number(row.computedPreviousMonthDue ?? row.previous_month_due ?? 0);
       const payableAmount = Number(row.total_amount || row.computedTotalAmount || (previousMonthDueValue + parts.currentMonthFee));
       const paidAmount = Number(row.this_month_paid || 0);
@@ -401,7 +469,7 @@ export default function CoordinatorFeeHistoryPage({
         ["Monthly Fee", formatMoney(parts.regularFee)],
         ["Admission Fee", formatMoney(parts.admissionFee)],
         ["Discount", formatMoney(parts.discount)],
-        ["Scholarship Given Amount", formatMoney(parts.scholarshipAmount)],
+        ["Scholarship Given Amount", formatMoney(displayScholarshipAmount)],
         ["Current Month Fee", formatMoney(parts.currentMonthFee)],
         ["Paid Amount", formatMoney(paidAmount)],
         ["Remaining Amount", formatMoney(remainingAmount)],
@@ -497,7 +565,7 @@ export default function CoordinatorFeeHistoryPage({
         ["Monthly Fee", formatMoney(parts.regularFee)],
         ["Admission Fee", formatMoney(parts.admissionFee)],
         ["Discount", formatMoney(parts.discount)],
-        ["Scholarship Given Amount", formatMoney(parts.scholarshipAmount)],
+        ["Scholarship Given Amount", formatMoney(displayScholarshipAmount)],
         ["Previous Month Due", formatMoney(previousMonthDueValue)],
         ["Current Month Fee", formatMoney(parts.currentMonthFee)],
         ["Total Payable", formatMoney(payableAmount)],
@@ -587,6 +655,10 @@ export default function CoordinatorFeeHistoryPage({
   }, [filteredItems, safePage]);
 
   const carryForwardHistoryRows = useMemo(() => buildCarryForwardHistoryRows(historyItems, drafts), [historyItems, drafts]);
+  const selectedStudentScholarshipAmount = carryForwardHistoryRows.reduce((highestAmount, row) => {
+    const scholarshipAmount = Number(row?.scholarship_amount || 0);
+    return scholarshipAmount > highestAmount ? scholarshipAmount : highestAmount;
+  }, 0);
 
   const filteredHistoryItems = useMemo(() => {
     const query = normalizeText(historySearchTerm);
@@ -619,7 +691,9 @@ export default function CoordinatorFeeHistoryPage({
     const startIndex = (safeHistoryPage - 1) * PAGE_SIZE;
     return filteredHistoryItems.slice(startIndex, startIndex + PAGE_SIZE);
   }, [filteredHistoryItems, safeHistoryPage]);
-  const feeEditComputed = feeEditDraft ? computeEditableFeeAmounts(feeEditDraft) : null;
+  const feeEditComputed = feeEditDraft
+    ? computeEditableFeeAmounts(feeEditDraft, { applyScholarship: isAdmissionFeeHistoryRow(feeEditTarget) })
+    : null;
 
   return (
     <div className="min-h-screen bg-[#FAF7F0]">
@@ -751,7 +825,7 @@ export default function CoordinatorFeeHistoryPage({
         </section>
 
         {selectedStudent ? (
-            <div className="fixed inset-0 z-[10000] flex min-h-screen items-start justify-center overflow-y-auto bg-[#063F32]/45 px-4 py-8 backdrop-blur-sm sm:py-10">
+            <div className={`fixed inset-0 z-[10000] flex min-h-dvh items-start justify-center bg-[#063F32]/45 px-4 py-8 backdrop-blur-sm sm:py-10 ${feeEditTarget ? "overflow-hidden" : "overflow-y-auto"}`}>
               <div className="w-full max-w-7xl min-w-0 overflow-hidden rounded-[2rem] border border-[#2D8A6A]/15 bg-[#FAF7F0] p-6 shadow-[0_24px_80px_-36px_rgba(13,59,46,0.24)]">
                 <div className="flex flex-wrap items-start justify-between gap-4">
                   <div>
@@ -858,29 +932,29 @@ export default function CoordinatorFeeHistoryPage({
                           this_month_paid: moneyInputValue(row.this_month_paid),
                         };
                         const parts = getCurrentMonthFeeParts(row);
-                        const currentMonthFeeValue = Number(draft.current_month_fee || row.current_month_fee || parts.currentMonthFee || 0);
+                        const currentMonthFeeValue = Number(draft.current_month_fee ?? row.current_month_fee ?? parts.currentMonthFee ?? 0);
                         const isAdmissionRow = String(row.source_type || "").toLowerCase() === "voucher-direct" || Number(parts.admissionFee || 0) > 0;
                         const hasAdmissionBreakdown = isAdmissionRow;
                         const hasMonthlyBreakdown = !hasAdmissionBreakdown && parts.regularFee > 0;
                         const hasBreakdown = hasAdmissionBreakdown || hasMonthlyBreakdown;
+                        const appliedScholarshipAmount = isAdmissionRow ? parts.scholarshipAmount : 0;
+                        const displayScholarshipAmount = parts.scholarshipAmount || selectedStudentScholarshipAmount;
                         const currentFeeParts = {
                           regularFee: hasBreakdown ? parts.regularFee : currentMonthFeeValue,
                           admissionFee: hasAdmissionBreakdown ? parts.admissionFee : 0,
                           discount: hasBreakdown ? parts.discount : 0,
-                          scholarshipAmount: hasBreakdown ? parts.scholarshipAmount : 0,
+                          scholarshipAmount: appliedScholarshipAmount,
                           currentMonthFee: isAdmissionRow
-                            ? Number(row.current_month_fee || row.total_amount || Math.max(parts.regularFee + parts.admissionFee - parts.discount - parts.scholarshipAmount, 0))
+                            ? Number(row.current_month_fee ?? row.total_amount ?? Math.max(parts.regularFee + parts.admissionFee - parts.discount - parts.scholarshipAmount, 0))
                             : currentMonthFeeValue,
                         };
                         const previousMonthDueValue = Number(
-                          isAdmissionRow
-                            ? 0
-                            : (row.computedPreviousMonthDue ?? row.previous_month_due ?? draft.previous_month_due ?? 0)
+                          row.previous_month_due ?? draft.previous_month_due ?? row.computedPreviousMonthDue ?? 0
                         );
                         const displayTotalAmount = Number(
                           isAdmissionRow
-                            ? (row.total_amount || row.current_month_fee || currentFeeParts.currentMonthFee || 0)
-                            : (row.total_amount || currentFeeParts.currentMonthFee || 0)
+                            ? (row.total_amount ?? row.current_month_fee ?? currentFeeParts.currentMonthFee ?? 0)
+                            : (row.total_amount ?? currentFeeParts.currentMonthFee ?? 0)
                         );
                         const displayMonthlyFee = Number(
                           hasAdmissionBreakdown
@@ -889,9 +963,7 @@ export default function CoordinatorFeeHistoryPage({
                         );
                         const computed = computeAmounts(previousMonthDueValue, currentFeeParts.currentMonthFee, draft.this_month_paid);
                         const rowRemainingDue = Number(
-                          isAdmissionRow
-                            ? Math.max(0, displayTotalAmount - Number(draft.this_month_paid || row.this_month_paid || 0))
-                            : (row.remaining_due ?? computed.remaining ?? 0)
+                          row.remaining_due ?? draft.remaining_due ?? computed.remaining ?? 0
                         );
                         return (
                           <tr key={row.id}>
@@ -904,7 +976,7 @@ export default function CoordinatorFeeHistoryPage({
                             <td className="px-4 py-4 font-semibold text-[#063F32]">{formatMoney(displayMonthlyFee)}</td>
                             <td className="px-4 py-4 font-semibold text-[#063F32]">{formatMoney(currentFeeParts.admissionFee)}</td>
                             <td className="px-4 py-4 font-semibold text-[#063F32]">{formatMoney(currentFeeParts.discount)}</td>
-                            <td className="px-4 py-4 font-semibold text-[#063F32]">{formatMoney(currentFeeParts.scholarshipAmount)}</td>
+                            <td className="px-4 py-4 font-semibold text-[#063F32]">{formatMoney(displayScholarshipAmount)}</td>
                             <td className="px-4 py-4 font-semibold text-[#063F32]">{formatMoney(currentFeeParts.currentMonthFee)}</td>
                             <td className="px-4 py-4 font-semibold text-[#063F32]">{formatMoney(displayTotalAmount)}</td>
                             <td className="px-4 py-4 font-semibold text-[#063F32]">{formatMoney(draft.this_month_paid)}</td>
@@ -912,8 +984,12 @@ export default function CoordinatorFeeHistoryPage({
                             <td className="px-4 py-4 text-[#245C4F]">{String(row.payment_status || "-").replace(/_/g, " ")}</td>
                             <td className="px-4 py-4 text-[#245C4F]">
                               {row.proof_file_url ? (
-                                <a href={row.proof_file_url} target="_blank" rel="noreferrer" className="inline-flex overflow-hidden rounded-xl border border-[#F1EADC] bg-white">
-                                  <img src={row.proof_file_url} alt={`Payment proof for ${row.voucher_no || row.month_label || "fee record"}`} className="h-14 w-14 object-cover" />
+                                <a href={row.proof_file_url} target="_blank" rel="noreferrer" className="inline-flex min-w-28 items-center justify-center overflow-hidden rounded-xl border border-[#F1EADC] bg-white">
+                                  {isPdfProof(row) ? (
+                                    <span className="px-3 py-4 text-xs font-semibold text-[#0D5C48]">Open PDF</span>
+                                  ) : (
+                                    <img src={row.proof_file_url} alt={`Payment proof for ${row.voucher_no || row.month_label || "fee record"}`} className="h-14 w-14 object-cover" />
+                                  )}
                                 </a>
                               ) : (
                                 <span>-</span>
@@ -963,9 +1039,10 @@ export default function CoordinatorFeeHistoryPage({
                 ) : null}
 
                 {feeEditTarget && feeEditDraft && feeEditComputed ? (
-                  <div className="fixed inset-0 z-[10001] flex items-start justify-center overflow-y-auto bg-[#063F32]/55 px-4 py-10 backdrop-blur-sm">
-                    <div className="w-full max-w-3xl rounded-[2rem] border border-[#2D8A6A]/15 bg-[#FAF7F0] p-5 shadow-[0_24px_80px_-36px_rgba(13,59,46,0.32)] sm:p-6">
-                      <div className="flex flex-wrap items-start justify-between gap-4">
+                  <ClientPortal targetId={portalTargetId}>
+                  <div className="absolute inset-0 z-[10001] flex min-h-full items-start justify-center overflow-hidden bg-[#063F32]/55 px-4 py-8 backdrop-blur-sm sm:py-10">
+                    <div className="flex max-h-[calc(100dvh-5rem)] w-full max-w-3xl flex-col overflow-hidden rounded-[2rem] border border-[#2D8A6A]/15 bg-[#FAF7F0] shadow-[0_24px_80px_-36px_rgba(13,59,46,0.32)]">
+                      <div className="flex flex-wrap items-start justify-between gap-4 border-b border-[#2D8A6A]/10 p-5 sm:p-6">
                         <div>
                           <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[#C9A227]">Edit fee row</p>
                           <h3 className="mt-2 text-2xl font-semibold text-[#063F32]">{feeEditTarget.voucher_no || feeEditTarget.month_label || "Fee history row"}</h3>
@@ -982,6 +1059,7 @@ export default function CoordinatorFeeHistoryPage({
                         </button>
                       </div>
 
+                      <div className="min-h-0 flex-1 overflow-y-auto p-5 sm:p-6">
                       <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                         {[
                           ["previous_month_due", "Previous Month Due"],
@@ -994,19 +1072,38 @@ export default function CoordinatorFeeHistoryPage({
                           ["total_amount", "Total Amount"],
                           ["this_month_paid", "Paid Amount"],
                           ["remaining_due", "Remaining Amount"],
-                        ].map(([key, label]) => (
-                          <label key={key} className="block">
-                            <span className="mb-2 block text-sm font-semibold text-[#245C4F]">{label}</span>
-                            <input
-                              type="number"
-                              min="0"
-                              value={feeEditDraft[key]}
-                              onChange={(event) => updateFeeEditDraft(key, event.target.value)}
-                              className="w-full rounded-2xl border border-[#2D8A6A]/20 bg-white px-4 py-3 text-sm font-semibold text-[#063F32] outline-none transition focus:border-[#2D8A6A] focus:ring-4 focus:ring-[#FFF5D6]"
-                            />
-                          </label>
-                        ))}
+                        ].map(([key, label]) => {
+                          return (
+                            <label key={key} className="block">
+                              <span className="mb-2 block text-sm font-semibold text-[#245C4F]">{label}</span>
+                              <input
+                                type="number"
+                                min="0"
+                                value={feeEditDraft[key]}
+                                onChange={(event) => updateFeeEditDraft(key, event.target.value)}
+                                className="w-full rounded-2xl border border-[#2D8A6A]/20 bg-white px-4 py-3 text-sm font-semibold text-[#063F32] outline-none transition focus:border-[#2D8A6A] focus:ring-4 focus:ring-[#FFF5D6]"
+                              />
+                            </label>
+                          );
+                        })}
                       </div>
+
+                      <label className="mt-6 block rounded-[1.5rem] border border-[#2D8A6A]/15 bg-white p-4">
+                        <span className="mb-2 block text-sm font-semibold text-[#245C4F]">Payment Proof</span>
+                        <input
+                          type="file"
+                          accept="image/*,application/pdf"
+                          onChange={(event) => setFeeEditProofFile(event.target.files?.[0] || null)}
+                          className="w-full rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 text-sm text-[#063F32] file:mr-4 file:rounded-xl file:border-0 file:bg-[#EAF6EF] file:px-4 file:py-2 file:text-sm file:font-semibold file:text-[#0D5C48]"
+                        />
+                        <p className="mt-2 text-xs font-medium text-[#245C4F]">
+                          {feeEditProofFile?.name
+                            ? `Selected file: ${feeEditProofFile.name}`
+                            : feeEditTarget.proof_file_path
+                            ? "Current proof will stay unchanged unless you select a new file."
+                            : "No payment proof uploaded yet."}
+                        </p>
+                      </label>
 
                       <div className="mt-6 rounded-[1.5rem] border border-[#2D8A6A]/15 bg-white p-4">
                         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[#0D5C48]">Updated values</p>
@@ -1043,8 +1140,10 @@ export default function CoordinatorFeeHistoryPage({
                           {savingRowId === feeEditTarget.id ? "Updating..." : "Confirm Update"}
                         </button>
                       </div>
+                      </div>
                     </div>
                   </div>
+                  </ClientPortal>
                 ) : null}
               </div>
             </div>

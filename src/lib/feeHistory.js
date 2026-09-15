@@ -100,19 +100,14 @@ export async function getLatestFeeHistoryCarryForward(tx, studentId) {
       fee_history_records.previous_month_due::float8 AS previous_month_due,
       fee_history_records.current_month_fee::float8 AS current_month_fee,
       fee_history_records.this_month_paid::float8 AS this_month_paid,
-      GREATEST(
-        COALESCE(fee_history_records.previous_month_due::float8, 0)
-        + CASE
-          WHEN COALESCE(fv.regular_fee_amount::float8, 0) > 0 THEN GREATEST(
-            COALESCE(fv.regular_fee_amount::float8, 0)
-            - COALESCE(fv.discount_amount::float8, 0)
-            - COALESCE(fv.scholarship_amount::float8, 0),
-            0
-          )
-          ELSE COALESCE(fee_history_records.current_month_fee::float8, fv.total_amount::float8, fv.amount::float8, 0)
-        END
-        - COALESCE(fee_history_records.this_month_paid::float8, 0),
-        0
+      COALESCE(
+        fee_history_records.remaining_due::float8,
+        GREATEST(
+          COALESCE(fee_history_records.previous_month_due::float8, 0)
+          + COALESCE(fee_history_records.current_month_fee::float8, fv.total_amount::float8, fv.amount::float8, 0)
+          - COALESCE(fee_history_records.this_month_paid::float8, 0),
+          0
+        )
       ) AS remaining_due
     FROM fee_history_records
     LEFT JOIN fee_vouchers fv ON fv.id = fee_history_records.voucher_id
@@ -225,15 +220,17 @@ export async function insertFeeHistoryRow({
 export async function recalculateStudentFeeHistory(tx, studentId) {
   const rows = await tx.$queryRaw`
     SELECT
-      id::text AS id,
-      due_date,
-      created_at,
-      previous_month_due::float8 AS previous_month_due,
-      current_month_fee::float8 AS current_month_fee,
-      this_month_paid::float8 AS this_month_paid
+      fee_history_records.id::text AS id,
+      COALESCE(fv.voucher_no, '') AS voucher_no,
+      fee_history_records.due_date,
+      fee_history_records.created_at,
+      fee_history_records.previous_month_due::float8 AS previous_month_due,
+      fee_history_records.current_month_fee::float8 AS current_month_fee,
+      fee_history_records.this_month_paid::float8 AS this_month_paid
     FROM fee_history_records
-    WHERE student_id = ${studentId}::uuid
-    ORDER BY due_date ASC NULLS LAST, created_at ASC NULLS LAST, id ASC
+    LEFT JOIN fee_vouchers fv ON fv.id = fee_history_records.voucher_id
+    WHERE fee_history_records.student_id = ${studentId}::uuid
+    ORDER BY COALESCE(fv.voucher_no, '') ASC NULLS LAST, fee_history_records.due_date ASC NULLS LAST, fee_history_records.created_at ASC NULLS LAST, fee_history_records.id ASC
   `;
 
   let carryForward = 0;
@@ -241,6 +238,61 @@ export async function recalculateStudentFeeHistory(tx, studentId) {
     const previousMonthDue = normalizeMoney(carryForward);
     const computed = computeFeeHistoryAmounts({
       previousMonthDue,
+      currentMonthFee: item.current_month_fee,
+      thisMonthPaid: item.this_month_paid,
+    });
+
+    await tx.$executeRaw`
+      UPDATE fee_history_records
+      SET
+        previous_month_due = ${computed.previousMonthDue},
+        total_amount = ${computed.totalAmount},
+        remaining_due = ${computed.remainingDue},
+        updated_at = NOW()
+      WHERE id = ${item.id}::uuid
+    `;
+
+    carryForward = computed.remainingDue;
+  }
+}
+
+export async function recalculateStudentFeeHistoryFromVoucher(tx, voucherId) {
+  const [targetRow] = await tx.$queryRaw`
+    SELECT
+      fee_history_records.id::text AS id,
+      fee_history_records.student_id::text AS student_id
+    FROM fee_history_records
+    WHERE fee_history_records.voucher_id = ${voucherId}::uuid
+    ORDER BY fee_history_records.created_at DESC NULLS LAST, fee_history_records.id DESC
+    LIMIT 1
+  `;
+
+  if (!targetRow?.id || !targetRow?.student_id) return;
+
+  const rows = await tx.$queryRaw`
+    SELECT
+      fee_history_records.id::text AS id,
+      COALESCE(fv.voucher_no, '') AS voucher_no,
+      fee_history_records.due_date,
+      fee_history_records.created_at,
+      fee_history_records.previous_month_due::float8 AS previous_month_due,
+      fee_history_records.current_month_fee::float8 AS current_month_fee,
+      fee_history_records.this_month_paid::float8 AS this_month_paid,
+      fee_history_records.remaining_due::float8 AS remaining_due
+    FROM fee_history_records
+    LEFT JOIN fee_vouchers fv ON fv.id = fee_history_records.voucher_id
+    WHERE fee_history_records.student_id = ${targetRow.student_id}::uuid
+    ORDER BY COALESCE(fv.voucher_no, '') ASC NULLS LAST, fee_history_records.due_date ASC NULLS LAST, fee_history_records.created_at ASC NULLS LAST, fee_history_records.id ASC
+  `;
+
+  const targetIndex = rows.findIndex((row) => row.id === targetRow.id);
+  if (targetIndex === -1) return;
+
+  let carryForward = normalizeMoney(rows[targetIndex]?.remaining_due ?? 0);
+  for (let index = targetIndex + 1; index < rows.length; index += 1) {
+    const item = rows[index];
+    const computed = computeFeeHistoryAmounts({
+      previousMonthDue: carryForward,
       currentMonthFee: item.current_month_fee,
       thisMonthPaid: item.this_month_paid,
     });

@@ -123,7 +123,7 @@ async function getItems(status) {
         COALESCE(fv."admission_fee_amount", 0) AS admission_fee_amount,
         COALESCE(fv."regular_fee_amount", 0) AS regular_fee_amount,
         COALESCE(fv."discount_amount", 0) AS discount_amount,
-        COALESCE(fv."scholarship_amount", 0) AS scholarship_amount,
+        COALESCE(NULLIF(fv."scholarship_amount", 0), student_scholarship.scholarship_amount, 0) AS scholarship_amount,
         fv."status"::text AS voucher_status,
         CASE WHEN fv.registration_id IS NULL THEN true ELSE false END AS is_monthly_voucher,
         rl."id"::text AS registration_lead_id,
@@ -147,6 +147,19 @@ async function getItems(status) {
       LEFT JOIN "regular_monthly_fee_voucher_items" item ON item.voucher_id = fv.id
       LEFT JOIN "student_profiles" sp ON sp.id = item.student_id
       LEFT JOIN "users" su ON su.id = sp.user_id
+      LEFT JOIN LATERAL (
+        SELECT nsf.scholarship_amount
+        FROM need_based_scholarship_forms nsf
+        INNER JOIN fee_vouchers scholarship_voucher ON scholarship_voucher.id = nsf.voucher_id
+        WHERE nsf.scholarship_amount > 0
+          AND (
+            nsf.registration_id = fv.registration_id
+            OR scholarship_voucher.student_id = item.student_id
+            OR scholarship_voucher.registration_id = fv.registration_id
+          )
+        ORDER BY nsf.updated_at DESC NULLS LAST, nsf.created_at DESC NULLS LAST, nsf.id DESC
+        LIMIT 1
+      ) student_scholarship ON TRUE
       ${whereClause}
       ORDER BY fs."created_at" DESC NULLS LAST, fs."paid_at" DESC NULLS LAST, fs."id" DESC
       `,
@@ -204,8 +217,8 @@ export default async function CoordinatorPaymentsPage({
     const items = await getItems("");
 
     return (
-      <div className="min-h-screen bg-[#FAF7F0] px-4 py-6 sm:px-6 lg:px-8">
-        <div className="mx-auto w-full max-w-7xl space-y-6">
+      <div id="payments-page-portal-root" className="relative min-h-screen bg-[#FAF7F0] px-4 py-6 sm:px-6 lg:px-8">
+        <div className="mx-auto min-h-screen w-full max-w-7xl space-y-6">
         <section className="relative overflow-hidden rounded-[2rem] border border-[#2D8A6A]/15 bg-[linear-gradient(135deg,rgba(13,59,46,0.98),rgba(13,92,72,0.94))] p-6 text-[#FAF7F0] shadow-[0_24px_80px_-36px_rgba(13,59,46,0.32)] sm:p-8">
           <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(135deg,rgba(13,59,46,0.98),rgba(13,92,72,0.94))]" />
           <div className="relative">
@@ -224,6 +237,7 @@ export default async function CoordinatorPaymentsPage({
           initialStatus={safeStatus}
           initialStudentFilter={safeStudentFilter}
           canManage={canManage}
+          portalTargetId="payments-page-portal-root"
         />
         </div>
       </div>
@@ -240,8 +254,8 @@ export default async function CoordinatorPaymentsPage({
   const notVerifiedStudentCount = Math.max(items.length - verifiedStudentCount, 0);
 
   return (
-    <div className="min-h-screen bg-[#FAF7F0] px-4 py-6 sm:px-6 lg:px-8">
-      <div className="mx-auto w-full max-w-7xl space-y-6">
+    <div id="payments-page-portal-root" className="relative min-h-screen bg-[#FAF7F0] px-4 py-6 sm:px-6 lg:px-8">
+      <div className="mx-auto min-h-screen w-full max-w-7xl space-y-6">
       <section className="relative overflow-hidden rounded-[2rem] border border-[#2D8A6A]/15 bg-[linear-gradient(135deg,rgba(13,59,46,0.98),rgba(13,92,72,0.94))] p-6 text-[#FAF7F0] shadow-[0_24px_80px_-36px_rgba(13,59,46,0.32)] sm:p-8">
         <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(135deg,rgba(13,59,46,0.98),rgba(13,92,72,0.94))]" />
         <div className="relative">
@@ -276,7 +290,7 @@ export default async function CoordinatorPaymentsPage({
         items={studentFilteredItems}
         page={page}
         pageSize={7}
-        renderItems={(visibleItems) => <PaymentVerificationTable items={visibleItems} canManage={canManage} />}
+        renderItems={(visibleItems) => <PaymentVerificationTable items={visibleItems} canManage={canManage} portalTargetId="payments-page-portal-root" />}
         emptyMessage="No payment submissions match this filter."
         hrefBase={`${hrefBasePath}?status=${safeStatus}&studentFilter=${safeStudentFilter}`}
       />

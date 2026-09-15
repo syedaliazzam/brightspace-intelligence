@@ -73,6 +73,10 @@ export async function GET(request) {
           fv.id::text AS fee_voucher_id,
           fv.voucher_no,
           fv.amount AS voucher_amount,
+          COALESCE(fv.admission_fee_amount, 0) AS admission_fee_amount,
+          COALESCE(fv.regular_fee_amount, 0) AS regular_fee_amount,
+          COALESCE(fv.discount_amount, 0) AS discount_amount,
+          COALESCE(NULLIF(fv.scholarship_amount, 0), student_scholarship.scholarship_amount, 0) AS scholarship_amount,
           fv.status::text AS voucher_status,
           CASE WHEN fv.registration_id IS NULL THEN true ELSE false END AS is_monthly_voucher,
           rl.id::text AS registration_lead_id,
@@ -91,6 +95,19 @@ export async function GET(request) {
         LEFT JOIN regular_monthly_fee_voucher_items item ON item.voucher_id = fv.id
         LEFT JOIN student_profiles sp ON sp.id = item.student_id
         LEFT JOIN users su ON su.id = sp.user_id
+        LEFT JOIN LATERAL (
+          SELECT nsf.scholarship_amount
+          FROM need_based_scholarship_forms nsf
+          INNER JOIN fee_vouchers scholarship_voucher ON scholarship_voucher.id = nsf.voucher_id
+          WHERE nsf.scholarship_amount > 0
+            AND (
+              nsf.registration_id = fv.registration_id
+              OR scholarship_voucher.student_id = item.student_id
+              OR scholarship_voucher.registration_id = fv.registration_id
+            )
+          ORDER BY nsf.updated_at DESC NULLS LAST, nsf.created_at DESC NULLS LAST, nsf.id DESC
+          LIMIT 1
+        ) student_scholarship ON TRUE
         LEFT JOIN regular_monthly_fee_batches b ON b.id = item.batch_id
         LEFT JOIN courses c ON c.id = b.class_id
         ${whereClause}

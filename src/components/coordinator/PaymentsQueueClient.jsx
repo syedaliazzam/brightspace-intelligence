@@ -20,6 +20,7 @@ export default function PaymentsQueueClient({
   initialStatus = "pending",
   initialStudentFilter = "verified",
   canManage = true,
+  portalTargetId = "coordinator-payments-portal-root",
 }) {
   const [status, setStatus] = useState(initialStatus);
   const [studentFilter, setStudentFilter] = useState(initialStudentFilter);
@@ -92,7 +93,7 @@ export default function PaymentsQueueClient({
 
       {filteredItems.length ? (
         <section className="space-y-4">
-          <PaymentVerificationTable items={visibleItems} canManage={canManage} />
+          <PaymentVerificationTable items={visibleItems} canManage={canManage} portalTargetId={portalTargetId} />
           {filteredItems.length > PAGE_SIZE ? (
             <PaginationControls
               page={safePage}

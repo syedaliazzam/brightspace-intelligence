@@ -29,6 +29,7 @@ export const dashboardNavigation = {
     { label: "Headlines", href: "/superadmin/headlines" },
     { label: "Audit History", href: "/superadmin/audit-logs" },
     { label: "Sent Emails", href: "/superadmin/sent-emails" },
+    { label: "Custom Emails", href: "/superadmin/custom-emails" },
   ],
   admin: [
     { label: "Dashboard", href: "/admin/dashboard" },
@@ -87,6 +88,7 @@ export const dashboardNavigation = {
     { label: "Sent Emails", href: "/coordinator/sent-emails" },
     { label: "Admin", href: "/coordinator/admin" },
     { label: "Careers Applications", href: "/coordinator/careers-applications" },
+    { label: "Custom Emails", href: "/coordinator/custom-emails" },
   ],
   teacher: [
     { label: "Dashboard", href: "/teacher/dashboard" },

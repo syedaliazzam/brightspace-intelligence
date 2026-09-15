@@ -108,19 +108,14 @@ async function getStudentsByClass() {
       LIMIT 1
     ) default_discount ON TRUE
     LEFT JOIN LATERAL (
-      SELECT GREATEST(
-        COALESCE(fhr.previous_month_due::float8, 0)
-        + CASE
-          WHEN COALESCE(fv.regular_fee_amount::float8, 0) > 0 THEN GREATEST(
-            COALESCE(fv.regular_fee_amount::float8, 0)
-            - COALESCE(fv.discount_amount::float8, 0)
-            - COALESCE(fv.scholarship_amount::float8, 0),
-            0
-          )
-          ELSE COALESCE(fhr.current_month_fee::float8, fv.total_amount::float8, fv.amount::float8, 0)
-        END
-        - COALESCE(fhr.this_month_paid::float8, 0),
-        0
+      SELECT COALESCE(
+        fhr.remaining_due::float8,
+        GREATEST(
+          COALESCE(fhr.previous_month_due::float8, 0)
+          + COALESCE(fhr.current_month_fee::float8, fv.total_amount::float8, fv.amount::float8, 0)
+          - COALESCE(fhr.this_month_paid::float8, 0),
+          0
+        )
       ) AS remaining_due
       FROM fee_history_records fhr
       LEFT JOIN fee_vouchers fv ON fv.id = fhr.voucher_id

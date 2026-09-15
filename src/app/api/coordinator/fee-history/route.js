@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireRole, roleGuardResponse } from "@/lib/roleGuard";
 import prisma from "@/lib/prisma";
-import { createSignedPaymentProofUrl } from "@/lib/supabaseStorage";
+import { createSignedPaymentProofUrl, uploadPaymentProof } from "@/lib/supabaseStorage";
 import { applyCarryForwardHistoryRows, computeFeeHistoryAmounts, feeHistoryTableExists, normalizeMoney } from "@/lib/feeHistory";
 
 function json(message, status = 200, extra = {}) {
@@ -197,10 +197,7 @@ async function loadStudentHistory(studentId) {
         COALESCE(fhr.month_label, '') AS month_label,
         fhr.due_date,
         COALESCE(fhr.previous_month_due::float8, 0) AS previous_month_due,
-        CASE
-          WHEN COALESCE(fv.admission_fee_amount::float8, 0) > 0 THEN COALESCE(fv.discount_amount::float8, 0)
-          ELSE COALESCE(fhr.discount_amount::float8, fv.discount_amount::float8, 0)
-        END AS discount_amount,
+        COALESCE(fhr.discount_amount::float8, fv.discount_amount::float8, 0) AS discount_amount,
         COALESCE(
           fhr.current_month_fee::float8,
           CASE
@@ -223,19 +220,12 @@ async function loadStudentHistory(studentId) {
             ELSE COALESCE(fv.total_amount::float8, fv.amount::float8, 0)
           END
         ) AS current_month_fee,
-        CASE
-          WHEN COALESCE(fv.admission_fee_amount::float8, 0) > 0 THEN COALESCE(
-            fv.total_amount::float8,
-            (
-              COALESCE(fv.regular_fee_amount::float8, 0)
-              + COALESCE(fv.admission_fee_amount::float8, 0)
-              - COALESCE(fv.discount_amount::float8, 0)
-            ),
-            fv.amount::float8,
-            0
-          )
-          ELSE COALESCE(fhr.total_amount::float8, fv.total_amount::float8, fv.amount::float8, 0)
-        END AS total_amount,
+        COALESCE(
+          fhr.total_amount::float8,
+          fv.total_amount::float8,
+          fv.amount::float8,
+          0
+        ) AS total_amount,
         COALESCE(fhr.this_month_paid::float8, fs.paid_amount::float8, 0) AS this_month_paid,
         COALESCE(fhr.remaining_due::float8, (COALESCE(fhr.total_amount::float8, fv.total_amount::float8, fv.amount::float8, 0) - COALESCE(fs.paid_amount::float8, 0))) AS remaining_due,
         COALESCE(fv.voucher_no, '') AS voucher_no,
@@ -428,16 +418,18 @@ async function propagateHistory(tx, rowId) {
 
   const rows = await tx.$queryRaw`
     SELECT
-      id::text AS id,
-      due_date,
-      created_at,
-      previous_month_due::float8 AS previous_month_due,
-      current_month_fee::float8 AS current_month_fee,
-      this_month_paid::float8 AS this_month_paid,
-      remaining_due::float8 AS remaining_due
+      fee_history_records.id::text AS id,
+      COALESCE(fv.voucher_no, '') AS voucher_no,
+      fee_history_records.due_date,
+      fee_history_records.created_at,
+      fee_history_records.previous_month_due::float8 AS previous_month_due,
+      fee_history_records.current_month_fee::float8 AS current_month_fee,
+      fee_history_records.this_month_paid::float8 AS this_month_paid,
+      fee_history_records.remaining_due::float8 AS remaining_due
     FROM fee_history_records
-    WHERE student_id = ${targetRow.student_id}::uuid
-    ORDER BY due_date ASC NULLS LAST, created_at ASC NULLS LAST, id ASC
+    LEFT JOIN fee_vouchers fv ON fv.id = fee_history_records.voucher_id
+    WHERE fee_history_records.student_id = ${targetRow.student_id}::uuid
+    ORDER BY COALESCE(fv.voucher_no, '') ASC NULLS LAST, fee_history_records.due_date ASC NULLS LAST, fee_history_records.created_at ASC NULLS LAST, fee_history_records.id ASC
   `;
 
   const targetIndex = rows.findIndex((item) => item.id === targetRow.id);
@@ -595,7 +587,19 @@ export async function PATCH(request) {
       return json("Fee history table is not available yet. Please run the provided SQL script first.", 400);
     }
 
-    const body = await request.json();
+    const contentType = String(request.headers.get("content-type") || "").toLowerCase();
+    let body = {};
+    let proofFile = null;
+    if (contentType.includes("multipart/form-data")) {
+      const formData = await request.formData();
+      body = Object.fromEntries(formData.entries());
+      const candidateFile = formData.get("proofFile");
+      if (candidateFile instanceof File && candidateFile.size > 0) {
+        proofFile = candidateFile;
+      }
+    } else {
+      body = await request.json();
+    }
     const rowId = normalizeText(body?.rowId);
     const sourceType = normalizeText(body?.sourceType || "history");
     const hasField = (fieldName) => Object.prototype.hasOwnProperty.call(body || {}, fieldName);
@@ -688,6 +692,35 @@ export async function PATCH(request) {
       `;
     }
 
+    async function syncPaymentProof(tx, voucherId) {
+      if (!voucherId || !(proofFile instanceof File) || proofFile.size <= 0) return;
+
+      const [voucher] = await tx.$queryRaw`
+        SELECT voucher_no
+        FROM fee_vouchers
+        WHERE id = ${voucherId}::uuid
+        LIMIT 1
+      `;
+      const upload = await uploadPaymentProof({
+        voucherNo: voucher?.voucher_no || "fee-history",
+        file: proofFile,
+      });
+
+      await tx.$executeRaw`
+        UPDATE fee_submissions
+        SET
+          proof_file_path = ${upload.storedPath},
+          updated_at = NOW()
+        WHERE id = (
+          SELECT id
+          FROM fee_submissions
+          WHERE voucher_id = ${voucherId}::uuid
+          ORDER BY created_at DESC NULLS LAST, id DESC
+          LIMIT 1
+        )
+      `;
+    }
+
     if (sourceType === "voucher") {
       const studentId = normalizeText(body?.studentId);
       const voucherId = normalizeText(body?.voucherId);
@@ -763,6 +796,7 @@ export async function PATCH(request) {
           WHERE id = ${effectiveRowId}::uuid
         `;
       await syncLinkedVoucher(prisma, voucherId, computed);
+      await syncPaymentProof(prisma, voucherId);
       const result = { rowId: effectiveRowId, studentId };
 
       const propagated = await propagateHistory(prisma, result.rowId);
@@ -801,6 +835,7 @@ export async function PATCH(request) {
       `;
     if (updated?.voucher_id) {
       await syncLinkedVoucher(prisma, updated.voucher_id, computed);
+      await syncPaymentProof(prisma, updated.voucher_id);
     }
     const result = { rowId, studentId: updated?.student_id || "" };
 

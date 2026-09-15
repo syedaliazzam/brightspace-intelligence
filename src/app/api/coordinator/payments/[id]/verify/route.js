@@ -5,7 +5,7 @@ import { auth } from "@/lib/auth";
 import { buildCredentialsEmailHtml, buildPaymentDecisionEmailHtml, getAppUrl, sendEmail } from "@/lib/email";
 import prisma from "@/lib/prisma";
 import { uploadPaymentProof } from "@/lib/supabaseStorage";
-import { recalculateStudentFeeHistory } from "@/lib/feeHistory";
+import { recalculateStudentFeeHistoryFromVoucher } from "@/lib/feeHistory";
 
 const ALLOWED_ROLES = new Set(["admin", "coordinator", "superadmin"]);
 const TRANSACTION_OPTIONS = { maxWait: 10000, timeout: 30000 };
@@ -743,6 +743,7 @@ export async function POST(request, { params }) {
           UPDATE fee_history_records
           SET
             this_month_paid = ${resolvedPaidAmount},
+            remaining_due = GREATEST(COALESCE(total_amount::float8, previous_month_due::float8 + current_month_fee::float8, 0) - ${resolvedPaidAmount}, 0),
             updated_at = NOW()
           WHERE voucher_id = ${submission.fee_voucher_id || submission.voucher_id}::uuid
         `;
@@ -766,10 +767,7 @@ export async function POST(request, { params }) {
           { entityType: "fee_vouchers", entityId: submission.fee_voucher_id || submission.voucher_id }
         );
 
-        const resolvedStudentId = normalizeText(submission.student_id || voucherFallback?.student_id);
-        if (resolvedStudentId) {
-          await recalculateStudentFeeHistory(tx, resolvedStudentId);
-        }
+        await recalculateStudentFeeHistoryFromVoucher(tx, submission.fee_voucher_id || submission.voucher_id);
       }, TRANSACTION_OPTIONS);
 
       if (submission.email) {

@@ -28,7 +28,7 @@ async function getDiscountRecords() {
         COALESCE(fv.admission_fee_amount::float8, 0) AS admission_fee_amount,
         COALESCE(fv.discount_percent::float8, 0) AS discount_percent,
         COALESCE(fv.discount_amount::float8, 0) AS discount_amount,
-        COALESCE(fv.scholarship_amount::float8, 0) AS scholarship_amount,
+        COALESCE(NULLIF(fv.scholarship_amount::float8, 0), student_scholarship.scholarship_amount::float8, 0) AS scholarship_amount,
         COALESCE(fv.total_amount::float8, fv.amount::float8, 0) AS total_amount,
         CASE WHEN item.id IS NOT NULL THEN 'Monthly voucher' ELSE 'Admission voucher' END AS voucher_type,
         COALESCE(item.student_name, su.full_name, rl.student_name, '-') AS student_name,
@@ -48,6 +48,19 @@ async function getDiscountRecords() {
       LEFT JOIN courses c_month ON c_month.id = batch.class_id
       LEFT JOIN student_profiles sp ON sp.id = item.student_id
       LEFT JOIN users su ON su.id = sp.user_id
+      LEFT JOIN LATERAL (
+        SELECT nsf.scholarship_amount
+        FROM need_based_scholarship_forms nsf
+        INNER JOIN fee_vouchers scholarship_voucher ON scholarship_voucher.id = nsf.voucher_id
+        WHERE nsf.scholarship_amount > 0
+          AND (
+            nsf.registration_id = fv.registration_id
+            OR scholarship_voucher.student_id = item.student_id
+            OR scholarship_voucher.registration_id = fv.registration_id
+          )
+        ORDER BY nsf.updated_at DESC NULLS LAST, nsf.created_at DESC NULLS LAST, nsf.id DESC
+        LIMIT 1
+      ) student_scholarship ON TRUE
       WHERE COALESCE(fv.discount_amount::float8, 0) > 0
          OR COALESCE(fv.discount_percent::float8, 0) > 0
       ORDER BY fv.created_at DESC NULLS LAST, fv.voucher_no DESC NULLS LAST
