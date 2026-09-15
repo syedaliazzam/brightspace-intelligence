@@ -185,6 +185,7 @@ export default function CoordinatorFeeHistoryPage({
   const [feeEditTarget, setFeeEditTarget] = useState(null);
   const [feeEditDraft, setFeeEditDraft] = useState(null);
   const [feeEditProofFile, setFeeEditProofFile] = useState(null);
+  const [scholarshipDisplayOverrides, setScholarshipDisplayOverrides] = useState({});
   const [savingRowId, setSavingRowId] = useState("");
   const [voucherPdfLoadingId, setVoucherPdfLoadingId] = useState("");
 
@@ -267,6 +268,9 @@ export default function CoordinatorFeeHistoryPage({
   function openFeeEdit(row) {
     if (!row?.id) return;
     const nextDraft = buildFeeEditDraft(row);
+    if (scholarshipDisplayOverrides[row.id] !== undefined) {
+      nextDraft.scholarship_amount = moneyInputValue(scholarshipDisplayOverrides[row.id]);
+    }
     if (
       !isAdmissionFeeHistoryRow(row)
       && Number(nextDraft.scholarship_amount || 0) <= 0
@@ -385,6 +389,7 @@ export default function CoordinatorFeeHistoryPage({
           remainingDue: moneyDraftNumber(draft.remaining_due),
           thisMonthPaid: moneyDraftNumber(draft.this_month_paid),
       };
+      const editedScholarshipAmount = moneyDraftNumber(draft.scholarship_amount);
       const requestOptions = feeEditProofFile
         ? (() => {
             const formData = new FormData();
@@ -402,6 +407,10 @@ export default function CoordinatorFeeHistoryPage({
       const response = await fetch("/api/coordinator/fee-history", requestOptions);
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data?.message || "Unable to update fee history row.");
+      setScholarshipDisplayOverrides((current) => ({
+        ...current,
+        [row.id]: editedScholarshipAmount,
+      }));
       closeFeeEdit();
       if (Array.isArray(data?.items)) {
         const nextItems = data.items;
@@ -938,7 +947,9 @@ export default function CoordinatorFeeHistoryPage({
                         const hasMonthlyBreakdown = !hasAdmissionBreakdown && parts.regularFee > 0;
                         const hasBreakdown = hasAdmissionBreakdown || hasMonthlyBreakdown;
                         const appliedScholarshipAmount = isAdmissionRow ? parts.scholarshipAmount : 0;
-                        const displayScholarshipAmount = parts.scholarshipAmount || selectedStudentScholarshipAmount;
+                        const displayScholarshipAmount = scholarshipDisplayOverrides[row.id] !== undefined
+                          ? Number(scholarshipDisplayOverrides[row.id] || 0)
+                          : (parts.scholarshipAmount || selectedStudentScholarshipAmount);
                         const currentFeeParts = {
                           regularFee: hasBreakdown ? parts.regularFee : currentMonthFeeValue,
                           admissionFee: hasAdmissionBreakdown ? parts.admissionFee : 0,
