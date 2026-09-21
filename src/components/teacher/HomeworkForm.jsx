@@ -1,4 +1,5 @@
 "use client";
+/* eslint-disable react-hooks/set-state-in-effect */
 
 import { useEffect, useMemo, useState } from "react";
 import { ChevronDown } from "lucide-react";
@@ -67,21 +68,96 @@ export default function HomeworkForm({ lectures = [], excludeLectureIds = [], in
     };
   }, [filePreviews]);
 
+  async function uploadFileDirectly(file, lectureId) {
+    const signedResponse = await fetch("/api/teacher/homework/upload-url", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        lectureId: lectureId || "teacher_homework",
+        fileName: file.name || "homework",
+        contentType: file.type || "application/octet-stream",
+        fileSize: file.size || 0,
+      }),
+    });
+    const signedData = await signedResponse.json().catch(() => ({}));
+    if (!signedResponse.ok) {
+      throw new Error(signedData?.message || "Unable to prepare upload URL.");
+    }
+
+    const uploadResponse = await fetch(signedData.signedUrl, {
+      method: "PUT",
+      headers: {
+        "Content-Type": file.type || "application/octet-stream",
+      },
+      body: file,
+    });
+
+    if (!uploadResponse.ok) {
+      const errorText = await uploadResponse.text().catch(() => "");
+      throw new Error(errorText || "Unable to upload document to storage.");
+    }
+
+    return {
+      bucket: signedData.bucket,
+      storedPath: signedData.path,
+      path: signedData.path,
+      name: file.name || "homework",
+      type: file.type || "",
+      size: file.size || 0,
+    };
+  }
+
   async function submit(event) {
     event.preventDefault();
     setPending(true);
     try {
-      const payload = new FormData();
-      payload.append("lectureId", form.lectureId);
-      payload.append("title", form.title);
-      payload.append("description", form.description);
-      payload.append("dueDate", form.dueDate);
-      form.files.forEach((file) => payload.append("file", file));
+      // 1. Direct-to-storage upload for attached files (bypassing Vercel Serverless payload limits)
+      const uploadedAttachments = [];
+      for (const file of form.files) {
+        if (file instanceof File && file.size > 0) {
+          const uploaded = await uploadFileDirectly(file, form.lectureId);
+          uploadedAttachments.push(uploaded);
+        }
+      }
+
+      // 2. Retained existing attachments
+      const retainedAttachmentBuckets = [];
+      const retainedAttachmentPaths = [];
+      const retainedAttachmentNames = [];
+      filePreviews.forEach((preview) => {
+        if (preview.isExisting && preview.url) {
+          retainedAttachmentPaths.push(preview.url);
+          retainedAttachmentNames.push(preview.name || "homework");
+          retainedAttachmentBuckets.push("ash-shajrah");
+        }
+      });
+
+      // 3. Send lightweight JSON payload
+      const payload = {
+        lectureId: form.lectureId,
+        title: form.title,
+        description: form.description,
+        dueDate: form.dueDate,
+        attachments: uploadedAttachments,
+        retainedAttachmentBuckets,
+        retainedAttachmentPaths,
+        retainedAttachmentNames,
+      };
+
       const response = await fetch("/api/teacher/homework", {
         method: initialValue ? "PATCH" : "POST",
-        body: payload,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
       });
-      const data = await response.json();
+
+      const text = await response.text();
+      let data = {};
+      try {
+        data = JSON.parse(text);
+      } catch {
+        throw new Error(text.slice(0, 160) || "Unable to save homework.");
+      }
+
       if (!response.ok) throw new Error(data?.message || "Unable to save homework.");
       setForm({ lectureId: "", title: "", description: "", dueDate: "", files: [] });
       setFilePreviews([]);

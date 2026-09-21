@@ -146,6 +146,7 @@ export async function POST(request) {
     let retainedAttachmentBuckets = [];
     let retainedAttachmentPaths = [];
     let retainedAttachmentNames = [];
+    let uploadedAttachments = [];
 
     if (contentType.includes("multipart/form-data")) {
       const formData = await request.formData();
@@ -160,7 +161,7 @@ export async function POST(request) {
       retainedAttachmentPaths = normalizeTextArray(formData.get("retainedAttachmentPaths"));
       retainedAttachmentNames = normalizeTextArray(formData.get("retainedAttachmentNames"));
     } else {
-      const body = await request.json();
+      const body = await request.json().catch(() => ({}));
       homeworkId = clean(body?.homeworkId);
       lectureId = clean(body?.lectureId);
       title = clean(body?.title);
@@ -169,6 +170,15 @@ export async function POST(request) {
       retainedAttachmentBuckets = normalizeTextArray(body?.retainedAttachmentBuckets);
       retainedAttachmentPaths = normalizeTextArray(body?.retainedAttachmentPaths);
       retainedAttachmentNames = normalizeTextArray(body?.retainedAttachmentNames);
+      if (Array.isArray(body?.attachments)) {
+        uploadedAttachments = body.attachments
+          .map((item) => ({
+            bucket: item.bucket || "ash-shajrah",
+            storedPath: item.storedPath || item.path || "",
+            name: item.name || "homework",
+          }))
+          .filter((item) => item.storedPath);
+      }
     }
     if (!title || (!homeworkId && !lectureId)) return json("Homework title is required.", 400);
 
@@ -207,9 +217,9 @@ export async function POST(request) {
 
     if (!students.length) return json("No active students found for this class.", 404);
 
-    const uploads = files.length
-      ? await uploadHomeworkSubmissions({ homeworkId: lectureId, files })
-      : [];
+    const uploads = uploadedAttachments.length
+      ? uploadedAttachments
+      : (files.length ? await uploadHomeworkSubmissions({ homeworkId: lectureId, files }) : []);
     const upload = uploads[0] || null;
 
     const created = [];
@@ -245,7 +255,7 @@ export async function POST(request) {
           ${dueDate || null}::date,
           ${(upload?.bucket || null)}::text,
           ${(upload?.storedPath || null)}::text,
-          ${(files[0]?.name || null)}::text,
+          ${(uploads[0]?.name || files[0]?.name || null)}::text,
           ${JSON.stringify(uploads.map((item) => item.bucket || null))}::jsonb,
           ${JSON.stringify(uploads.map((item) => item.storedPath || null))}::jsonb,
           ${JSON.stringify(uploads.map((item) => item.name || null))}::jsonb,
@@ -283,6 +293,7 @@ export async function PATCH(request) {
     let retainedAttachmentBuckets = [];
     let retainedAttachmentPaths = [];
     let retainedAttachmentNames = [];
+    let uploadedAttachments = [];
 
     if (contentType.includes("multipart/form-data")) {
       const formData = await request.formData();
@@ -298,7 +309,7 @@ export async function PATCH(request) {
       retainedAttachmentPaths = normalizeTextArray(formData.get("retainedAttachmentPaths"));
       retainedAttachmentNames = normalizeTextArray(formData.get("retainedAttachmentNames"));
     } else {
-      const body = await request.json();
+      const body = await request.json().catch(() => ({}));
       homeworkId = clean(body?.homeworkId);
       lectureId = clean(body?.lectureId);
       title = clean(body?.title);
@@ -307,6 +318,15 @@ export async function PATCH(request) {
       retainedAttachmentBuckets = normalizeTextArray(body?.retainedAttachmentBuckets);
       retainedAttachmentPaths = normalizeTextArray(body?.retainedAttachmentPaths);
       retainedAttachmentNames = normalizeTextArray(body?.retainedAttachmentNames);
+      if (Array.isArray(body?.attachments)) {
+        uploadedAttachments = body.attachments
+          .map((item) => ({
+            bucket: item.bucket || "ash-shajrah",
+            storedPath: item.storedPath || item.path || "",
+            name: item.name || "homework",
+          }))
+          .filter((item) => item.storedPath);
+      }
     }
     if (!title || (!homeworkId && !lectureId)) {
       return json("Lecture and homework title are required.", 400);
@@ -341,9 +361,9 @@ export async function PATCH(request) {
         `.then((rows) => rows[0]);
     if (!lecture?.id) return json("Assigned lecture not found.", 404);
 
-    const uploads = files.length
-      ? await uploadHomeworkSubmissions({ homeworkId: lectureId, files })
-      : [];
+    const uploads = uploadedAttachments.length
+      ? uploadedAttachments
+      : (files.length ? await uploadHomeworkSubmissions({ homeworkId: lectureId, files }) : []);
     const upload = uploads[0] || null;
     const nextBuckets = [...retainedAttachmentBuckets, ...uploads.map((item) => item.bucket || null).filter(Boolean)];
     const nextPaths = [...retainedAttachmentPaths, ...uploads.map((item) => item.storedPath || null).filter(Boolean)];
@@ -356,7 +376,7 @@ export async function PATCH(request) {
           due_date = ${dueDate || null}::date,
           homework_attachment_bucket = COALESCE(${upload?.bucket || null}::text, homework_attachment_bucket),
           homework_attachment_path = COALESCE(${upload?.storedPath || null}::text, homework_attachment_path),
-          homework_attachment_name = COALESCE(${files[0]?.name || null}::text, homework_attachment_name),
+          homework_attachment_name = COALESCE(${uploads[0]?.name || files[0]?.name || null}::text, homework_attachment_name),
           homework_attachment_buckets = ${JSON.stringify(nextBuckets)}::jsonb,
           homework_attachment_paths = ${JSON.stringify(nextPaths)}::jsonb,
           homework_attachment_names = ${JSON.stringify(nextNames)}::jsonb,

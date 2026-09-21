@@ -234,9 +234,17 @@ export async function createSignedPaymentProofUrl(storedPath, expiresIn = 3600) 
   return `${url}/storage/v1/object/public/${bucket}/${objectPath}`;
 }
 
+const admissionSignedUrlCache = new Map();
+
 export async function createSignedAdmissionDocumentUrl(storedPath, expiresIn = 3600) {
   if (!storedPath) {
     return "";
+  }
+
+  const cacheKey = `${storedPath}:${expiresIn}`;
+  const cached = admissionSignedUrlCache.get(cacheKey);
+  if (cached && cached.expiresAt > Date.now()) {
+    return cached.url;
   }
 
   const { url, serviceRoleKey, bucket } = getAdmissionSupabaseConfig();
@@ -262,23 +270,29 @@ export async function createSignedAdmissionDocumentUrl(storedPath, expiresIn = 3
 
   const data = await response.json();
   const signedPath = data?.signedURL || data?.signedUrl || data?.signed_url || "";
+  let finalUrl = "";
   if (signedPath) {
     if (/^https?:\/\//i.test(signedPath)) {
-      return signedPath;
+      finalUrl = signedPath;
+    } else if (signedPath.startsWith("/storage/v1/")) {
+      finalUrl = `${url}${signedPath}`;
+    } else if (signedPath.startsWith("/")) {
+      finalUrl = `${url}/storage/v1${signedPath}`;
+    } else {
+      finalUrl = `${url}/storage/v1/${signedPath}`;
     }
-
-    if (signedPath.startsWith("/storage/v1/")) {
-      return `${url}${signedPath}`;
-    }
-
-    if (signedPath.startsWith("/")) {
-      return `${url}/storage/v1${signedPath}`;
-    }
-
-    return `${url}/storage/v1/${signedPath}`;
+  } else {
+    finalUrl = `${url}/storage/v1/object/public/${signingBucket}/${objectPath}`;
   }
 
-  return `${url}/storage/v1/object/public/${signingBucket}/${objectPath}`;
+  if (finalUrl) {
+    admissionSignedUrlCache.set(cacheKey, {
+      url: finalUrl,
+      expiresAt: Date.now() + Math.max(300, expiresIn - 120) * 1000,
+    });
+  }
+
+  return finalUrl;
 }
 
 export async function createSignedHomeworkSubmissionUrl(storedPath, expiresIn = 3600) {

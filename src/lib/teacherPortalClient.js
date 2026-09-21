@@ -51,9 +51,15 @@ export async function loadTeacherPortalJsonCached(url, { force = false, ttlMs = 
 
   const request = fetch(key, { cache: "no-store" })
     .then(async (response) => {
-      const data = await response.json().catch(() => ({}));
+      const text = await response.text().catch(() => "");
+      let data = {};
+      try {
+        data = text ? JSON.parse(text) : {};
+      } catch {
+        data = {};
+      }
       if (!response.ok) {
-        throw new Error(data?.message || "Unable to load data.");
+        throw new Error(data?.message || (response.status === 413 ? "Payload is too large for this operation." : (text.slice(0, 120) || "Unable to load data.")));
       }
       responseCache.set(key, { data, cachedAt: Date.now() });
       writeStoredCache(key, data);
