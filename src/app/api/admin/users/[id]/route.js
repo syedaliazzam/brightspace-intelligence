@@ -178,141 +178,207 @@ export async function PATCH(request, { params }) {
       return json("User not found.", 404);
     }
 
-    if (
+    const hasUpdates = Boolean(
       fullName ||
       email ||
       phone ||
-      nextRole ||
+      (nextRole && nextRole !== existing.role) ||
       relation ||
+      admissionNo ||
+      gradeLevel ||
+      age !== null ||
       (existing.status && nextStatus !== existing.status)
-    ) {
-      await prisma.$transaction(async (tx) => {
-        const roleId = nextRole ? await getRoleId(nextRole) : null;
-        if (roleId) {
-          await tx.$executeRaw`
-            UPDATE users
-            SET
-              full_name = ${fullName || existing.full_name || existing.name},
-              email = ${email || existing.email || null},
-              phone = ${phone || existing.phone || null},
-              role_id = ${roleId}::uuid,
-              status = ${nextStatus}::user_status,
-              updated_at = NOW()
-            WHERE id = ${id}::uuid
-          `;
-        } else {
-          await tx.$executeRaw`
-            UPDATE users
-            SET
-              full_name = ${fullName || existing.full_name || existing.name},
-              email = ${email || existing.email || null},
-              phone = ${phone || existing.phone || null},
-              status = ${nextStatus}::user_status,
-              updated_at = NOW()
-            WHERE id = ${id}::uuid
-          `;
-        }
+    );
 
-        if (existing.role === "parent") {
-          await tx.$executeRaw`
-            UPDATE parent_profiles
-            SET relation = ${relation || existing.relation || null}, updated_at = NOW()
-            WHERE user_id = ${id}::uuid
-          `;
-        } else if (existing.role === "student") {
-          const resolvedCourseId = gradeLevel ? await findCourseByClassLevel(gradeLevel, tx) : null;
-          await tx.$executeRaw`
-            UPDATE student_profiles
-            SET
-              admission_no = ${admissionNo || existing.admission_no || null},
-              age = ${age === null ? existing.age || null : age},
-              grade_level = ${gradeLevel || existing.grade_level || null},
-              status = ${nextStatus}::user_status,
-              updated_at = NOW()
-            WHERE user_id = ${id}::uuid
-          `;
+    if (hasUpdates) {
+      const roleId = (nextRole && nextRole !== existing.role) ? await getRoleId(nextRole) : null;
+      const resolvedCourseId = (existing.role === "student" && gradeLevel)
+        ? await findCourseByClassLevel(gradeLevel)
+        : null;
 
-          if (resolvedCourseId) {
-            const [existingTargetEnrollment] = await tx.$queryRaw`
-              SELECT id::text AS id
-              FROM enrollments
-              WHERE student_id = ${existing.student_profile_id}::uuid
-                AND course_id = ${resolvedCourseId}::uuid
-              ORDER BY updated_at DESC NULLS LAST, created_at DESC NULLS LAST
-              LIMIT 1
+      await prisma.$transaction(
+        async (tx) => {
+          if (roleId) {
+            await tx.$executeRaw`
+              UPDATE users
+              SET
+                full_name = ${fullName || existing.full_name || existing.name},
+                email = ${email || existing.email || null},
+                phone = ${phone || existing.phone || null},
+                role_id = ${roleId}::uuid,
+                status = ${nextStatus}::user_status,
+                updated_at = NOW()
+              WHERE id = ${id}::uuid
             `;
-
-            const [activeEnrollment] = await tx.$queryRaw`
-              SELECT id::text AS id
-              FROM enrollments
-              WHERE student_id = ${existing.student_profile_id}::uuid
-                AND LOWER(status) = 'active'
-              ORDER BY updated_at DESC NULLS LAST, created_at DESC NULLS LAST
-              LIMIT 1
+          } else {
+            await tx.$executeRaw`
+              UPDATE users
+              SET
+                full_name = ${fullName || existing.full_name || existing.name},
+                email = ${email || existing.email || null},
+                phone = ${phone || existing.phone || null},
+                status = ${nextStatus}::user_status,
+                updated_at = NOW()
+              WHERE id = ${id}::uuid
             `;
+          }
 
-            if (existingTargetEnrollment?.id) {
-              await tx.$executeRaw`
-                UPDATE enrollments
-                SET
-                  status = 'active',
-                  end_date = NULL,
-                  updated_at = NOW()
-                WHERE id = ${existingTargetEnrollment.id}::uuid
-              `;
-
-              await tx.$executeRaw`
-                UPDATE enrollments
-                SET
-                  status = 'archived',
-                  end_date = CURRENT_DATE,
-                  updated_at = NOW()
-                WHERE student_id = ${existing.student_profile_id}::uuid
-                  AND id <> ${existingTargetEnrollment.id}::uuid
-                  AND LOWER(status) = 'active'
-              `;
-            } else if (activeEnrollment?.id) {
-              await tx.$executeRaw`
-                UPDATE enrollments
-                SET
-                  course_id = ${resolvedCourseId}::uuid,
-                  status = 'active',
-                  end_date = NULL,
-                  updated_at = NOW()
-                WHERE id = ${activeEnrollment.id}::uuid
-              `;
-            } else {
-              await tx.$executeRaw`
-                INSERT INTO enrollments (
-                  id,
-                  student_id,
-                  course_id,
-                  registration_id,
-                  start_date,
-                  status,
-                  created_at,
-                  updated_at
+          if (existing.role === "parent") {
+            await tx.$executeRaw`
+              UPDATE parent_profiles
+              SET relation = ${relation || existing.relation || null}, updated_at = NOW()
+              WHERE user_id = ${id}::uuid
+            `;
+          } else if (existing.role === "student") {
+            let studentProfileId = existing.student_profile_id;
+            if (!studentProfileId) {
+              const [newSp] = await tx.$queryRaw`
+                INSERT INTO student_profiles (
+                  id, user_id, admission_no, age, grade_level, status, created_at, updated_at
                 )
                 VALUES (
                   gen_random_uuid(),
-                  ${existing.student_profile_id}::uuid,
-                  ${resolvedCourseId}::uuid,
-                  NULL,
-                  CURRENT_DATE,
-                  'active',
+                  ${id}::uuid,
+                  ${admissionNo || null},
+                  ${age},
+                  ${gradeLevel || null},
+                  ${nextStatus}::user_status,
                   NOW(),
                   NOW()
                 )
-                ON CONFLICT (student_id, course_id)
-                DO UPDATE SET
-                  status = 'active',
-                  end_date = NULL,
+                ON CONFLICT (user_id) DO UPDATE SET
+                  admission_no = COALESCE(EXCLUDED.admission_no, student_profiles.admission_no),
+                  age = COALESCE(EXCLUDED.age, student_profiles.age),
+                  grade_level = COALESCE(EXCLUDED.grade_level, student_profiles.grade_level),
+                  status = EXCLUDED.status,
                   updated_at = NOW()
+                RETURNING id::text AS id
+              `;
+              studentProfileId = newSp?.id;
+            } else {
+              await tx.$executeRaw`
+                UPDATE student_profiles
+                SET
+                  admission_no = ${admissionNo || existing.admission_no || null},
+                  age = ${age === null ? existing.age || null : age},
+                  grade_level = ${gradeLevel || existing.grade_level || null},
+                  status = ${nextStatus}::user_status,
+                  updated_at = NOW()
+                WHERE user_id = ${id}::uuid
               `;
             }
+
+            if (gradeLevel && studentProfileId) {
+              await tx.$executeRaw`
+                UPDATE registration_leads rl
+                SET
+                  class_level = ${gradeLevel},
+                  updated_at = NOW()
+                FROM enrollments e
+                WHERE e.registration_id = rl.id
+                  AND e.student_id = ${studentProfileId}::uuid
+              `;
+
+              await tx.$executeRaw`
+                UPDATE parent_interview_forms
+                SET
+                  interested_programme = ${gradeLevel},
+                  updated_at = NOW()
+                WHERE registration_id IN (
+                  SELECT registration_id::text
+                  FROM enrollments
+                  WHERE student_id = ${studentProfileId}::uuid
+                    AND registration_id IS NOT NULL
+                )
+              `;
+            }
+
+            if (resolvedCourseId && studentProfileId) {
+              const [existingTargetEnrollment] = await tx.$queryRaw`
+                SELECT id::text AS id
+                FROM enrollments
+                WHERE student_id = ${studentProfileId}::uuid
+                  AND course_id = ${resolvedCourseId}::uuid
+                ORDER BY updated_at DESC NULLS LAST, created_at DESC NULLS LAST
+                LIMIT 1
+              `;
+
+              const [activeEnrollment] = await tx.$queryRaw`
+                SELECT id::text AS id
+                FROM enrollments
+                WHERE student_id = ${studentProfileId}::uuid
+                  AND LOWER(status) = 'active'
+                ORDER BY updated_at DESC NULLS LAST, created_at DESC NULLS LAST
+                LIMIT 1
+              `;
+
+              if (existingTargetEnrollment?.id) {
+                await tx.$executeRaw`
+                  UPDATE enrollments
+                  SET
+                    status = 'active',
+                    end_date = NULL,
+                    updated_at = NOW()
+                  WHERE id = ${existingTargetEnrollment.id}::uuid
+                `;
+
+                await tx.$executeRaw`
+                  UPDATE enrollments
+                  SET
+                    status = 'archived',
+                    end_date = CURRENT_DATE,
+                    updated_at = NOW()
+                  WHERE student_id = ${studentProfileId}::uuid
+                    AND id <> ${existingTargetEnrollment.id}::uuid
+                    AND LOWER(status) = 'active'
+                `;
+              } else if (activeEnrollment?.id) {
+                await tx.$executeRaw`
+                  UPDATE enrollments
+                  SET
+                    course_id = ${resolvedCourseId}::uuid,
+                    status = 'active',
+                    end_date = NULL,
+                    updated_at = NOW()
+                  WHERE id = ${activeEnrollment.id}::uuid
+                `;
+              } else {
+                await tx.$executeRaw`
+                  INSERT INTO enrollments (
+                    id,
+                    student_id,
+                    course_id,
+                    registration_id,
+                    start_date,
+                    status,
+                    created_at,
+                    updated_at
+                  )
+                  VALUES (
+                    gen_random_uuid(),
+                    ${studentProfileId}::uuid,
+                    ${resolvedCourseId}::uuid,
+                    NULL,
+                    CURRENT_DATE,
+                    'active',
+                    NOW(),
+                    NOW()
+                  )
+                  ON CONFLICT (student_id, course_id)
+                  DO UPDATE SET
+                    status = 'active',
+                    end_date = NULL,
+                    updated_at = NOW()
+                `;
+              }
+            }
           }
+        },
+        {
+          maxWait: 15000,
+          timeout: 30000,
         }
-      });
+      );
     } else {
       await prisma.$executeRaw`
         UPDATE users
