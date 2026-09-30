@@ -65,7 +65,7 @@ export default function DashboardShell({ session, children }) {
                 initial={{ opacity: 0, y: 14 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.35 }}
-                className="rounded-[2rem] border border-black/10 bg-white/85 p-0 shadow-[0_24px_80px_-36px_rgba(15,23,42,0.25)] backdrop-blur-xl sm:p-0"
+                className="border border-black/10 bg-[radial-gradient(circle_at_top_left,rgba(201,162,39,0.12),transparent_35%),radial-gradient(circle_at_top_right,rgba(45,138,106,0.12),transparent_32%),linear-gradient(180deg,#FAF7F0_0%,#F7F1E3_100%)] p-0 shadow-[0_24px_80px_-36px_rgba(15,23,42,0.25)] backdrop-blur-xl sm:p-0"
               >
                 {children ?? (
                   <div className="grid gap-4 md:grid-cols-3">

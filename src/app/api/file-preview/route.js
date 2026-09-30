@@ -20,7 +20,7 @@ function buildResponseHeaders(upstream, bypassDataCache = false) {
   headers.set("content-disposition", "inline");
   headers.set(
     "cache-control",
-    bypassDataCache ? "private, no-store, max-age=0" : "private, max-age=300, stale-while-revalidate=300"
+    bypassDataCache ? "private, no-store, max-age=0" : "public, max-age=86400, stale-while-revalidate=604800"
   );
   return headers;
 }

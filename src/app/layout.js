@@ -1,4 +1,4 @@
-import { Cormorant_Garamond, Outfit } from "next/font/google";
+import { Cormorant_Garamond, Outfit, Noto_Naskh_Arabic } from "next/font/google";
 import "./globals.css";
 
 const cormorant = Cormorant_Garamond({
@@ -13,10 +13,16 @@ const outfit = Outfit({
   weight: ["400", "500", "600", "700"],
 });
 
+const notoNaskh = Noto_Naskh_Arabic({
+  variable: "--font-noto-naskh",
+  subsets: ["arabic"],
+  weight: ["400", "600", "700"],
+});
+
 export const metadata = {
   title: "Ash-Shajrah Learning Hub (ALH) | Online Learning for Values, Creativity & Confidence",
   description:
-    "A fully online learning hub for children, parents, and educators â€” focused on early years learning, Montessori-inspired guidance, character, creativity, confidence, and leadership.",
+    "A fully online learning hub for children, parents, and educators — focused on early years learning, Montessori-inspired guidance, character, creativity, confidence, and leadership.",
   icons: {
     icon: "/favicon-32.png",
   },
@@ -27,7 +33,8 @@ export default function RootLayout({ children }) {
     <html
       lang="en"
       dir="ltr"
-      className={`${cormorant.variable} ${outfit.variable} h-full antialiased`}
+      className={`${cormorant.variable} ${outfit.variable} ${notoNaskh.variable} h-full antialiased`}
+      data-scroll-behavior="smooth"
       suppressHydrationWarning
     >
       <body className="font-body min-h-full flex flex-col" suppressHydrationWarning>

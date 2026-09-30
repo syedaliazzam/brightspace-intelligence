@@ -11,6 +11,7 @@ const NAV_ITEMS = [
   { id: "homework", label: "Homework" },
   { id: "attendance", label: "Attendance" },
   { id: "notes", label: "Notes" },
+  { id: "assessments", label: "Assessments" },
   { id: "profile", label: "Profile" },
 ];
 

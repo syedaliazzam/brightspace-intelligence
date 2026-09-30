@@ -60,6 +60,16 @@ textarea,
   font-family: var(--font-outfit), system-ui, sans-serif;
 }
 
+select {
+  background-color: #ffffff;
+  color: #063f32;
+}
+
+select option {
+  background-color: #ffffff;
+  color: #063f32;
+}
+
 ::selection {
   background: rgba(45, 138, 106, 0.3);
   color: #063f32;
@@ -233,3 +243,23 @@ textarea,
   border: none !important;
   box-shadow: 0 10px 22px -16px rgba(13, 59, 46, 0.45);
 }
+
+/* ECCE Responsive Assessment Criteria Tables */
+@media (max-width: 900px) {
+  .ecce-desktop-criteria {
+    display: none !important;
+  }
+  .ecce-mobile-criteria {
+    display: block !important;
+  }
+}
+
+@media (min-width: 901px) {
+  .ecce-desktop-criteria {
+    display: block !important;
+  }
+  .ecce-mobile-criteria {
+    display: none !important;
+  }
+}
+
