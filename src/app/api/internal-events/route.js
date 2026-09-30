@@ -4,6 +4,7 @@ import { auth } from "@/lib/auth";
 import { createCalendarLectureEvent, extractMeetCodeFromLink, updateCalendarLectureEvent } from "@/lib/googleCalendar";
 import prisma from "@/lib/prisma";
 import { isEventVisibleToRole, normalizeVisibleRoles } from "@/lib/internalEventsVisibility";
+import { createSignedAdmissionDocumentUrl, uploadAdmissionDocument } from "@/lib/supabaseStorage";
 
 const READ_ROLES = new Set(["admin", "coordinator", "superadmin", "teacher", "parent"]);
 const WRITE_ROLES = new Set(["admin", "coordinator", "superadmin"]);
@@ -27,6 +28,58 @@ function parseDateTime(value) {
     : normalized;
   const date = new Date(hasTimezone ? normalized : `${withSeconds}+05:00`);
   return Number.isNaN(date.getTime()) ? null : date;
+}
+
+async function ensureInternalEventImageColumns() {
+  await prisma.$executeRaw`
+    ALTER TABLE internal_events
+    ADD COLUMN IF NOT EXISTS image_bucket text,
+    ADD COLUMN IF NOT EXISTS image_object_path text,
+    ADD COLUMN IF NOT EXISTS image_stored_path text
+  `;
+}
+
+async function hydrateInternalEventImages(items = []) {
+  return Promise.all(
+    items.map(async (item) => ({
+      ...item,
+      image_url: item.image_stored_path
+        ? await createSignedAdmissionDocumentUrl(item.image_stored_path).catch(() => "")
+        : "",
+    }))
+  );
+}
+
+async function parseInternalEventRequest(request) {
+  const contentType = String(request.headers.get("content-type") || "").toLowerCase();
+  if (contentType.includes("multipart/form-data")) {
+    const formData = await request.formData();
+    let visibleToRoles = [];
+    try {
+      const parsed = JSON.parse(String(formData.get("visibleToRoles") || "[]"));
+      visibleToRoles = Array.isArray(parsed) ? parsed : [];
+    } catch {
+      visibleToRoles = [];
+    }
+
+    return {
+      id: clean(formData.get("id")),
+      title: clean(formData.get("title")),
+      description: clean(formData.get("description")),
+      attendeeUserId: clean(formData.get("attendeeUserId")),
+      scheduledStart: clean(formData.get("scheduledStart")),
+      scheduledEnd: clean(formData.get("scheduledEnd")),
+      status: clean(formData.get("status")),
+      visibleToRoles,
+      image: formData.get("image"),
+    };
+  }
+
+  const body = await request.json();
+  return {
+    ...body,
+    image: null,
+  };
 }
 
 async function getFirstCoordinator(tx = prisma) {
@@ -74,6 +127,8 @@ export async function GET(request) {
   const search = clean(searchParams.get("search"));
 
   try {
+    await ensureInternalEventImageColumns();
+
     if (mode === "options") {
       if (!WRITE_ROLES.has(role)) return json("Forbidden.", 403);
 
@@ -145,6 +200,9 @@ export async function GET(request) {
         ie.recording_synced_at,
         ie.google_last_error,
         ie.visible_to_roles,
+        ie.image_bucket,
+        ie.image_object_path,
+        ie.image_stored_path,
         host.id::text AS host_user_id,
         host.full_name AS host_name,
         host.email AS host_email,
@@ -177,7 +235,7 @@ export async function GET(request) {
         })
       : visibleItems;
 
-    return json("Internal events fetched.", 200, { items: searchableItems });
+    return json("Internal events fetched.", 200, { items: await hydrateInternalEventImages(searchableItems) });
   } catch (error) {
     return json(error instanceof Error ? error.message : "Unable to load internal events.", 500);
   }
@@ -191,13 +249,15 @@ export async function POST(request) {
   if (!WRITE_ROLES.has(role)) return json("Forbidden.", 403);
 
   try {
-    const body = await request.json();
+    await ensureInternalEventImageColumns();
+    const body = await parseInternalEventRequest(request);
     const title = clean(body?.title);
     const description = clean(body?.description);
     const attendeeUserId = clean(body?.attendeeUserId);
     const scheduledStart = parseDateTime(body?.scheduledStart);
     const scheduledEnd = parseDateTime(body?.scheduledEnd);
     const visibleToRoles = normalizeVisibleRoles(body?.visibleToRoles ?? body?.visible_to_roles ?? []);
+    const imageFile = body?.image;
     if (role === "coordinator" && !visibleToRoles.includes("coordinator")) {
       visibleToRoles.push("coordinator");
     }
@@ -209,6 +269,15 @@ export async function POST(request) {
     }
 
     const eventId = crypto.randomUUID();
+    let upload = null;
+    if (imageFile instanceof File && imageFile.size > 0) {
+      upload = await uploadAdmissionDocument({
+        applicationId: eventId,
+        documentType: "internal_event_image",
+        file: imageFile,
+      });
+    }
+
     const attendee = await getAttendee(attendeeUserId);
     const visibleToRolesSql = visibleToRoles.length
       ? `ARRAY[${visibleToRoles.map((role) => `'${String(role).replace(/'/g, "''")}'`).join(", ")}]::text[]`
@@ -229,6 +298,9 @@ export async function POST(request) {
         scheduled_start,
         scheduled_end,
         status,
+        image_bucket,
+        image_object_path,
+        image_stored_path,
         created_by,
         created_at,
         updated_at
@@ -242,6 +314,9 @@ export async function POST(request) {
         ${scheduledStart},
         ${scheduledEnd},
         'scheduled',
+        ${upload?.bucket || null},
+        ${upload?.objectPath || null},
+        ${upload?.storedPath || null},
         ${session.user.id}::uuid,
         NOW(),
         NOW()
@@ -306,7 +381,8 @@ export async function PATCH(request) {
   if (!WRITE_ROLES.has(role)) return json("Forbidden.", 403);
 
   try {
-    const body = await request.json();
+    await ensureInternalEventImageColumns();
+    const body = await parseInternalEventRequest(request);
     const id = clean(body?.id);
     const title = clean(body?.title);
     const description = clean(body?.description);
@@ -315,6 +391,7 @@ export async function PATCH(request) {
     const scheduledEnd = parseDateTime(body?.scheduledEnd);
     const status = clean(body?.status || "scheduled").toLowerCase();
     const visibleToRoles = normalizeVisibleRoles(body?.visibleToRoles ?? body?.visible_to_roles ?? []);
+    const imageFile = body?.image;
     if (role === "coordinator" && !visibleToRoles.includes("coordinator")) {
       visibleToRoles.push("coordinator");
     }
@@ -346,6 +423,15 @@ export async function PATCH(request) {
     const attendee = await getAttendee(attendeeUserId);
     if (!attendee?.id) throw new Error("Selected attendee is not available.");
 
+    let upload = null;
+    if (imageFile instanceof File && imageFile.size > 0) {
+      upload = await uploadAdmissionDocument({
+        applicationId: id,
+        documentType: "internal_event_image",
+        file: imageFile,
+      });
+    }
+
     const visibleToRolesSql = visibleToRoles.length
       ? `ARRAY[${visibleToRoles.map((roleName) => `'${String(roleName).replace(/'/g, "''")}'`).join(", ")}]::text[]`
       : "NULL";
@@ -359,6 +445,9 @@ export async function PATCH(request) {
         scheduled_start = ${scheduledStart},
         scheduled_end = ${scheduledEnd},
         status = ${status},
+        image_bucket = COALESCE(${upload?.bucket || null}, image_bucket),
+        image_object_path = COALESCE(${upload?.objectPath || null}, image_object_path),
+        image_stored_path = COALESCE(${upload?.storedPath || null}, image_stored_path),
         updated_at = NOW()
       WHERE id = ${id}::uuid
     `;

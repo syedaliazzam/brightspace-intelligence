@@ -70,7 +70,8 @@ export async function GET() {
         pe.event_fee_amount::float8 AS event_fee_amount,
         pe.registration_deadline,
         COALESCE(pe.registration_form_schema, '[]'::jsonb) AS registration_form_schema,
-        LOWER(COALESCE(pe.publication_status::text, 'draft')) AS publication_status
+        LOWER(COALESCE(pe.publication_status::text, 'draft')) AS publication_status,
+        pe.created_at
       FROM public_events pe
       ORDER BY pe.start_at DESC NULLS LAST, pe.created_at DESC NULLS LAST
     `;

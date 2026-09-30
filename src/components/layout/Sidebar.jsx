@@ -38,6 +38,7 @@ import {
   UserPlus,
   BadgePercent,
   Library,
+  CircleHelp,
 } from "lucide-react";
 
 function isActive(pathname, href) {
@@ -47,6 +48,7 @@ function isActive(pathname, href) {
 function getIconForLabel(label) {
   const key = String(label || "").toLowerCase();
   if (key.includes("dashboard")) return LayoutDashboard;
+  if (key.includes("faq") || key.includes("help")) return CircleHelp;
   if (key.includes("staff")) return UserCog;
   if (key.includes("teacher create") || key.includes("create teacher")) return UserPlus;
   if (key.includes("interested students")) return Users;
@@ -58,6 +60,7 @@ function getIconForLabel(label) {
   if (key.includes("fee vouchers") || key.includes("fees")) return ReceiptText;
   if (key.includes("discount")) return BadgePercent;
   if (key.includes("scholarship")) return BadgePercent;
+  if (key.includes("ecce") || key.includes("assessment")) return ClipboardCheck;
   if (key.includes("payments")) return CreditCard;
   if (key.includes("educational documents")) return BookOpen;
   if (key.includes("library")) return Library;

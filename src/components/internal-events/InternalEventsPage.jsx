@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { ChevronDown, Copy, FileVideo, Link as LinkIcon, Pencil, Plus, RefreshCw } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ChevronDown, Copy, FileVideo, Image as ImageIcon, Link as LinkIcon, Pencil, Plus, RefreshCw } from "lucide-react";
 import { normalizeVisibleRoles } from "@/lib/internalEventsVisibility";
 
 const APP_TIMEZONE = "Asia/Karachi";
@@ -126,6 +126,12 @@ export default function InternalEventsPage({
   const [editingItem, setEditingItem] = useState(null);
   const [editVisibleToRoles, setEditVisibleToRoles] = useState([]);
   const [editSaving, setEditSaving] = useState(false);
+  const [imageFile, setImageFile] = useState(null);
+  const [imagePreview, setImagePreview] = useState("");
+  const [editImageFile, setEditImageFile] = useState(null);
+  const [editImagePreview, setEditImagePreview] = useState("");
+  const imageInputRef = useRef(null);
+  const editImageInputRef = useRef(null);
   const [form, setForm] = useState({
     title: "",
     description: "",
@@ -225,10 +231,18 @@ export default function InternalEventsPage({
     setCreating(true);
     setError("");
     try {
+      const payload = new FormData();
+      payload.append("title", form.title);
+      payload.append("description", form.description);
+      payload.append("attendeeUserId", form.attendeeUserId);
+      payload.append("scheduledStart", form.scheduledStart);
+      payload.append("scheduledEnd", form.scheduledEnd);
+      payload.append("visibleToRoles", JSON.stringify(visibleToRoles));
+      if (imageFile instanceof File && imageFile.size > 0) payload.append("image", imageFile);
+
       const response = await fetch("/api/internal-events", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...form, visibleToRoles }),
+        body: payload,
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data?.message || "Unable to create event.");
@@ -240,6 +254,9 @@ export default function InternalEventsPage({
         scheduledStart: "",
         scheduledEnd: "",
       });
+      setImageFile(null);
+      setImagePreview("");
+      if (imageInputRef.current) imageInputRef.current.value = "";
       setVisibleToRoles([]);
       await load();
     } catch (submitError) {
@@ -253,6 +270,9 @@ export default function InternalEventsPage({
     setError("");
     setEditingItem(item);
     setEditVisibleToRoles(normalizeVisibleRoles(item.visible_to_roles || []));
+    setEditImageFile(null);
+    setEditImagePreview(item.image_url || "");
+    if (editImageInputRef.current) editImageInputRef.current.value = "";
     setEditAttendeeOpen(false);
     setEditForm({
       title: item.title || "",
@@ -270,6 +290,9 @@ export default function InternalEventsPage({
     setEditingItem(null);
     setEditVisibleToRoles([]);
     setEditSaving(false);
+    setEditImageFile(null);
+    setEditImagePreview("");
+    if (editImageInputRef.current) editImageInputRef.current.value = "";
     setEditForm({
       title: "",
       description: "",
@@ -287,14 +310,20 @@ export default function InternalEventsPage({
     setEditSaving(true);
     setError("");
     try {
+      const payload = new FormData();
+      payload.append("id", editingItem.id);
+      payload.append("title", editForm.title);
+      payload.append("description", editForm.description);
+      payload.append("attendeeUserId", editForm.attendeeUserId);
+      payload.append("scheduledStart", editForm.scheduledStart);
+      payload.append("scheduledEnd", editForm.scheduledEnd);
+      payload.append("status", editForm.status);
+      payload.append("visibleToRoles", JSON.stringify(editVisibleToRoles));
+      if (editImageFile instanceof File && editImageFile.size > 0) payload.append("image", editImageFile);
+
       const response = await fetch("/api/internal-events", {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          id: editingItem.id,
-          ...editForm,
-          visibleToRoles: editVisibleToRoles,
-        }),
+        body: payload,
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data?.message || "Unable to update event.");
@@ -406,6 +435,36 @@ export default function InternalEventsPage({
                   className="w-full rounded-2xl border border-[#2D8A6A]/20 bg-white px-4 py-3 text-sm outline-none focus:border-[#2D8A6A] focus:ring-2 focus:ring-[#2D8A6A]/20"
                 />
               </label>
+              <label className="block lg:col-span-2">
+                <span className="mb-2 block text-sm font-semibold text-[#245C4F]">Event image</span>
+                <div className="grid gap-3 rounded-2xl border border-[#2D8A6A]/20 bg-white p-3 sm:grid-cols-[160px_1fr] sm:items-center">
+                  <div className="flex h-28 items-center justify-center overflow-hidden rounded-2xl border border-[#2D8A6A]/15 bg-[#FAF7F0]">
+                    {imagePreview ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={imagePreview} alt="Selected event" className="h-full w-full object-cover" />
+                    ) : (
+                      <div className="flex flex-col items-center gap-2 text-[#0D5C48]">
+                        <ImageIcon className="h-6 w-6" />
+                        <span className="text-xs font-semibold">No image</span>
+                      </div>
+                    )}
+                  </div>
+                  <div>
+                    <input
+                      type="file"
+                      ref={imageInputRef}
+                      accept="image/*"
+                      onChange={(event) => {
+                        const file = event.target.files?.[0] || null;
+                        setImageFile(file);
+                        setImagePreview(file ? URL.createObjectURL(file) : "");
+                      }}
+                      className="w-full cursor-pointer rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 text-sm text-[#063F32] file:mr-3 file:cursor-pointer file:rounded-full file:border-0 file:bg-[#0D5C48] file:px-4 file:py-2 file:text-sm file:font-semibold file:text-[#FFF5D6]"
+                    />
+                    <p className="mt-2 text-xs text-[#2D8A6A]">Optional image for showing this event on LMS and your website.</p>
+                  </div>
+                </div>
+              </label>
               <fieldset className="block lg:col-span-2">
                 <legend className="mb-2 block text-sm font-semibold text-[#245C4F]">Visible to portals</legend>
 
@@ -486,6 +545,7 @@ export default function InternalEventsPage({
               <thead className="bg-[#FAF7F0] text-xs uppercase tracking-[0.18em] text-[#0D5C48]">
                 <tr>
                   <th className="px-5 py-3 font-semibold">Title</th>
+                  <th className="px-5 py-3 font-semibold">Image</th>
                   <th className="px-5 py-3 font-semibold">Host</th>
                   <th className="px-5 py-3 font-semibold">Attendee</th>
                   <th className="px-5 py-3 font-semibold">Start time</th>
@@ -502,6 +562,14 @@ export default function InternalEventsPage({
                       className="border-t border-[#2D8A6A]/10 transition"
                     >
                       <td className="px-5 py-4 font-medium text-[#063F32]">{item.title}</td>
+                      <td className="px-5 py-4">
+                        {item.image_url ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={item.image_url} alt={item.title || "Internal event"} className="h-14 w-20 rounded-xl border border-[#2D8A6A]/15 object-cover" />
+                        ) : (
+                          <span className="inline-flex h-14 w-20 items-center justify-center rounded-xl border border-[#2D8A6A]/15 bg-[#FAF7F0] text-xs font-semibold text-[#7A938B]">No image</span>
+                        )}
+                      </td>
                       <td className="px-5 py-4">{item.host_name || "Coordinator"}</td>
                       <td className="px-5 py-4">{item.attendee_name || "-"}</td>
                       <td className="px-5 py-4">{formatDateTime(item.scheduled_start)}</td>
@@ -527,7 +595,7 @@ export default function InternalEventsPage({
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={canCreate ? 7 : 6} className="px-5 py-8 text-center text-[#245C4F]">
+                    <td colSpan={canCreate ? 8 : 7} className="px-5 py-8 text-center text-[#245C4F]">
                       {loading ? "Loading events..." : "No internal events available."}
                     </td>
                   </tr>
@@ -631,6 +699,37 @@ export default function InternalEventsPage({
                     disabled={editSaving}
                     className="w-full rounded-2xl border border-[#2D8A6A]/20 bg-white px-4 py-3 text-sm outline-none focus:border-[#2D8A6A] focus:ring-2 focus:ring-[#2D8A6A]/20 disabled:cursor-not-allowed disabled:bg-[#F7F2E8]"
                   />
+                </label>
+                <label className="block lg:col-span-2">
+                  <span className="mb-2 block text-sm font-semibold text-[#245C4F]">Event image</span>
+                  <div className="grid gap-3 rounded-2xl border border-[#2D8A6A]/20 bg-white p-3 sm:grid-cols-[160px_1fr] sm:items-center">
+                    <div className="flex h-28 items-center justify-center overflow-hidden rounded-2xl border border-[#2D8A6A]/15 bg-[#FAF7F0]">
+                      {editImagePreview ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={editImagePreview} alt="Selected event" className="h-full w-full object-cover" />
+                      ) : (
+                        <div className="flex flex-col items-center gap-2 text-[#0D5C48]">
+                          <ImageIcon className="h-6 w-6" />
+                          <span className="text-xs font-semibold">No image</span>
+                        </div>
+                      )}
+                    </div>
+                    <div>
+                      <input
+                        type="file"
+                        ref={editImageInputRef}
+                        accept="image/*"
+                        disabled={editSaving}
+                        onChange={(event) => {
+                          const file = event.target.files?.[0] || null;
+                          setEditImageFile(file);
+                          setEditImagePreview(file ? URL.createObjectURL(file) : editingItem?.image_url || "");
+                        }}
+                        className="w-full cursor-pointer rounded-2xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-4 py-3 text-sm text-[#063F32] file:mr-3 file:cursor-pointer file:rounded-full file:border-0 file:bg-[#0D5C48] file:px-4 file:py-2 file:text-sm file:font-semibold file:text-[#FFF5D6] disabled:cursor-not-allowed disabled:opacity-70"
+                      />
+                      <p className="mt-2 text-xs text-[#2D8A6A]">Choose a new image only if you want to replace the current event image.</p>
+                    </div>
+                  </div>
                 </label>
                 <fieldset className="block lg:col-span-2">
                   <legend className="mb-2 block text-sm font-semibold text-[#245C4F]">Visible to portals</legend>

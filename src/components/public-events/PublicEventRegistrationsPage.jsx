@@ -454,9 +454,54 @@ function truncateSelectLabel(value, limit = 42) {
   return `${text.slice(0, Math.max(0, limit - 3)).trimEnd()}...`;
 }
 
+function compareDateThenText(leftDate, rightDate, leftText = "", rightText = "") {
+  const leftTime = leftDate ? new Date(leftDate).getTime() : Number.MAX_SAFE_INTEGER;
+  const rightTime = rightDate ? new Date(rightDate).getTime() : Number.MAX_SAFE_INTEGER;
+  if (leftTime !== rightTime) return leftTime - rightTime;
+  return String(leftText || "").localeCompare(String(rightText || ""), "en", { sensitivity: "base" });
+}
+
+function buildCoordinatorRegistrationIdMap(events, registrations) {
+  const eventNumberById = new Map();
+  const knownEvents = [...(Array.isArray(events) ? events : [])].sort((left, right) => (
+    compareDateThenText(left.start_at || left.event_start_at || left.created_at, right.start_at || right.event_start_at || right.created_at, left.event_name || left.title || left.name || left.id, right.event_name || right.title || right.name || right.id)
+  ));
+
+  knownEvents.forEach((event) => {
+    const eventId = String(event?.id || "").trim();
+    if (eventId && !eventNumberById.has(eventId)) eventNumberById.set(eventId, eventNumberById.size + 1);
+  });
+
+  [...(Array.isArray(registrations) ? registrations : [])]
+    .sort((left, right) => compareDateThenText(left.submitted_at || left.created_at, right.submitted_at || right.created_at, left.registration_no || left.id, right.registration_no || right.id))
+    .forEach((item) => {
+      const eventId = String(item?.event_id || "").trim();
+      if (eventId && !eventNumberById.has(eventId)) eventNumberById.set(eventId, eventNumberById.size + 1);
+    });
+
+  const registrationIdByItemId = new Map();
+  Array.from(eventNumberById.entries()).forEach(([eventId, eventNumber]) => {
+    const eventRegistrations = (Array.isArray(registrations) ? registrations : [])
+      .filter((item) => String(item?.event_id || "") === eventId)
+      .sort((left, right) => compareDateThenText(left.submitted_at || left.created_at, right.submitted_at || right.created_at, left.registration_no || left.id, right.registration_no || right.id));
+
+    eventRegistrations.forEach((item, index) => {
+      const itemId = String(item?.id || "").trim();
+      if (!itemId) return;
+      registrationIdByItemId.set(
+        itemId,
+        `E${String(eventNumber).padStart(3, "0")}-${String(index + 1).padStart(3, "0")}`
+      );
+    });
+  });
+
+  return registrationIdByItemId;
+}
+
 export default function PublicEventRegistrationsPage({ portalLabel = "Coordinator portal", title = "Event registrations", description = "Review public event registrations, verify payments, and track each registration from one LMS table.", canManage = true, }) {
   const pageSize = 7;
   const normalizedPortalLabel = String(portalLabel).toLowerCase().trim();
+  const showCoordinatorRegistrationIdColumn = normalizedPortalLabel === "coordinator portal";
   const showReceivedAmountColumn = normalizedPortalLabel === "coordinator portal" || normalizedPortalLabel === "super admin portal" || normalizedPortalLabel === "superadmin portal";
   const [items, setItems] = useState([]);
   const [events, setEvents] = useState([]);
@@ -697,17 +742,23 @@ export default function PublicEventRegistrationsPage({ portalLabel = "Coordinato
     });
     return columns;
   }, [events, filteredItems, filters.eventId]);
+  const coordinatorRegistrationIdByItemId = useMemo(
+    () => buildCoordinatorRegistrationIdMap(events, items),
+    [events, items]
+  );
   const tableColumnCount =
     6 +
     customRegistrationColumns.length +
+    Number(showCoordinatorRegistrationIdColumn) +
     Number(showReceivedAmountColumn);
   const registrationTableColumnWidths = useMemo(() => {
     const widths = [190, 280, 160];
+    if (showCoordinatorRegistrationIdColumn) widths.splice(1, 0, 170);
     customRegistrationColumns.forEach(() => widths.push(220));
     if (showReceivedAmountColumn) widths.push(300);
     widths.push(150, 250, 430);
     return widths;
-  }, [customRegistrationColumns, showReceivedAmountColumn]);
+  }, [customRegistrationColumns, showCoordinatorRegistrationIdColumn, showReceivedAmountColumn]);
   const registrationTableWidth = useMemo(
     () => registrationTableColumnWidths.reduce((sum, width) => sum + width, 0),
     [registrationTableColumnWidths]
@@ -1169,6 +1220,7 @@ export default function PublicEventRegistrationsPage({ portalLabel = "Coordinato
               <thead className="bg-[linear-gradient(180deg,#FAF7F0_0%,#F1EADC_100%)] text-xs uppercase tracking-[0.18em] text-[#0D5C48]">
                 <tr>
                   <th className="overflow-hidden whitespace-nowrap px-6 py-4">Registration No</th>
+                  {showCoordinatorRegistrationIdColumn ? <th className="overflow-hidden whitespace-nowrap px-6 py-4">Registration ID</th> : null}
                   <th className="overflow-hidden whitespace-nowrap px-6 py-4">Event</th>
                   <th className="overflow-hidden whitespace-nowrap px-6 py-4">Event Date</th>
                   {customRegistrationColumns.map((field) => <th key={field.id} className="overflow-hidden whitespace-nowrap px-6 py-4" title={field.label}>{field.label}</th>)}
@@ -1182,6 +1234,11 @@ export default function PublicEventRegistrationsPage({ portalLabel = "Coordinato
                 {visibleItems.length ? visibleItems.map((item) => (
                   <tr key={item.id}>
                     <td className="overflow-hidden whitespace-nowrap px-6 py-4 font-semibold text-[#063F32]">{item.registration_no}</td>
+                    {showCoordinatorRegistrationIdColumn ? (
+                      <td className="overflow-hidden whitespace-nowrap px-6 py-4 font-semibold text-[#0D5C48]">
+                        {coordinatorRegistrationIdByItemId.get(String(item.id || "")) || "-"}
+                      </td>
+                    ) : null}
                     <td className="whitespace-normal break-words px-6 py-4 font-medium leading-6 text-[#063F32]"><span className="block" title={item.event_name || ""}>{item.event_name}</span></td>
                     <td className="overflow-hidden whitespace-nowrap px-6 py-4 text-[#245C4F]">{formatEventDate(item.event_start_at)}</td>
                     {customRegistrationColumns.map((field) => {

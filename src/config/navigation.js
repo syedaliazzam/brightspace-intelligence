@@ -14,6 +14,7 @@ export const dashboardNavigation = {
     { label: "Payments", href: "/superadmin/payments" },
     { label: "Discount", href: "/superadmin/discount" },
     { label: "Fee History", href: "/superadmin/fee-history" },
+    { label: "ECCE Assessments", href: "/superadmin/ecce-assessments" },
     { label: "Careers Applications", href: "/superadmin/careers-applications" },
     {
       label: "User Management",
@@ -30,6 +31,7 @@ export const dashboardNavigation = {
     { label: "Audit History", href: "/superadmin/audit-logs" },
     { label: "Sent Emails", href: "/superadmin/sent-emails" },
     { label: "Custom Emails", href: "/superadmin/custom-emails" },
+    { label: "FAQs", href: "/superadmin/faqs" },
   ],
   admin: [
     { label: "Dashboard", href: "/admin/dashboard" },
@@ -60,6 +62,7 @@ export const dashboardNavigation = {
     { label: "Headlines", href: "/admin/headlines" },
     { label: "Audit History", href: "/admin/audit-logs" },    
     { label: "Sent Emails", href: "/admin/sent-emails" },
+    { label: "FAQs", href: "/admin/faqs" },
   ],
   coordinator: [
     { label: "Dashboard", href: "/coordinator/dashboard" },
@@ -77,6 +80,7 @@ export const dashboardNavigation = {
     { label: "Payments", href: "/coordinator/payments" },
     { label: "Discount", href: "/coordinator/discount" },
     { label: "Fee History", href: "/coordinator/fee-history" },
+    { label: "ECCE Assessments", href: "/coordinator/ecce-assessments" },
     { label: "Students", href: "/coordinator/students" },
     { label: "Parents", href: "/coordinator/parents" },
     { label: "Create teacher", href: "/coordinator/teacher-create" },
@@ -95,11 +99,14 @@ export const dashboardNavigation = {
     { label: "All Events Calendar", href: "/teacher/class-schedulers" },
     { label: "Lectures", href: "/teacher/lectures" },
     { label: "Attendance", href: "/teacher/attendance" },
+    { label: "ECCE Assessments", href: "/teacher/ecce-assessments" },
+    { label: "ECCE Assessment Records", href: "/teacher/ecce-assessment-records" },
     { label: "Students", href: "/teacher/students" },
     { label: "Homework", href: "/teacher/homework" },
     { label: "Approve Homework", href: "/teacher/homework-approval" },
     { label: "Library", href: "/teacher/library" },
     { label: "Notes", href: "/teacher/notes" },
+    { label: "FAQs", href: "/teacher/faqs" },
     { label: "Profile", href: "/teacher/profile" },
   ],
   parent: [
@@ -108,9 +115,11 @@ export const dashboardNavigation = {
     { label: "Lectures", href: "/parent/lectures" },
     { label: "Homework", href: "/parent/homework" },
     { label: "Attendance", href: "/parent/attendance" },
+    { label: "Assessment Reports", href: "/parent/ecce-assessments" },
     { label: "Library", href: "/parent/library" },
     { label: "Notes", href: "/parent/notes" },
     { label: "Fees", href: "/parent/fees" },
+    { label: "FAQs", href: "/parent/faqs" },
     { label: "Profile", href: "/parent/profile" },
   ],
   student: [
@@ -120,6 +129,7 @@ export const dashboardNavigation = {
     { label: "Homework", href: "/student/homework" },
     { label: "Attendance", href: "/student/attendance" },
     { label: "Notes", href: "/student/dashboard#notes" },
+    { label: "Assessment Reports", href: "/student/ecce-assessments" },
     { label: "Profile", href: "/student/profile" },
   ],
 };
