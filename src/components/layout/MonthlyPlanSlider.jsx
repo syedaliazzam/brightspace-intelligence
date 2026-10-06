@@ -34,7 +34,8 @@ function writeMonthlyPlansCache(items) {
 }
 
 export default function MonthlyPlanSlider() {
-  const [plan, setPlan] = useState(null);
+  const [plans, setPlans] = useState([]);
+  const [currentPlan, setCurrentPlan] = useState(null);
   const [currentIdx, setCurrentIdx] = useState(0);
   const [loading, setLoading] = useState(true);
   const [previewImage, setPreviewImage] = useState(null);
@@ -56,16 +57,35 @@ export default function MonthlyPlanSlider() {
           writeMonthlyPlansCache(items);
         }
 
-        // Filter to only show plan for current month (between start and end date)
         const now = new Date();
         const currentMonth = now.getMonth();
         const currentYear = now.getFullYear();
 
-        const currentMonthPlan = items.find((item) => {
+        // Filter out future/forward months — only include plans up to the current month
+        const eligiblePlans = items.filter((item) => {
+          if (!item?.start_date) return false;
+          const startDate = new Date(item.start_date);
+          if (Number.isNaN(startDate.getTime())) return false;
+
+          const itemYear = startDate.getFullYear();
+          const itemMonth = startDate.getMonth();
+
+          if (itemYear > currentYear) return false;
+          if (itemYear === currentYear && itemMonth > currentMonth) return false;
+          return true;
+        });
+
+        // Sort in strict sequence from newest/current month down to previous months
+        const sortedPlans = eligiblePlans.sort((a, b) => {
+          const timeA = new Date(a.start_date).getTime();
+          const timeB = new Date(b.start_date).getTime();
+          return timeB - timeA;
+        });
+
+        const currentMonthPlan = sortedPlans.find((item) => {
           const startDate = new Date(item.start_date);
           const endDate = new Date(item.end_date);
 
-          // Check if start date month/year OR end date month/year matches current month
           const startInCurrentMonth =
             startDate.getMonth() === currentMonth && startDate.getFullYear() === currentYear;
           const endInCurrentMonth =
@@ -76,7 +96,8 @@ export default function MonthlyPlanSlider() {
           return startInCurrentMonth || endInCurrentMonth || spansCurrentMonth;
         });
 
-        setPlan(currentMonthPlan || null);
+        setPlans(sortedPlans);
+        setCurrentPlan(currentMonthPlan || sortedPlans[0] || null);
       } catch (error) {
         console.error("Error loading plan:", error);
       } finally {
@@ -87,7 +108,7 @@ export default function MonthlyPlanSlider() {
     loadPlan();
   }, []);
 
-  const images = Array.isArray(plan?.image_urls) ? [...plan.image_urls] : [];
+  const images = plans.flatMap((p) => (Array.isArray(p?.image_urls) ? p.image_urls : []));
   const isVideoSource = (value = "") => /^data:video\//i.test(String(value || "")) || /\.(mp4|webm|ogg|mov|m4v)(\?.*)?$/i.test(String(value || ""));
   const buildPreviewUrl = (value) => {
     const text = String(value || "").trim();
@@ -95,9 +116,9 @@ export default function MonthlyPlanSlider() {
     if (/^https?:\/\//i.test(text) || text.startsWith("blob:") || text.startsWith("data:")) return text;
     return `/api/file-preview?path=${encodeURIComponent(text)}`;
   };
-  const monthName = plan?.start_date
-    ? new Date(plan.start_date).toLocaleDateString("en-US", { month: "long", year: "numeric" })
-    : "";
+  const monthName = currentPlan?.start_date
+    ? new Date(currentPlan.start_date).toLocaleDateString("en-US", { month: "long", year: "numeric" })
+    : new Date().toLocaleDateString("en-US", { month: "long", year: "numeric" });
 
   const scrollToIndex = useCallback((index) => {
     const scroller = scrollerRef.current;
@@ -121,23 +142,23 @@ export default function MonthlyPlanSlider() {
     timerRef.current = setInterval(() => {
       if (isAutoScrollingRef.current || isVideoPlayingRef.current) return;
       isAutoScrollingRef.current = true;
-      if (!plan?.image_urls?.length) return;
+      if (!images.length) return;
 
-      const nextIndex = (currentIdx + 1) % plan.image_urls.length;
+      const nextIndex = (currentIdx + 1) % images.length;
       scrollToIndex(nextIndex);
       window.setTimeout(() => {
         isAutoScrollingRef.current = false;
       }, 900);
     }, 6500);
-  }, [plan, currentIdx, scrollToIndex]);
+  }, [images.length, currentIdx, scrollToIndex]);
 
   useEffect(() => {
-    if (!plan?.image_urls?.length || loading) return;
+    if (!images.length || loading) return;
     startAutoSlide();
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
     };
-  }, [plan, loading, startAutoSlide]);
+  }, [images.length, loading, startAutoSlide]);
 
   useEffect(() => {
     const scroller = scrollerRef.current;

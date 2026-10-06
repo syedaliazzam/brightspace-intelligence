@@ -84,17 +84,60 @@ export async function GET(request) {
             WHEN fv.registration_id IS NULL THEN COALESCE(su.full_name, '')
             ELSE COALESCE(rl.student_name, item.student_name, '')
           END AS student_name,
-          COALESCE(rl.parent_name, item.parent_name) AS parent_name,
-          COALESCE(rl.email, fs.payer_email) AS email,
-          COALESCE(rl.phone, fs.payer_phone) AS phone,
+          COALESCE(
+            NULLIF(TRIM(pu.full_name), ''),
+            NULLIF(TRIM(pu_by_email.full_name), ''),
+            NULLIF(TRIM(rl.parent_name), ''),
+            NULLIF(TRIM(item.parent_name), ''),
+            ''
+          ) AS parent_name,
+          COALESCE(
+            NULLIF(TRIM(pu.email), ''),
+            NULLIF(TRIM(pu_by_email.email), ''),
+            NULLIF(TRIM(item.parent_email), ''),
+            NULLIF(TRIM(rl.email), ''),
+            ''
+          ) AS email,
+          COALESCE(
+            NULLIF(TRIM(pu.phone), ''),
+            NULLIF(TRIM(pu_by_email.phone), ''),
+            NULLIF(TRIM(item.parent_phone), ''),
+            NULLIF(TRIM(rl.phone), ''),
+            ''
+          ) AS phone,
           c.title AS class_title,
           b.id::text AS batch_id
         FROM fee_submissions fs
         INNER JOIN fee_vouchers fv ON fv.id = fs.voucher_id
         LEFT JOIN registration_leads rl ON rl.id = fv.registration_id
         LEFT JOIN regular_monthly_fee_voucher_items item ON item.voucher_id = fv.id
-        LEFT JOIN student_profiles sp ON sp.id = item.student_id
+        LEFT JOIN LATERAL (
+          SELECT e.student_id
+          FROM enrollments e
+          WHERE e.registration_id = fv.registration_id OR e.student_id = item.student_id
+          ORDER BY e.updated_at DESC NULLS LAST, e.created_at DESC NULLS LAST, e.id DESC
+          LIMIT 1
+        ) active_enr ON TRUE
+        LEFT JOIN student_profiles sp ON sp.id = COALESCE(item.student_id, active_enr.student_id)
         LEFT JOIN users su ON su.id = sp.user_id
+        LEFT JOIN LATERAL (
+          SELECT spp.parent_id
+          FROM student_parents spp
+          WHERE spp.student_id = sp.id
+          ORDER BY spp.is_primary DESC, spp.id DESC
+          LIMIT 1
+        ) primary_parent ON TRUE
+        LEFT JOIN parent_profiles pp ON pp.id = primary_parent.parent_id
+        LEFT JOIN users pu ON pu.id = pp.user_id
+        LEFT JOIN LATERAL (
+          SELECT u_parent.full_name, u_parent.email, u_parent.phone
+          FROM users u_parent
+          INNER JOIN parent_profiles pp_email ON pp_email.user_id = u_parent.id
+          WHERE LOWER(u_parent.email) = LOWER(COALESCE(rl.email, item.parent_email, ''))
+            AND NULLIF(TRIM(COALESCE(rl.email, item.parent_email, '')), '') IS NOT NULL
+          ORDER BY u_parent.id DESC
+          LIMIT 1
+        ) pu_by_email ON TRUE
         LEFT JOIN LATERAL (
           SELECT nsf.scholarship_amount
           FROM need_based_scholarship_forms nsf

@@ -189,49 +189,71 @@ export async function uploadAdmissionDocument({ applicationId, documentType, fil
   };
 }
 
+const paymentProofSignedUrlCache = new Map();
+
 export async function createSignedPaymentProofUrl(storedPath, expiresIn = 3600) {
   if (!storedPath) {
     return "";
   }
 
+  const cacheKey = `${storedPath}:${expiresIn}`;
+  const cached = paymentProofSignedUrlCache.get(cacheKey);
+  if (cached && cached.expiresAt > Date.now()) {
+    return cached.url;
+  }
+
   const { url, serviceRoleKey, bucket } = getSupabaseConfig();
   const objectPath = normalizeStoredPath(storedPath, bucket);
-  const signUrl = `${url}/storage/v1/object/sign/${bucket}/${objectPath}`;
-  const response = await fetch(signUrl, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${serviceRoleKey}`,
-      apikey: serviceRoleKey,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ expiresIn }),
-    cache: "no-store",
-  });
+  const fallbackUrl = `${url}/storage/v1/object/public/${bucket}/${objectPath}`;
 
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`Supabase signed URL generation failed: ${errorText}`);
+  try {
+    const signUrl = `${url}/storage/v1/object/sign/${bucket}/${objectPath}`;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 3500);
+
+    const response = await fetch(signUrl, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${serviceRoleKey}`,
+        apikey: serviceRoleKey,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ expiresIn }),
+      cache: "no-store",
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      return fallbackUrl;
+    }
+
+    const data = await response.json();
+    const signedPath = data?.signedURL || data?.signedUrl || data?.signed_url || "";
+    let finalUrl = fallbackUrl;
+
+    if (signedPath) {
+      if (/^https?:\/\//i.test(signedPath)) {
+        finalUrl = signedPath;
+      } else if (signedPath.startsWith("/storage/v1/")) {
+        finalUrl = `${url}${signedPath}`;
+      } else if (signedPath.startsWith("/")) {
+        finalUrl = `${url}/storage/v1${signedPath}`;
+      } else {
+        finalUrl = `${url}/storage/v1/${signedPath}`;
+      }
+    }
+
+    paymentProofSignedUrlCache.set(cacheKey, {
+      url: finalUrl,
+      expiresAt: Date.now() + Math.max(300, expiresIn - 120) * 1000,
+    });
+
+    return finalUrl;
+  } catch (err) {
+    // Return fallback URL so timeout or network errors never crash the page
+    return fallbackUrl;
   }
-
-  const data = await response.json();
-  const signedPath = data?.signedURL || data?.signedUrl || data?.signed_url || "";
-  if (signedPath) {
-    if (/^https?:\/\//i.test(signedPath)) {
-      return signedPath;
-    }
-
-    if (signedPath.startsWith("/storage/v1/")) {
-      return `${url}${signedPath}`;
-    }
-
-    if (signedPath.startsWith("/")) {
-      return `${url}/storage/v1${signedPath}`;
-    }
-
-    return `${url}/storage/v1/${signedPath}`;
-  }
-
-  return `${url}/storage/v1/object/public/${bucket}/${objectPath}`;
 }
 
 const admissionSignedUrlCache = new Map();

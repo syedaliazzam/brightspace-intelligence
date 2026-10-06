@@ -65,10 +65,25 @@ export async function GET() {
         nbsf.created_at,
         nbsf.updated_at,
         rl.student_name,
-        rl.parent_name,
+        COALESCE(
+          NULLIF(TRIM(pu.full_name), ''),
+          NULLIF(TRIM(pu_by_email.full_name), ''),
+          NULLIF(TRIM(rl.parent_name), ''),
+          ''
+        ) AS parent_name,
         rl.class_level,
-        rl.email,
-        rl.phone,
+        COALESCE(
+          NULLIF(TRIM(pu.email), ''),
+          NULLIF(TRIM(pu_by_email.email), ''),
+          NULLIF(TRIM(rl.email), ''),
+          ''
+        ) AS email,
+        COALESCE(
+          NULLIF(TRIM(pu.phone), ''),
+          NULLIF(TRIM(pu_by_email.phone), ''),
+          NULLIF(TRIM(rl.phone), ''),
+          ''
+        ) AS phone,
         LOWER(COALESCE(rl.status::text, 'new_lead')) AS lead_status
       FROM need_based_scholarship_forms nbsf
       INNER JOIN registration_leads rl ON rl.id = nbsf.registration_id
@@ -89,6 +104,33 @@ export async function GET() {
           fv_inner.id DESC
         LIMIT 1
       ) fv ON TRUE
+      LEFT JOIN LATERAL (
+        SELECT e.student_id
+        FROM enrollments e
+        WHERE e.registration_id = nbsf.registration_id
+           OR (fv.student_id IS NOT NULL AND e.student_id = fv.student_id)
+        ORDER BY e.updated_at DESC NULLS LAST, e.created_at DESC NULLS LAST, e.id DESC
+        LIMIT 1
+      ) active_enr ON TRUE
+      LEFT JOIN student_profiles sp ON sp.id = COALESCE(fv.student_id, active_enr.student_id)
+      LEFT JOIN LATERAL (
+        SELECT spp.parent_id
+        FROM student_parents spp
+        WHERE spp.student_id = sp.id
+        ORDER BY spp.is_primary DESC, spp.id DESC
+        LIMIT 1
+      ) primary_parent ON TRUE
+      LEFT JOIN parent_profiles pp ON pp.id = primary_parent.parent_id
+      LEFT JOIN users pu ON pu.id = pp.user_id
+      LEFT JOIN LATERAL (
+        SELECT u_parent.full_name, u_parent.email, u_parent.phone
+        FROM users u_parent
+        INNER JOIN parent_profiles pp_email ON pp_email.user_id = u_parent.id
+        WHERE LOWER(u_parent.email) = LOWER(rl.email)
+          AND NULLIF(TRIM(rl.email), '') IS NOT NULL
+        ORDER BY u_parent.id DESC
+        LIMIT 1
+      ) pu_by_email ON TRUE
       LEFT JOIN LATERAL (
         SELECT fs.id, fs.status, fs.paid_amount
         FROM fee_submissions fs
