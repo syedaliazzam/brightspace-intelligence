@@ -50,12 +50,6 @@ const FAQS = [
   },
   {
     category: "Fees",
-    question: "Where can I review fee history?",
-    answer:
-      "Open Fee History to review student fee records, monthly fee details, admission fee values, discounts, scholarships, paid amounts, pending dues, payment proofs, and voucher PDFs.",
-  },
-  {
-    category: "Fees",
     question: "Where are fee settings managed?",
     answer:
       "Fee Management contains fee setup areas such as regular fees, other fees, and related fee configuration used across fee vouchers and payment workflows.",

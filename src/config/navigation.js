@@ -45,8 +45,6 @@ export const dashboardNavigation = {
     { label: "Admission Records", href: "/admin/registration-leads" },
     { label: "Scholarship", href: "/admin/need-based-scholarships" },
     { label: "Payments", href: "/admin/payments" },
-    { label: "Discount", href: "/admin/discount" },
-    { label: "Fee History", href: "/admin/fee-history" },
     { label: "Careers Applications", href: "/admin/careers-applications" },
     {
       label: "User Management",
