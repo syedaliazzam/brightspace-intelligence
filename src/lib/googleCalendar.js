@@ -206,6 +206,12 @@ function buildEventPayload(payload, includeConferenceData = true) {
     eventPayload.attendees = attendees;
   }
 
+  if (payload.publicEventSchedule) {
+    eventPayload.start.dateTime = start.toISOString();
+    eventPayload.end.dateTime = end.toISOString();
+    eventPayload.recurrence = payload.recurrence || [];
+  }
+
   return eventPayload;
 }
 

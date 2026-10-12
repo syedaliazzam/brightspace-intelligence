@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 import { uploadAdmissionDocument } from "@/lib/supabaseStorage";
-import { cleanText, parsePakistanDateTime } from "@/lib/publicEvents";
+import { buildPublicEventCalendarSchedule, parsePublicEventDays, cleanText, parsePakistanDateTime } from "@/lib/publicEvents";
 import { createCalendarPublicEvent, updateCalendarLectureEvent } from "@/lib/googleCalendar";
 
 const ALLOWED_ROLES = new Set(["admin", "coordinator", "superadmin"]);
@@ -71,6 +71,9 @@ export async function PATCH(request, context) {
       const endDate = cleanText(formData.get("endDate"));
       const startTime = cleanText(formData.get("startTime"));
       const endTime = cleanText(formData.get("endTime"));
+      let days;
+      try { days = parsePublicEventDays(formData.get("days") || "[]"); }
+      catch (error) { return json(error.message, 400); }
       const eventFeeAmount = toMoney(formData.get("eventFeeAmount"));
       const registrationDeadlineDate = cleanText(formData.get("registrationDeadlineDate"));
       const registrationDeadlineTime = cleanText(formData.get("registrationDeadlineTime"));
@@ -99,6 +102,10 @@ export async function PATCH(request, context) {
       if (!startAt || !endAt || endAt <= startAt) {
         return json("Event end time must be after the start time.", 400);
       }
+
+      let calendarSchedule;
+      try { calendarSchedule = buildPublicEventCalendarSchedule(startAt, endAt, days); }
+      catch (error) { return json(error.message, 400); }
 
       const registrationDeadline = registrationDeadlineDate && registrationDeadlineTime
         ? parsePakistanDateTime(registrationDeadlineDate, registrationDeadlineTime)
@@ -141,6 +148,7 @@ export async function PATCH(request, context) {
           event_fee_amount = ${eventFeeAmount},
           registration_deadline = ${registrationDeadline},
           registration_form_schema = ${JSON.stringify(registrationFormSchema)}::jsonb,
+          schedule_days = ${JSON.stringify(days)}::jsonb,
           image_bucket = COALESCE(NULLIF(${upload?.bucket || ""}, ''), image_bucket),
           image_object_path = COALESCE(NULLIF(${upload?.objectPath || ""}, ''), image_object_path),
           image_stored_path = COALESCE(NULLIF(${upload?.storedPath || ""}, ''), image_stored_path),
@@ -155,8 +163,7 @@ export async function PATCH(request, context) {
             organizerEmail,
             title: title || "Public Event",
             description: description || "",
-            start: startAt,
-            end: endAt,
+            ...calendarSchedule,
             attendees: [],
             timeZone: "Asia/Karachi",
           });
@@ -199,6 +206,7 @@ export async function PATCH(request, context) {
         pe.description,
         pe.start_at,
         pe.end_at,
+        pe.schedule_days,
         pe.meet_link,
         pe.google_calendar_event_id,
         pe.google_calendar_event_html_link,
@@ -225,8 +233,7 @@ export async function PATCH(request, context) {
           organizerEmail,
           title: event.title || "Public Event",
           description: event.description || "",
-          start: event.start_at,
-          end: event.end_at,
+          ...buildPublicEventCalendarSchedule(event.start_at, event.end_at, event.schedule_days || []),
           attendees: [],
           timeZone: "Asia/Karachi",
         });

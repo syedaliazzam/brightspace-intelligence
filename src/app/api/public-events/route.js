@@ -20,6 +20,7 @@ export async function GET() {
         pe.google_calendar_last_error,
         pe.start_at,
         pe.end_at,
+        pe.schedule_days,
         pe.event_fee_amount::float8 AS event_fee_amount,
         pe.registration_deadline,
         COALESCE(pe.registration_form_schema, '[]'::jsonb) AS registration_form_schema,

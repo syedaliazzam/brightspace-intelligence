@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowDown, ArrowUp, Check, ChevronDown, ClipboardCopy, Eye, FileVideo, ImagePlus, Pencil, Plus, RefreshCw, RotateCcw, Search, X } from "lucide-react";
 import {
   cleanText,
+  PUBLIC_EVENT_DAYS,
   formatEventDate,
   formatEventDateTime,
   formatEventLifecycleLabel,
@@ -31,6 +32,7 @@ const EMPTY_FORM = {
   registrationDeadlineTime: "",
   image: null,
   registrationFormSchema: [],
+  days: [],
 };
 
 const SYSTEM_REGISTRATION_FIELDS = [
@@ -46,32 +48,50 @@ const SYSTEM_REGISTRATION_FIELDS = [
 
 function normalizeRegistrationField(field, index) {
   const rawType = String(field.type || "text").toLowerCase();
-  const fieldType = { int: "number", integer: "number", float: "number", phone: "tel", long_text: "textarea" }[rawType] || rawType;
+  const fieldType = { int: "number", integer: "number", float: "number", phone: "tel", long_text: "textarea", multiselect: "checkbox" }[rawType] || rawType;
+  const options = Array.isArray(field.options)
+    ? field.options.map((item) => String(item).trim()).filter(Boolean)
+    : typeof field.options === "string"
+      ? field.options.split(",").map((s) => s.trim()).filter(Boolean)
+      : [];
   return {
     id: String(field.id || `custom-${Date.now()}-${index}`),
     label: String(field.label || "Custom field").trim(),
-    type: ["text", "email", "tel", "number", "date", "textarea", "repeatable-text"].includes(fieldType) ? fieldType : "text",
+    type: ["text", "email", "tel", "number", "date", "textarea", "repeatable-text", "radio", "checkbox", "select"].includes(fieldType) ? fieldType : "text",
     required: Boolean(field.required),
     placeholder: String(field.placeholder || ""),
     helperText: String(field.helperText || ""),
     enabled: field.enabled !== false,
     system: Boolean(field.system),
+    options,
   };
 }
 
+function parseEventDays(value) {
+  if (Array.isArray(value)) return value;
+  if (typeof value === "string") {
+    try {
+      const parsed = JSON.parse(value);
+      if (Array.isArray(parsed)) return parsed;
+    } catch {}
+    const trimmed = value.trim();
+    if (trimmed && trimmed !== "[]") {
+      return trimmed
+        .replace(/[\[\]"']/g, "")
+        .split(",")
+        .map((d) => d.trim().toLowerCase().slice(0, 3))
+        .filter(Boolean);
+    }
+  }
+  return [];
+}
+
 function parseRegistrationFormSchema(value) {
-  const normalize = (fields) => fields.map((field) => {
-    const rawType = String(field.type || "text").toLowerCase();
-    return {
-      ...field,
-      type: { int: "number", integer: "number", float: "number", phone: "tel", long_text: "textarea" }[rawType] || rawType,
-    };
-  });
-  if (Array.isArray(value)) return normalize(value);
+  if (Array.isArray(value)) return value.map(normalizeRegistrationField);
   if (typeof value !== "string") return [];
   try {
     const parsed = JSON.parse(value);
-    return Array.isArray(parsed) ? normalize(parsed) : [];
+    return Array.isArray(parsed) ? parsed.map(normalizeRegistrationField) : [];
   } catch {
     return [];
   }
@@ -85,7 +105,7 @@ function RegistrationFormBuilder({ value, onChange, category }) {
   const selectedIds = new Set(selected.map((field) => field.id));
   const available = SYSTEM_REGISTRATION_FIELDS.filter((field) => !selectedIds.has(field.id) && field.label.toLowerCase().includes(search.toLowerCase()));
   const addField = (field) => onChange([...selected, normalizeRegistrationField(field, selected.length)]);
-  const addCustom = () => setNewField({ label: "", type: "text", required: false, placeholder: "", helperText: "", defaultValue: "" });
+  const addCustom = () => setNewField({ label: "", type: "text", required: false, placeholder: "", helperText: "", defaultValue: "", optionsText: "" });
   const updateField = (id, changes) => onChange(selected.map((field) => field.id === id ? { ...field, ...changes } : field));
   const removeField = (id) => onChange(selected.filter((field) => field.id !== id));
   const moveField = (index, direction) => {
@@ -99,7 +119,7 @@ function RegistrationFormBuilder({ value, onChange, category }) {
   return (
     <div className="md:col-span-2 rounded-[1.5rem] border border-[#2D8A6A]/15 bg-[#F7F2E8] p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div><p className="text-xs font-bold uppercase tracking-[0.2em] text-[#C9A227]">Registration form builder</p><p className="mt-1 text-sm text-[#245C4F]">Choose existing fields or add fields for this event.</p></div>
+        <div><p className="text-xs font-bold uppercase tracking-[0.2em] text-[#C9A227]">Registration form builder</p><p className="mt-1 text-sm text-[#245C4F]">Choose existing fields or add custom fields (text, radio, checkboxes, dropdown) for this event.</p></div>
         <button type="button" onClick={addCustom} className="rounded-full bg-[#0D5C48] px-4 py-2 text-xs font-semibold text-[#FFF5D6]">Add new field</button>
       </div>
       <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search existing fields" className="mt-4 w-full rounded-xl border border-[#2D8A6A]/20 bg-white px-3 py-2 text-sm text-[#063F32] outline-none" />
@@ -113,16 +133,93 @@ function RegistrationFormBuilder({ value, onChange, category }) {
       <div className="mt-4 rounded-xl border border-[#2D8A6A]/10 bg-white/70 p-3">
         <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#0D5C48]">Selected fields</p>
         <div className="mt-3 space-y-2">
-        {selected.map((field, index) => (
-          <div key={field.id} draggable onDragStart={(event) => event.dataTransfer.setData("text/plain", String(index))} onDragOver={(event) => event.preventDefault()} onDrop={(event) => { const from = Number(event.dataTransfer.getData("text/plain")); if (!Number.isInteger(from) || from === index) return; const next = [...selected]; const [moved] = next.splice(from, 1); next.splice(index, 0, moved); onChange(next); }} className="rounded-xl border border-[#2D8A6A]/15 bg-white p-3">
-            <div className="flex flex-wrap items-center gap-2"><input value={field.label} onChange={(event) => updateField(field.id, { label: event.target.value })} className="min-w-[180px] flex-1 rounded-lg border border-[#2D8A6A]/15 px-2 py-1 text-xs font-bold text-[#0D5C48]" /><span className="text-[10px] uppercase tracking-wide text-[#6B7280]">{field.type}</span><label className="ml-auto flex items-center gap-1 text-xs text-[#245C4F]"><input type="checkbox" checked={field.required} onChange={(event) => updateField(field.id, { required: event.target.checked })} /> Required</label><label className="flex items-center gap-1 text-xs text-[#245C4F]"><input type="checkbox" checked={field.enabled !== false} onChange={(event) => updateField(field.id, { enabled: event.target.checked })} /> Enabled</label><button type="button" aria-label="Move field up" onClick={() => moveField(index, -1)} disabled={index === 0} className="rounded-md p-1 text-[#0D5C48] disabled:opacity-30"><ArrowUp className="h-4 w-4" /></button><button type="button" aria-label="Move field down" onClick={() => moveField(index, 1)} disabled={index === selected.length - 1} className="rounded-md p-1 text-[#0D5C48] disabled:opacity-30"><ArrowDown className="h-4 w-4" /></button><button type="button" onClick={() => removeField(field.id)} className="text-xs font-semibold text-rose-700">Remove</button></div>
-            <div className="mt-2 grid gap-2 sm:grid-cols-3"><input value={field.placeholder || ""} onChange={(event) => updateField(field.id, { placeholder: event.target.value })} placeholder="Placeholder text" className="rounded-lg border border-[#2D8A6A]/15 px-2 py-1 text-xs" /><input value={field.helperText || ""} onChange={(event) => updateField(field.id, { helperText: event.target.value })} placeholder="Help text" className="rounded-lg border border-[#2D8A6A]/15 px-2 py-1 text-xs" /><input value={field.defaultValue || ""} onChange={(event) => updateField(field.id, { defaultValue: event.target.value })} placeholder="Default value" className="rounded-lg border border-[#2D8A6A]/15 px-2 py-1 text-xs" /></div>
-          </div>
-        ))}
+        {selected.map((field, index) => {
+          const hasOptions = ["radio", "checkbox", "select"].includes(field.type);
+          return (
+            <div key={field.id} draggable onDragStart={(event) => event.dataTransfer.setData("text/plain", String(index))} onDragOver={(event) => event.preventDefault()} onDrop={(event) => { const from = Number(event.dataTransfer.getData("text/plain")); if (!Number.isInteger(from) || from === index) return; const next = [...selected]; const [moved] = next.splice(from, 1); next.splice(index, 0, moved); onChange(next); }} className="rounded-xl border border-[#2D8A6A]/15 bg-white p-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <input value={field.label} onChange={(event) => updateField(field.id, { label: event.target.value })} className="min-w-[180px] flex-1 rounded-lg border border-[#2D8A6A]/15 px-2 py-1 text-xs font-bold text-[#0D5C48]" />
+                <span className="rounded bg-[#FAF7F0] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[#0D5C48] border border-[#2D8A6A]/15">
+                  {field.type === "radio" ? "Single Choice" : field.type === "checkbox" ? "Multiple Choice" : field.type === "select" ? "Dropdown" : field.type}
+                </span>
+                <label className="ml-auto flex items-center gap-1 text-xs text-[#245C4F]"><input type="checkbox" checked={field.required} onChange={(event) => updateField(field.id, { required: event.target.checked })} /> Required</label>
+                <label className="flex items-center gap-1 text-xs text-[#245C4F]"><input type="checkbox" checked={field.enabled !== false} onChange={(event) => updateField(field.id, { enabled: event.target.checked })} /> Enabled</label>
+                <button type="button" aria-label="Move field up" onClick={() => moveField(index, -1)} disabled={index === 0} className="rounded-md p-1 text-[#0D5C48] disabled:opacity-30"><ArrowUp className="h-4 w-4" /></button>
+                <button type="button" aria-label="Move field down" onClick={() => moveField(index, 1)} disabled={index === selected.length - 1} className="rounded-md p-1 text-[#0D5C48] disabled:opacity-30"><ArrowDown className="h-4 w-4" /></button>
+                <button type="button" onClick={() => removeField(field.id)} className="text-xs font-semibold text-rose-700">Remove</button>
+              </div>
+              <div className="mt-2 grid gap-2 sm:grid-cols-3">
+                <input value={field.placeholder || ""} onChange={(event) => updateField(field.id, { placeholder: event.target.value })} placeholder="Placeholder text" className="rounded-lg border border-[#2D8A6A]/15 px-2 py-1 text-xs" />
+                <input value={field.helperText || ""} onChange={(event) => updateField(field.id, { helperText: event.target.value })} placeholder="Help text" className="rounded-lg border border-[#2D8A6A]/15 px-2 py-1 text-xs" />
+                <input value={field.defaultValue || ""} onChange={(event) => updateField(field.id, { defaultValue: event.target.value })} placeholder="Default value" className="rounded-lg border border-[#2D8A6A]/15 px-2 py-1 text-xs" />
+              </div>
+              {hasOptions ? (
+                <div className="mt-2">
+                  <input
+                    value={Array.isArray(field.options) ? field.options.join(", ") : (field.options || "")}
+                    onChange={(event) => updateField(field.id, { options: event.target.value.split(",").map((s) => s.trim()).filter(Boolean) })}
+                    placeholder="Options separated by comma (e.g. Yes, No, Not Sure)"
+                    className="w-full rounded-lg border border-[#2D8A6A]/20 bg-[#FAF7F0] px-3 py-1.5 text-xs text-[#063F32] outline-none"
+                  />
+                  <p className="mt-1 text-[10px] text-[#6B7280]">Separate each choice with a comma.</p>
+                </div>
+              ) : null}
+            </div>
+          );
+        })}
         {!selected.length ? <p className="rounded-lg border border-dashed border-[#2D8A6A]/20 px-3 py-4 text-xs text-[#6B7280]">No fields selected yet.</p> : null}
         </div>
       </div>
-      {newField ? <div className="mt-4 rounded-xl border border-[#E4C766]/50 bg-white p-4"><div className="flex items-center justify-between"><p className="text-xs font-bold uppercase tracking-[0.18em] text-[#0D5C48]">Add new field</p><button type="button" onClick={() => setNewField(null)} aria-label="Close add field" className="text-[#0D5C48]"><X className="h-4 w-4" /></button></div><div className="mt-3 grid gap-2 sm:grid-cols-2"><input autoFocus value={newField.label} onChange={(event) => setNewField((current) => ({ ...current, label: event.target.value }))} placeholder="Field label" className="rounded-lg border border-[#2D8A6A]/15 px-3 py-2 text-sm" /><select value={newField.type} onChange={(event) => setNewField((current) => ({ ...current, type: event.target.value }))} className="rounded-lg border border-[#2D8A6A]/15 px-3 py-2 text-sm"><option value="text">Short text</option><option value="textarea">Long text</option><option value="email">Email</option><option value="tel">Phone</option><option value="number">Number</option><option value="date">Date</option></select><input value={newField.placeholder} onChange={(event) => setNewField((current) => ({ ...current, placeholder: event.target.value }))} placeholder="Placeholder text" className="rounded-lg border border-[#2D8A6A]/15 px-3 py-2 text-sm" /><input value={newField.helperText} onChange={(event) => setNewField((current) => ({ ...current, helperText: event.target.value }))} placeholder="Help text" className="rounded-lg border border-[#2D8A6A]/15 px-3 py-2 text-sm" /><input value={newField.defaultValue} onChange={(event) => setNewField((current) => ({ ...current, defaultValue: event.target.value }))} placeholder="Default value" className="rounded-lg border border-[#2D8A6A]/15 px-3 py-2 text-sm" /><label className="flex items-center gap-2 text-sm text-[#245C4F]"><input type="checkbox" checked={newField.required} onChange={(event) => setNewField((current) => ({ ...current, required: event.target.checked }))} /> Required field</label></div><button type="button" onClick={() => { if (!newField.label.trim()) return; addField({ ...newField, id: `custom-${Date.now()}`, system: false }); setNewField(null); }} className="mt-3 inline-flex items-center gap-2 rounded-full bg-[#0D5C48] px-4 py-2 text-xs font-semibold text-[#FFF5D6]"><Plus className="h-3.5 w-3.5" /> Add field</button></div> : null}
+      {newField ? (
+        <div className="mt-4 rounded-xl border border-[#E4C766]/50 bg-white p-4">
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#0D5C48]">Add new field</p>
+            <button type="button" onClick={() => setNewField(null)} aria-label="Close add field" className="text-[#0D5C48]"><X className="h-4 w-4" /></button>
+          </div>
+          <div className="mt-3 grid gap-2 sm:grid-cols-2">
+            <input autoFocus value={newField.label} onChange={(event) => setNewField((current) => ({ ...current, label: event.target.value }))} placeholder="Field label" className="rounded-lg border border-[#2D8A6A]/15 px-3 py-2 text-sm" />
+            <select value={newField.type} onChange={(event) => setNewField((current) => ({ ...current, type: event.target.value }))} className="rounded-lg border border-[#2D8A6A]/15 px-3 py-2 text-sm">
+              <option value="text">Short text</option>
+              <option value="textarea">Long text</option>
+              <option value="radio">Single choice (Radio)</option>
+              <option value="checkbox">Multiple choice (Checkboxes)</option>
+              <option value="select">Dropdown selection</option>
+              <option value="email">Email</option>
+              <option value="tel">Phone</option>
+              <option value="number">Number</option>
+              <option value="date">Date</option>
+            </select>
+            {["radio", "checkbox", "select"].includes(newField.type) ? (
+              <input
+                value={newField.optionsText || ""}
+                onChange={(event) => setNewField((current) => ({ ...current, optionsText: event.target.value }))}
+                placeholder="Options (comma-separated, e.g. Yes, No, Not Sure)"
+                className="rounded-lg border border-[#2D8A6A]/20 bg-[#FAF7F0] px-3 py-2 text-sm sm:col-span-2"
+              />
+            ) : null}
+            <input value={newField.placeholder} onChange={(event) => setNewField((current) => ({ ...current, placeholder: event.target.value }))} placeholder="Placeholder text" className="rounded-lg border border-[#2D8A6A]/15 px-3 py-2 text-sm" />
+            <input value={newField.helperText} onChange={(event) => setNewField((current) => ({ ...current, helperText: event.target.value }))} placeholder="Help text" className="rounded-lg border border-[#2D8A6A]/15 px-3 py-2 text-sm" />
+            <input value={newField.defaultValue} onChange={(event) => setNewField((current) => ({ ...current, defaultValue: event.target.value }))} placeholder="Default value" className="rounded-lg border border-[#2D8A6A]/15 px-3 py-2 text-sm sm:col-span-2" />
+            <label className="flex items-center gap-2 text-sm text-[#245C4F] sm:col-span-2">
+              <input type="checkbox" checked={newField.required} onChange={(event) => setNewField((current) => ({ ...current, required: event.target.checked }))} /> Required field
+            </label>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              if (!newField.label.trim()) return;
+              const options = ["radio", "checkbox", "select"].includes(newField.type)
+                ? (newField.optionsText || "").split(",").map((s) => s.trim()).filter(Boolean)
+                : [];
+              addField({ ...newField, options, id: `custom-${Date.now()}`, system: false });
+              setNewField(null);
+            }}
+            className="mt-3 inline-flex items-center gap-2 rounded-full bg-[#0D5C48] px-4 py-2 text-xs font-semibold text-[#FFF5D6]"
+          >
+            <Plus className="h-3.5 w-3.5" /> Add field
+          </button>
+        </div>
+      ) : null}
       <div className="mt-5 rounded-[1.25rem] border border-[#2D8A6A]/15 bg-[#FAF7F0] p-4">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div><p className="text-xs font-bold uppercase tracking-[0.2em] text-[#C9A227]">Live preview</p><p className="mt-1 text-xs text-[#245C4F]">{category ? `${category} registration form` : "Registration form"}</p></div>
@@ -132,8 +229,40 @@ function RegistrationFormBuilder({ value, onChange, category }) {
         </div>
         <div className={`mx-auto mt-3 rounded-xl border border-[#2D8A6A]/15 bg-white p-4 transition-all ${previewMode === "mobile" ? "max-w-[220px]" : previewMode === "tablet" ? "max-w-[420px]" : "max-w-full"}`}>
           <p className="text-sm font-semibold text-[#063F32]">Event registration</p>
-          <div className="mt-3 space-y-2">
-            {selected.filter((field) => field.enabled !== false).map((field) => <div key={field.id} className="rounded-lg border border-[#2D8A6A]/10 bg-[#FAF7F0] px-3 py-2 text-xs text-[#245C4F]"><span className="font-semibold text-[#063F32]">{field.label}{field.required ? " *" : ""}</span>{field.type === "textarea" ? <div className="mt-1 min-h-12 rounded border border-[#2D8A6A]/10 bg-white px-2 py-2 text-[#8A9B94]">{field.defaultValue || field.placeholder || "Enter your response"}</div> : <div className={`mt-1 rounded border border-[#2D8A6A]/10 bg-white px-2 py-2 ${field.defaultValue ? "text-[#245C4F]" : "text-[#8A9B94]"}`}>{field.defaultValue || field.placeholder || "Enter your response"}</div>}{field.helperText ? <p className="mt-1 text-[10px] text-[#6B7280]">{field.helperText}</p> : null}</div>)}
+          <div className="mt-3 space-y-3">
+            {selected.filter((field) => field.enabled !== false).map((field) => (
+              <div key={field.id} className="rounded-lg border border-[#2D8A6A]/10 bg-[#FAF7F0] px-3 py-2 text-xs text-[#245C4F]">
+                <span className="font-semibold text-[#063F32]">{field.label}{field.required ? " *" : ""}</span>
+                {field.type === "textarea" ? (
+                  <div className="mt-1 min-h-12 rounded border border-[#2D8A6A]/10 bg-white px-2 py-2 text-[#8A9B94]">{field.defaultValue || field.placeholder || "Enter your response"}</div>
+                ) : field.type === "radio" ? (
+                  <div className="mt-2 space-y-1">
+                    {(field.options?.length ? field.options : ["Option 1", "Option 2"]).map((opt, optIdx) => (
+                      <label key={optIdx} className="flex items-center gap-2 text-xs text-[#063F32]">
+                        <input type="radio" disabled name={`preview-${field.id}`} />
+                        <span>{opt}</span>
+                      </label>
+                    ))}
+                  </div>
+                ) : field.type === "checkbox" ? (
+                  <div className="mt-2 space-y-1">
+                    {(field.options?.length ? field.options : ["Option 1", "Option 2"]).map((opt, optIdx) => (
+                      <label key={optIdx} className="flex items-center gap-2 text-xs text-[#063F32]">
+                        <input type="checkbox" disabled />
+                        <span>{opt}</span>
+                      </label>
+                    ))}
+                  </div>
+                ) : field.type === "select" ? (
+                  <div className="mt-1 rounded border border-[#2D8A6A]/10 bg-white px-2 py-2 text-[#8A9B94]">
+                    {field.options?.length ? `Dropdown: ${field.options.join(" | ")}` : "Select an option"}
+                  </div>
+                ) : (
+                  <div className={`mt-1 rounded border border-[#2D8A6A]/10 bg-white px-2 py-2 ${field.defaultValue ? "text-[#245C4F]" : "text-[#8A9B94]"}`}>{field.defaultValue || field.placeholder || "Enter your response"}</div>
+                )}
+                {field.helperText ? <p className="mt-1 text-[10px] text-[#6B7280]">{field.helperText}</p> : null}
+              </div>
+            ))}
             {!selected.some((field) => field.enabled !== false) ? <p className="text-xs text-[#6B7280]">Select fields to preview the form.</p> : null}
           </div>
         </div>
@@ -146,6 +275,14 @@ function eventTone(status) {
   const normalized = String(status || "").toLowerCase();
   if (normalized === "current") return "bg-[#EEF4FF] text-[#1D4ED8]";
   return "bg-[#F1EADC] text-[#6B7280]";
+}
+
+function EventDays({ value = [], onChange }) {
+  return <div className="md:col-span-2">
+    <p className="mb-2 text-sm font-semibold text-[#245C4F]">Event days</p>
+    <div className="flex flex-wrap gap-2">{PUBLIC_EVENT_DAYS.map((day) => <label key={day.key} className="inline-flex items-center gap-2 rounded-2xl border border-[#2D8A6A]/15 bg-[#FAF7F0] px-4 py-3 text-sm text-[#063F32]"><input type="checkbox" checked={value.includes(day.key)} onChange={() => onChange(value.includes(day.key) ? value.filter((key) => key !== day.key) : [...value, day.key])} />{day.label}</label>)}</div>
+    <p className="mt-2 text-xs text-[#245C4F]">Select session days within the start and end dates. All sessions share this event and meeting link. Leave empty for a single event.</p>
+  </div>;
 }
 
 function formatTimeOnly(value) {
@@ -446,6 +583,7 @@ export default function PublicEventsManagementPage({
       registrationDeadlineTime: deadline.time || "",
       image: null,
       registrationFormSchema: parseRegistrationFormSchema(item.registration_form_schema),
+      days: parseEventDays(item.schedule_days),
     });
     setEditPreviewImage(item.image_url || "");
     if (editFileInputRef.current) {
@@ -471,6 +609,7 @@ export default function PublicEventsManagementPage({
       payload.set("registrationDeadlineDate", form.registrationDeadlineDate || form.startDate);
       payload.set("registrationDeadlineTime", form.registrationDeadlineTime || form.startTime);
       payload.set("registrationFormSchema", JSON.stringify(form.registrationFormSchema || []));
+      payload.set("days", JSON.stringify(form.days || []));
       if (form.image instanceof File) {
         payload.set("image", form.image);
       }
@@ -524,6 +663,7 @@ export default function PublicEventsManagementPage({
       payload.set("registrationDeadlineDate", editForm.registrationDeadlineDate || editForm.startDate);
       payload.set("registrationDeadlineTime", editForm.registrationDeadlineTime || editForm.startTime);
       payload.set("registrationFormSchema", JSON.stringify(editForm.registrationFormSchema || []));
+      payload.set("days", JSON.stringify(editForm.days || []));
       if (editForm.image instanceof File) {
         payload.set("image", editForm.image);
       }
@@ -1053,6 +1193,7 @@ export default function PublicEventsManagementPage({
               <div className="max-h-[80vh] overflow-y-auto p-6">
                 <form className="grid gap-4 md:grid-cols-2" onSubmit={handleEditSubmit}>
                   <RegistrationFormBuilder category={editForm.eventCategory} value={editForm.registrationFormSchema} onChange={(registrationFormSchema) => setEditForm((current) => ({ ...current, registrationFormSchema }))} />
+                  <EventDays value={editForm.days} onChange={(days) => setEditForm((current) => ({ ...current, days }))} />
                   <label className="block md:col-span-2">
                     <span className="mb-2 block text-sm font-semibold text-[#245C4F]">Select Event Category</span>
                     <div className="relative">
@@ -1194,6 +1335,7 @@ export default function PublicEventsManagementPage({
                     </div>
                   </label>
                   <RegistrationFormBuilder category={form.eventCategory} value={form.registrationFormSchema} onChange={(registrationFormSchema) => setForm((current) => ({ ...current, registrationFormSchema }))} />
+                  <EventDays value={form.days} onChange={(days) => setForm((current) => ({ ...current, days }))} />
                   <label className="block">
                     <span className="mb-2 block text-sm font-semibold text-[#245C4F]">Event name</span>
                     <input value={form.title} onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))} className="w-full rounded-2xl border border-[#2D8A6A]/20 bg-white px-4 py-3 text-sm outline-none focus:border-[#2D8A6A] focus:ring-2 focus:ring-[#FFF5D6]" required />

@@ -107,8 +107,11 @@ export async function POST(request) {
       if (field.enabled === false || !field.required) continue;
       const fieldValue = field.id === "studentNames"
         ? studentNames.filter(Boolean).join(", ")
-        : customFieldValues[field.id];
-      if (!cleanText(fieldValue)) return json(`${field.label || "This field"} is required.`, 400);
+        : (customFieldValues[field.id] !== undefined ? customFieldValues[field.id] : body?.[field.id]);
+      const hasValue = Array.isArray(fieldValue)
+        ? fieldValue.some((item) => String(item || "").trim().length > 0)
+        : Boolean(cleanText(fieldValue));
+      if (!hasValue) return json(`${field.label || "This field"} is required.`, 400);
     }
     if (!usesConfiguredForm && (category === "alh-students" || category === "general-students") && !studentName) {
       return json("Student name is required for this event category.", 400);
@@ -223,7 +226,7 @@ export async function POST(request) {
             eventName: event.title || "Public Event",
             eventSchedule: `${formatEventDateTime(event.start_at)} - ${formatEventDateTime(event.end_at)}`,
             eventFee: isFreeRegistration ? "Free" : formatMoney(event.event_fee_amount || 0),
-            coordinatorName: event.coordinator_name || "Coordinator",
+            coordinatorName: event.coordinator_name || "Muhammad Adeel Hassan",
             coordinatorEmail: event.coordinator_email || "",
             coordinatorPhone: event.coordinator_phone || "",
             paymentMethods,

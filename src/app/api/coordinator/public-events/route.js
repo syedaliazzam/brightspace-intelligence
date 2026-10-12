@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 import { createSignedAdmissionDocumentUrl, uploadAdmissionDocument } from "@/lib/supabaseStorage";
-import { cleanText, formatEventLifecycleStatus, parsePakistanDateTime } from "@/lib/publicEvents";
+import { buildPublicEventCalendarSchedule, parsePublicEventDays, cleanText, formatEventLifecycleStatus, parsePakistanDateTime } from "@/lib/publicEvents";
 import { createCalendarPublicEvent } from "@/lib/googleCalendar";
 
 const ALLOWED_VIEW_ROLES = new Set(["admin", "coordinator", "superadmin", "teacher"]);
@@ -62,14 +62,13 @@ async function hydrateEventImages(items) {
   );
 }
 
-async function syncPublicEventCalendar({ title, description, startAt, endAt, organizerEmail }) {
+async function syncPublicEventCalendar({ title, description, calendarSchedule, organizerEmail }) {
   try {
     const calendarData = await createCalendarPublicEvent({
       organizerEmail,
       title,
       description,
-      start: startAt,
-      end: endAt,
+      ...calendarSchedule,
       attendees: [],
       timeZone: "Asia/Karachi",
     });
@@ -109,6 +108,7 @@ export async function GET() {
         pe.meet_link,
         pe.start_at,
         pe.end_at,
+        pe.schedule_days,
         pe.event_fee_amount::float8 AS event_fee_amount,
         pe.registration_deadline,
         LOWER(pe.publication_status::text) AS publication_status,
@@ -166,6 +166,9 @@ export async function POST(request) {
     const endDate = cleanText(formData.get("endDate"));
     const startTime = cleanText(formData.get("startTime"));
     const endTime = cleanText(formData.get("endTime"));
+    let days;
+    try { days = parsePublicEventDays(formData.get("days") || "[]"); }
+    catch (error) { return json(error.message, 400); }
     const eventFeeAmount = toMoney(formData.get("eventFeeAmount"));
     const registrationDeadlineDate = cleanText(formData.get("registrationDeadlineDate"));
     const registrationDeadlineTime = cleanText(formData.get("registrationDeadlineTime"));
@@ -196,6 +199,10 @@ export async function POST(request) {
       return json("Event end time must be after the start time.", 400);
     }
 
+    let calendarSchedule;
+    try { calendarSchedule = buildPublicEventCalendarSchedule(startAt, endAt, days); }
+    catch (error) { return json(error.message, 400); }
+
     const registrationDeadline = registrationDeadlineDate && registrationDeadlineTime
       ? parsePakistanDateTime(registrationDeadlineDate, registrationDeadlineTime)
       : startAt;
@@ -223,6 +230,7 @@ export async function POST(request) {
         event_fee_amount,
         registration_deadline,
         registration_form_schema,
+        schedule_days,
         publication_status,
         image_bucket,
         image_object_path,
@@ -248,6 +256,7 @@ export async function POST(request) {
         ${eventFeeAmount},
         ${registrationDeadline},
         ${JSON.stringify(registrationFormSchema)}::jsonb,
+        ${JSON.stringify(days)}::jsonb,
         ${"published"},
         ${upload.bucket},
         ${upload.objectPath},
@@ -271,6 +280,7 @@ export async function POST(request) {
       description,
       startAt,
       endAt,
+      calendarSchedule,
       organizerEmail,
     });
 

@@ -155,6 +155,26 @@ function mapClassSchedulerEvents(items = []) {
   })));
 }
 
+function getPublicEventScheduleDays(item) {
+  const raw = item?.schedule_days ?? item?.scheduleDays;
+  if (Array.isArray(raw)) return raw.map((d) => String(d).toLowerCase().trim().slice(0, 3));
+  if (typeof raw === "string") {
+    try {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed.map((d) => String(d).toLowerCase().trim().slice(0, 3));
+    } catch {}
+    const trimmed = raw.trim();
+    if (trimmed && trimmed !== "[]") {
+      return trimmed
+        .replace(/[\[\]"']/g, "")
+        .split(",")
+        .map((d) => d.trim().toLowerCase().slice(0, 3))
+        .filter(Boolean);
+    }
+  }
+  return [];
+}
+
 function mapPublicEvents(items = []) {
   return (items || []).flatMap((item) => {
     const start = parseDateTime(item?.start_at || item?.startAt);
@@ -166,15 +186,26 @@ function mapPublicEvents(items = []) {
       cursor.setHours(0, 0, 0, 0);
       const endDate = new Date(end);
       endDate.setHours(0, 0, 0, 0);
+      const scheduleDays = getPublicEventScheduleDays(item);
 
       while (cursor <= endDate) {
+        const weekday = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"][cursor.getDay()];
+        if (scheduleDays.length > 0 && !scheduleDays.includes(weekday)) {
+          cursor.setDate(cursor.getDate() + 1);
+          continue;
+        }
+
+        const dateStr = `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, "0")}-${String(cursor.getDate()).padStart(2, "0")}`;
         const occurrenceStart = new Date(cursor);
         occurrenceStart.setHours(start.getHours(), start.getMinutes(), start.getSeconds(), 0);
         const occurrenceEnd = new Date(cursor);
         occurrenceEnd.setHours(end.getHours(), end.getMinutes(), end.getSeconds(), 0);
+        if (occurrenceEnd <= occurrenceStart) {
+          occurrenceEnd.setTime(occurrenceStart.getTime() + Math.max(60 * 60 * 1000, end.getTime() - start.getTime()));
+        }
 
         events.push({
-          id: `public-${item.id}-${cursor.toISOString().slice(0, 10)}`,
+          id: `public-${item.id}-${dateStr}`,
           title: item?.title || "Public event",
           start: toCalendarDate(occurrenceStart),
           end: toCalendarDate(occurrenceEnd),

@@ -368,10 +368,10 @@ export function buildPaymentDecisionEmailHtml({
 }) {
   const messageRows = reason
     ? reason
-        .split("\n")
-        .map((line) => line.trim())
-        .filter(Boolean)
-        .map((line) => line.replace(/^\s*[-•]\s*/, ""))
+      .split("\n")
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .map((line) => line.replace(/^\s*[-•]\s*/, ""))
     : [];
 
   return themedEmailShell({
@@ -443,27 +443,27 @@ export function buildPublicEventRegistrationEmailHtml({
 }) {
   const paymentBlocks = paymentMethods.length
     ? paymentMethods.map((method) => {
-        const lines = [
-          method?.name ? `<p style="margin:0 0 4px;"><strong>${escapeHtml(method.name)}</strong></p>` : "",
-          method?.bank_name ? `<p style="margin:0 0 4px;"><strong>Bank:</strong> ${escapeHtml(method.bank_name)}</p>` : "",
-          method?.account_title ? `<p style="margin:0 0 4px;"><strong>Account Title:</strong> ${escapeHtml(method.account_title)}</p>` : "",
-          method?.account_number ? `<p style="margin:0 0 4px;"><strong>Account Number:</strong> ${escapeHtml(method.account_number)}</p>` : "",
-          method?.iban ? `<p style="margin:0 0 4px;"><strong>IBAN:</strong> ${escapeHtml(method.iban)}</p>` : "",
-          method?.branch_code ? `<p style="margin:0 0 4px;"><strong>Branch Code:</strong> ${escapeHtml(method.branch_code)}</p>` : "",
-          method?.instructions ? `<p style="margin:8px 0 0;color:#245C4F;">${escapeHtml(method.instructions)}</p>` : "",
-        ]
-          .filter(Boolean)
-          .join("");
+      const lines = [
+        method?.name ? `<p style="margin:0 0 4px;"><strong>${escapeHtml(method.name)}</strong></p>` : "",
+        method?.bank_name ? `<p style="margin:0 0 4px;"><strong>Bank:</strong> ${escapeHtml(method.bank_name)}</p>` : "",
+        method?.account_title ? `<p style="margin:0 0 4px;"><strong>Account Title:</strong> ${escapeHtml(method.account_title)}</p>` : "",
+        method?.account_number ? `<p style="margin:0 0 4px;"><strong>Account Number:</strong> ${escapeHtml(method.account_number)}</p>` : "",
+        method?.iban ? `<p style="margin:0 0 4px;"><strong>IBAN:</strong> ${escapeHtml(method.iban)}</p>` : "",
+        method?.branch_code ? `<p style="margin:0 0 4px;"><strong>Branch Code:</strong> ${escapeHtml(method.branch_code)}</p>` : "",
+        method?.instructions ? `<p style="margin:8px 0 0;color:#245C4F;">${escapeHtml(method.instructions)}</p>` : "",
+      ]
+        .filter(Boolean)
+        .join("");
 
-        return `<div style="margin-top:14px;padding:14px 16px;border:1px solid #2D8A6A;border-radius:18px;background:#fffaf0;font-size:14px;line-height:1.7;color:#063F32;">${lines}</div>`;
-      }).join("")
+      return `<div style="margin-top:14px;padding:14px 16px;border:1px solid #2D8A6A;border-radius:18px;background:#fffaf0;font-size:14px;line-height:1.7;color:#063F32;">${lines}</div>`;
+    }).join("")
     : `<div style="margin-top:14px;padding:14px 16px;border:1px solid #2D8A6A;border-radius:18px;background:#fffaf0;font-size:14px;line-height:1.7;color:#063F32;">Payment methods will be shared by the coordinator.</div>`;
 
   const coordinatorBlock = `
     <div style="padding:16px;border:1px solid #2D8A6A;border-radius:18px;background:#fffaf0;font-size:14px;line-height:1.8;color:#063F32;">
-      <p style="margin:0 0 6px;"><strong>Coordinator:</strong> ${escapeHtml(coordinatorName || "-")}</p>
+      <p style="margin:0 0 6px;"><strong>Coordinator:</strong> ${escapeHtml(coordinatorName || "Muhammad Adeel Hassan")}</p>
       <p style="margin:0 0 6px;"><strong>Coordinator Email:</strong> ${escapeHtml(coordinatorEmail || "-")}</p>
-      <p style="margin:0;"><strong>Coordinator WhatsApp:</strong> ${escapeHtml(coordinatorPhone || "+92 3473547036")}</p>
+      <p style="margin:0;"><strong>Coordinator WhatsApp:</strong> ${escapeHtml(coordinatorPhone || "+92 3101734369")}</p>
     </div>
   `;
 
@@ -502,9 +502,9 @@ export function buildPublicEventVerificationEmailHtml({
       ["Registration No", registrationNo],
       ["Event", eventName],
       ["Schedule", eventSchedule],
-      ["Coordinator", coordinatorName || "-"],
+      ["Coordinator", coordinatorName || "Muhammad Adeel Hassan"],
       ["Coordinator Email", coordinatorEmail || "-"],
-      ["Coordinator WhatsApp", coordinatorPhone || "+92 3473547036"],
+      ["Coordinator WhatsApp", coordinatorPhone || "+92 3101734369"],
     ],
   });
 }
