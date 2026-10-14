@@ -1614,7 +1614,7 @@ export default function EcceAssessmentsPage({ portal = "teacher", title = "ECCE 
   );
 
   return (
-    <div className="mx-auto w-full max-w-[1500px] space-y-8 px-4 py-6 sm:px-6 lg:px-8">
+    <div className="mx-auto flex min-h-[calc(100vh-5rem)] w-full max-w-[1500px] flex-col space-y-8 px-4 py-6 pb-16 sm:px-6 lg:px-8">
       {/* Themed Top-Right Success Toast Notification */}
       {successToast ? (
         <div

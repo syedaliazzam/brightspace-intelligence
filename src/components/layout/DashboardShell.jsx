@@ -37,7 +37,7 @@ export default function DashboardShell({ session, children }) {
 
   return (
     <DashboardSessionProvider session={session}>
-      <div className="min-h-screen bg-[linear-gradient(180deg,#f8fbff_0%,#eef4ff_100%)] text-slate-900">
+      <div className="min-h-screen bg-[#FAF7F0] text-slate-900">
         {!isStudent ? (
           <>
             <Sidebar
@@ -57,15 +57,15 @@ export default function DashboardShell({ session, children }) {
           </>
         ) : null}
 
-        <main className={`transition-[padding] duration-200 ${isStudent ? "pt-0" : `pt-20 ${collapsed ? "lg:pl-20" : "lg:pl-72"}`}`}>
+        <main className={`min-h-screen transition-[padding] duration-200 ${isStudent ? "pt-0" : `pt-20 ${collapsed ? "lg:pl-20" : "lg:pl-72"}`}`}>
           {!isStudent ? <div className="pt-0" /> : null}
-          <div className="px-0 pb-0 sm:px-0 lg:px-0">
+          <div className="flex min-h-[calc(100vh-5rem)] flex-col px-0 pb-0 sm:px-0 lg:px-0">
             {isStudent ? children : (
               <motion.section
                 initial={{ opacity: 0, y: 14 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.35 }}
-                className="border border-black/10 bg-[radial-gradient(circle_at_top_left,rgba(201,162,39,0.12),transparent_35%),radial-gradient(circle_at_top_right,rgba(45,138,106,0.12),transparent_32%),linear-gradient(180deg,#FAF7F0_0%,#F7F1E3_100%)] p-0 shadow-[0_24px_80px_-36px_rgba(15,23,42,0.25)] backdrop-blur-xl sm:p-0"
+                className="flex min-h-[calc(100vh-5rem)] flex-1 flex-col border-0 bg-[radial-gradient(circle_at_top_left,rgba(201,162,39,0.12),transparent_35%),radial-gradient(circle_at_top_right,rgba(45,138,106,0.12),transparent_32%),linear-gradient(180deg,#FAF7F0_0%,#F7F1E3_100%)] p-0 shadow-none backdrop-blur-xl sm:p-0"
               >
                 {children ?? (
                   <div className="grid gap-4 md:grid-cols-3">

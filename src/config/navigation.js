@@ -45,6 +45,7 @@ export const dashboardNavigation = {
     { label: "Admission Records", href: "/admin/registration-leads" },
     { label: "Scholarship", href: "/admin/need-based-scholarships" },
     { label: "Payments", href: "/admin/payments" },
+    { label: "ECCE Assessments", href: "/admin/ecce-assessments" },
     { label: "Careers Applications", href: "/admin/careers-applications" },
     {
       label: "User Management",
