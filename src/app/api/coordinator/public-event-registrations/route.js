@@ -25,6 +25,7 @@ export async function GET() {
         pe.title AS event_name,
         pe.start_at AS event_start_at,
         pe.end_at AS event_end_at,
+        COALESCE(pe.schedule_days, '[]'::jsonb) AS event_schedule_days,
         per.participant_name,
         per.student_name,
         per.student_names,
@@ -69,6 +70,7 @@ export async function GET() {
         pe.end_at,
         pe.event_fee_amount::float8 AS event_fee_amount,
         pe.registration_deadline,
+        COALESCE(pe.schedule_days, '[]'::jsonb) AS schedule_days,
         COALESCE(pe.registration_form_schema, '[]'::jsonb) AS registration_form_schema,
         LOWER(COALESCE(pe.publication_status::text, 'draft')) AS publication_status,
         pe.created_at

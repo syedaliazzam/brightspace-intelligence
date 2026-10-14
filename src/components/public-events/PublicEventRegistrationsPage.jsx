@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ChevronDown, Eye, Pencil, RotateCcw, Search } from "lucide-react";
-import { formatEventDate, formatEventDateTime, formatMoney, formatRegistrationStatusLabel, normalizeRegistrationStatus } from "@/lib/publicEvents";
+import { formatEventDate, formatEventDateTime, formatEventScheduleDates, formatMoney, formatRegistrationStatusLabel, normalizeRegistrationStatus } from "@/lib/publicEvents";
 
 const INITIAL_CREATE_FORM = {
   eventId: "",
@@ -463,6 +463,36 @@ function truncateSelectLabel(value, limit = 42) {
   return `${text.slice(0, Math.max(0, limit - 3)).trimEnd()}...`;
 }
 
+function ExpandableColumnText({ text, title, onReadMore }) {
+  const content = String(text ?? "").trim();
+  if (!content || content === "-") {
+    return <span className="block" title={content}>{content || "-"}</span>;
+  }
+
+  const words = content.split(/\s+/).filter(Boolean);
+  if (words.length <= 15) {
+    return <span className="block" title={content}>{content}</span>;
+  }
+
+  const truncatedText = `${words.slice(0, 15).join(" ")}...`;
+
+  return (
+    <span className="block">
+      <span title={content}>{truncatedText}</span>{" "}
+      <button
+        type="button"
+        onClick={(event) => {
+          event.stopPropagation();
+          onReadMore({ title: title || "Details", text: content });
+        }}
+        className="inline-flex items-center text-xs font-semibold text-[#0D5C48] underline underline-offset-2 hover:text-[#063F32] hover:no-underline cursor-pointer"
+      >
+        Read more
+      </button>
+    </span>
+  );
+}
+
 function compareDateThenText(leftDate, rightDate, leftText = "", rightText = "") {
   const leftTime = leftDate ? new Date(leftDate).getTime() : Number.MAX_SAFE_INTEGER;
   const rightTime = rightDate ? new Date(rightDate).getTime() : Number.MAX_SAFE_INTEGER;
@@ -560,7 +590,25 @@ export default function PublicEventRegistrationsPage({ portalLabel = "Coordinato
   const [openFilterSelect, setOpenFilterSelect] = useState("");
   const [page, setPage] = useState(1);
   const [filters, setFilters] = useState({ eventId: "all", status: "all", dateFrom: "", dateTo: "", search: "", sortBy: "submitted_at", sortDir: "desc" });
+  const [expandedTextMessage, setExpandedTextMessage] = useState(null);
   const didInitializeEventFilterRef = useRef(false);
+
+  useEffect(() => {
+    if (!expandedTextMessage) return;
+    const handleKeyDown = (event) => {
+      if (event.key === "Escape") setExpandedTextMessage(null);
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [expandedTextMessage]);
+
+  function getItemEventDates(item) {
+    if (!item) return "-";
+    const matchedEvent = events.find((e) => e.id === item.event_id);
+    const endAt = item.event_end_at ?? matchedEvent?.end_at;
+    const scheduleDays = item.event_schedule_days ?? matchedEvent?.schedule_days;
+    return formatEventScheduleDates(item.event_start_at, endAt, scheduleDays);
+  }
 
   async function load() {
     setLoading(true);
@@ -1264,11 +1312,17 @@ export default function PublicEventRegistrationsPage({ portalLabel = "Coordinato
                           {coordinatorRegistrationIdByItemId.get(String(item.id || "")) || "-"}
                         </td>
                       ) : null}
-                      <td className="whitespace-normal break-words px-6 py-4 font-medium leading-6 text-[#063F32]"><span className="block" title={item.event_name || ""}>{item.event_name}</span></td>
-                      <td className="overflow-hidden whitespace-nowrap px-6 py-4 text-[#245C4F]">{formatEventDate(item.event_start_at)}</td>
+                      <td className="whitespace-normal break-words px-6 py-4 font-medium leading-6 text-[#063F32]">
+                        <ExpandableColumnText text={item.event_name} title="Event" onReadMore={setExpandedTextMessage} />
+                      </td>
+                      <td className="overflow-hidden whitespace-nowrap px-6 py-4 text-[#245C4F]" title={getItemEventDates(item)}>{getItemEventDates(item)}</td>
                       {customRegistrationColumns.map((field) => {
                         const value = getCustomFieldValue(item, field.id);
-                        return <td key={field.id} className="whitespace-normal break-words px-6 py-4 text-[#245C4F]"><span className="block" title={value}>{value}</span></td>;
+                        return (
+                          <td key={field.id} className="whitespace-normal break-words px-6 py-4 text-[#245C4F]">
+                            <ExpandableColumnText text={value} title={field.label || field.id} onReadMore={setExpandedTextMessage} />
+                          </td>
+                        );
                       })}
                       {showReceivedAmountColumn ? (
                         <td className="overflow-hidden whitespace-nowrap px-6 py-4">
@@ -1941,6 +1995,7 @@ export default function PublicEventRegistrationsPage({ portalLabel = "Coordinato
                   <div className="rounded-2xl border border-[#2D8A6A]/12 bg-white px-4 py-4">
                     <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]">Event and verification</p>
                     <div className="mt-3 space-y-2">
+                      <p><span className="font-semibold text-[#063F32]">Event Date:</span> {getItemEventDates(selected)}</p>
                       <p><span className="font-semibold text-[#063F32]">Schedule:</span> {formatEventDateTime(selected.event_start_at)} to {formatEventDateTime(selected.event_end_at)}</p>
                       <p><span className="font-semibold text-[#063F32]">Submitted:</span> {formatEventDateTime(selected.submitted_at)}</p>
                       <p><span className="font-semibold text-[#063F32]">Verified at:</span> {formatEventDateTime(selected.verified_at)}</p>
@@ -1962,6 +2017,52 @@ export default function PublicEventRegistrationsPage({ portalLabel = "Coordinato
                     <p className="mt-3 whitespace-pre-line">{selected.notes}</p>
                   </div> : null}
                 </div>
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+        {expandedTextMessage ? (
+          <div
+            className="fixed inset-0 z-[10000] flex items-center justify-center overflow-y-auto bg-[#063F32]/45 px-4 py-6 backdrop-blur-sm"
+            onClick={() => setExpandedTextMessage(null)}
+          >
+            <div
+              className="w-full max-w-lg max-h-[calc(100vh-48px)] overflow-hidden rounded-[2rem] border border-[#2D8A6A]/15 bg-[#FAF7F0] shadow-[0_24px_80px_-36px_rgba(13,59,46,0.24)] flex flex-col"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-start justify-between gap-4 border-b border-[#F1EADC] px-6 py-4">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[#C9A227]">Full message</p>
+                  <h2 className="mt-1 text-xl font-semibold text-[#063F32] break-words">
+                    {expandedTextMessage.title || "Message details"}
+                  </h2>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setExpandedTextMessage(null)}
+                  className="rounded-xl border border-[#2D8A6A]/20 bg-[#FAF7F0] px-3 py-2 text-sm font-semibold text-[#063F32] transition hover:bg-[#F1EADC]"
+                >
+                  Close
+                </button>
+              </div>
+
+              <div className="overflow-y-auto p-6 max-h-[60vh]">
+                <div className="rounded-2xl border border-[#2D8A6A]/12 bg-white p-5">
+                  <p className="whitespace-pre-wrap break-words text-sm leading-relaxed text-[#245C4F]">
+                    {expandedTextMessage.text}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end border-t border-[#F1EADC] px-6 py-4">
+                <button
+                  type="button"
+                  onClick={() => setExpandedTextMessage(null)}
+                  className="rounded-full bg-[#0D5C48] px-5 py-2 text-sm font-semibold text-[#FAF7F0] transition hover:bg-[#063F32]"
+                >
+                  Close
+                </button>
               </div>
             </div>
           </div>

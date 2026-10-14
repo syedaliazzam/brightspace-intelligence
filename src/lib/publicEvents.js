@@ -89,7 +89,10 @@ export function formatEventDateTime(value) {
   }).format(date);
 }
 
-export function formatEventDate(value) {
+export function formatEventDate(value, endAt, scheduleDays) {
+  if (endAt || scheduleDays) {
+    return formatEventScheduleDates(value, endAt, scheduleDays);
+  }
   if (!value) return "-";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "-";
@@ -97,6 +100,188 @@ export function formatEventDate(value) {
   return new Intl.DateTimeFormat("en-PK", {
     dateStyle: "medium",
   }).format(date);
+}
+
+const WEEKDAY_MAP = {
+  sun: 0, sunday: 0, su: 0,
+  mon: 1, monday: 1, mo: 1,
+  tue: 2, tuesday: 2, tu: 2,
+  wed: 3, wednesday: 3, we: 3,
+  thu: 4, thursday: 4, th: 4,
+  fri: 5, friday: 5, fr: 5,
+  sat: 6, saturday: 6, sa: 6,
+};
+
+function getPKTDateParts(dateInput) {
+  const d = new Date(dateInput);
+  if (Number.isNaN(d.getTime())) return null;
+  const utcMillis = d.getTime() + d.getTimezoneOffset() * 60000;
+  const pktMillis = utcMillis + 5 * 3600000;
+  const pktDate = new Date(pktMillis);
+  return {
+    year: pktDate.getFullYear(),
+    month: pktDate.getMonth(),
+    date: pktDate.getDate(),
+    day: pktDate.getDay(),
+  };
+}
+
+export function parseScheduleDays(scheduleDays) {
+  if (Array.isArray(scheduleDays)) {
+    return scheduleDays.map((d) => (typeof d === "string" ? d.trim() : "")).filter(Boolean);
+  }
+  if (typeof scheduleDays === "string" && scheduleDays.trim()) {
+    try {
+      const parsed = JSON.parse(scheduleDays);
+      if (Array.isArray(parsed)) {
+        return parsed.map((d) => String(d).trim()).filter(Boolean);
+      }
+    } catch {}
+    const trimmed = scheduleDays.replace(/[\[\]"']/g, "").trim();
+    if (trimmed) {
+      return trimmed.split(",").map((d) => d.trim()).filter(Boolean);
+    }
+  }
+  return [];
+}
+
+export function getEventSessionDates(startAt, endAt, scheduleDays) {
+  if (!startAt) return [];
+  const startPkt = getPKTDateParts(startAt);
+  if (!startPkt) return [];
+  const endPkt = endAt ? getPKTDateParts(endAt) : startPkt;
+
+  const parsedDays = parseScheduleDays(scheduleDays);
+  const weekdaySet = new Set();
+  const explicitDates = [];
+
+  for (const item of parsedDays) {
+    if (!item) continue;
+    const clean = item.toLowerCase();
+    if (WEEKDAY_MAP[clean] !== undefined) {
+      weekdaySet.add(WEEKDAY_MAP[clean]);
+    } else {
+      const parsed = new Date(item);
+      if (!Number.isNaN(parsed.getTime())) {
+        explicitDates.push(parsed);
+      }
+    }
+  }
+
+  if (explicitDates.length > 0 && weekdaySet.size === 0) {
+    return explicitDates.sort((a, b) => a.getTime() - b.getTime());
+  }
+
+  if (weekdaySet.size > 0 && endPkt) {
+    const dates = [];
+    const cur = new Date(Date.UTC(startPkt.year, startPkt.month, startPkt.date));
+    const end = new Date(Date.UTC(endPkt.year, endPkt.month, endPkt.date));
+
+    while (cur <= end) {
+      if (weekdaySet.has(cur.getUTCDay())) {
+        dates.push(new Date(cur.getTime()));
+      }
+      cur.setUTCDate(cur.getUTCDate() + 1);
+    }
+    if (dates.length > 0) return dates;
+  }
+
+  if (
+    endPkt &&
+    (startPkt.year !== endPkt.year ||
+      startPkt.month !== endPkt.month ||
+      startPkt.date !== endPkt.date)
+  ) {
+    const cur = new Date(Date.UTC(startPkt.year, startPkt.month, startPkt.date));
+    const end = new Date(Date.UTC(endPkt.year, endPkt.month, endPkt.date));
+    const diffDays = Math.round((end.getTime() - cur.getTime()) / 86400000);
+    if (diffDays <= 4) {
+      const dates = [];
+      while (cur <= end) {
+        dates.push(new Date(cur.getTime()));
+        cur.setUTCDate(cur.getUTCDate() + 1);
+      }
+      return dates;
+    }
+    return [
+      new Date(Date.UTC(startPkt.year, startPkt.month, startPkt.date)),
+      new Date(Date.UTC(endPkt.year, endPkt.month, endPkt.date)),
+    ];
+  }
+
+  return [new Date(Date.UTC(startPkt.year, startPkt.month, startPkt.date))];
+}
+
+export function formatEventScheduleDates(startAtOrEvent, endAt, scheduleDays) {
+  let start = startAtOrEvent;
+  let end = endAt;
+  let days = scheduleDays;
+
+  if (startAtOrEvent && typeof startAtOrEvent === "object" && !(startAtOrEvent instanceof Date)) {
+    start = startAtOrEvent.start_at || startAtOrEvent.event_start_at || startAtOrEvent.startAt;
+    end = startAtOrEvent.end_at || startAtOrEvent.event_end_at || startAtOrEvent.endAt;
+    days = startAtOrEvent.schedule_days || startAtOrEvent.event_schedule_days || startAtOrEvent.scheduleDays;
+  }
+
+  if (!start) return "-";
+  const sessionDates = getEventSessionDates(start, end, days);
+  if (!sessionDates.length) {
+    const d = new Date(start);
+    return Number.isNaN(d.getTime()) ? "-" : new Intl.DateTimeFormat("en-PK", { dateStyle: "medium" }).format(d);
+  }
+
+  const formatSingle = (date) => new Intl.DateTimeFormat("en-PK", { dateStyle: "medium", timeZone: "UTC" }).format(date);
+
+  if (sessionDates.length === 1) {
+    return formatSingle(sessionDates[0]);
+  }
+
+  const firstYear = sessionDates[0].getUTCFullYear();
+  const allSameYear = sessionDates.every((d) => d.getUTCFullYear() === firstYear);
+  const firstMonth = sessionDates[0].getUTCMonth();
+  const allSameMonthAndYear = allSameYear && sessionDates.every((d) => d.getUTCMonth() === firstMonth);
+
+  const monthName = new Intl.DateTimeFormat("en-PK", {
+    month: "short",
+    timeZone: "UTC",
+  }).format(sessionDates[0]);
+
+  if (allSameMonthAndYear) {
+    const dayNumbers = sessionDates.map((d) => d.getUTCDate());
+    if (dayNumbers.length === 2) {
+      return `${dayNumbers[0]} & ${dayNumbers[1]}-${monthName}-${firstYear}`;
+    }
+    const allButLast = dayNumbers.slice(0, -1).join(", ");
+    const last = dayNumbers[dayNumbers.length - 1];
+    return `${allButLast} & ${last}-${monthName}-${firstYear}`;
+  }
+
+  if (allSameYear) {
+    const groups = new Map();
+    for (const d of sessionDates) {
+      const m = d.getUTCMonth();
+      if (!groups.has(m)) {
+        groups.set(m, {
+          monthStr: new Intl.DateTimeFormat("en-PK", { month: "short", timeZone: "UTC" }).format(d),
+          days: [],
+        });
+      }
+      groups.get(m).days.push(d.getUTCDate());
+    }
+    const parts = [];
+    for (const { monthStr, days } of groups.values()) {
+      if (days.length === 1) {
+        parts.push(`${days[0]}-${monthStr}`);
+      } else if (days.length === 2) {
+        parts.push(`${days[0]} & ${days[1]}-${monthStr}`);
+      } else {
+        parts.push(`${days.slice(0, -1).join(", ")} & ${days[days.length - 1]}-${monthStr}`);
+      }
+    }
+    return `${parts.join(" & ")}-${firstYear}`;
+  }
+
+  return sessionDates.map(formatSingle).join(", ");
 }
 
 export function formatMoney(value) {
