@@ -33,6 +33,21 @@ function writeMonthlyPlansCache(items) {
   }
 }
 
+function parsePlanDate(value) {
+  if (!value) return null;
+  if (value instanceof Date) return value;
+  const str = String(value).trim();
+  const match = str.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (match) {
+    const year = parseInt(match[1], 10);
+    const month = parseInt(match[2], 10) - 1;
+    const day = parseInt(match[3], 10);
+    return new Date(year, month, day);
+  }
+  const d = new Date(str);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
 export default function MonthlyPlanSlider() {
   const [plans, setPlans] = useState([]);
   const [currentPlan, setCurrentPlan] = useState(null);
@@ -63,9 +78,8 @@ export default function MonthlyPlanSlider() {
 
         // Filter out future/forward months — only include plans up to the current month
         const eligiblePlans = items.filter((item) => {
-          if (!item?.start_date) return false;
-          const startDate = new Date(item.start_date);
-          if (Number.isNaN(startDate.getTime())) return false;
+          const startDate = parsePlanDate(item?.start_date);
+          if (!startDate) return false;
 
           const itemYear = startDate.getFullYear();
           const itemMonth = startDate.getMonth();
@@ -77,14 +91,15 @@ export default function MonthlyPlanSlider() {
 
         // Sort in strict sequence from newest/current month down to previous months
         const sortedPlans = eligiblePlans.sort((a, b) => {
-          const timeA = new Date(a.start_date).getTime();
-          const timeB = new Date(b.start_date).getTime();
+          const timeA = parsePlanDate(a.start_date)?.getTime() || 0;
+          const timeB = parsePlanDate(b.start_date)?.getTime() || 0;
           return timeB - timeA;
         });
 
         const currentMonthPlan = sortedPlans.find((item) => {
-          const startDate = new Date(item.start_date);
-          const endDate = new Date(item.end_date);
+          const startDate = parsePlanDate(item.start_date);
+          const endDate = parsePlanDate(item.end_date);
+          if (!startDate || !endDate) return false;
 
           const startInCurrentMonth =
             startDate.getMonth() === currentMonth && startDate.getFullYear() === currentYear;
@@ -116,9 +131,7 @@ export default function MonthlyPlanSlider() {
     if (/^https?:\/\//i.test(text) || text.startsWith("blob:") || text.startsWith("data:")) return text;
     return `/api/file-preview?path=${encodeURIComponent(text)}`;
   };
-  const monthName = currentPlan?.start_date
-    ? new Date(currentPlan.start_date).toLocaleDateString("en-US", { month: "long", year: "numeric" })
-    : new Date().toLocaleDateString("en-US", { month: "long", year: "numeric" });
+  const monthName = new Date().toLocaleDateString("en-US", { month: "long", year: "numeric" });
 
   const scrollToIndex = useCallback((index) => {
     const scroller = scrollerRef.current;
