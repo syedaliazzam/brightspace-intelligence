@@ -1,11 +1,11 @@
-import EcceAssessmentsPage from "@/components/ecce/EcceAssessmentsPage";
+import AssessmentPortalWrapper from "@/components/assessments/AssessmentPortalWrapper";
 
 export default function StudentEcceAssessmentsPage() {
   return (
-    <EcceAssessmentsPage
+    <AssessmentPortalWrapper
       portal="student"
       title="My Learning Progress"
-      description="View your published ECCE assessment reports and progress summary."
+      description="View your published ECCE assessment reports and Term Assessments."
     />
   );
 }

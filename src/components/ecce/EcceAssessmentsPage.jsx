@@ -569,7 +569,13 @@ function getStoredPrefill() {
   return null;
 }
 
-export default function EcceAssessmentsPage({ portal = "teacher", title = "ECCE Assessments", description = "Complete, review, and share official ECCE assessment reports.", showTeacherForm = true }) {
+export default function EcceAssessmentsPage({
+  portal = "teacher",
+  title = "ECCE Assessments",
+  description = "Complete, review, and share official ECCE assessment reports.",
+  showTeacherForm = true,
+  hideHero = false,
+}) {
   const router = useRouter();
   const isTeacher = portal === "teacher";
   const canShowTeacherForm = isTeacher && showTeacherForm;
@@ -1614,7 +1620,7 @@ export default function EcceAssessmentsPage({ portal = "teacher", title = "ECCE 
   );
 
   return (
-    <div className="mx-auto flex min-h-[calc(100vh-5rem)] w-full max-w-[1500px] flex-col space-y-8 px-4 py-6 pb-16 sm:px-6 lg:px-8">
+    <div className={`mx-auto flex w-full max-w-[1500px] flex-col space-y-6 ${hideHero ? "" : "min-h-[calc(100vh-5rem)] px-4 py-6 pb-16 sm:px-6 lg:px-8"}`}>
       {/* Themed Top-Right Success Toast Notification */}
       {successToast ? (
         <div
@@ -1645,11 +1651,13 @@ export default function EcceAssessmentsPage({ portal = "teacher", title = "ECCE 
         </div>
       ) : null}
 
-      <section className="rounded-[2rem] border border-[#2D8A6A]/15 bg-[linear-gradient(135deg,#0F4C3A_0%,#0B3D30_100%)] p-8 text-white shadow-[0_24px_70px_-35px_rgba(15,76,58,.8)]">
-        <p className="text-xs font-black uppercase tracking-[0.35em] text-[#E4C766]">ECCE Assessment</p>
-        <h1 className="mt-3 text-3xl font-black">{title}</h1>
-        <p className="mt-3 max-w-3xl text-sm font-semibold text-white/85">{description}</p>
-      </section>
+      {!hideHero && (
+        <section className="rounded-[2rem] border border-[#2D8A6A]/15 bg-[linear-gradient(135deg,#0F4C3A_0%,#0B3D30_100%)] p-8 text-white shadow-[0_24px_70px_-35px_rgba(15,76,58,.8)]">
+          <p className="text-xs font-black uppercase tracking-[0.35em] text-[#E4C766]">ECCE Assessment</p>
+          <h1 className="mt-3 text-3xl font-black">{title}</h1>
+          <p className="mt-3 max-w-3xl text-sm font-semibold text-white/85">{description}</p>
+        </section>
+      )}
 
       {message ? (
         <div className="rounded-[1.25rem] border border-[#C79A3B]/30 bg-[#FFF8E4] px-5 py-4 text-sm font-bold text-[#0F4C3A]">

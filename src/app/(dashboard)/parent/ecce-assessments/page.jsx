@@ -1,11 +1,11 @@
-import EcceAssessmentsPage from "@/components/ecce/EcceAssessmentsPage";
+import AssessmentPortalWrapper from "@/components/assessments/AssessmentPortalWrapper";
 
 export default function ParentEcceAssessmentsPage() {
   return (
-    <EcceAssessmentsPage
+    <AssessmentPortalWrapper
       portal="parent"
       title="Assessment Reports"
-      description="View published ECCE assessment reports for your child."
+      description="View published ECCE assessment reports and Term Assessments for your child."
     />
   );
 }
