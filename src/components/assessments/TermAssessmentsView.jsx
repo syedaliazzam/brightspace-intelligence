@@ -10,7 +10,7 @@ import {
   Download,
 } from "lucide-react";
 import PizzaPieChart, { getAreaChartData } from "@/components/assessments/PizzaPieChart";
-import { downloadTermAssessmentPdf } from "@/lib/termAssessmentPdf";
+import { downloadTermAssessmentPdf, getAssessmentDisplayTerm } from "@/lib/termAssessmentPdf";
 
 function formatScore(rawScore) {
   const num = Number(rawScore);
@@ -124,7 +124,7 @@ export default function TermAssessmentsView({
                     <p className="text-xs text-[#EAF6EF]">Learning Areas</p>
                   </div>
                   <div className="rounded-2xl border border-[#E4C766]/30 bg-[#FAF7F0]/10 px-4 py-3">
-                    <p className="font-semibold text-lg">{activeAssessment.term}</p>
+                    <p className="font-semibold text-lg">{getAssessmentDisplayTerm(activeAssessment)}</p>
                     <p className="text-xs text-[#EAF6EF]">{activeAssessment.academic_year}</p>
                   </div>
                 </div>
@@ -172,7 +172,7 @@ export default function TermAssessmentsView({
                 ) : portal === "student" ? (
                   assessments.map((a) => (
                     <option key={a.id} value={a.id}>
-                      {a.term} ({a.academic_year}) {a.template_name ? `• ${a.template_name}` : ""}
+                      {getAssessmentDisplayTerm(a)} ({a.academic_year})
                     </option>
                   ))
                 ) : assessments.length === 1 ? (
@@ -184,7 +184,7 @@ export default function TermAssessmentsView({
                     <option value="">-- Select Child --</option>
                     {assessments.map((a) => (
                       <option key={a.id} value={a.id}>
-                        {a.student_name} {a.class_name ? `• ${a.class_name}` : ""} • {a.term} ({a.academic_year})
+                        {a.student_name} {a.class_name ? `• ${a.class_name}` : ""} • {getAssessmentDisplayTerm(a)} ({a.academic_year})
                       </option>
                     ))}
                   </>
@@ -266,12 +266,12 @@ export default function TermAssessmentsView({
                   <span>{downloading ? "Preparing PDF..." : "Download Report"}</span>
                 </button>
 
-                <div className="rounded-2xl border border-[#2D8A6A]/15 bg-white px-5 py-3 text-right shadow-2xs">
+                <div className="rounded-2xl border border-[#2D8A6A]/15 bg-white px-5 py-3 text-left shadow-2xs">
                   <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]">
                     Assessment Term
                   </p>
                   <p className="mt-0.5 text-sm font-bold text-[#063F32]">
-                    {activeAssessment.term} ({activeAssessment.academic_year})
+                    {getAssessmentDisplayTerm(activeAssessment)} ({activeAssessment.academic_year})
                   </p>
                 </div>
               </div>

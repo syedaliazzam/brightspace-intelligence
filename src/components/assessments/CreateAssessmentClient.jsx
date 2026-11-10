@@ -15,7 +15,7 @@ import {
   X,
 } from "lucide-react";
 import PizzaPieChart, { getAreaChartData } from "@/components/assessments/PizzaPieChart";
-import { downloadTermAssessmentPdf } from "@/lib/termAssessmentPdf";
+import { downloadTermAssessmentPdf, getAssessmentDisplayTerm } from "@/lib/termAssessmentPdf";
 
 const OBSERVATION_OPTIONS = ["Achieved", "Developing", "Emerging", "Needs Support"];
 
@@ -171,17 +171,7 @@ export default function CreateAssessmentClient({
 
     setAssessmentName(tmpl.name || "");
     setAcademicYear(tmpl.academic_year || "2025-2026");
-
-    const nameLower = (tmpl.name || "").toLowerCase();
-    if (nameLower.includes("final")) {
-      setTerm("Final Term");
-    } else if (nameLower.includes("mid")) {
-      setTerm("Mid Term");
-    } else if (nameLower.includes("term 2")) {
-      setTerm("Term 2");
-    } else {
-      setTerm("Term 1");
-    }
+    setTerm(tmpl.name || "Term 1");
 
     const areas = Array.isArray(tmpl.learning_areas)
       ? tmpl.learning_areas
@@ -560,7 +550,7 @@ export default function CreateAssessmentClient({
                       {item.template_name || "Custom Assessment"}
                     </td>
                     <td className="px-6 py-4 text-[#245C4F] whitespace-nowrap">
-                      {item.term} ({item.academic_year})
+                      {getAssessmentDisplayTerm(item)} ({item.academic_year})
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span
@@ -949,7 +939,7 @@ export default function CreateAssessmentClient({
             <div className="flex items-start justify-between gap-4 border-b border-[#2D8A6A]/10 px-6 py-5">
               <div>
                 <span className="inline-flex rounded-full border border-[#E4C766]/30 bg-[#FFF5D6]/35 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-[#0D5C48]">
-                  {previewItem.class_name} • {previewItem.term} ({previewItem.academic_year})
+                  {previewItem.class_name} • {getAssessmentDisplayTerm(previewItem)} ({previewItem.academic_year})
                 </span>
                 <h2 className="mt-2 text-2xl font-semibold tracking-tight text-[#063F32]">
                   {previewItem.student_name}

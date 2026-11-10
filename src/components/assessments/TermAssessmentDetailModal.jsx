@@ -4,7 +4,7 @@ import React, { useEffect, useState } from "react";
 import { X, Award, CheckCircle2, Download, RefreshCw } from "lucide-react";
 import ClientPortal from "@/components/shared/ClientPortal";
 import PizzaPieChart, { getAreaChartData } from "@/components/assessments/PizzaPieChart";
-import { downloadTermAssessmentPdf } from "@/lib/termAssessmentPdf";
+import { downloadTermAssessmentPdf, getAssessmentDisplayTerm } from "@/lib/termAssessmentPdf";
 
 function formatScore(rawScore) {
   const num = Number(rawScore);
@@ -59,7 +59,7 @@ export default function TermAssessmentDetailModal({ item, onClose }) {
                   Term Assessment
                 </span>
                 <span className="inline-flex rounded-full border border-[#E4C766]/40 bg-[#FFF5D6] px-3 py-1 text-[11px] font-bold uppercase tracking-[0.16em] text-[#7A5E2B]">
-                  {item.term} ({item.academic_year || "Current Year"})
+                  {getAssessmentDisplayTerm(item)} ({item.academic_year || "Current Year"})
                 </span>
               </div>
               <h2 className="mt-2 text-2xl font-bold tracking-tight text-[#063F32]">

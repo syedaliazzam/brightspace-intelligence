@@ -1,6 +1,22 @@
 import { jsPDF } from "jspdf";
 import { getAreaChartData } from "@/components/assessments/PizzaPieChart";
 
+/**
+ * Returns the canonical term/assessment display name (preferring template_name / assessment_name over legacy generic term fallback).
+ */
+export function getAssessmentDisplayTerm(item) {
+  if (!item) return "Term Assessment";
+  const tName = String(item.template_name || "").trim();
+  if (tName && tName !== "Custom Assessment") {
+    return tName;
+  }
+  const aName = String(item.assessment_name || "").trim();
+  if (aName && aName !== "Custom Assessment") {
+    return aName;
+  }
+  return String(item.term || "").trim() || "Term Assessment";
+}
+
 function formatScore(rawScore) {
   const num = Number(rawScore);
   if (isNaN(num)) return "0%";
@@ -262,7 +278,7 @@ export function renderTermAssessmentCanvases(item, scale = 2.5) {
   const className = item.class_name || "";
   const rollNo = item.admission_no || "";
   const academicYear = item.academic_year || "Current Year";
-  const term = item.term || "Term Assessment";
+  const term = getAssessmentDisplayTerm(item);
   const teacherRemarks = String(item.teacher_remarks || "").trim();
 
   const records = Array.isArray(item.records)
@@ -659,11 +675,11 @@ export function renderTermAssessmentCanvases(item, scale = 2.5) {
 
     ctx.font = `700 9px ${fontFamily}`;
     ctx.fillStyle = "#E4C766";
-    drawOpticalText(ctx, termTitle, termBoxX + termBoxW - 16, hdrCenterY - 8.5, "right", 1.2);
+    drawOpticalText(ctx, termTitle, termBoxX + 16, hdrCenterY - 8.5, "left", 1.2);
 
     ctx.font = `700 12.5px ${fontFamily}`;
     ctx.fillStyle = "#FAF7F0";
-    drawOpticalText(ctx, termVal, termBoxX + termBoxW - 16, hdrCenterY + 9, "right");
+    drawOpticalText(ctx, termVal, termBoxX + 16, hdrCenterY + 9, "left");
 
     cursorY += hdrH;
 
@@ -1030,7 +1046,7 @@ export function renderTermAssessmentCanvases(item, scale = 2.5) {
     ctx.fillStyle = "#0D5C48";
     drawOpticalText(
       ctx,
-      `Ash-Shajrah School System • Term Assessment Report • Page ${pIdx + 1} of ${totalPages}`,
+      `Ash-Shajrah Learning Hub • ${term} • Page ${pIdx + 1} of ${totalPages}`,
       PAGE_W / 2,
       FOOTER_Y,
       "center"
@@ -1077,7 +1093,7 @@ export async function downloadTermAssessmentPdf(item) {
   }
 
   const studentName = item.student_name || "Student";
-  const term = item.term || "Assessment";
+  const term = getAssessmentDisplayTerm(item);
   const cleanName = String(studentName).trim().replace(/[^a-zA-Z0-9_-]/g, "_");
   const cleanTerm = String(term).trim().replace(/[^a-zA-Z0-9_-]/g, "_");
   const fileName = `Term_Assessment_${cleanName}_${cleanTerm}.pdf`;

@@ -16,7 +16,7 @@ import PaginationControls from "@/components/teacher/PaginationControls";
 import EcceAssessmentDetailModal from "./EcceAssessmentDetailModal";
 import TermAssessmentDetailModal from "@/components/assessments/TermAssessmentDetailModal";
 import { downloadAssessmentPdf } from "@/lib/ecceAssessmentPdf";
-import { downloadTermAssessmentPdf } from "@/lib/termAssessmentPdf";
+import { downloadTermAssessmentPdf, getAssessmentDisplayTerm } from "@/lib/termAssessmentPdf";
 import { ECCE_SECTIONS } from "@/lib/ecceAssessmentTemplate";
 
 function formatDate(value) {
@@ -92,7 +92,7 @@ export default function StudentAssessmentsSection() {
               assessmentType: "term",
               typeBadge: "Term Assessment",
               academic_year: item.academic_year || "Current Year",
-              term: item.term || "Term Assessment",
+              term: getAssessmentDisplayTerm(item),
               class_name: item.class_name || "—",
               remarks: item.teacher_remarks || "",
               published_at: item.updated_at || item.created_at,
