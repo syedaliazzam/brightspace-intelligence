@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { ChevronDown, Plus, Trash2, Edit2, Search, FileImage, FileVideo, FileText, File } from "lucide-react";
 import ClientPortal from "@/components/shared/ClientPortal";
 import PaginationControls from "@/components/teacher/PaginationControls";
-import { STORAGE_SAFE_UPLOAD_MAX_BYTES, formatUploadLimit } from "@/lib/uploadLimits";
+import { LIBRARY_UPLOAD_MAX_BYTES, formatUploadLimit } from "@/lib/uploadLimits";
 
 const PAGE_SIZE = 7;
 const LIBRARY_CACHE_TTL_MS = 60 * 1000;
@@ -56,7 +56,7 @@ function buildPreviewUrl(value) {
 }
 
 function filterAllowedFiles(files) {
-  return Array.from(files || []).filter((file) => Number(file?.size || 0) <= STORAGE_SAFE_UPLOAD_MAX_BYTES);
+  return Array.from(files || []).filter((file) => Number(file?.size || 0) <= LIBRARY_UPLOAD_MAX_BYTES);
 }
 
 function normalizeIdList(value, fallback = []) {
@@ -156,6 +156,9 @@ async function uploadLibraryAsset(file) {
 
   if (!uploadResponse.ok) {
     const text = await uploadResponse.text().catch(() => "");
+    if (text.includes("EntityTooLarge") || text.includes("Payload too large") || uploadResponse.status === 413) {
+      throw new Error(`"${file.name}" exceeds Supabase storage upload limit (Free tier is max 50 MB; on Pro tier, please check bucket file size limit in Supabase Dashboard).`);
+    }
     throw new Error(text || "Unable to upload document file.");
   }
 
@@ -293,9 +296,9 @@ export default function LibraryPageShell({
       return;
     }
 
-    const oversizedFile = selectedFiles.find((file) => Number(file?.size || 0) > STORAGE_SAFE_UPLOAD_MAX_BYTES);
+    const oversizedFile = selectedFiles.find((file) => Number(file?.size || 0) > LIBRARY_UPLOAD_MAX_BYTES);
     if (oversizedFile) {
-      setError(`One selected file is too large. Please upload files smaller than ${formatUploadLimit()}.`);
+      setError(`One selected file is too large. Please upload files smaller than ${formatUploadLimit(LIBRARY_UPLOAD_MAX_BYTES)}.`);
       return;
     }
 
@@ -785,7 +788,7 @@ export default function LibraryPageShell({
                         <Plus size={20} />
                       </div>
                       <span className="text-sm font-semibold text-[#063F32]">Click to upload files</span>
-                      <p className="mt-1 text-xs text-[#245C4F]">Maximum file size: {formatUploadLimit()} per file. Attach multiple files if needed.</p>
+                      <p className="mt-1 text-xs text-[#245C4F]">Maximum file size: {formatUploadLimit(LIBRARY_UPLOAD_MAX_BYTES)} per file. Attach multiple files if needed.</p>
                     </div>
                     <input
                       type="file"
@@ -795,7 +798,7 @@ export default function LibraryPageShell({
                         const files = Array.from(e.target.files || []);
                         const allowedFiles = filterAllowedFiles(files);
                         if (allowedFiles.length !== files.length) {
-                          setError(`One or more selected files are too large. Please upload files smaller than ${formatUploadLimit()}.`);
+                          setError(`One or more selected files are too large. Please upload files smaller than ${formatUploadLimit(LIBRARY_UPLOAD_MAX_BYTES)}.`);
                         }
                         setSelectedFiles([...selectedFiles, ...allowedFiles]);
                         e.target.value = null; // reset input
