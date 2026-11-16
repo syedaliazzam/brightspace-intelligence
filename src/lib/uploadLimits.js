@@ -1,5 +1,5 @@
 export const STORAGE_SAFE_UPLOAD_MAX_BYTES = 10 * 1024 * 1024;
-export const LIBRARY_UPLOAD_MAX_BYTES = 500 * 1024 * 1024;
+export const LIBRARY_UPLOAD_MAX_BYTES = 600 * 1024 * 1024;
 
 export function formatUploadLimit(maxBytes = STORAGE_SAFE_UPLOAD_MAX_BYTES) {
   const sizeInMb = maxBytes / (1024 * 1024);
