@@ -94,6 +94,16 @@ function mapPublicEvents(items = []) {
     const start = parseDateTime(item?.start_at || item?.startAt);
     const end = parseDateTime(item?.end_at || item?.endAt);
     const events = [];
+    const eventMode = item?.event_type || (item?.meet_link ? "online" : (item?.location ? "physical" : "online"));
+    const isPhysical = eventMode === "physical";
+    const subtitle = isPhysical
+      ? (item?.location ? `Location: ${item.location}` : "In-Person Event")
+      : (item?.publication_status || "Public event");
+    const typeLabel = isPhysical ? "Public Event (In-Person)" : "Public";
+    const meetLink = isPhysical ? "" : (item?.meet_link || item?.google_meet_link || item?.meeting_link || "");
+    const recordingLink = isPhysical ? "" : (item?.recording_drive_url || item?.recording_link || item?.event_detail_link?.href || "");
+    const recordingKind = isPhysical ? "" : (item?.recording_drive_url ? "recording" : item?.event_detail_link?.kind || "");
+    const recordingLabel = isPhysical ? "" : (item?.recording_drive_url ? "View Recording" : item?.event_detail_link?.label || "");
 
     if (start && end) {
       const cursor = new Date(start);
@@ -128,14 +138,16 @@ function mapPublicEvents(items = []) {
           textColor: "#FFFFFF",
           extendedProps: {
             type: "public-events",
-            typeLabel: "Public",
-            subtitle: item?.publication_status || "Public event",
-            meetLink: item?.meet_link || item?.google_meet_link || item?.meeting_link || "",
-            recordingLink: item?.recording_drive_url || item?.recording_link || item?.event_detail_link?.href || "",
-            recordingKind: item?.recording_drive_url ? "recording" : item?.event_detail_link?.kind || "",
-            recordingLabel: item?.recording_drive_url ? "View Recording" : item?.event_detail_link?.label || "",
+            typeLabel,
+            subtitle,
+            meetLink,
+            recordingLink,
+            recordingKind,
+            recordingLabel,
             eventId: item?.id,
             eventType: "public-events",
+            eventMode,
+            location: item?.location || "",
           },
         });
 
@@ -155,14 +167,16 @@ function mapPublicEvents(items = []) {
           textColor: "#FFFFFF",
           extendedProps: {
             type: "public-events",
-            typeLabel: "Public",
-            subtitle: item?.publication_status || "Public event",
-            meetLink: item?.meet_link || item?.google_meet_link || item?.meeting_link || "",
-            recordingLink: item?.recording_drive_url || item?.recording_link || item?.event_detail_link?.href || "",
-            recordingKind: item?.recording_drive_url ? "recording" : item?.event_detail_link?.kind || "",
-            recordingLabel: item?.recording_drive_url ? "View Recording" : item?.event_detail_link?.label || "",
+            typeLabel,
+            subtitle,
+            meetLink,
+            recordingLink,
+            recordingKind,
+            recordingLabel,
             eventId: item?.id,
             eventType: "public-events",
+            eventMode,
+            location: item?.location || "",
           },
         }];
   });
@@ -264,8 +278,10 @@ export default function TeacherEventsCalendarPage() {
   const resolvedRecordingLabel = selectedEvent?.extendedProps?.recordingLabel || "View Recording";
   const resolvedRecordingKind = selectedEvent?.extendedProps?.recordingKind || "";
   const isClassEvent = selectedEvent?.extendedProps?.eventType === "class-schedulers";
+  const isPhysicalEvent = selectedEvent?.extendedProps?.eventMode === "physical";
   const showRecordingActionLink = Boolean(
-    resolvedRecordingLink &&
+    !isPhysicalEvent &&
+      resolvedRecordingLink &&
       resolvedRecordingLink !== selectedEvent?.extendedProps?.meetLink &&
       (!isClassEvent || resolvedRecordingKind === "recording")
   );
@@ -396,11 +412,20 @@ export default function TeacherEventsCalendarPage() {
                 )}
                 <p><strong className="text-[#063F32]">Start:</strong> {selectedEvent.start?.toLocaleString() || "N/A"}</p>
                 <p><strong className="text-[#063F32]">End:</strong> {selectedEvent.end?.toLocaleString() || "N/A"}</p>
-                {selectedEvent.extendedProps?.meetLink && (
+                {selectedEvent.extendedProps?.eventMode === "physical" ? (
+                  <div className="rounded-2xl border border-[#2D8A6A]/15 bg-[#FAF7F0] p-4">
+                    <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#C9A227]">Event Venue / Location</p>
+                    <p className="mt-2 font-semibold text-[#063F32]">
+                      {selectedEvent.extendedProps?.location || "Physical Event"}
+                    </p>
+                  </div>
+                ) : selectedEvent.extendedProps?.meetLink ? (
                   <div className="rounded-2xl border border-[#2D8A6A]/15 bg-[#FAF7F0] p-4">
                     <div className="flex flex-col gap-3">
                       <div>
-                        <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#C9A227]">Class Joining Link</p>
+                        <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#C9A227]">
+                          {isClassEvent ? "Class Joining Link" : "Event Joining Link"}
+                        </p>
                         <p className="mt-2 break-all text-sm text-[#245C4F]">{selectedEvent.extendedProps.meetLink}</p>
                       </div>
                       <div className="flex flex-wrap gap-2">
@@ -421,12 +446,12 @@ export default function TeacherEventsCalendarPage() {
                           rel="noreferrer"
                           className="inline-flex rounded-full bg-[linear-gradient(135deg,#0D3B2E,#0D5C48)] px-4 py-2 text-sm font-semibold text-[#FFF5D6]"
                         >
-                          Join Class
+                          {isClassEvent ? "Join Class" : "Join Event"}
                         </a>
                       </div>
                     </div>
                   </div>
-                )}
+                ) : null}
                 {showRecordingActionLink ? (
                   <a
                     href={resolvedRecordingLink}

@@ -432,6 +432,8 @@ function normalizeEventCategory(value) {
 
 function isEventRegistrationOpen(eventItem) {
   if (!eventItem) return false;
+  const eventMode = eventItem.event_type || (eventItem.meet_link ? "online" : (eventItem.location ? "physical" : "online"));
+  if (eventMode === "physical") return false;
   const now = Date.now();
   const deadline = eventItem.registration_deadline ? new Date(eventItem.registration_deadline).getTime() : NaN;
   const endTime = eventItem.end_at ? new Date(eventItem.end_at).getTime() : NaN;
@@ -722,12 +724,19 @@ export default function PublicEventRegistrationsPage({ portalLabel = "Coordinato
 
 
 
-  const availableCreateEvents = useMemo(() => {
-    return events.filter((item) => isEventRegistrationOpen(item));
+  const onlineEvents = useMemo(() => {
+    return events.filter((item) => {
+      const mode = item?.event_type || (item?.meet_link ? "online" : (item?.location ? "physical" : "online"));
+      return mode !== "physical";
+    });
   }, [events]);
 
-  const selectedCreateEvent = useMemo(() => getSelectedEvent(events, createForm.eventId), [createForm.eventId, events]);
-  const selectedEditEvent = useMemo(() => getSelectedEvent(events, editForm.eventId), [editForm.eventId, events]);
+  const availableCreateEvents = useMemo(() => {
+    return onlineEvents.filter((item) => isEventRegistrationOpen(item));
+  }, [onlineEvents]);
+
+  const selectedCreateEvent = useMemo(() => getSelectedEvent(onlineEvents, createForm.eventId), [createForm.eventId, onlineEvents]);
+  const selectedEditEvent = useMemo(() => getSelectedEvent(onlineEvents, editForm.eventId), [editForm.eventId, onlineEvents]);
   const selectedDetailEvent = useMemo(() => getSelectedEvent(events, selected?.event_id), [events, selected?.event_id]);
   const selectedDetailFields = useMemo(
     () => getRegistrationDisplayFields(selectedDetailEvent),
@@ -1205,7 +1214,7 @@ export default function PublicEventRegistrationsPage({ portalLabel = "Coordinato
               <div className="relative">
                 <select value={filters.eventId} onFocus={() => setOpenFilterSelect("event")} onBlur={() => setOpenFilterSelect("")} onChange={(event) => { setOpenFilterSelect(""); setFilters((current) => ({ ...current, eventId: event.target.value })); }} className="w-full min-w-0 appearance-none truncate rounded-2xl border border-[#2D8A6A]/20 bg-white px-4 py-3 pr-11 text-sm text-[#063F32] outline-none focus:border-[#2D8A6A]">
                   <option value="all">All events</option>
-                  {events.map((item) => <option key={item.id} value={item.id} title={item.title || ""}>{truncateSelectLabel(item.title)}</option>)}
+                  {onlineEvents.map((item) => <option key={item.id} value={item.id} title={item.title || ""}>{truncateSelectLabel(item.title)}</option>)}
                 </select>
                 <ChevronDown className={`pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#0D5C48] transition ${openFilterSelect === "event" ? "rotate-180" : ""}`} />
               </div>
@@ -1790,7 +1799,7 @@ export default function PublicEventRegistrationsPage({ portalLabel = "Coordinato
                         required
                       >
                         <option value="">Select event</option>
-                        {events.map((item) => <option key={item.id} value={item.id} title={item.title || ""}>{truncateSelectLabel(item.title)}</option>)}
+                        {onlineEvents.map((item) => <option key={item.id} value={item.id} title={item.title || ""}>{truncateSelectLabel(item.title)}</option>)}
                       </select>
                       <ChevronDown className={`pointer-events-none absolute right-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#0D5C48] transition-transform duration-200 ${editEventOpen ? "rotate-180" : ""}`} />
                     </div>

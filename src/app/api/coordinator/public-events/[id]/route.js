@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { auth } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 import { uploadAdmissionDocument } from "@/lib/supabaseStorage";
@@ -48,6 +49,35 @@ async function getFirstCoordinatorEmail() {
   return String(coordinator?.email || "").trim();
 }
 
+
+async function getTableColumns(tableName) {
+  try {
+    const rows = await prisma.$queryRaw`
+      SELECT column_name
+      FROM information_schema.columns
+      WHERE table_schema = 'public'
+        AND table_name = ${tableName}
+    `;
+    return new Set(rows.map((row) => String(row.column_name || "").toLowerCase()));
+  } catch {
+    return new Set();
+  }
+}
+
+let publicEventsColumnsEnsured = false;
+async function ensurePublicEventsColumns() {
+  if (publicEventsColumnsEnsured) return;
+  try {
+    await prisma.$executeRawUnsafe(`
+      ALTER TABLE public_events ADD COLUMN IF NOT EXISTS event_type VARCHAR(50) DEFAULT 'online';
+      ALTER TABLE public_events ADD COLUMN IF NOT EXISTS location TEXT;
+    `);
+    publicEventsColumnsEnsured = true;
+  } catch {
+    // Graceful fallback if database permissions disallow DDL
+  }
+}
+
 export async function PATCH(request, context) {
   const session = await auth();
   const role = String(session?.user?.role || "").toLowerCase();
@@ -65,6 +95,8 @@ export async function PATCH(request, context) {
     if (contentType.includes("multipart/form-data")) {
       const formData = await request.formData();
       const eventCategory = cleanText(formData.get("eventCategory"));
+      const eventType = cleanText(formData.get("eventType")).toLowerCase() === "physical" ? "physical" : "online";
+      const location = cleanText(formData.get("location"));
       const title = cleanText(formData.get("title"));
       const description = cleanText(formData.get("description"));
       const startDate = cleanText(formData.get("startDate"));
@@ -74,17 +106,19 @@ export async function PATCH(request, context) {
       let days;
       try { days = parsePublicEventDays(formData.get("days") || "[]"); }
       catch (error) { return json(error.message, 400); }
-      const eventFeeAmount = toMoney(formData.get("eventFeeAmount"));
+      const eventFeeAmount = eventType === "physical" ? 0 : toMoney(formData.get("eventFeeAmount"));
       const registrationDeadlineDate = cleanText(formData.get("registrationDeadlineDate"));
       const registrationDeadlineTime = cleanText(formData.get("registrationDeadlineTime"));
       const file = formData.get("image");
       let registrationFormSchema = [];
-      try {
-        const rawSchema = formData.get("registrationFormSchema");
-        const parsedSchema = JSON.parse(String(rawSchema || "[]"));
-        registrationFormSchema = Array.isArray(parsedSchema) ? parsedSchema : [];
-      } catch {
-        return json("Registration form fields must be valid.", 400);
+      if (eventType !== "physical") {
+        try {
+          const rawSchema = formData.get("registrationFormSchema");
+          const parsedSchema = JSON.parse(String(rawSchema || "[]"));
+          registrationFormSchema = Array.isArray(parsedSchema) ? parsedSchema : [];
+        } catch {
+          return json("Registration form fields must be valid.", 400);
+        }
       }
 
       if (!eventCategory) return json("Event category is required.", 400);
@@ -93,7 +127,7 @@ export async function PATCH(request, context) {
       if (!startDate || !endDate || !startTime || !endTime) {
         return json("Event start and end date/time are required.", 400);
       }
-      if (!Number.isFinite(eventFeeAmount) || eventFeeAmount < 0) {
+      if (eventType !== "physical" && (!Number.isFinite(eventFeeAmount) || eventFeeAmount < 0)) {
         return json("A valid event fee is required.", 400);
       }
 
@@ -107,7 +141,7 @@ export async function PATCH(request, context) {
       try { calendarSchedule = buildPublicEventCalendarSchedule(startAt, endAt, days); }
       catch (error) { return json(error.message, 400); }
 
-      const registrationDeadline = registrationDeadlineDate && registrationDeadlineTime
+      const registrationDeadline = (eventType !== "physical" && registrationDeadlineDate && registrationDeadlineTime)
         ? parsePakistanDateTime(registrationDeadlineDate, registrationDeadlineTime)
         : startAt;
 
@@ -137,6 +171,13 @@ export async function PATCH(request, context) {
         });
       }
 
+      await ensurePublicEventsColumns();
+      const columns = await getTableColumns("public_events");
+      const hasEventType = columns.has("event_type");
+      const hasLocation = columns.has("location");
+      const eventTypeSet = hasEventType ? Prisma.sql`, event_type = ${eventType}` : Prisma.empty;
+      const locationSet = hasLocation ? Prisma.sql`, location = ${location || null}` : Prisma.empty;
+
       await prisma.$executeRaw`
         UPDATE public_events
         SET
@@ -151,10 +192,22 @@ export async function PATCH(request, context) {
           schedule_days = ${JSON.stringify(days)}::jsonb,
           image_bucket = COALESCE(NULLIF(${upload?.bucket || ""}, ''), image_bucket),
           image_object_path = COALESCE(NULLIF(${upload?.objectPath || ""}, ''), image_object_path),
-          image_stored_path = COALESCE(NULLIF(${upload?.storedPath || ""}, ''), image_stored_path),
+          image_stored_path = COALESCE(NULLIF(${upload?.storedPath || ""}, ''), image_stored_path)${eventTypeSet}${locationSet},
           updated_at = NOW()
         WHERE id = ${id}::uuid
       `;
+
+      if (eventType === "physical") {
+        await prisma.$executeRaw`
+          UPDATE public_events
+          SET
+            meet_link = NULL,
+            google_calendar_last_error = NULL,
+            updated_at = NOW()
+          WHERE id = ${id}::uuid
+        `;
+        return json("Public event updated successfully.", 200);
+      }
 
       if (event.google_calendar_event_id) {
         try {
@@ -199,9 +252,15 @@ export async function PATCH(request, context) {
       return json("A valid publication status is required.", 400);
     }
 
+    await ensurePublicEventsColumns();
+    const columnsPub = await getTableColumns("public_events");
+    const hasEventTypePub = columnsPub.has("event_type");
+    const eventTypePubExpr = hasEventTypePub ? Prisma.sql`COALESCE(pe.event_type, 'online') AS event_type,` : Prisma.sql`'online' AS event_type,`;
+
     const [event] = await prisma.$queryRaw`
       SELECT
         pe.id::text AS id,
+        ${eventTypePubExpr}
         pe.title,
         pe.description,
         pe.start_at,
@@ -226,7 +285,7 @@ export async function PATCH(request, context) {
       WHERE id = ${id}::uuid
     `;
 
-    if (publicationStatus === "published" && !event.google_calendar_event_id) {
+    if (publicationStatus === "published" && !event.google_calendar_event_id && String(event.event_type || "").toLowerCase() !== "physical") {
       try {
         const organizerEmail = (await getFirstCoordinatorEmail()) || String(session.user.email || "").trim();
         const calendarData = await createCalendarPublicEvent({

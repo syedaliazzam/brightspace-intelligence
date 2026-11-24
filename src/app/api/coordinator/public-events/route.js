@@ -1,5 +1,6 @@
 import crypto from "crypto";
 import { NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { auth } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 import { createSignedAdmissionDocumentUrl, uploadAdmissionDocument } from "@/lib/supabaseStorage";
@@ -62,6 +63,35 @@ async function hydrateEventImages(items) {
   );
 }
 
+
+async function getTableColumns(tableName) {
+  try {
+    const rows = await prisma.$queryRaw`
+      SELECT column_name
+      FROM information_schema.columns
+      WHERE table_schema = 'public'
+        AND table_name = ${tableName}
+    `;
+    return new Set(rows.map((row) => String(row.column_name || "").toLowerCase()));
+  } catch {
+    return new Set();
+  }
+}
+
+let publicEventsColumnsEnsured = false;
+async function ensurePublicEventsColumns() {
+  if (publicEventsColumnsEnsured) return;
+  try {
+    await prisma.$executeRawUnsafe(`
+      ALTER TABLE public_events ADD COLUMN IF NOT EXISTS event_type VARCHAR(50) DEFAULT 'online';
+      ALTER TABLE public_events ADD COLUMN IF NOT EXISTS location TEXT;
+    `);
+    publicEventsColumnsEnsured = true;
+  } catch {
+    // Graceful fallback if database permissions disallow DDL
+  }
+}
+
 async function syncPublicEventCalendar({ title, description, calendarSchedule, organizerEmail }) {
   try {
     const calendarData = await createCalendarPublicEvent({
@@ -99,8 +129,17 @@ export async function GET() {
   if (!ALLOWED_VIEW_ROLES.has(role)) return json("Forbidden.", 403);
 
   try {
+    await ensurePublicEventsColumns();
+    const columns = await getTableColumns("public_events");
+    const hasEventType = columns.has("event_type");
+    const hasLocation = columns.has("location");
+    const eventTypeExpr = hasEventType ? Prisma.sql`COALESCE(pe.event_type, 'online') AS event_type,` : Prisma.sql`'online' AS event_type,`;
+    const locationExpr = hasLocation ? Prisma.sql`COALESCE(pe.location, '') AS location,` : Prisma.sql`'' AS location,`;
+
     const items = await prisma.$queryRaw`
       SELECT
+        ${eventTypeExpr}
+        ${locationExpr}
         pe.id::text AS id,
         pe.title,
         pe.description,
@@ -160,6 +199,8 @@ export async function POST(request) {
   try {
     const formData = await request.formData();
     const eventCategory = cleanText(formData.get("eventCategory"));
+    const eventType = cleanText(formData.get("eventType")).toLowerCase() === "physical" ? "physical" : "online";
+    const location = cleanText(formData.get("location"));
     const title = cleanText(formData.get("title"));
     const description = cleanText(formData.get("description"));
     const startDate = cleanText(formData.get("startDate"));
@@ -189,7 +230,7 @@ export async function POST(request) {
     if (!startDate || !endDate || !startTime || !endTime) {
       return json("Event start and end date/time are required.", 400);
     }
-    if (!Number.isFinite(eventFeeAmount) || eventFeeAmount < 0) {
+    if (eventType !== "physical" && (!Number.isFinite(eventFeeAmount) || eventFeeAmount < 0)) {
       return json("A valid event fee is required.", 400);
     }
 
@@ -203,7 +244,7 @@ export async function POST(request) {
     try { calendarSchedule = buildPublicEventCalendarSchedule(startAt, endAt, days); }
     catch (error) { return json(error.message, 400); }
 
-    const registrationDeadline = registrationDeadlineDate && registrationDeadlineTime
+    const registrationDeadline = (eventType !== "physical" && registrationDeadlineDate && registrationDeadlineTime)
       ? parsePakistanDateTime(registrationDeadlineDate, registrationDeadlineTime)
       : startAt;
 
@@ -217,6 +258,15 @@ export async function POST(request) {
       documentType: "public_event_image",
       file,
     });
+
+    await ensurePublicEventsColumns();
+    const columns = await getTableColumns("public_events");
+    const hasEventType = columns.has("event_type");
+    const hasLocation = columns.has("location");
+    const eventTypeCol = hasEventType ? Prisma.sql`, event_type` : Prisma.empty;
+    const eventTypeVal = hasEventType ? Prisma.sql`, ${eventType}` : Prisma.empty;
+    const locationCol = hasLocation ? Prisma.sql`, location` : Prisma.empty;
+    const locationVal = hasLocation ? Prisma.sql`, ${location || null}` : Prisma.empty;
 
     const [created] = await prisma.$queryRaw`
       INSERT INTO public_events (
@@ -243,7 +293,7 @@ export async function POST(request) {
         recording_drive_url,
         recording_synced_at,
         created_at,
-        updated_at
+        updated_at${eventTypeCol}${locationCol}
       )
       VALUES (
         ${eventId}::uuid,
@@ -269,10 +319,20 @@ export async function POST(request) {
         NULL,
         NULL,
         NOW(),
-        NOW()
+        NOW()${eventTypeVal}${locationVal}
       )
       RETURNING id::text AS id
     `;
+
+    if (eventType === "physical") {
+      return json("Physical public event created successfully.", 201, {
+        id: created?.id || eventId,
+        calendarSynced: false,
+        calendarEventId: "",
+        meetLink: "",
+        calendarError: "",
+      });
+    }
 
     const organizerEmail = (await getFirstCoordinatorEmail()) || String(session.user.email || "").trim();
     const syncResult = await syncPublicEventCalendar({

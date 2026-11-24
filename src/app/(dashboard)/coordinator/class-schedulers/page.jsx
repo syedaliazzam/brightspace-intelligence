@@ -219,7 +219,7 @@ function getPublicEventScheduleDays(item) {
     try {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed)) return parsed.map((d) => String(d).toLowerCase().trim().slice(0, 3));
-    } catch {}
+    } catch { }
     const trimmed = raw.trim();
     if (trimmed && trimmed !== "[]") {
       return trimmed
@@ -237,6 +237,17 @@ function mapPublicEvents(items = []) {
     const start = parseDateTime(item?.start_at || item?.startAt);
     const end = parseDateTime(item?.end_at || item?.endAt);
     const events = [];
+    const eventMode = item?.event_type || (item?.meet_link ? "online" : (item?.location ? "physical" : "online"));
+    const isPhysical = eventMode === "physical";
+    const subtitle = isPhysical
+      ? (item?.location ? `Location: ${item.location}` : "In-Person Event")
+      : (item?.publication_status || "Public event");
+    const typeLabel = isPhysical ? "Public Event (In-Person)" : "Public";
+    const meetLink = isPhysical ? "" : (item?.meet_link || item?.google_meet_link || item?.meeting_link || "");
+    const recordingLink = isPhysical ? "" : (item?.recording_drive_url || item?.recording_link || item?.event_detail_link?.href || "");
+    const recordingKind = isPhysical ? "" : (item?.recording_drive_url ? "recording" : item?.event_detail_link?.kind || "");
+    const recordingLabel = isPhysical ? "" : (item?.recording_drive_url ? "View Recording" : item?.event_detail_link?.label || "");
+    const syncEndpoint = isPhysical ? null : `/api/coordinator/public-events/${item.id}/recording-sync`;
 
     if (start && end) {
       const cursor = new Date(start);
@@ -271,15 +282,17 @@ function mapPublicEvents(items = []) {
           textColor: "#FFFFFF",
           extendedProps: {
             type: "public-events",
-            typeLabel: "Public",
-            subtitle: item?.publication_status || "Public event",
-            meetLink: item?.meet_link || item?.google_meet_link || item?.meeting_link || "",
-            recordingLink: item?.recording_drive_url || item?.recording_link || item?.event_detail_link?.href || "",
-            recordingKind: item?.recording_drive_url ? "recording" : item?.event_detail_link?.kind || "",
-            recordingLabel: item?.recording_drive_url ? "View Recording" : item?.event_detail_link?.label || "",
+            typeLabel,
+            subtitle,
+            meetLink,
+            recordingLink,
+            recordingKind,
+            recordingLabel,
             eventId: item?.id,
             eventType: "public-events",
-            syncEndpoint: `/api/coordinator/public-events/${item.id}/recording-sync`,
+            eventMode,
+            location: item?.location || "",
+            syncEndpoint,
           },
         });
 
@@ -290,26 +303,28 @@ function mapPublicEvents(items = []) {
     return events.length
       ? events
       : [{
-          id: `public-${item.id}`,
-          title: item?.title || "Public event",
-          start: start ? toCalendarDate(start) : "",
-          end: end ? toCalendarDate(end) : "",
-          backgroundColor: "#2563EB",
-          borderColor: "#1D4ED8",
-          textColor: "#FFFFFF",
-          extendedProps: {
-            type: "public-events",
-            typeLabel: "Public",
-            subtitle: item?.publication_status || "Public event",
-            meetLink: item?.meet_link || item?.google_meet_link || item?.meeting_link || "",
-            recordingLink: item?.recording_drive_url || item?.recording_link || item?.event_detail_link?.href || "",
-            recordingKind: item?.recording_drive_url ? "recording" : item?.event_detail_link?.kind || "",
-            recordingLabel: item?.recording_drive_url ? "View Recording" : item?.event_detail_link?.label || "",
-            eventId: item?.id,
-            eventType: "public-events",
-            syncEndpoint: `/api/coordinator/public-events/${item.id}/recording-sync`,
-          },
-        }];
+        id: `public-${item.id}`,
+        title: item?.title || "Public event",
+        start: start ? toCalendarDate(start) : "",
+        end: end ? toCalendarDate(end) : "",
+        backgroundColor: "#2563EB",
+        borderColor: "#1D4ED8",
+        textColor: "#FFFFFF",
+        extendedProps: {
+          type: "public-events",
+          typeLabel,
+          subtitle,
+          meetLink,
+          recordingLink,
+          recordingKind,
+          recordingLabel,
+          eventId: item?.id,
+          eventType: "public-events",
+          eventMode,
+          location: item?.location || "",
+          syncEndpoint,
+        },
+      }];
   });
 }
 
@@ -356,11 +371,7 @@ export default function CoordinatorUnifiedCalendarPage() {
     internalEvents: [],
   });
 
-  const loadCalendar = async (setLoadingState = true) => {
-    if (setLoadingState) {
-      setState((current) => ({ ...current, loading: true, error: "" }));
-    }
-
+  const fetchCalendarData = async () => {
     try {
       const [lectureResult, publicResult, internalResult] = await Promise.allSettled([
         fetch("/api/coordinator/lecture-schedules?range=all", { cache: "no-store" }),
@@ -378,27 +389,15 @@ export default function CoordinatorUnifiedCalendarPage() {
         internalResult.status === "rejected" ? "Unable to load internal events." : null,
       ].filter(Boolean);
 
-      setState({
-        loading: false,
-        error: errors[0] || "",
-        classEvents: Array.isArray(lectureData?.items) ? mapClassSchedulerEvents(lectureData.items) : [],
-        publicEvents: Array.isArray(publicData?.items) ? mapPublicEvents(publicData.items) : [],
-        internalEvents: Array.isArray(internalData?.items) ? mapInternalEvents(internalData.items) : [],
-      });
       return {
+        error: errors[0] || "",
         classEvents: Array.isArray(lectureData?.items) ? mapClassSchedulerEvents(lectureData.items) : [],
         publicEvents: Array.isArray(publicData?.items) ? mapPublicEvents(publicData.items) : [],
         internalEvents: Array.isArray(internalData?.items) ? mapInternalEvents(internalData.items) : [],
       };
     } catch (error) {
-      setState({
-        loading: false,
-        error: error instanceof Error ? error.message : "Unable to load event calendar.",
-        classEvents: [],
-        publicEvents: [],
-        internalEvents: [],
-      });
       return {
+        error: error instanceof Error ? error.message : "Unable to load event calendar.",
         classEvents: [],
         publicEvents: [],
         internalEvents: [],
@@ -408,9 +407,17 @@ export default function CoordinatorUnifiedCalendarPage() {
 
   useEffect(() => {
     let active = true;
-    void loadCalendar(true).then(() => {
+
+    async function load() {
+      const payload = await fetchCalendarData();
       if (!active) return;
-    });
+      setState({
+        loading: false,
+        ...payload,
+      });
+    }
+
+    void load();
     return () => {
       active = false;
     };
@@ -446,7 +453,8 @@ export default function CoordinatorUnifiedCalendarPage() {
           ...prev,
           [eventId]: { link: nextRecordingLink, kind: "recording", label: "View Recording" },
         }));
-        const refreshed = await loadCalendar(false);
+        const refreshed = await fetchCalendarData();
+        setState((current) => ({ ...current, ...refreshed }));
         if (selectedEvent?.extendedProps?.eventId === eventId) {
           const refreshedEvent =
             [...(refreshed?.classEvents || []), ...(refreshed?.publicEvents || []), ...(refreshed?.internalEvents || [])]
@@ -489,10 +497,13 @@ export default function CoordinatorUnifiedCalendarPage() {
     recordingLinks[selectedEventId]?.label || selectedEvent?.extendedProps?.recordingLabel || "View Recording";
   const resolvedRecordingKind =
     recordingLinks[selectedEventId]?.kind || selectedEvent?.extendedProps?.recordingKind || "";
+  const isPhysicalEvent = selectedEvent?.extendedProps?.eventMode === "physical";
+  const isClassEvent = selectedEventType === "class-schedulers";
   const showRecordingActionLink = Boolean(
-    resolvedRecordingLink && resolvedRecordingLink !== selectedEvent?.extendedProps?.meetLink
+    !isPhysicalEvent && resolvedRecordingLink && resolvedRecordingLink !== selectedEvent?.extendedProps?.meetLink
   );
   const showSyncRecordingButton = Boolean(
+    !isPhysicalEvent &&
     selectedEventId &&
     ["public-events", "internal-events"].includes(selectedEventType) &&
     !showRecordingActionLink
@@ -531,11 +542,10 @@ export default function CoordinatorUnifiedCalendarPage() {
                   key={option.id}
                   type="button"
                   onClick={() => setActiveFilter(option.id)}
-                  className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
-                    isActive
+                  className={`rounded-full px-4 py-2 text-sm font-semibold transition ${isActive
                       ? "bg-[#0D5C48] text-[#FAF7F0] shadow-[0_12px_28px_-18px_rgba(13,59,46,0.55)]"
                       : "border border-[#2D8A6A]/15 bg-white text-[#063F32] hover:border-[#2D8A6A]/30"
-                  }`}
+                    }`}
                 >
                   {option.label}
                 </button>
@@ -624,11 +634,20 @@ export default function CoordinatorUnifiedCalendarPage() {
                 )}
                 <p><strong className="text-[#063F32]">Start:</strong> {formatLocalDateTime(selectedEvent.start || selectedEvent.startStr || selectedEvent.extendedProps?.scheduled_start)}</p>
                 <p><strong className="text-[#063F32]">End:</strong> {formatLocalDateTime(selectedEvent.end || selectedEvent.endStr || selectedEvent.extendedProps?.scheduled_end)}</p>
-                {selectedEvent.extendedProps?.meetLink && (
+                {selectedEvent.extendedProps?.eventMode === "physical" ? (
+                  <div className="rounded-2xl border border-[#2D8A6A]/15 bg-[#FAF7F0] p-4">
+                    <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#C9A227]">Event Venue / Location</p>
+                    <p className="mt-2 font-semibold text-[#063F32]">
+                      {selectedEvent.extendedProps?.location || "Physical Event"}
+                    </p>
+                  </div>
+                ) : selectedEvent.extendedProps?.meetLink ? (
                   <div className="rounded-2xl border border-[#2D8A6A]/15 bg-[#FAF7F0] p-4">
                     <div className="flex flex-col gap-3">
                       <div>
-                        <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#C9A227]">Class Joining Link</p>
+                        <p className="text-xs font-semibold uppercase tracking-[0.22em] text-[#C9A227]">
+                          {isClassEvent ? "Class Joining Link" : "Event Joining Link"}
+                        </p>
                         <p className="mt-2 break-all text-sm text-[#245C4F]">{selectedEvent.extendedProps.meetLink}</p>
                       </div>
                       <div className="flex flex-wrap gap-2">
@@ -649,12 +668,12 @@ export default function CoordinatorUnifiedCalendarPage() {
                           rel="noreferrer"
                           className="inline-flex rounded-full bg-[linear-gradient(135deg,#0D3B2E,#0D5C48)] px-4 py-2 text-sm font-semibold text-[#FFF5D6]"
                         >
-                          Join Class
+                          {isClassEvent ? "Join Class" : "Join Event"}
                         </a>
                       </div>
                     </div>
                   </div>
-                )}
+                ) : null}
                 {showRecordingActionLink ? (
                   <a
                     href={resolvedRecordingLink}

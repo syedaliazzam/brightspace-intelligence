@@ -1,7 +1,22 @@
 import { NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import { buildPublicEventRegistrationEmailHtml, sendEmail } from "@/lib/email";
 import { cleanText, formatEventDateTime, formatMoney } from "@/lib/publicEvents";
+
+async function getTableColumns(tableName) {
+  try {
+    const rows = await prisma.$queryRaw`
+      SELECT column_name
+      FROM information_schema.columns
+      WHERE table_schema = 'public'
+        AND table_name = ${tableName}
+    `;
+    return new Set(rows.map((row) => String(row.column_name || "").toLowerCase()));
+  } catch {
+    return new Set();
+  }
+}
 
 function json(message, status = 200, extra = {}) {
   return NextResponse.json({ message, ...extra }, { status });
@@ -49,6 +64,10 @@ export async function POST(request) {
 
     if (!eventId) return json("Event id is required.", 400);
 
+    const columns = await getTableColumns("public_events");
+    const hasEventType = columns.has("event_type");
+    const eventTypeExpr = hasEventType ? Prisma.sql`COALESCE(pe.event_type, 'online') AS event_type,` : Prisma.sql`'online' AS event_type,`;
+
     const [event] = await prisma.$queryRaw`
       SELECT
         pe.id::text AS id,
@@ -61,6 +80,7 @@ export async function POST(request) {
         pe.event_category,
         COALESCE(pe.registration_form_schema, '[]'::jsonb) AS registration_form_schema,
         LOWER(pe.publication_status::text) AS publication_status,
+        ${eventTypeExpr}
         pe.created_by::text AS created_by,
         creator.full_name AS coordinator_name,
         creator.email AS coordinator_email,
@@ -72,6 +92,9 @@ export async function POST(request) {
     `;
 
     if (!event?.id) return json("Public event not found.", 404);
+    if (event.event_type === "physical") {
+      return json("Physical events do not accept registrations.", 400);
+    }
     if (String(event.publication_status || "").toLowerCase() !== "published") {
       return json("This event is not open for public registration.", 400);
     }

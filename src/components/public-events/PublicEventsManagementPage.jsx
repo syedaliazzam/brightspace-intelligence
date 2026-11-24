@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowDown, ArrowUp, Check, ChevronDown, ClipboardCopy, Eye, FileVideo, ImagePlus, Pencil, Plus, RefreshCw, RotateCcw, Search, X } from "lucide-react";
+import { ArrowDown, ArrowUp, Check, ChevronDown, ClipboardCopy, Eye, FileVideo, ImagePlus, MapPin, Pencil, Plus, RefreshCw, RotateCcw, Search, Video, X } from "lucide-react";
 import {
   cleanText,
   PUBLIC_EVENT_DAYS,
@@ -21,6 +21,8 @@ const EVENT_CATEGORIES = [
 
 const EMPTY_FORM = {
   eventCategory: "",
+  eventType: "online",
+  location: "",
   title: "",
   description: "",
   startDate: "",
@@ -325,6 +327,8 @@ function getPakistanInputParts(value) {
 const PUBLIC_EVENT_TABLE_COLUMNS = [
   { value: "all", label: "All columns" },
   { value: "title", label: "Event" },
+  { value: "event_type", label: "Event Mode" },
+  { value: "location", label: "Location / Venue" },
   { value: "event_category", label: "Category" },
   { value: "start_date", label: "Start date" },
   { value: "start_time", label: "Start time" },
@@ -348,6 +352,10 @@ function getPublicEventColumnValue(item, column) {
   switch (column) {
     case "title":
       return item.title;
+    case "event_type":
+      return item.event_type === "physical" ? "Physical" : "Online";
+    case "location":
+      return item.location || "";
     case "event_category":
       return categoryLabel;
     case "start_date":
@@ -371,7 +379,7 @@ function getPublicEventColumnValue(item, column) {
     case "publication":
       return publication;
     case "meet_link":
-      return item.meet_link;
+      return item.event_type === "physical" ? (item.location || "Physical Event") : (item.meet_link || "");
     case "description":
       return item.description;
     default:
@@ -393,6 +401,7 @@ function matchesPublicEventSearch(item, column, query) {
 }
 
 function canShowPublicEventRecordingSection(item) {
+  if (item?.event_type === "physical") return false;
   const status = formatEventLifecycleStatus(item?.start_at, item?.end_at);
   return status === "current" || status === "past";
 }
@@ -584,6 +593,8 @@ export default function PublicEventsManagementPage({
       image: null,
       registrationFormSchema: parseRegistrationFormSchema(item.registration_form_schema),
       days: parseEventDays(item.schedule_days),
+      eventType: item.event_type || (item.meet_link ? "online" : (item.location ? "physical" : "online")),
+      location: item.location || "",
     });
     setEditPreviewImage(item.image_url || "");
     if (editFileInputRef.current) {
@@ -599,6 +610,8 @@ export default function PublicEventsManagementPage({
     try {
       const payload = new FormData();
       payload.set("eventCategory", form.eventCategory);
+      payload.set("eventType", form.eventType || "online");
+      payload.set("location", form.location || "");
       payload.set("title", form.title);
       payload.set("description", form.description);
       payload.set("startDate", form.startDate);
@@ -653,6 +666,8 @@ export default function PublicEventsManagementPage({
     try {
       const payload = new FormData();
       payload.set("eventCategory", editForm.eventCategory);
+      payload.set("eventType", editForm.eventType || "online");
+      payload.set("location", editForm.location || "");
       payload.set("title", editForm.title);
       payload.set("description", editForm.description);
       payload.set("startDate", editForm.startDate);
@@ -846,12 +861,12 @@ export default function PublicEventsManagementPage({
                     <p className="mt-1">{formatEventDateTime(selected.end_at)}</p>
                   </div>
                   <div className="rounded-2xl border border-[#2D8A6A]/12 bg-white px-4 py-3">
-                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]">Registration deadline</p>
-                    <p className="mt-1">{formatEventDateTime(selected.registration_deadline)}</p>
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]">Registration</p>
+                    <p className="mt-1">{selected.event_type === "physical" ? "No registration required (Physical)" : formatEventDateTime(selected.registration_deadline)}</p>
                   </div>
                   <div className="rounded-2xl border border-[#2D8A6A]/12 bg-white px-4 py-3">
                     <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]">Event fee</p>
-                    <p className="mt-1">{formatMoney(selected.event_fee_amount)}</p>
+                    <p className="mt-1">{selected.event_type === "physical" ? "Free / N/A" : formatMoney(selected.event_fee_amount)}</p>
                   </div>
                   <div className="rounded-2xl border border-[#2D8A6A]/12 bg-white px-4 py-3">
                     <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]">Lifecycle</p>
@@ -870,31 +885,49 @@ export default function PublicEventsManagementPage({
                     <p className="mt-2 whitespace-pre-line">{selected.description || "-"}</p>
                   </div>
                   <div className="col-span-2 rounded-2xl border border-[#2D8A6A]/12 bg-white px-4 py-3">
-                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]">Meet link</p>
-                    <p className="mt-2 break-all text-sm text-[#245C4F]">{selected.meet_link || "Not provided"}</p>
-                    {selected.meet_link ? (
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        <a
-                          href={selected.meet_link}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="inline-flex items-center gap-2 rounded-full bg-[linear-gradient(135deg,#0D3B2E,#0D5C48)] px-4 py-2 text-xs font-semibold text-[#FFF5D6]"
-                        >
-                          Open link
-                        </a>
-                        <button
-                          type="button"
-                          onClick={() => copyMeetLink(selected.meet_link)}
-                          className="inline-flex items-center gap-2 rounded-full border border-[#2D8A6A]/20 bg-white px-4 py-2 text-xs font-semibold text-[#0D5C48]"
-                        >
-                          {copiedMeetLink === selected.meet_link ? <Check className="h-3.5 w-3.5" /> : <ClipboardCopy className="h-3.5 w-3.5" />}
-                          {copiedMeetLink === selected.meet_link ? "Copied" : "Copy"}
-                        </button>
+                    <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#0D5C48]">
+                      {selected.event_type === "physical" ? "Event Mode & Venue" : "Meet link"}
+                    </p>
+                    {selected.event_type === "physical" ? (
+                      <div className="mt-2 space-y-1.5">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="inline-flex items-center gap-1.5 rounded-full bg-[#EAF6EF] px-3 py-1 text-xs font-semibold text-[#0D5C48]">
+                            <MapPin className="h-3.5 w-3.5" />
+                            Physical (In-Person Event)
+                          </span>
+                          {selected.location ? (
+                            <span className="text-sm font-semibold text-[#063F32]">{selected.location}</span>
+                          ) : null}
+                        </div>
                       </div>
-                    ) : null}
+                    ) : (
+                      <>
+                        <p className="mt-2 break-all text-sm text-[#245C4F]">{selected.meet_link || "Not provided"}</p>
+                        {selected.meet_link ? (
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            <a
+                              href={selected.meet_link}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-flex items-center gap-2 rounded-full bg-[linear-gradient(135deg,#0D3B2E,#0D5C48)] px-4 py-2 text-xs font-semibold text-[#FFF5D6]"
+                            >
+                              Join Event
+                            </a>
+                            <button
+                              type="button"
+                              onClick={() => copyMeetLink(selected.meet_link)}
+                              className="inline-flex items-center gap-2 rounded-full border border-[#2D8A6A]/20 bg-white px-4 py-2 text-xs font-semibold text-[#0D5C48]"
+                            >
+                              {copiedMeetLink === selected.meet_link ? <Check className="h-3.5 w-3.5" /> : <ClipboardCopy className="h-3.5 w-3.5" />}
+                              {copiedMeetLink === selected.meet_link ? "Copied" : "Copy"}
+                            </button>
+                          </div>
+                        ) : null}
+                      </>
+                    )}
                   </div>
                 </div>
-                {selected.google_calendar_last_error ? (
+                {selected.event_type !== "physical" && selected.google_calendar_last_error ? (
                   <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-amber-800">
                     {selected.google_calendar_last_error}
                   </div>
@@ -1064,34 +1097,41 @@ export default function PublicEventsManagementPage({
                         <td className="px-6 py-4 text-[#245C4F]">{formatTimeOnly(item.start_at)}</td>
                         <td className="px-6 py-4 text-[#245C4F]">{formatEventDate(item.end_at)}</td>
                         <td className="px-6 py-4 text-[#245C4F]">{formatTimeOnly(item.end_at)}</td>
-                        <td className="px-6 py-4 text-[#245C4F]">{formatEventDate(item.registration_deadline)}</td>
-                        <td className="px-6 py-4 text-[#245C4F]">{formatTimeOnly(item.registration_deadline)}</td>
-                        <td className="px-6 py-4 text-[#245C4F]">{formatMoney(item.event_fee_amount)}</td>
-                        <td className="px-6 py-4 text-[#245C4F]">{item.registration_count || 0}</td>
+                        <td className="px-6 py-4 text-[#245C4F]">{item.event_type === "physical" ? "-" : formatEventDate(item.registration_deadline)}</td>
+                        <td className="px-6 py-4 text-[#245C4F]">{item.event_type === "physical" ? "-" : formatTimeOnly(item.registration_deadline)}</td>
+                        <td className="px-6 py-4 text-[#245C4F]">{item.event_type === "physical" ? "Free / N/A" : formatMoney(item.event_fee_amount)}</td>
+                        <td className="px-6 py-4 text-[#245C4F]">{item.event_type === "physical" ? <span className="text-xs text-[#7A938B]">N/A (Physical)</span> : (item.registration_count || 0)}</td>
                         <td className="px-6 py-4"><span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${eventTone(lifecycle)}`}>{formatEventLifecycleLabel(lifecycle)}</span></td>
                         <td className="px-6 py-4"><span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${publication === "published" ? "bg-[#EAF6EF] text-[#0D5C48]" : "bg-[#F1EADC] text-[#7A5E2B]"}`}>{publication === "published" ? "Published" : "Draft"}</span></td>
                         <td className="px-6 py-4">
-                          <div className="flex items-center gap-2">
-                            <a
-                              href={item.meet_link || "#"}
-                              target="_blank"
-                              rel="noreferrer"
-                              className={`min-w-0 max-w-[160px] truncate rounded-full border border-[#2D8A6A]/20 bg-white px-4 py-2 text-xs font-semibold ${item.meet_link ? "text-[#063F32] transition hover:bg-[#F1EADC]" : "pointer-events-none text-[#9CA3AF]"}`}
-                              title={item.meet_link || "Not provided"}
-                            >
-                              {item.meet_link || "Not provided"}
-                            </a>
-                            {item.meet_link ? (
-                              <button
-                                type="button"
-                                onClick={() => copyMeetLink(item.meet_link)}
-                                className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[#2D8A6A]/20 bg-white text-[#0D5C48] transition hover:bg-[#F1EADC]"
-                                aria-label="Copy meet link"
+                          {item.event_type === "physical" ? (
+                            <span className="inline-flex items-center gap-1.5 rounded-full bg-[#EAF6EF] px-3 py-1.5 text-xs font-semibold text-[#0D5C48]" title={item.location || "Physical Event"}>
+                              <MapPin className="h-3.5 w-3.5 shrink-0" />
+                              <span className="max-w-[150px] truncate">{item.location || "Physical Event"}</span>
+                            </span>
+                          ) : (
+                            <div className="flex items-center gap-2">
+                              <a
+                                href={item.meet_link || "#"}
+                                target="_blank"
+                                rel="noreferrer"
+                                className={`min-w-0 max-w-[160px] truncate rounded-full border border-[#2D8A6A]/20 bg-white px-4 py-2 text-xs font-semibold ${item.meet_link ? "text-[#063F32] transition hover:bg-[#F1EADC]" : "pointer-events-none text-[#9CA3AF]"}`}
+                                title={item.meet_link || "Not provided"}
                               >
-                                {copiedMeetLink === item.meet_link ? <Check className="h-4 w-4" /> : <ClipboardCopy className="h-4 w-4" />}
-                              </button>
-                            ) : null}
-                          </div>
+                                {item.meet_link || "Not provided"}
+                              </a>
+                              {item.meet_link ? (
+                                <button
+                                  type="button"
+                                  onClick={() => copyMeetLink(item.meet_link)}
+                                  className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[#2D8A6A]/20 bg-white text-[#0D5C48] transition hover:bg-[#F1EADC]"
+                                  aria-label="Copy meet link"
+                                >
+                                  {copiedMeetLink === item.meet_link ? <Check className="h-4 w-4" /> : <ClipboardCopy className="h-4 w-4" />}
+                                </button>
+                              ) : null}
+                            </div>
+                          )}
                         </td>
                         <td className="px-6 py-4">
                           <button type="button" onClick={() => setDescriptionItem(item)} className="whitespace-nowrap rounded-full border border-[#2D8A6A]/20 bg-white px-4 py-2 text-xs font-semibold text-[#063F32] transition hover:bg-[#F1EADC]">
@@ -1192,8 +1232,50 @@ export default function PublicEventsManagementPage({
               </div>
               <div className="max-h-[80vh] overflow-y-auto p-6">
                 <form className="grid gap-4 md:grid-cols-2" onSubmit={handleEditSubmit}>
-                  <RegistrationFormBuilder category={editForm.eventCategory} value={editForm.registrationFormSchema} onChange={(registrationFormSchema) => setEditForm((current) => ({ ...current, registrationFormSchema }))} />
+                  {editForm.eventType !== "physical" ? (
+                    <RegistrationFormBuilder category={editForm.eventCategory} value={editForm.registrationFormSchema} onChange={(registrationFormSchema) => setEditForm((current) => ({ ...current, registrationFormSchema }))} />
+                  ) : null}
                   <EventDays value={editForm.days} onChange={(days) => setEditForm((current) => ({ ...current, days }))} />
+                  <div className="block md:col-span-2">
+                    <span className="mb-2 block text-sm font-semibold text-[#245C4F]">Event Mode</span>
+                    <div className="grid grid-cols-2 gap-3">
+                      <button
+                        type="button"
+                        onClick={() => setEditForm((c) => ({ ...c, eventType: "online" }))}
+                        className={`flex items-center justify-center gap-2 rounded-2xl border p-3 text-sm font-semibold transition ${
+                          (editForm.eventType || "online") === "online"
+                            ? "border-[#0D5C48] bg-[#0D5C48] text-white shadow-sm"
+                            : "border-[#2D8A6A]/20 bg-white text-[#245C4F] hover:bg-[#FAF7F0]"
+                        }`}
+                      >
+                        <Video className="h-4 w-4" />
+                        <span>Online (Google Meet)</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setEditForm((c) => ({ ...c, eventType: "physical" }))}
+                        className={`flex items-center justify-center gap-2 rounded-2xl border p-3 text-sm font-semibold transition ${
+                          editForm.eventType === "physical"
+                            ? "border-[#0D5C48] bg-[#0D5C48] text-white shadow-sm"
+                            : "border-[#2D8A6A]/20 bg-white text-[#245C4F] hover:bg-[#FAF7F0]"
+                        }`}
+                      >
+                        <MapPin className="h-4 w-4" />
+                        <span>Physical (In-Person)</span>
+                      </button>
+                    </div>
+                  </div>
+                  {editForm.eventType === "physical" ? (
+                    <label className="block md:col-span-2">
+                      <span className="mb-2 block text-sm font-semibold text-[#245C4F]">Venue / Location</span>
+                      <input
+                        value={editForm.location || ""}
+                        onChange={(event) => setEditForm((current) => ({ ...current, location: event.target.value }))}
+                        placeholder="e.g. Ash-Shajrah School Campus, Main Hall, etc."
+                        className="w-full rounded-2xl border border-[#2D8A6A]/20 bg-white px-4 py-3 text-sm outline-none focus:border-[#2D8A6A] focus:ring-2 focus:ring-[#FFF5D6]"
+                      />
+                    </label>
+                  ) : null}
                   <label className="block md:col-span-2">
                     <span className="mb-2 block text-sm font-semibold text-[#245C4F]">Select Event Category</span>
                     <div className="relative">
@@ -1222,10 +1304,12 @@ export default function PublicEventsManagementPage({
                     <span className="mb-2 block text-sm font-semibold text-[#245C4F]">Event name</span>
                     <input value={editForm.title} onChange={(event) => setEditForm((current) => ({ ...current, title: event.target.value }))} className="w-full rounded-2xl border border-[#2D8A6A]/20 bg-white px-4 py-3 text-sm outline-none focus:border-[#2D8A6A] focus:ring-2 focus:ring-[#FFF5D6]" required />
                   </label>
-                  <label className="block">
-                    <span className="mb-2 block text-sm font-semibold text-[#245C4F]">Event fee</span>
-                    <input type="number" min="0" step="0.01" value={editForm.eventFeeAmount} onChange={(event) => setEditForm((current) => ({ ...current, eventFeeAmount: event.target.value }))} className="w-full rounded-2xl border border-[#2D8A6A]/20 bg-white px-4 py-3 text-sm outline-none focus:border-[#2D8A6A] focus:ring-2 focus:ring-[#FFF5D6]" required />
-                  </label>
+                  {editForm.eventType !== "physical" ? (
+                    <label className="block">
+                      <span className="mb-2 block text-sm font-semibold text-[#245C4F]">Event fee</span>
+                      <input type="number" min="0" step="0.01" value={editForm.eventFeeAmount} onChange={(event) => setEditForm((current) => ({ ...current, eventFeeAmount: event.target.value }))} className="w-full rounded-2xl border border-[#2D8A6A]/20 bg-white px-4 py-3 text-sm outline-none focus:border-[#2D8A6A] focus:ring-2 focus:ring-[#FFF5D6]" required />
+                    </label>
+                  ) : null}
                   <label className="block">
                     <span className="mb-2 block text-sm font-semibold text-[#245C4F]">Start date</span>
                     <input type="date" value={editForm.startDate} onChange={(event) => setEditForm((current) => ({ ...current, startDate: event.target.value }))} className="w-full rounded-2xl border border-[#2D8A6A]/20 bg-white px-4 py-3 text-sm outline-none focus:border-[#2D8A6A] focus:ring-2 focus:ring-[#FFF5D6]" required />
@@ -1242,14 +1326,18 @@ export default function PublicEventsManagementPage({
                     <span className="mb-2 block text-sm font-semibold text-[#245C4F]">End time</span>
                     <input type="time" value={editForm.endTime} onChange={(event) => setEditForm((current) => ({ ...current, endTime: event.target.value }))} className="w-full rounded-2xl border border-[#2D8A6A]/20 bg-white px-4 py-3 text-sm outline-none focus:border-[#2D8A6A] focus:ring-2 focus:ring-[#FFF5D6]" required />
                   </label>
-                  <label className="block">
-                    <span className="mb-2 block text-sm font-semibold text-[#245C4F]">Registration deadline date</span>
-                    <input type="date" value={editForm.registrationDeadlineDate} onChange={(event) => setEditForm((current) => ({ ...current, registrationDeadlineDate: event.target.value }))} className="w-full rounded-2xl border border-[#2D8A6A]/20 bg-white px-4 py-3 text-sm outline-none focus:border-[#2D8A6A] focus:ring-2 focus:ring-[#FFF5D6]" />
-                  </label>
-                  <label className="block">
-                    <span className="mb-2 block text-sm font-semibold text-[#245C4F]">Registration deadline time</span>
-                    <input type="time" value={editForm.registrationDeadlineTime} onChange={(event) => setEditForm((current) => ({ ...current, registrationDeadlineTime: event.target.value }))} className="w-full rounded-2xl border border-[#2D8A6A]/20 bg-white px-4 py-3 text-sm outline-none focus:border-[#2D8A6A] focus:ring-2 focus:ring-[#FFF5D6]" />
-                  </label>
+                  {editForm.eventType !== "physical" ? (
+                    <>
+                      <label className="block">
+                        <span className="mb-2 block text-sm font-semibold text-[#245C4F]">Registration deadline date</span>
+                        <input type="date" value={editForm.registrationDeadlineDate} onChange={(event) => setEditForm((current) => ({ ...current, registrationDeadlineDate: event.target.value }))} className="w-full rounded-2xl border border-[#2D8A6A]/20 bg-white px-4 py-3 text-sm outline-none focus:border-[#2D8A6A] focus:ring-2 focus:ring-[#FFF5D6]" />
+                      </label>
+                      <label className="block">
+                        <span className="mb-2 block text-sm font-semibold text-[#245C4F]">Registration deadline time</span>
+                        <input type="time" value={editForm.registrationDeadlineTime} onChange={(event) => setEditForm((current) => ({ ...current, registrationDeadlineTime: event.target.value }))} className="w-full rounded-2xl border border-[#2D8A6A]/20 bg-white px-4 py-3 text-sm outline-none focus:border-[#2D8A6A] focus:ring-2 focus:ring-[#FFF5D6]" />
+                      </label>
+                    </>
+                  ) : null}
                   <label className="block md:col-span-2">
                     <span className="mb-2 block text-sm font-semibold text-[#245C4F]">Description</span>
                     <textarea rows={4} value={editForm.description} onChange={(event) => setEditForm((current) => ({ ...current, description: event.target.value }))} className="w-full rounded-2xl border border-[#2D8A6A]/20 bg-white px-4 py-3 text-sm outline-none focus:border-[#2D8A6A] focus:ring-2 focus:ring-[#FFF5D6]" required />
@@ -1311,6 +1399,46 @@ export default function PublicEventsManagementPage({
               </div>
               <div className="max-h-[80vh] overflow-y-auto p-6">
                 <form key={formResetKey} ref={formRef} className="grid gap-4 md:grid-cols-2" onSubmit={handleSubmit}>
+                  <div className="block md:col-span-2">
+                    <span className="mb-2 block text-sm font-semibold text-[#245C4F]">Event Mode</span>
+                    <div className="grid grid-cols-2 gap-3">
+                      <button
+                        type="button"
+                        onClick={() => setForm((c) => ({ ...c, eventType: "online" }))}
+                        className={`flex items-center justify-center gap-2 rounded-2xl border p-3 text-sm font-semibold transition ${
+                          (form.eventType || "online") === "online"
+                            ? "border-[#0D5C48] bg-[#0D5C48] text-white shadow-sm"
+                            : "border-[#2D8A6A]/20 bg-white text-[#245C4F] hover:bg-[#FAF7F0]"
+                        }`}
+                      >
+                        <Video className="h-4 w-4" />
+                        <span>Online (Google Meet)</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setForm((c) => ({ ...c, eventType: "physical" }))}
+                        className={`flex items-center justify-center gap-2 rounded-2xl border p-3 text-sm font-semibold transition ${
+                          form.eventType === "physical"
+                            ? "border-[#0D5C48] bg-[#0D5C48] text-white shadow-sm"
+                            : "border-[#2D8A6A]/20 bg-white text-[#245C4F] hover:bg-[#FAF7F0]"
+                        }`}
+                      >
+                        <MapPin className="h-4 w-4" />
+                        <span>Physical (In-Person)</span>
+                      </button>
+                    </div>
+                  </div>
+                  {form.eventType === "physical" ? (
+                    <label className="block md:col-span-2">
+                      <span className="mb-2 block text-sm font-semibold text-[#245C4F]">Venue / Location</span>
+                      <input
+                        value={form.location || ""}
+                        onChange={(event) => setForm((current) => ({ ...current, location: event.target.value }))}
+                        placeholder="e.g. Ash-Shajrah School Campus, Main Hall, etc."
+                        className="w-full rounded-2xl border border-[#2D8A6A]/20 bg-white px-4 py-3 text-sm outline-none focus:border-[#2D8A6A] focus:ring-2 focus:ring-[#FFF5D6]"
+                      />
+                    </label>
+                  ) : null}
                   <label className="block md:col-span-2">
                     <span className="mb-2 block text-sm font-semibold text-[#245C4F]">Select Event Category</span>
                     <div className="relative">
@@ -1334,16 +1462,20 @@ export default function PublicEventsManagementPage({
                       />
                     </div>
                   </label>
-                  <RegistrationFormBuilder category={form.eventCategory} value={form.registrationFormSchema} onChange={(registrationFormSchema) => setForm((current) => ({ ...current, registrationFormSchema }))} />
+                  {form.eventType !== "physical" ? (
+                    <RegistrationFormBuilder category={form.eventCategory} value={form.registrationFormSchema} onChange={(registrationFormSchema) => setForm((current) => ({ ...current, registrationFormSchema }))} />
+                  ) : null}
                   <EventDays value={form.days} onChange={(days) => setForm((current) => ({ ...current, days }))} />
                   <label className="block">
                     <span className="mb-2 block text-sm font-semibold text-[#245C4F]">Event name</span>
                     <input value={form.title} onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))} className="w-full rounded-2xl border border-[#2D8A6A]/20 bg-white px-4 py-3 text-sm outline-none focus:border-[#2D8A6A] focus:ring-2 focus:ring-[#FFF5D6]" required />
                   </label>
-                  <label className="block">
-                    <span className="mb-2 block text-sm font-semibold text-[#245C4F]">Event fee</span>
-                    <input type="number" min="0" step="0.01" value={form.eventFeeAmount} onChange={(event) => setForm((current) => ({ ...current, eventFeeAmount: event.target.value }))} className="w-full rounded-2xl border border-[#2D8A6A]/20 bg-white px-4 py-3 text-sm outline-none focus:border-[#2D8A6A] focus:ring-2 focus:ring-[#FFF5D6]" required />
-                  </label>
+                  {form.eventType !== "physical" ? (
+                    <label className="block">
+                      <span className="mb-2 block text-sm font-semibold text-[#245C4F]">Event fee</span>
+                      <input type="number" min="0" step="0.01" value={form.eventFeeAmount} onChange={(event) => setForm((current) => ({ ...current, eventFeeAmount: event.target.value }))} className="w-full rounded-2xl border border-[#2D8A6A]/20 bg-white px-4 py-3 text-sm outline-none focus:border-[#2D8A6A] focus:ring-2 focus:ring-[#FFF5D6]" required />
+                    </label>
+                  ) : null}
                   <label className="block">
                     <span className="mb-2 block text-sm font-semibold text-[#245C4F]">Start date</span>
                     <input type="date" value={form.startDate} onChange={(event) => setForm((current) => ({ ...current, startDate: event.target.value }))} className="w-full rounded-2xl border border-[#2D8A6A]/20 bg-white px-4 py-3 text-sm outline-none focus:border-[#2D8A6A] focus:ring-2 focus:ring-[#FFF5D6]" required />
@@ -1360,14 +1492,18 @@ export default function PublicEventsManagementPage({
                     <span className="mb-2 block text-sm font-semibold text-[#245C4F]">End time</span>
                     <input type="time" value={form.endTime} onChange={(event) => setForm((current) => ({ ...current, endTime: event.target.value }))} className="w-full rounded-2xl border border-[#2D8A6A]/20 bg-white px-4 py-3 text-sm outline-none focus:border-[#2D8A6A] focus:ring-2 focus:ring-[#FFF5D6]" required />
                   </label>
-                  <label className="block">
-                    <span className="mb-2 block text-sm font-semibold text-[#245C4F]">Registration deadline date</span>
-                    <input type="date" value={form.registrationDeadlineDate} onChange={(event) => setForm((current) => ({ ...current, registrationDeadlineDate: event.target.value }))} className="w-full rounded-2xl border border-[#2D8A6A]/20 bg-white px-4 py-3 text-sm outline-none focus:border-[#2D8A6A] focus:ring-2 focus:ring-[#FFF5D6]" />
-                  </label>
-                  <label className="block">
-                    <span className="mb-2 block text-sm font-semibold text-[#245C4F]">Registration deadline time</span>
-                    <input type="time" value={form.registrationDeadlineTime} onChange={(event) => setForm((current) => ({ ...current, registrationDeadlineTime: event.target.value }))} className="w-full rounded-2xl border border-[#2D8A6A]/20 bg-white px-4 py-3 text-sm outline-none focus:border-[#2D8A6A] focus:ring-2 focus:ring-[#FFF5D6]" />
-                  </label>
+                  {form.eventType !== "physical" ? (
+                    <>
+                      <label className="block">
+                        <span className="mb-2 block text-sm font-semibold text-[#245C4F]">Registration deadline date</span>
+                        <input type="date" value={form.registrationDeadlineDate} onChange={(event) => setForm((current) => ({ ...current, registrationDeadlineDate: event.target.value }))} className="w-full rounded-2xl border border-[#2D8A6A]/20 bg-white px-4 py-3 text-sm outline-none focus:border-[#2D8A6A] focus:ring-2 focus:ring-[#FFF5D6]" />
+                      </label>
+                      <label className="block">
+                        <span className="mb-2 block text-sm font-semibold text-[#245C4F]">Registration deadline time</span>
+                        <input type="time" value={form.registrationDeadlineTime} onChange={(event) => setForm((current) => ({ ...current, registrationDeadlineTime: event.target.value }))} className="w-full rounded-2xl border border-[#2D8A6A]/20 bg-white px-4 py-3 text-sm outline-none focus:border-[#2D8A6A] focus:ring-2 focus:ring-[#FFF5D6]" />
+                      </label>
+                    </>
+                  ) : null}
                   <label className="block md:col-span-2">
                     <span className="mb-2 block text-sm font-semibold text-[#245C4F]">Description</span>
                     <textarea rows={4} value={form.description} onChange={(event) => setForm((current) => ({ ...current, description: event.target.value }))} className="w-full rounded-2xl border border-[#2D8A6A]/20 bg-white px-4 py-3 text-sm outline-none focus:border-[#2D8A6A] focus:ring-2 focus:ring-[#FFF5D6]" required />

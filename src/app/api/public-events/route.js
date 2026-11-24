@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import prisma from "@/lib/prisma";
 import { createSignedAdmissionDocumentUrl } from "@/lib/supabaseStorage";
 import { formatEventLifecycleStatus } from "@/lib/publicEvents";
@@ -7,11 +8,49 @@ function json(message, status = 200, extra = {}) {
   return NextResponse.json({ message, ...extra }, { status });
 }
 
+
+async function getTableColumns(tableName) {
+  try {
+    const rows = await prisma.$queryRaw`
+      SELECT column_name
+      FROM information_schema.columns
+      WHERE table_schema = 'public'
+        AND table_name = ${tableName}
+    `;
+    return new Set(rows.map((row) => String(row.column_name || "").toLowerCase()));
+  } catch {
+    return new Set();
+  }
+}
+
+let publicEventsColumnsEnsured = false;
+async function ensurePublicEventsColumns() {
+  if (publicEventsColumnsEnsured) return;
+  try {
+    await prisma.$executeRawUnsafe(`
+      ALTER TABLE public_events ADD COLUMN IF NOT EXISTS event_type VARCHAR(50) DEFAULT 'online';
+      ALTER TABLE public_events ADD COLUMN IF NOT EXISTS location TEXT;
+    `);
+    publicEventsColumnsEnsured = true;
+  } catch {
+    // Graceful fallback if database permissions disallow DDL
+  }
+}
+
 export async function GET() {
   try {
+    await ensurePublicEventsColumns();
+    const columns = await getTableColumns("public_events");
+    const hasEventType = columns.has("event_type");
+    const hasLocation = columns.has("location");
+    const eventTypeExpr = hasEventType ? Prisma.sql`COALESCE(pe.event_type, 'online') AS event_type,` : Prisma.sql`'online' AS event_type,`;
+    const locationExpr = hasLocation ? Prisma.sql`COALESCE(pe.location, '') AS location,` : Prisma.sql`'' AS location,`;
+
     const rows = await prisma.$queryRaw`
       SELECT
         pe.id::text AS id,
+        ${eventTypeExpr}
+        ${locationExpr}
         pe.title,
         pe.description,
         pe.meet_link,

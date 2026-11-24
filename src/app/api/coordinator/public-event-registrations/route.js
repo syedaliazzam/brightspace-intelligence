@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { auth } from "@/lib/auth";
 import prisma from "@/lib/prisma";
 import { formatRegistrationStatusLabel } from "@/lib/publicEvents";
@@ -9,6 +10,20 @@ function json(message, status = 200, extra = {}) {
   return NextResponse.json({ message, ...extra }, { status });
 }
 
+async function getTableColumns(tableName) {
+  try {
+    const rows = await prisma.$queryRaw`
+      SELECT column_name
+      FROM information_schema.columns
+      WHERE table_schema = 'public'
+        AND table_name = ${tableName}
+    `;
+    return new Set(rows.map((row) => String(row.column_name || "").toLowerCase()));
+  } catch {
+    return new Set();
+  }
+}
+
 export async function GET() {
   const session = await auth();
   const role = String(session?.user?.role || "").toLowerCase();
@@ -17,6 +32,10 @@ export async function GET() {
   if (!ALLOWED_ROLES.has(role)) return json("Forbidden.", 403);
 
   try {
+    const columns = await getTableColumns("public_events");
+    const hasEventType = columns.has("event_type");
+    const eventTypeExpr = hasEventType ? Prisma.sql`COALESCE(pe.event_type, 'online') AS event_type,` : Prisma.sql`'online' AS event_type,`;
+
     const items = await prisma.$queryRaw`
       SELECT
         per.id::text AS id,
@@ -66,8 +85,10 @@ export async function GET() {
         COALESCE(pe.schedule_days, '[]'::jsonb) AS schedule_days,
         COALESCE(pe.registration_form_schema, '[]'::jsonb) AS registration_form_schema,
         LOWER(COALESCE(pe.publication_status::text, 'draft')) AS publication_status,
+        ${eventTypeExpr}
         pe.created_at
       FROM public_events pe
+      ${hasEventType ? Prisma.sql`WHERE COALESCE(pe.event_type, 'online') != 'physical'` : Prisma.empty}
       ORDER BY pe.start_at DESC NULLS LAST, pe.created_at DESC NULLS LAST
     `;
 
